@@ -48,6 +48,12 @@ public sealed class BrowserTabRoutingTests
     }
 
     [Theory]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":0}""", true)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":null}""", true)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord"}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"wine","value":0.5}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1e999}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1.01}""", false)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":0.4}""", true)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":false,"value":0}""", true)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":null}""", true)]
@@ -736,6 +742,7 @@ public sealed class BrowserTabRoutingTests
                 echo "$*" >> "$dir/calls"
                 case "$*" in
                   move-sink-input\ *) [ ! -e "$dir/refuse-moves" ] || exit 0 ;;
+                  set-sink-input-volume\ *) [ ! -e "$dir/refuse-volumes" ] || exit 1 ;;
                 esac
                 case "$*" in
                   'list sinks short') printf '1\tOpenXLR_ch_system\n2\tOpenXLR_ch_music\n3\tdesktop\n' ;;
@@ -766,6 +773,36 @@ public sealed class BrowserTabRoutingTests
         }
 
         public void RefuseMoves() => File.WriteAllText(Path.Combine(_directory, "refuse-moves"), "");
+
+        /// <summary>Make the sound server refuse stream volume writes, or take them again.</summary>
+        public void RefuseVolumes(bool refuse = true)
+        {
+            string path = Path.Combine(_directory, "refuse-volumes");
+            if (refuse) File.WriteAllText(path, "");
+            else File.Delete(path);
+        }
+
+        /// <summary>
+        /// Replace the registry with these playback nodes, all on the Music
+        /// sink, and have <paramref name="mixer"/> read it afresh.
+        /// </summary>
+        public void SetStreams(Mixer mixer, params string[] nodes)
+        {
+            File.WriteAllText(Path.Combine(_directory, "streams"), "[" + string.Join(",", nodes) + "]");
+            File.WriteAllText(Path.Combine(_directory, "inputs"), string.Concat(nodes.Select(node =>
+                System.Text.RegularExpressions.Regex.Match(node, "\"object.serial\":(\\d+)").Groups[1].Value + "\t2\n")));
+            var adapter = (PipeWireAdapter)typeof(Mixer).GetField("_pw", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(mixer)!;
+            typeof(PipeWireAdapter).GetMethod("InvalidateDump", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(adapter, null);
+        }
+
+        /// <summary>A playback node at a desktop percentage, or without a level of its own.</summary>
+        public static string Node(int id, int serial, string props, int? percent = 100)
+        {
+            string level = percent is int p
+                ? FormattableString.Invariant($",\"params\":{{\"Props\":[{{\"channelVolumes\":[{Math.Pow(p / 100.0, 3):R},{Math.Pow(p / 100.0, 3):R}],\"mute\":false}}]}}")
+                : "";
+            return FormattableString.Invariant($"{{\"id\":{id},\"type\":\"PipeWire:Interface:Node\",\"info\":{{\"props\":{{\"object.serial\":{serial},\"media.class\":\"Stream/Output/Audio\",{props}}}{level}}}}}");
+        }
 
         public void AddElectronStream()
         {

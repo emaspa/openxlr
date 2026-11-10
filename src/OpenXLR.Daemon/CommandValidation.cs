@@ -279,6 +279,9 @@ public static class CommandValidation
             case "assignStream":
                 if (cmd.Channel is not null && !IsChannelOrIgnore(layout, cmd.Channel)) return $"assignStream: unknown channel '{Short(cmd.Channel)}'";
                 return null;
+            case "setAppVolume":
+                if (!Mixer.ValidAppVolumeIdentity(cmd.Identity)) return "setAppVolume: supply a valid application identity";
+                return PlaybackVolume(cmd);
             case "setBrowserTabVolume":
                 if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "setBrowserTabVolume: supply a browser session and tabId";
                 if (BrowserTabRouting.CanonicalSite(cmd.Site) is null) return "setBrowserTabVolume: supply the tab's HTTP or HTTPS origin";

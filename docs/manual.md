@@ -1014,6 +1014,41 @@ routing. A remembered routing change is sent when you choose a different
 channel. When the mixer stops supplying an app list, both the APPLICATIONS
 card and the Manage list clear their stale entries.
 
+Select **Vol.** or the percentage beside a program's channel picker to
+adjust its playback volume from 0 to 100%. The same control in **Manage**
+works for remembered programs that are closed. OpenXLR uses the playback
+streams published through PipeWire. Audio that bypasses PipeWire does not
+appear here. This level applies to the
+program's playback streams, before the channel and its sends. Two apps
+can share one channel and still have different levels. A program marked
+**Not managed** can also have a saved volume. In the terminal mixer's
+Apps tab, `-` and `+` change the level by five points, `[` and `]` by
+one, and `r` resets it.
+
+The level is the program's stream volume, the one the desktop's volume
+control shows for that program. Moving the slider changes what plays at
+once. OpenXLR saves the level, gives it to every stream the program starts
+later and keeps it across daemon restarts. When you move the program in
+the desktop's volume control, or the program moves its own stream, the
+saved level follows it. A program with nothing saved starts the slider at
+the level it plays at, and its button shows that level when it is below
+100%. **Reset** or **Forget** clears the saved level and puts the program
+back to 100%. The saved level is machine state and profiles leave it in
+place.
+
+The session manager remembers stream volumes too, under the name a program
+gives PipeWire, and restores one to each new stream. Programs built on one
+runtime can share that name, as some Electron programs do. OpenXLR writes
+a saved level over the restored one as soon as the stream appears, so a
+stream can start at another program's level for a moment. A program with
+nothing saved in OpenXLR keeps what the session manager restored, which
+can be the level you set for another program of that name. Its button
+shows the level, and saving one for it settles it.
+
+The browser's application level still applies when individual Chromium
+tab routing is enabled. Set each captured tab or installed web app's
+relative level under **Browser tabs**. See [Browser tab routing](browser-routing.md).
+
 An app's playback streams and audio client share the same identity even
 when PipeWire puts the process name only on the client. Windows executable
 names such as `Balatro.exe` use the same normalized key as their Wine or
@@ -5806,6 +5841,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Outputs, on a sink | Space, Left/Right, Enter | select the sink, choose its feed (a summed feed asks for a second press), or make it the main output |
 | Outputs, on a sink | `-`, `+`, `m` | change its volume or toggle its mute |
 | Apps | Left/Right, `i`, `f` | assign a channel, leave routing to the desktop, or forget the assignment |
+| Apps | `-`, `+`, `[`, `]`, `r` | lower or raise the application's playback volume by five points or by one, or reset it to 100% |
 | Inserts | Space, Ctrl+Up/Down, `d`, `e` | bypass, reorder, remove, or open the plugin's native editor, with generated controls when blocked or refused |
 | Inserts | `a` | add a plugin: the picker lists plugins that fit the reported chain width: mono for a microphone, stereo for a capture pair or mix |
 | Plugin picker | letters and digits, Backspace, Up/Down, Enter, Escape | narrow the list by name, category or format; choose; add the plugin after the chain's last one; go back. While the picker is open `q` and the digits are filter text |

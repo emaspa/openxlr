@@ -1659,6 +1659,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 MonitorOutputLabels = new Dictionary<string, string>(_monitorOutputLabels, StringComparer.Ordinal),
                 AppOverrides = new Dictionary<string, string>(Matcher.Overrides),
+                AppVolumes = new Dictionary<string, double>(_appVolumes, StringComparer.OrdinalIgnoreCase),
                 RouteAppsByDefault = Matcher.RouteByDefault,
                 BlockSize = _blockSize,
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
@@ -1739,6 +1740,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             SetRouteAppsByDefault(s.RouteAppsByDefault);
             SetBlockSize(s.BlockSize);
             RestoreBrowserSettingsLocked(s);
+            _appVolumes = SavedMixerValidation.AppVolumes(s.AppVolumes, null);
+            _hasAppVolumes = _appVolumes.Count > 0;
             SetMonitorMuteMicrophones(s.MonitorMuteMicrophones);
             _outputVolumeLock = s.OutputVolumeLock;
             _outputVolumeLockRetryAt = 0;
@@ -3282,14 +3285,17 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
         lock (_gate)
         {
-            var seen = new HashSet<int>();
+            if (!_built) return false;
+            var seen = new Dictionary<int, (AudioStream Stream, string Identity)>(live.Count);
+            var latestByApp = new Dictionary<string, AudioStream>(StringComparer.OrdinalIgnoreCase);
             _browserIdentities.Clear();
             foreach (AudioStream source in live.Concat(clients))
                 if (BrowserTabRouting.IsChromium(source.Binary)) _browserIdentities.Add(source.Identity);
             foreach (AudioStream s in live)
             {
                 string identity = s.Identity;
-                seen.Add(s.Id);
+                seen[s.Id] = (s, identity);
+                latestByApp[identity] = s;
                 bool browser = BrowserTabRouting.IsChromium(s.Binary);
                 if (_streams.TryGetValue(s.Id, out StreamAssignment? previous))
                 {
@@ -3388,11 +3394,14 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 changed = true;
             }
 
-            foreach (int gone in _streams.Keys.Where(k => !seen.Contains(k)).ToList())
+            foreach (int gone in _streams.Keys.Where(k => !seen.ContainsKey(k)).ToList())
             {
                 _streams.Remove(gone);
                 changed = true;
             }
+
+            // A route can still be pending while its playback level is editable.
+            changed |= SyncAppVolumesLocked(live);
 
             // Every running audio-capable app is listed even before it plays:
             // PipeWire clients cover "running", streams cover "playing".
@@ -3431,9 +3440,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // An app keeps the icon it was last seen with once it stops.
             foreach ((string identity, StreamAssignment app) in _apps.ToList())
             {
-                AudioStream? stream = live.FirstOrDefault(s => s.Id == app.Id && s.Serial == app.Serial
-                    && string.Equals(s.Identity, identity, StringComparison.OrdinalIgnoreCase))
-                    ?? live.LastOrDefault(s => string.Equals(s.Identity, identity, StringComparison.OrdinalIgnoreCase));
+                AudioStream? stream = seen.TryGetValue(app.Id, out var current) && current.Stream.Serial == app.Serial
+                    && string.Equals(current.Identity, identity, StringComparison.OrdinalIgnoreCase)
+                    ? current.Stream : latestByApp.GetValueOrDefault(identity);
                 bool activeNow = stream is not null;
                 bool runningNow = activeNow || runningIdentities.Contains(identity);
                 string? icon = icons.GetValueOrDefault(identity) ?? app.Icon
@@ -3511,6 +3520,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             identity = StreamMatcher.MigrateIdentity(identity);
             _apps.Remove(identity);
+            ResetAppVolumeLocked(identity);
             Matcher.RemoveOverride(identity);
             foreach ((int id, StreamAssignment placed) in _streams.ToList())
                 if (string.Equals(placed.Identity, identity, StringComparison.OrdinalIgnoreCase))
@@ -3673,8 +3683,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 EnforcedDefaultSink = _enforcedSink,
                 EnforcedDefaultSource = _enforcedSource,
                 AuxPortEnabled = _auxPortEnabled,
+                AppVolumeSupported = true,
                 Streams = [.. _apps.Values
-                    .Select(a => a with { Label = _icons.DisplayName(a.Label) })
+                    .Select(a => a with { Label = _icons.DisplayName(a.Label),
+                        Volume = _appVolumes.TryGetValue(AppVolumeKey(a.Identity), out double level) ? level : null,
+                        LiveVolume = _appLiveVolumes.TryGetValue(AppVolumeKey(a.Identity), out double playing) ? playing : null })
                     .OrderByDescending(a => a.Active).ThenBy(a => a.Label, StringComparer.OrdinalIgnoreCase)],
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
                 RouteAppsByDefault = Matcher.RouteByDefault,

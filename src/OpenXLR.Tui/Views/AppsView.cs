@@ -3,7 +3,8 @@ namespace OpenXLR.Tui;
 /// <summary>
 /// The applications the daemon has placed on channels: every live stream, the
 /// channel it plays into, and the keys to move it. A move is remembered for
-/// the application, which is what the window's Manage list does.
+/// the application, which is what the window's Manage list does. Each has a
+/// playback volume too, the one the UI's volume button sets.
 /// </summary>
 internal sealed class AppsView : View
 {
@@ -11,7 +12,7 @@ internal sealed class AppsView : View
 
     public override string Title => "Apps";
 
-    public override string Keys => "Space toggle  Left/Right channel  i ignore  f forget";
+    public override string Keys => "Space toggle  Left/Right channel  -/+ volume  r reset volume  i ignore  f forget";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
@@ -64,13 +65,36 @@ internal sealed class AppsView : View
                 "ignore" => "left to the desktop",
                 _ => state.Mixer.Channels.FirstOrDefault(entry => entry.Id == stream.ChannelId)?.Name ?? stream.ChannelId,
             };
+            // The saved level reads like any value; without one, the level
+            // the desktop left the application at is shown muted.
+            bool levels = state.Mixer.AppVolumeSupported && width >= 40;
             screen.Text(x + 2, y, channel, focused ? theme.TextPrimary : theme.TextDetail, back,
-                bold: focused, maxWidth: Math.Max(4, width - 20));
+                bold: focused, maxWidth: Math.Max(4, width - (levels ? 26 : 20)));
+            if (levels && (stream.Volume ?? stream.LiveVolume) is double level)
+                screen.Text(x + width - 24, y, $"{level * 100:0}%".PadLeft(4),
+                    stream.Volume is null ? theme.TextMuted : focused ? theme.TextPrimary : theme.TextDetail, back, maxWidth: 4);
             screen.Text(x + Math.Max(6, width - 18), y, stream.Identity, theme.TextMuted, back, maxWidth: 18);
         }
 
         public override bool Handle(KeyPress key)
         {
+            if (state.Mixer.AppVolumeSupported && key.Key == Key.Char)
+                switch (key.Char)
+                {
+                    case '-' or '_': Level(-0.05); return true;
+                    case '+' or '=': Level(0.05); return true;
+                    case '[': Level(-0.01); return true;
+                    case ']': Level(0.01); return true;
+                    case 'r':
+                        if (stream.Volume is null) return true;
+                        app.Link.Send("setAppVolume", body =>
+                        {
+                            body["identity"] = stream.Identity;
+                            body["value"] = null;
+                        });
+                        app.Say($"{Label} plays at full volume again");
+                        return true;
+                }
             if (targets.Count == 0) return false;
             int at = targets.FindIndex(channel => channel.Id == stream.ChannelId);
 
@@ -92,6 +116,19 @@ internal sealed class AppsView : View
                 default:
                     return false;
             }
+        }
+
+        // A step starts from the saved level, or from what the application plays at.
+        private void Level(double by)
+        {
+            double from = stream.Volume ?? stream.LiveVolume ?? 1;
+            double to = Math.Round(Math.Clamp(from + by, 0, 1), 2);
+            if (to == Math.Round(from, 2)) return;
+            app.Link.Send("setAppVolume", body =>
+            {
+                body["identity"] = stream.Identity;
+                body["value"] = to;
+            });
         }
 
         private void Assign(string channel) =>

@@ -525,6 +525,14 @@
                     "value": true
                   }
                 },
+                "setApplicationVolume": {
+                  "summary": "Save a playback level for a known application",
+                  "value": {
+                    "cmd": "setAppVolume",
+                    "identity": "discord",
+                    "value": 0.45
+                  }
+                },
                 "setBrowserTabVolume": {
                   "summary": "Save a playback level for a routed browser tab's website",
                   "value": {

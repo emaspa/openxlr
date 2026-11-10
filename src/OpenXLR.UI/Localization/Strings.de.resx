@@ -2397,6 +2397,12 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Wiedergabelautstärke</value>
   </data>
+  <data name="AppPlaybackVolumeHint" xml:space="preserve">
+    <value>Ändere den Pegel dieses Programms vor dem Mix. Er folgt dem Lautstärkeregler des Desktops, und Zurücksetzen stellt das Programm wieder auf volle Lautstärke.</value>
+  </data>
+  <data name="BrowserPlaybackVolumeHint" xml:space="preserve">
+    <value>Das regelt den gesamten Browser. Unter Browser-Tabs kannst du geroutete Tabs und Web-Apps einzeln einstellen.</value>
+  </data>
   <data name="TabPlaybackVolumeHint" xml:space="preserve">
     <value>Der Pegel gilt, sobald die Erweiterung diesen Tab routet.</value>
   </data>

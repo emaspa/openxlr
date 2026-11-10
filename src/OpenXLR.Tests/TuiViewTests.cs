@@ -108,6 +108,52 @@ public sealed class TuiViewTests
     }
 
     [Theory]
+    [InlineData(null, null, '-', 0.95)]
+    [InlineData(null, 0.6, '-', 0.55)]
+    [InlineData(null, 0.6, ']', 0.61)]
+    [InlineData(0.35, 0.6, '+', 0.4)]
+    [InlineData(0.35, null, '[', 0.34)]
+    [InlineData(0.02, null, '-', 0.0)]
+    [InlineData(0.35, null, 'r', null)]
+    public void AppsStepAndResetAnApplicationVolume(double? saved, double? live, char key, double? expected)
+    {
+        (App app, List<string> sent) = Ready(tab: 4);
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["appVolumeSupported"] = true;
+        state["mixer"]!["streams"]![0]!["volume"] = saved;
+        state["mixer"]!["streams"]![0]!["liveVolume"] = live;
+        app.Link.Receive(state.ToJsonString());
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        app.Handle(new KeyPress(Key.Down));   // from the auto-route switch, when shown, to Spotify
+        app.Handle(new KeyPress(Key.Down));
+        app.Handle(new KeyPress(Key.Char, key));
+        JsonElement command = Command(sent);
+        Assert.Equal("setAppVolume", Text(command, "cmd"));
+        Assert.Equal("spotify", Text(command, "identity"));
+        if (expected is double level) Assert.Equal(level, command.GetProperty("value").GetDouble(), 3);
+        else Assert.Equal(JsonValueKind.Null, command.GetProperty("value").ValueKind);
+    }
+
+    [Fact]
+    public void AppsLeaveVolumeKeysAloneOnAnOlderDaemonAndWhenNothingIsSaved()
+    {
+        (App app, List<string> sent) = Ready(tab: 4);
+        app.Handle(new KeyPress(Key.Down));
+        app.Handle(new KeyPress(Key.Down));
+        app.Handle(new KeyPress(Key.Char, '-'));
+        Assert.Empty(sent);
+
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["mixer"]!["appVolumeSupported"] = true;
+        app.Link.Receive(state.ToJsonString());
+        app.Draw(new Screen(140, 36));
+        app.Handle(new KeyPress(Key.Char, 'r'));   // nothing saved, nothing to reset
+        app.Handle(new KeyPress(Key.Char, '+'));   // already at full volume
+        Assert.Empty(sent);
+    }
+
+    [Theory]
     [InlineData(null, true, 256)]
     [InlineData(1024, true, null)]
     [InlineData(null, false, 1024)]

@@ -49,6 +49,7 @@ internal static class SavedMixerValidation
             MonitorOutputLabels = Mapping(settings.MonitorOutputLabels, "monitorOutputLabels", notes),
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
             BrowserSiteChannels = BrowserSites(settings.BrowserSiteChannels, notes),
+            AppVolumes = AppVolumes(settings.AppVolumes, notes),
             BrowserSiteVolumes = SiteVolumes(settings.BrowserSiteVolumes, notes),
             KnownApps = Apps(settings.KnownApps, notes),
             Inserts = Inserts(settings, notes),
@@ -251,6 +252,20 @@ internal static class SavedMixerValidation
         if (entries is null) { notes.Add($"{field}: {NullEntry}"); return []; }
         var kept = entries.Where(pair => pair.Value is not null).ToDictionary();
         if (kept.Count != entries.Count) notes.Add($"{field}: {NullEntry}");
+        return kept;
+    }
+
+    internal static Dictionary<string, double> AppVolumes(IReadOnlyDictionary<string, double>? entries, List<string>? notes)
+    {
+        var kept = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        const string field = "appVolumes";
+        if (entries is null) notes?.Add($"{field}: {NullEntry}");
+        foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
+        {
+            if (Mixer.ValidAppVolumeIdentity(key) && Mixer.ValidPlaybackVolume(volume) && kept.Count < Mixer.MaxAppOverrides)
+                kept.TryAdd(Mixer.AppVolumeKey(key), Math.Round(volume * 100) / 100);
+            else if (notes is not null && !notes.Contains(field)) notes.Add(field);
+        }
         return kept;
     }
 

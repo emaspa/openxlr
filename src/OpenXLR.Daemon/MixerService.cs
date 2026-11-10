@@ -829,7 +829,12 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     private void BuildGraph(string? output, StartupDefaults before)
     {
-        _graphWatch ??= _pipeWire.WatchGraph(note => _log.LogInformation("{msg}", note));
+        if (_graphWatch is null)
+        {
+            _graphWatch = _pipeWire.WatchGraph(note => _log.LogInformation("{msg}", note));
+            _pipeWire.PlaybackStreamArrived -= OnPlaybackStreamArrived;
+            _pipeWire.PlaybackStreamArrived += OnPlaybackStreamArrived;
+        }
         MixerSettings? saved = MixerSettings.Load(MixerSettings.DefaultPath, out string? settingsWarning);
         if (settingsWarning is not null)
             _log.LogWarning("mixer settings: {warning}{fallback}", settingsWarning, saved is null ? "; starting with defaults" : "");
@@ -1055,6 +1060,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     string.Join(", ", reloadedChannels));
             stop.ThrowIfCancellationRequested();
             bool changed = _mixer.SyncStreams();
+            // A level the desktop or the program moved is a setting too.
+            if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
             if (_mixer.MigrateCaptureInputs(source => _devices.SupportedUnitFor(source)?.Id))
             {
                 ScheduleSave();
@@ -1209,6 +1216,31 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 (int)StopBudget.TotalSeconds, _pipeWire.ModulesLeft == 0 ? ""
                     : $" and {_pipeWire.ModulesLeft} OpenXLR module(s) stay loaded until the next start removes them");
         Interlocked.Exchange(ref _graphWatch, null)?.Dispose();
+    }
+
+    private int _streamVolumePass;
+
+    // A new playback stream gets its application's saved level now, not on
+    // the next sweep. The registry reader only hands the work on; one pass
+    // runs at a time and takes every stream that arrived meanwhile.
+    private void OnPlaybackStreamArrived()
+    {
+        if (_stopping.IsCancellationRequested || Interlocked.Exchange(ref _streamVolumePass, 1) != 0) return;
+        _ = Task.Run(() =>
+        {
+            Interlocked.Exchange(ref _streamVolumePass, 0);
+            try
+            {
+                if (_stopping.IsCancellationRequested) return;
+                bool changed = _mixer.SyncAppVolumes();
+                if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
+                if (changed) Changed?.Invoke();
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException or ObjectDisposedException)
+            {
+                _log.LogDebug("stream volume pass: {msg}", ex.Message);
+            }
+        });
     }
 
     public string OpenBrowserSession(Guid owner) => _mixer.OpenBrowserSession(owner);
@@ -1572,6 +1604,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 case "assignApp":
                     if (cmd.Channel is null || cmd.Identity is null) return "assignApp: need 'channel' and 'identity'";
                     _mixer.AssignApp(cmd.Identity, cmd.Channel, cmd.Label);
+                    break;
+                case "setAppVolume":
+                    // A fader: written to the playing streams now, saved with the next debounced write.
+                    _mixer.SetAppVolume(cmd.Identity!,
+                        cmd.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetDouble());
                     break;
                 case "forgetApp":
                     if (cmd.Identity is null) return "forgetApp: need 'identity'";
