@@ -261,17 +261,35 @@ public sealed partial class MonitorVolumeIntegrationTests
     /// the chosen node gets 3000 over the packaged 2200, and a node of the
     /// same card on another profile and another device keep their numbers.
     /// WirePlumber 0.4 reads Lua rules instead and is not checked.
+    ///
+    /// The second WirePlumber gets a PipeWire of its own. On the shared
+    /// servers it exported its own settings metadata, the harness's
+    /// WirePlumber bound it, and PipeWire 1.6.2 (the CI runners') holds a
+    /// binding client busy until the exporter answers a ping. When the
+    /// exporter exited first, the harness's WirePlumber stayed busy for
+    /// good: PipeWire stopped reading its requests, so no new client was
+    /// given permissions and every later pactl, pw-cli and pw-dump waited
+    /// until it timed out. PipeWire 1.6.9 clears the flag (issue 5445).
     /// </summary>
     [MonitorPipeWireFact]
-    public void WirePlumberGivesTheChosenNodeTheRulesPriority()
+    public async Task WirePlumberGivesTheChosenNodeTheRulesPriority()
     {
         if (!ProcessRunner.Run("wireplumber", ["--help"]).StdoutText.Contains("--profile", StringComparison.Ordinal)) return;
         const string chosen = "alsa_input.usb-Elgato_Elgato_Wave_3_MK.2_AD0JH55014KSN3-00.analog-stereo";
         const string other = "alsa_input.usb-Elgato_Elgato_Wave_3_MK.2_AD0JH55014KSN3-00.pro-input-0";
         const string card = "alsa_input.usb-Elgato_Elgato_4K_X_ABCDEF-02.analog-stereo";
         string directory = Directory.CreateTempSubdirectory("openxlr-clock-wireplumber-").FullName;
+        string runtime = Directory.CreateDirectory(Path.Combine(directory, "run")).FullName;
+        var own = new Dictionary<string, string> { ["XDG_RUNTIME_DIR"] = runtime, ["PIPEWIRE_RUNTIME_DIR"] = runtime };
+        using var stop = new CancellationTokenSource();
+        Task<ProcessResult> server = ProcessRunner.RunAsync("pipewire", [], TimeSpan.FromSeconds(60), cancel: stop.Token,
+            environment: own, removeEnvironment: ["PIPEWIRE_REMOTE"]);
         try
         {
+            Assert.True(SpinWait.SpinUntil(() => File.Exists(Path.Combine(runtime, "pipewire-0")) || server.IsCompleted,
+                TimeSpan.FromSeconds(10)), "the check's own PipeWire did not start");
+            if (server.IsCompleted) Assert.Fail("the check's own PipeWire exited: " + (await server).Stderr);
+            var environment = new Dictionary<string, string>(own);
             string config = Path.Combine(directory, "config"), data = Path.Combine(directory, "data");
             string fragments = Path.Combine(config, "wireplumber", "wireplumber.conf.d");
             AudioClockRule.Save(chosen, Path.Combine(fragments, AudioClockRule.FileName));
@@ -301,9 +319,11 @@ public sealed partial class MonitorVolumeIntegrationTests
                   Log.warning ("CLOCKCHECK " .. name .. " " .. tostring (props["priority.driver"]))
                 end
                 """);
+            environment["XDG_CONFIG_HOME"] = config;
+            environment["XDG_DATA_HOME"] = data;
+            environment["XDG_STATE_HOME"] = Path.Combine(directory, "state");
             ProcessResult run = ProcessRunner.Run("wireplumber", ["--profile", "clockcheck"], TimeSpan.FromSeconds(4),
-                environment: new Dictionary<string, string> { ["XDG_CONFIG_HOME"] = config, ["XDG_DATA_HOME"] = data,
-                    ["XDG_STATE_HOME"] = Path.Combine(directory, "state") });
+                environment: environment, removeEnvironment: ["PIPEWIRE_REMOTE"]);
             string log = run.StdoutText + run.Stderr;
             Assert.Contains($"CLOCKCHECK {chosen} {AudioClockRule.PriorityDriver}", log);
             Assert.Contains($"CLOCKCHECK {other} 2109", log);
@@ -312,11 +332,19 @@ public sealed partial class MonitorVolumeIntegrationTests
             // Automatic: the packaged rule's number again.
             AudioClockRule.Save(null, Path.Combine(fragments, AudioClockRule.FileName));
             run = ProcessRunner.Run("wireplumber", ["--profile", "clockcheck"], TimeSpan.FromSeconds(4),
-                environment: new Dictionary<string, string> { ["XDG_CONFIG_HOME"] = config, ["XDG_DATA_HOME"] = data,
-                    ["XDG_STATE_HOME"] = Path.Combine(directory, "state") });
+                environment: environment, removeEnvironment: ["PIPEWIRE_REMOTE"]);
             Assert.Contains($"CLOCKCHECK {chosen} 2200", run.StdoutText + run.Stderr);
+
+            // The shared servers still let a new client in.
+            Assert.True(ProcessRunner.Run("pw-cli", ["info", "0"]).Ok, "PipeWire no longer answers a new client");
+            Assert.True(ProcessRunner.Run("pactl", ["info"]).Ok, "pipewire-pulse no longer answers a new client");
         }
-        finally { Directory.Delete(directory, true); }
+        finally
+        {
+            stop.Cancel();
+            await server;
+            Directory.Delete(directory, true);
+        }
 
         static string RepositoryRoot()
         {
