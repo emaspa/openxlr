@@ -11,7 +11,7 @@ public sealed partial class Mixer
     public static bool ValidAppVolumeIdentity(string? identity)
         => identity is { Length: > 0 and <= MaxAppVolumeIdentityLength }
             && !string.IsNullOrWhiteSpace(identity) && !identity.Any(char.IsControl)
-            && !PipeWireAdapter.IsPlumbingIdentity(StreamMatcher.MigrateIdentity(identity));
+            && !PipeWireAdapter.IsPlumbingIdentity(identity);
 
     internal static bool ValidPlaybackVolume(double volume) => volume is >= 0 and <= 1;
 
@@ -20,7 +20,6 @@ public sealed partial class Mixer
         if (!ValidAppVolumeIdentity(identity)) throw new ArgumentException("invalid application identity");
         if (volume is double level && !ValidPlaybackVolume(level))
             throw new ArgumentOutOfRangeException(nameof(volume), "playback volume must be between 0 and 1");
-        identity = StreamMatcher.MigrateIdentity(identity);
         lock (_gate)
         {
             if (!_apps.ContainsKey(identity))

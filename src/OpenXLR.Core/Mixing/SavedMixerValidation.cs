@@ -253,7 +253,7 @@ internal static class SavedMixerValidation
         foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
         {
             string? name = sites ? BrowserTabRouting.CanonicalSite(key)
-                : Mixer.ValidAppVolumeIdentity(key) ? StreamMatcher.MigrateIdentity(key) : null;
+                : Mixer.ValidAppVolumeIdentity(key) ? key : null;
             if (name is not null && Mixer.ValidPlaybackVolume(volume) && kept.Count < limit)
                 kept.TryAdd(name, Math.Round(volume * 100) / 100);
             else if (notes is not null && !notes.Contains(field)) notes.Add(field);

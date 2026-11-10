@@ -1785,7 +1785,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // an app does not appear twice after its binary was updated.
             foreach (SavedApp app in s.KnownApps)
             {
-                string identity = StreamMatcher.MigrateIdentity(Sanitize(app.Identity));
+                // Volume preferences use the exact published key. A name
+                // with spaces can belong to a different app from its legacy alias.
+                bool exactIdentity = _appVolumes.ContainsKey(app.Identity);
+                string identity = exactIdentity ? app.Identity : StreamMatcher.MigrateIdentity(Sanitize(app.Identity));
                 if (PipeWireAdapter.IsPlumbingIdentity(identity)) continue;   // pre-filter leftovers
                 // A label saved from a helper stream's identifier reads as
                 // the application's own name, as a live stream's now does.
@@ -1796,7 +1799,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 // Saved before WebKitGTK applications were told apart: the
                 // shared web process was the identity, and the label names
                 // the application that was playing. The choice goes with it.
-                if (StreamMatcher.IsWebKitProcess(identity) && label.Length > 0 && !StreamMatcher.IsWebKitProcess(label))
+                if (!exactIdentity && StreamMatcher.IsWebKitProcess(identity) && label.Length > 0 && !StreamMatcher.IsWebKitProcess(label))
                 {
                     if (Matcher.Overrides.TryGetValue(identity, out string? shared)) Matcher.SetOverride(label, shared);
                     identity = label;
@@ -3512,7 +3515,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
-            identity = StreamMatcher.MigrateIdentity(identity);
+            if (!_apps.ContainsKey(identity) && !_appVolumes.ContainsKey(identity))
+                identity = StreamMatcher.MigrateIdentity(identity);
             _apps.Remove(identity);
             if (_appVolumes.Remove(identity)) ClearAppliedAppVolumeLocked(identity);
             Matcher.RemoveOverride(identity);

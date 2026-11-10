@@ -471,15 +471,15 @@ public static class CommandValidation
         }
     }
 
+    private static string? PlaybackVolume(Command cmd)
+        => cmd.Value.ValueKind == JsonValueKind.Null ? null
+            : Finite(cmd, "value") ?? (Mixer.ValidPlaybackVolume(cmd.Value.GetDouble()) ? null : $"{cmd.Cmd}: volume must be between 0 and 1");
+
     /// <summary>
     /// What an EQ command acts on: a microphone or capture input as <c>channel</c>, or, where
     /// <paramref name="mixAllowed"/>, any mix of the layout as <c>mix</c>.
     /// Exactly one of the two. Null when the target is right.
     /// </summary>
-    private static string? PlaybackVolume(Command cmd)
-        => cmd.Value.ValueKind == JsonValueKind.Null ? null
-            : Finite(cmd, "value") ?? (Mixer.ValidPlaybackVolume(cmd.Value.GetDouble()) ? null : $"{cmd.Cmd}: volume must be between 0 and 1");
-
     private static string? EqTarget(Command cmd, ILayoutInfo layout, bool mixAllowed)
     {
         if (cmd.Channel is not null && cmd.Mix is not null) return $"{cmd.Cmd}: give 'channel' or 'mix', not both";

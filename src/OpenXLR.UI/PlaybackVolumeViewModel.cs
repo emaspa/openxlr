@@ -7,7 +7,7 @@ namespace OpenXLR.UI;
 /// <summary>Volume flyout shared by the application and browser tab lists.</summary>
 public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> send, bool website = false) : ViewModelBase
 {
-    private sealed record Choice(double? Level, bool Remember);
+    private readonly record struct Choice(double? Level, bool Remember);
 
     private readonly string _key = Guid.NewGuid().ToString("N");
     private Choice _reported = new(null, false);
