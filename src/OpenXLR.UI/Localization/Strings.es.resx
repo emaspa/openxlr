@@ -1423,6 +1423,18 @@
   <data name="OptionsTabSupport" xml:space="preserve">
     <value>Soporte</value>
   </data>
+  <data name="LockActiveOutputVolume" xml:space="preserve">
+    <value>Bloquear el volumen de la salida activa</value>
+  </data>
+  <data name="LockActiveOutputVolumeHint" xml:space="preserve">
+    <value>Mantiene una salida en el volumen que tiene ahora: la Salida pred. elegida arriba o, si no hay ninguna, la salida predeterminada del escritorio. Si es un dispositivo de OpenXLR, se mantiene la primera salida MONITOR. Para bloquear otra salida, desactiva el bloqueo y vuelve a activarlo.</value>
+  </data>
+  <data name="OutputVolumeLockHolding" xml:space="preserve">
+    <value>{0}: volumen bloqueado al {1:0}%.</value>
+  </data>
+  <data name="OutputVolumeLockSuspended" xml:space="preserve">
+    <value>{0} se mezcla en la unidad. El bloqueo al {1:0}% vuelve cuando la mezcla regresa a este ordenador.</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>MEZCLAS DE SALIDA</value>
   </data>

@@ -1473,7 +1473,7 @@
     <value>Lautstärke des aktiven Ausgangs sperren</value>
   </data>
   <data name="LockActiveOutputVolumeHint" xml:space="preserve">
-    <value>Hält die aktuelle Lautstärke des ausgewählten PipeWire-Ausgangs. Schalte die Sperre aus und wieder ein, um einen anderen Ausgang zu sperren.</value>
+    <value>Hält einen Ausgang auf seiner aktuellen Lautstärke: den oben gewählten Std.-Ausgang, sonst den Standardausgang des Desktops. Ist das ein OpenXLR-Gerät, wird stattdessen der erste MONITOR-Ausgang gehalten. Um einen anderen Ausgang zu sperren, schalte die Sperre aus und wieder ein.</value>
   </data>
   <data name="OutputVolumeLockHolding" xml:space="preserve">
     <value>{0} ist bei {1:0} % gesperrt.</value>

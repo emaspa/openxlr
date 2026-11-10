@@ -1431,6 +1431,18 @@
   <data name="OptionsTabSupport" xml:space="preserve">
     <value>Supporto</value>
   </data>
+  <data name="LockActiveOutputVolume" xml:space="preserve">
+    <value>Blocca il volume dell'uscita attiva</value>
+  </data>
+  <data name="LockActiveOutputVolumeHint" xml:space="preserve">
+    <value>Mantiene un'uscita al volume che ha ora: l'Uscita pred. scelta sopra, altrimenti l'uscita predefinita del desktop. Se è un dispositivo OpenXLR, viene mantenuta la prima uscita MONITOR. Per bloccare un'altra uscita, disattiva il blocco e riattivalo.</value>
+  </data>
+  <data name="OutputVolumeLockHolding" xml:space="preserve">
+    <value>{0}: volume bloccato al {1:0}%.</value>
+  </data>
+  <data name="OutputVolumeLockSuspended" xml:space="preserve">
+    <value>{0}: il mix avviene sull'unità. Il blocco al {1:0}% riprende quando il mix torna su questo computer.</value>
+  </data>
   <data name="OutputMixesHeading" xml:space="preserve">
     <value>MIX DI USCITA</value>
   </data>

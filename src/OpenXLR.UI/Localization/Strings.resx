@@ -1468,7 +1468,7 @@
     <value>Lock active output volume</value>
   </data>
   <data name="LockActiveOutputVolumeHint" xml:space="preserve">
-    <value>Holds the selected PipeWire output at its current volume. To lock a different output, turn the lock off and on again.</value>
+    <value>Holds one output at the volume it has now: the Default output chosen above, else the desktop's default output. If that is an OpenXLR device, the first MONITOR output is held instead. To lock a different output, turn the lock off and on again.</value>
   </data>
   <data name="OutputVolumeLockHolding" xml:space="preserve">
     <value>{0} is locked at {1:0}%.</value>
