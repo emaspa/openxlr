@@ -1520,7 +1520,7 @@ public sealed class PipeWireAdapter
 
     internal bool DuckHostInstalled => File.Exists(DuckHost ?? NativePluginHost.Executable);
 
-    /// <summary>One stereo duck stage with a separate mono key and a reduction meter in dB.</summary>
+    /// <summary>One stereo duck stage with eight separate mono keys, key_0 to key_7, and a reduction meter in dB.</summary>
     internal FilterHandle CreateDucker(string mixId, IReadOnlyDictionary<string, double> controls)
     {
         string executable = DuckHost ?? NativePluginHost.Executable;
@@ -1543,7 +1543,7 @@ public sealed class PipeWireAdapter
         {
             if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process, count: 2)
                 || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process, count: 2)
-                || !WaitForPorts(node, "key", false, TimeSpan.FromSeconds(3), host.Process))
+                || !WaitForPorts(node, "key", false, TimeSpan.FromSeconds(3), host.Process, count: DuckingSetup.MaxKeys))
                 throw new InvalidOperationException("Ducking's audio ports did not appear.");
             return filter;
         }

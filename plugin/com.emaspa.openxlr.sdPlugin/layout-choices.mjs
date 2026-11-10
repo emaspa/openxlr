@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { eqChoices } from "./microphone-eq.mjs";
 import { voiceChoices } from "./voice-changer.mjs";
 import { eqProfileChoices } from "./eq-profiles.mjs";
+import { canKeyDucking } from "./unit-inputs.mjs";
 
 // The built-in icon set, generated from LayoutIcons.cs by tools/deck-icons.py.
 const ICON_TABLE = JSON.parse(fs.readFileSync(new URL("./icons.json", import.meta.url), "utf8"));
@@ -90,6 +91,12 @@ export function layoutChoices(mixer, devices = [], eqProfiles = []) {
     label: `Send mutes: ${mix.name}`,
     items: channels.map((channel) => option(
       `sendmute:${channel.id}:${mix.id}`, `${channel.name} in ${mix.name}`)),
+  });
+  // Each channel that can key ducking, as a key that adds it to the keys or takes it out.
+  const keyable = channels.filter(canKeyDucking);
+  if (keyable.length) toggleGroups.push({
+    id: "layout-ducking-keys", label: "Ducking keys",
+    items: keyable.map((channel) => option(`duckkey:${channel.id}`, `${channel.name} keys ducking`)),
   });
   if (mixer.exclusiveGroups?.length) toggleGroups.push({
     id: "layout-exclusive-groups", label: "Exclusive groups",
@@ -191,7 +198,7 @@ export function targetAppearance(mixer, target) {
   if (typeof target !== "string") return { icon: "", path: null, colour: null };
   let item;
   if (/^(mixmute|mixvol):/.test(target)) item = mixer?.mixes?.find(m => m.id === target.split(":")[1]);
-  else if (/^(sendmute|send|focus|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|eq|eqband|eqtype|eqfreq|eqgain|eqq|voice|eqprofile):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
+  else if (/^(sendmute|send|focus|duckkey|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|eq|eqband|eqtype|eqfreq|eqgain|eqq|voice|eqprofile):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
   else if (target.startsWith("group:")) {
     const open = openGroupMember(mixer, mixer?.exclusiveGroups?.find(g => g.id === target.slice(6)));
     item = open === null ? undefined : mixer?.channels?.find(c => c.id === open);

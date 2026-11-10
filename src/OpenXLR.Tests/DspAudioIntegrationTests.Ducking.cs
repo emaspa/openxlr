@@ -72,7 +72,7 @@ public sealed partial class DspAudioIntegrationTests
             f.Mixer.SetChannelMuted("talk", "monitor", false);
             f.Mixer.SetChannelMuted("key", "stream", true);
             f.Signal(.5, .1, 0);
-            f.Mixer.SetDuckingPlan(DuckPlan with { Key = "talk" });
+            f.Mixer.SetDuckingPlan(DuckPlan with { Keys = ["talk"] });
             f.Level("stream", DuckedMusic);
             f.Mixer.SetMonitorMuteMicrophones(true);
             f.Level("stream", DuckedMusic);   // monitoring still runs
@@ -210,9 +210,15 @@ public sealed partial class DspAudioIntegrationTests
         f.Mixer.SetChannelMuted("key", "stream", false);
         f.Level("monitor", DuckedMusic + .05);
         Assert.Equal(stages.OrderBy(n => n.Key), DuckNodes("OpenXLR_duck_").OrderBy(n => n.Key));
-        f.Mixer.SetDuckingPlan(DuckPlan with { Key = "chat" });
+        f.Mixer.SetDuckingPlan(DuckPlan with { Keys = ["chat"] });
         f.Level("monitor", .15);   // the new key is below the threshold
         Assert.All(stages.Keys, stage => Assert.Contains("OpenXLR_ch_chat", LinksInto(stage)));
+        // A second key on the same stages, on their second key input: the
+        // loud one ducks beside the quiet one, and no stage restarts.
+        f.Mixer.SetDuckingPlan(DuckPlan with { Keys = ["chat", "key"] });
+        f.Level("monitor", DuckedMusic + .05);
+        Assert.All(stages.Keys, stage => Assert.Contains("OpenXLR_ch_key", LinksInto(stage)));
+        Assert.Equal(stages.OrderBy(n => n.Key), DuckNodes("OpenXLR_duck_").OrderBy(n => n.Key));
         f.Mixer.SetDuckingPlan(DuckPlan with { Cells = new HashSet<string> { "chat|monitor", "music|stream" } });
         f.Level("monitor", .1 + .05 * Math.Pow(10, -12.0 / 20));
         f.Mixer.SetDuckingPlan(DuckPlan with { Cells = new HashSet<string> { "music|stream" } });

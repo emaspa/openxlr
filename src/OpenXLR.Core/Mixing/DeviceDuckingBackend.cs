@@ -7,28 +7,43 @@ namespace OpenXLR.Core.Mixing;
 /// primary unit should duck. <see cref="Sections"/>, in hardware mixing,
 /// says in which of block 0x0001's sections each pair is ducked; without it
 /// the pairs are ducked as whole outputs (see <see cref="ProDucking"/>).
+/// <see cref="Keys"/> are the sources whose level ducks, and
+/// <see cref="Inputs"/> the unit's own inputs ducked beside the pairs.
 /// </summary>
 public sealed record ProDuckingTarget(bool Enabled, DuckingLevel Sensitivity, DuckingLevel Amount, DuckingSpeed Speed, IReadOnlySet<int> Pairs)
 {
     /// <summary>Section start to the pairs ducked in it, each a subset of <see cref="Pairs"/>; null for whole outputs.</summary>
     public IReadOnlyDictionary<int, IReadOnlySet<int>>? Sections { get; init; }
 
+    /// <summary>
+    /// The sources that key the ducking, bit M for source M in block
+    /// 0x0008's numbering (0 XLR 1, 1 XLR 2, 2 USB Aux, 3 Line In, 4 + k pair
+    /// k): the unit follows the loudest. XLR 1 alone unless set.
+    /// </summary>
+    public ushort Keys { get; init; } = ProDucking.KeyXlr1Mask;
+
+    /// <summary>The unit's inputs ducked (0 XLR 1 to 3 Line In), in the sections <see cref="ProDucking.InputSections"/> names.</summary>
+    public IReadOnlySet<int> Inputs { get; init; } = NoInputs;
+
+    private static readonly IReadOnlySet<int> NoInputs = new HashSet<int>();
+
     public bool Equals(ProDuckingTarget? other)
         => other is not null && Enabled == other.Enabled && Sensitivity == other.Sensitivity
-            && Amount == other.Amount && Speed == other.Speed && Pairs.SetEquals(other.Pairs) && SameSections(Sections, other.Sections);
+            && Amount == other.Amount && Speed == other.Speed && Pairs.SetEquals(other.Pairs) && SameSections(Sections, other.Sections)
+            && Keys == other.Keys && Inputs.SetEquals(other.Inputs);
 
     private static bool SameSections(IReadOnlyDictionary<int, IReadOnlySet<int>>? a, IReadOnlyDictionary<int, IReadOnlySet<int>>? b)
         => a is null ? b is null
             : b is not null && a.Count == b.Count && a.All(p => b.TryGetValue(p.Key, out IReadOnlySet<int>? other) && p.Value.SetEquals(other));
 
-    public override int GetHashCode() => HashCode.Combine(Enabled, Sensitivity, Amount, Speed, Pairs.Count, Sections?.Count);
+    public override int GetHashCode() => HashCode.Combine(Enabled, Sensitivity, Amount, Speed, Pairs.Count, Sections?.Count, Keys, Inputs.Count);
 
     /// <summary>The unit's ducking switched off, which writes no preset.</summary>
     public static ProDuckingTarget Off { get; } = new(false, ProDucking.Medium, ProDucking.Medium, ProDucking.Medium, new HashSet<int>());
 
-    /// <summary>For the journal: off, or the pairs (by section, when it has sections) and values.</summary>
+    /// <summary>For the journal: off, or the pairs (by section, when it has sections), the inputs, the keys and the values.</summary>
     public override string ToString() => Enabled
-        ? $"on, pairs {PairsText()}, sensitivity {Sensitivity}, amount {Amount}, speed {Speed}"
+        ? $"on, pairs {PairsText()}{InputsText()}, keys {Sources(Keys)}, sensitivity {Sensitivity}, amount {Amount}, speed {Speed}"
         : "off";
 
     private string PairsText()
@@ -36,6 +51,14 @@ public sealed record ProDuckingTarget(bool Enabled, DuckingLevel Sensitivity, Du
         static string List(IEnumerable<int> pairs) => pairs.Any() ? string.Join(" ", pairs.Order()) : "none";
         if (Sections is not { Count: > 0 } sections) return List(Pairs);
         return string.Join("; ", sections.OrderBy(s => s.Key).Select(s => $"{List(s.Value)} in section {s.Key}"));
+    }
+
+    private string InputsText() => Inputs.Count == 0 ? "" : $", inputs {string.Join(" and ", Inputs.Order().Select(ProMixSections.SourceName))}";
+
+    private static string Sources(int mask)
+    {
+        List<string> names = [.. Enumerable.Range(0, ProMixSections.SourceCount).Where(m => (mask & 1 << m) != 0).Select(ProMixSections.SourceName)];
+        return names.Count == 0 ? "none" : string.Join(", ", names);
     }
 }
 

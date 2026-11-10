@@ -115,7 +115,7 @@
                      the window the SUBMIXER header's Soundboard button opens, so the mixer off never hides it -->
                 <WrapPanel Name="AudioWindows" ItemSpacing="6" LineSpacing="4">
                   <Button Name="DuckingButton" Content="{loc:Text Key=Ducking}" Padding="14,5"
-                          IsVisible="{Binding Main.Ducking.IsReported}" Click="OnDucking" ToolTip.Tip="{loc:Text Key=DuckingButtonTip}"/>
+                          IsVisible="{Binding Main.Ducking.IsReported}" Click="OnDucking" ToolTip.Tip="{loc:Text Key=DuckingKeysButtonTip}"/>
                   <Button Name="SoundboardButton" Content="{loc:Text Key=Soundboard}" Padding="14,5"
                           IsVisible="{Binding Main.Soundboard.IsReported}" Click="OnSoundboard" ToolTip.Tip="{loc:Text Key=SoundboardButtonTip}"/>
                 </WrapPanel>

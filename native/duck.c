@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// One stereo duck bus, keyed by a separate mono input. Only the audio
-// thread owns the detector and gain; it reads controls once per block.
+// One stereo duck bus, keyed by up to MAX_KEYS separate mono inputs: the
+// detector follows the loudest open key at each sample, so two keys never
+// add up. key_open is a mask, bit i for key_i. Only the audio thread owns
+// the detector and gain; it reads controls once per block.
 #include "host.h"
 #include <float.h>
 #include <math.h>
@@ -24,7 +26,7 @@ static bool duck_load(Host *h, char **arguments) {
   d->depth = host_add_control(h, "depth", 0, 40, 12, false, NULL);
   d->attack = host_add_control(h, "attack", 1, 5000, 80, false, NULL);
   d->release = host_add_control(h, "release", 1, 10000, 1200, false, NULL);
-  d->key_open = host_add_control(h, "key_open", 0, 1, 1, false, NULL);
+  d->key_open = host_add_control(h, "key_open", 0, (1 << MAX_KEYS) - 1, 1, false, NULL);
   d->reduction = host_add_control(h, "reduction", 0, 40, 0, true, NULL);
   return d->enabled && d->threshold && d->depth && d->attack && d->release &&
          d->key_open && d->reduction;
@@ -48,18 +50,25 @@ static void duck_unload(Host *h) {
 static void duck_process(Host *h, uint32_t frames, float *const *in, float *const *out) {
   Duck *d = h->impl;
   bool enabled = atomic_load(&d->enabled->desired) >= 0.5f;
-  bool key_open = atomic_load(&d->key_open->desired) >= 0.5f;
+  long open = lrintf(atomic_load(&d->key_open->desired));
   double threshold = pow(10, atomic_load(&d->threshold->desired) / 20.0);
   double depth = atomic_load(&d->depth->desired);
   double attack_ms = atomic_load(&d->attack->desired);
   double release_ms = atomic_load(&d->release->desired);
   double attack = depth / (attack_ms * h->rate / 1000);
   double release = depth / (release_ms * h->rate / 1000);
-  const float *key = host_key(h);
+  const float *keys[MAX_KEYS];
+  unsigned count = 0;
+  for (unsigned i = 0; i < MAX_KEYS; i++) {
+    const float *key = host_key_at(h, i);
+    if ((open & 1L << i) && key) keys[count++] = key;
+  }
   for (uint32_t n = 0; n < frames; n++) {
     // An infinite sample would hold the peak follower at infinity for good,
     // so a nonfinite key sample counts as silence.
-    double k = key_open && isfinite(key[n]) ? fabs(key[n]) : 0;
+    double k = 0;
+    for (unsigned i = 0; i < count; i++)
+      if (isfinite(keys[i][n])) k = fmax(k, fabs(keys[i][n]));
     d->envelope = fmax(k, d->envelope * d->decay);
     // A decaying peak must reach zero instead of lingering as a subnormal.
     if (d->envelope < DBL_MIN) d->envelope = 0;
@@ -82,5 +91,5 @@ const Backend duck_backend = {
   .name = "Duck", .argument_count = 0,
   .load = duck_load, .activate = duck_activate,
   .deactivate = duck_deactivate, .process = duck_process,
-  .unload = duck_unload, .key_inputs = 1,
+  .unload = duck_unload, .key_inputs = MAX_KEYS,
 };

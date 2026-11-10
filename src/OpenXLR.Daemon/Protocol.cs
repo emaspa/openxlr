@@ -421,6 +421,9 @@ public sealed record StateMessage
 public sealed record DuckingState
 {
     [JsonPropertyName("enabled")] public bool Enabled { get; init; }
+    /// <summary>The key channels, one to eight, in the order chosen.</summary>
+    [JsonPropertyName("keys")] public IReadOnlyList<string> Keys { get; init; } = [];
+    /// <summary>The first key, for clients from before several keys.</summary>
     [JsonPropertyName("key")] public string Key { get; init; } = "";
     [JsonPropertyName("channels")] public IReadOnlyList<string> Channels { get; init; } = [];
     [JsonPropertyName("mixes")] public IReadOnlyList<string> Mixes { get; init; } = [];
@@ -437,7 +440,8 @@ public sealed record DuckingState
 
     public static DuckingState From(DuckingStateSnapshot s) => new()
     {
-        Enabled = s.Setup.Enabled, Key = s.Setup.Key, Channels = s.Setup.Channels, Mixes = s.Setup.Mixes,
+        Enabled = s.Setup.Enabled, Keys = OpenXLR.Core.DuckingScene.KeysOf(s.Setup) ?? [], Key = OpenXLR.Core.DuckingScene.KeysOf(s.Setup)?.FirstOrDefault() ?? "",
+        Channels = s.Setup.Channels, Mixes = s.Setup.Mixes,
         Sensitivity = s.Setup.Sensitivity, Amount = s.Setup.Amount, Speed = s.Setup.Speed, Processing = s.Setup.Processing,
         Backend = s.Backend, Available = s.Available, Error = s.Error,
         Device = s.Device is not { } d ? null : new DuckingDevice

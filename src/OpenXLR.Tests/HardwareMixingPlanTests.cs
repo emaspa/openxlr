@@ -308,13 +308,13 @@ public sealed class HardwareMixingPlanTests
         // 5, so nothing about the microphone, Mic setup or auditions is off.
         Assert.Equal(
         [
-            "ducking:channel:aux", "ducking:channel:line", "ducking:channel:xlr2", "ducking:key",
+            "ducking:key",
             "eq:mix:monitor", "eq:mix:monitor2", "inserts:mix:monitor", "inserts:mix:monitor2", "latencyCompensation",
         ], disabled.Keys.Order(StringComparer.Ordinal));
         Assert.All(disabled.Values, sentence => Assert.DoesNotContain("\u2014", sentence));
         Assert.Contains("Monitor A", disabled["inserts:mix:monitor"]);
-        Assert.Contains("XLR 1", disabled["ducking:key"]);
-        Assert.Equal("The Wave XLR Pro does not duck Line In, its own input, in the mixes it builds.", disabled["ducking:channel:line"]);
+        Assert.Equal("The Wave XLR Pro ducks the mixes it builds only with its own inputs and the channels on its USB pairs as keys.",
+            disabled["ducking:key"]);
         // With no jack in the mode, the unit builds no mix and turns no ducking off.
         Assert.DoesNotContain(HardwareMixingPlanner.Plan(Setup() with { Jacks = [] }).Disabled.Keys, k => k.StartsWith("ducking:", StringComparison.Ordinal));
     }

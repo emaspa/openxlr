@@ -26,6 +26,8 @@ public interface ILayoutInfo
     bool HasBindableStrip(string id) => Mixer.IsBindableStrip(id) && HasChannel(id);
     /// <summary>A microphone input that can record a mono Sound Check take.</summary>
     bool IsSoundCheckChannel(string id) => id is "xlr1" or "xlr2" && HasChannel(id);
+    /// <summary>A channel that can key ducking: a microphone, Aux In, Line In or an application channel, never a capture input on a stereo pair.</summary>
+    bool IsDuckingKeyChannel(string id) => IsSoundCheckChannel(id) || id is "aux" or "line" && HasChannel(id) || HasApplicationChannel(id);
     /// <summary>A microphone input, with noise removal, the dynamics and the voice changer: XLR 1, XLR 2 or a capture input on one mono port.</summary>
     bool IsMicrophoneChannel(string id) => Mixer.IsMicrophoneId(id) && HasChannel(id);
     /// <summary>A channel that carries the EQ: a microphone input, or a capture input on a stereo pair.</summary>

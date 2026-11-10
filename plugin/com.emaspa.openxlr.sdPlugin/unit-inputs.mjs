@@ -143,6 +143,59 @@ export function duckingToggle(state) {
   return enabled === null ? null : { cmd: "setDucking", value: { enabled: !enabled } };
 }
 
+// The most keys the daemon takes.
+export const MAX_DUCKING_KEYS = 8;
+
+// Ducking's keys in the order chosen, or null from a daemon that sends no
+// ducking. A daemon from before several keys sends only `key`.
+export function duckingKeys(state) {
+  const ducking = state?.ducking;
+  if (!ducking || typeof ducking !== "object") return null;
+  const keys = Array.isArray(ducking.keys) ? ducking.keys.filter(key => typeof key === "string") : [];
+  return keys.length ? keys : [typeof ducking.key === "string" ? ducking.key : "xlr1"];
+}
+
+// A channel that can key ducking: a microphone, one of the unit's own inputs
+// or an application channel. A stereo capture input cannot.
+export function canKeyDucking(channel) {
+  return !!channel && (channel.microphone === true || channel.hardware === true || !channel.captureSource);
+}
+
+// Whether a channel is one of ducking's keys, or null without ducking or
+// once the channel is gone or cannot key.
+export function duckingKeyOn(state, id) {
+  const keys = duckingKeys(state);
+  const channel = state?.mixer?.channels?.find(c => c.id === id);
+  return keys === null || !canKeyDucking(channel) ? null : keys.includes(id);
+}
+
+// What a press of a channel's ducking key sends: the keys with the channel
+// added at the end or taken out. A channel that becomes a key leaves the
+// ducked channels in the same command, since a key is never ducked. Null
+// when nothing may be sent: the last key stays, a ninth is not added, and
+// a channel that cannot key sends nothing.
+export function duckingKeyToggle(state, id) {
+  if (duckingKeyOn(state, id) === null) return null;
+  const keys = duckingKeys(state);
+  if (keys.includes(id))
+    return keys.length > 1 ? { cmd: "setDucking", value: { keys: keys.filter(key => key !== id) } } : null;
+  if (keys.length >= MAX_DUCKING_KEYS) return null;
+  const value = { keys: [...keys, id] };
+  const channels = state.ducking.channels;
+  if (Array.isArray(channels) && channels.includes(id)) value.channels = channels.filter(channel => channel !== id);
+  return { cmd: "setDucking", value };
+}
+
+// The state as it reads once the daemon takes a ducking command. A second
+// press before the daemon's answer then builds on the first instead of
+// sending a list that drops it; the daemon's next state replaces this one.
+export function withDucking(state, value) {
+  if (!state?.ducking || typeof state.ducking !== "object" || !value || typeof value !== "object") return state;
+  const ducking = { ...state.ducking, ...value };
+  if (Array.isArray(value.keys) && value.keys.length) ducking.key = value.keys[0];
+  return { ...state, ducking };
+}
+
 // Whether the driven unit has a hardware target, by its capabilities alone.
 // A binding never changes this: the unit stays driven whatever XLR 1 takes.
 // With no unit connected the daemon sends no capabilities and every hardware

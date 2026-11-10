@@ -33,7 +33,9 @@ public sealed class CommandValidationTests : IDisposable
     public void AWellFormedSetDuckingNamesOnlyWhatItCarries()
     {
         Assert.Equal(new DuckingChange(Enabled: true), Change("""{"enabled":true}"""));
-        Assert.Equal(new DuckingChange(Key: "xlr2"), Change("""{"key":"xlr2"}"""));
+        // The single key of a client from before several keys is a list of one.
+        Assert.Equal(new DuckingChange(Keys: ["xlr2"]), Change("""{"key":"xlr2"}"""));
+        Assert.Equal(new DuckingChange(Keys: ["xlr2", "music", "aux", "line"]), Change("""{"keys":["xlr2","music","aux","line"]}"""));
         DuckingChange lists = Change("""{"channels":["music","game"],"mixes":["monitor","stream"]}""");
         Assert.Equal(["music", "game"], lists.Channels);
         Assert.Equal(["monitor", "stream"], lists.Mixes);
@@ -51,8 +53,9 @@ public sealed class CommandValidationTests : IDisposable
         DuckingChange preset = Change("""{"sensitivity":-12,"amount":12,"speed":{"attack":80,"release":1200}}""");
         Assert.Equal((null, -12, null, 12, null, 80, 1200), (preset.Sensitivity!.Word, preset.Sensitivity.Db, preset.Amount!.Word,
             preset.Amount.Db, preset.Speed!.Word, preset.Speed.Attack, preset.Speed.Release));
-        // The key may be named with channels that leave it out.
-        Assert.Equal("xlr2", Change("""{"key":"xlr2","channels":["xlr1","music"]}""").Key);
+        // The keys may be named with channels that leave them out.
+        Assert.Equal(["xlr2"], Change("""{"key":"xlr2","channels":["xlr1","music"]}""").Keys);
+        Assert.Equal(["xlr2", "voicechat"], Change("""{"keys":["xlr2","voicechat"],"channels":["xlr1","music"]}""").Keys);
         // The general check knows the command too.
         Assert.Null(CommandValidation.Check(Ducking("""{"enabled":false}"""), _layout, _ => null));
     }
@@ -67,6 +70,9 @@ public sealed class CommandValidationTests : IDisposable
         Assert.Equal(["music"], moved.Channels);
         Assert.Empty(moved.Mixes);
         Assert.Equal(("high", "software", true), (moved.Sensitivity, moved.Processing, moved.Enabled));
+        DuckingSetup keyed = new DuckingChange(Keys: ["xlr2", "voicechat"]).ApplyTo(saved);
+        Assert.Equal(["xlr2", "voicechat"], keyed.Keys);
+        Assert.Equal(saved.Channels, keyed.Channels);
         DuckingSetup custom = new DuckingChange(Amount: 18, Speed: DuckingSpeed.Times(50, 600)).ApplyTo(saved);
         Assert.Equal((DuckingLevel.Preset("high"), DuckingLevel.Number(18), DuckingSpeed.Times(50, 600)),
             (custom.Sensitivity, custom.Amount, custom.Speed));
@@ -75,19 +81,27 @@ public sealed class CommandValidationTests : IDisposable
     [Theory]
     [InlineData("true", "value must be an object")]
     [InlineData("[]", "value must be an object")]
-    [InlineData("{}", "value needs at least one of enabled, key, channels, mixes, sensitivity, amount and speed")]
+    [InlineData("{}", "value needs at least one of enabled, keys, key, channels, mixes, sensitivity, amount and speed")]
     [InlineData("""{"enabled":"yes"}""", "enabled must be a boolean")]
     [InlineData("""{"enabled":null}""", "enabled must be a boolean")]
-    [InlineData("""{"key":"music"}""", "key must be a microphone channel")]
-    [InlineData("""{"key":"xlr3"}""", "key must be a microphone channel")]
-    [InlineData("""{"key":""}""", "key must be a microphone channel")]
-    [InlineData("""{"key":1}""", "key must be a microphone channel")]
-    [InlineData("""{"channels":"music"}""", "channels must be distinct channel ids other than the key")]
-    [InlineData("""{"channels":["music","music"]}""", "channels must be distinct channel ids other than the key")]
-    [InlineData("""{"channels":["nothing"]}""", "channels must be distinct channel ids other than the key")]
-    [InlineData("""{"channels":[1]}""", "channels must be distinct channel ids other than the key")]
-    [InlineData("""{"channels":[""]}""", "channels must be distinct channel ids other than the key")]
-    [InlineData("""{"key":"xlr1","channels":["xlr1"]}""", "channels must be distinct channel ids other than the key")]
+    [InlineData("""{"key":"xlr3"}""", "key must be a microphone, Aux In, Line In or application channel")]
+    [InlineData("""{"key":""}""", "key must be a microphone, Aux In, Line In or application channel")]
+    [InlineData("""{"key":1}""", "key must be a microphone, Aux In, Line In or application channel")]
+    [InlineData("""{"keys":"xlr1"}""", "keys must be one to 8 distinct microphone, Aux In, Line In or application channels")]
+    [InlineData("""{"keys":[]}""", "keys must be one to 8 distinct microphone, Aux In, Line In or application channels")]
+    [InlineData("""{"keys":["xlr1","xlr1"]}""", "keys must be one to 8 distinct microphone, Aux In, Line In or application channels")]
+    [InlineData("""{"keys":["xlr1","xlr3"]}""", "keys must be one to 8 distinct microphone, Aux In, Line In or application channels")]
+    [InlineData("""{"keys":[null]}""", "keys must be one to 8 distinct microphone, Aux In, Line In or application channels")]
+    [InlineData("""{"keys":["xlr1","xlr2","aux","line","game","music","browser","system","voicechat"]}""", "keys must be one to 8 distinct microphone, Aux In, Line In or application channels")]
+    [InlineData("""{"key":"xlr1","keys":["xlr2"]}""", "give key or keys, not both")]
+    [InlineData("""{"keys":["xlr2"],"key":"xlr1"}""", "give key or keys, not both")]
+    [InlineData("""{"keys":["xlr1","music"],"channels":["music"]}""", "channels must be distinct channel ids other than the keys")]
+    [InlineData("""{"channels":"music"}""", "channels must be distinct channel ids other than the keys")]
+    [InlineData("""{"channels":["music","music"]}""", "channels must be distinct channel ids other than the keys")]
+    [InlineData("""{"channels":["nothing"]}""", "channels must be distinct channel ids other than the keys")]
+    [InlineData("""{"channels":[1]}""", "channels must be distinct channel ids other than the keys")]
+    [InlineData("""{"channels":[""]}""", "channels must be distinct channel ids other than the keys")]
+    [InlineData("""{"key":"xlr1","channels":["xlr1"]}""", "channels must be distinct channel ids other than the keys")]
     [InlineData("""{"mixes":"monitor"}""", "mixes must be distinct mix ids")]
     [InlineData("""{"mixes":["monitor","monitor"]}""", "mixes must be distinct mix ids")]
     [InlineData("""{"mixes":["music"]}""", "mixes must be distinct mix ids")]
@@ -132,7 +146,7 @@ public sealed class CommandValidationTests : IDisposable
     public void AListLongerThanTheLayoutCanHoldIsRefused()
     {
         string many = "[" + string.Join(",", Enumerable.Range(0, CommandValidation.MaxDuckingIds + 1).Select(i => $"\"c{i}\"")) + "]";
-        Assert.Equal("setDucking: channels must be distinct channel ids other than the key",
+        Assert.Equal("setDucking: channels must be distinct channel ids other than the keys",
             CommandValidation.CheckDucking(Ducking($$"""{"channels":{{many}}}"""), null, out _));
         Assert.Equal("setDucking: mixes must be distinct mix ids", CommandValidation.CheckDucking(Ducking($$"""{"mixes":{{many}}}"""), null, out _));
         // Without a layout only the shape is checked; the mixer checks the ids.
@@ -159,8 +173,9 @@ public sealed class CommandValidationTests : IDisposable
 
         public bool Equals(DuckingSetup? x, DuckingSetup? y)
             => x is not null && y is not null && x.Channels.SequenceEqual(y.Channels) && x.Mixes.SequenceEqual(y.Mixes)
-                && (x.Enabled, x.Key, x.Sensitivity, x.Amount, x.Speed, x.Processing) == (y.Enabled, y.Key, y.Sensitivity, y.Amount, y.Speed, y.Processing);
+                && x.Keys.SequenceEqual(y.Keys)
+                && (x.Enabled, x.Sensitivity, x.Amount, x.Speed, x.Processing) == (y.Enabled, y.Sensitivity, y.Amount, y.Speed, y.Processing);
 
-        public int GetHashCode(DuckingSetup obj) => obj.Key.GetHashCode(StringComparison.Ordinal);
+        public int GetHashCode(DuckingSetup obj) => obj.Keys.Count;
     }
 }

@@ -27,6 +27,7 @@ enum {
   MAX_FRAMES = 8192,
   MAX_CHANNELS = 2,
   MAX_TAPS = 2,
+  MAX_KEYS = 8,  // detector inputs key_0 to key_7, for the duck stage's keys
   MAX_CONTROLS = 4096,
   MAX_SYMBOL = 255
 };
@@ -89,7 +90,7 @@ typedef struct {
   uint32_t (*latency)(Host *h);
   // These formats can arrive through Wine and need the coordinate nudge.
   bool editor_coordinate_nudge;
-  unsigned key_inputs;  // 0, or one mono detector input separate from the audio
+  unsigned key_inputs;  // 0 to MAX_KEYS mono detector inputs separate from the audio
   // The outputs beside the audio, at most MAX_TAPS, ended by an entry with
   // no port; NULL for none. The backend writes tap i through Host.taps[i] in
   // process, every sample of it. Unlinked, a tap is written and dropped.
@@ -157,8 +158,9 @@ struct Host {
   struct pw_filter *filter;
   struct spa_source *timer;
   void *in_ports[MAX_CHANNELS], *out_ports[MAX_CHANNELS];
-  void *key_port;
-  const float *key;
+  void *key_ports[MAX_KEYS];
+  // Each key input's buffer for this cycle, silence for one with none.
+  const float *keys[MAX_KEYS];
   void *tap_ports[MAX_TAPS];
   unsigned tap_count;  // the taps the backend declared and the host added
   // Each tap output's buffer for this cycle, or NULL past tap_count.
@@ -288,7 +290,8 @@ uint32_t host_rate(const Host *h);
 // for: MAX_FRAMES, or OWN_BLOCK_FRAMES exactly when it runs on its own block.
 uint32_t host_max_block(const Host *h);
 unsigned host_channels(const Host *h);
-const float *host_key(const Host *h);
+const float *host_key(const Host *h);  // key input 0
+const float *host_key_at(const Host *h, unsigned index);  // key input index, or NULL past MAX_KEYS
 unsigned long host_window(const Host *h);  // the X window, or 0
 void *host_impl(const Host *h);
 void host_set_impl(Host *h, void *impl);

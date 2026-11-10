@@ -213,9 +213,12 @@ levels go out only on the WebSocket's meters, after `watchDynamics`, and
 only while software runs them.
 [Ducking](api.md#ducking) is one setup on any device:
 `{"cmd":"setDucking","value":{"enabled":true,"channels":["music","game"],"mixes":["monitor"],"amount":"high"}}`
-lowers Music and Game in Monitor A by 24 dB while XLR 1 is loud. The fields
-it leaves out keep their values. `GET /api/v1/state` reads the setup back as
-`ducking`, with `backend` saying whether the unit or this computer runs it.
+lowers Music and Game in Monitor A by 24 dB while XLR 1 is loud, and
+`{"cmd":"setDucking","value":{"keys":["xlr1","voicechat"]}}` makes XLR 1
+and Voice Chat the keys, the louder of them ducking at each moment. The
+fields it leaves out keep their values. `GET /api/v1/state` reads the setup
+back as `ducking`, with `keys`, and with `backend` saying whether the unit
+or this computer runs it.
 [Sound Check](api.md#sound-check), which the UI's Mic setup drives, takes
 its commands the same way: `{"cmd":"setSoundCheckRaw","channel":"xlr1","value":true}`
 plays XLR 1 past its processing, starting a session on the live microphone

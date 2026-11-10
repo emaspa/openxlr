@@ -277,6 +277,24 @@ public sealed class ProMixSectionsTests
     }
 
     [Fact]
+    public void InputDuckingSetsTheChosenInputsAndKeepsTheOnesTheUnitIsMeantToHold()
+    {
+        // 0xe6: XLR 2 at 1, XLR 1 at 2, USB Aux at 2, Line In at 3.
+        Assert.Equal(0b10_10_11_10, ProMixSections.WithInputDucking(0b11_10_01_10, 0b0010));
+        Assert.Equal(0b11_10_01_11, ProMixSections.WithInputDucking(0b11_10_01_10, 0b1001));
+        Assert.Equal(0b10_10_01_10, ProMixSections.WithoutInputDucking(0b11_10_01_10));
+        Assert.Equal(0b11_10_01_10, ProMixSections.WithoutInputDucking(0b11_10_01_10, kept: 0b1000));
+        byte[] b = new byte[ProMixSections.Length];
+        foreach (int s in ProMixSections.Starts) b[s + ProMixSections.InputTapsOffset] = 0xff;
+        // Kept: XLR 2 in section 0 and Line In in section 36; the rest goes back to 2.
+        Assert.True(ProMixSections.ClearInputDucking(b, new Dictionary<int, int> { [0] = 0b0010, [36] = 0b1000 }));
+        Assert.Equal(0xae, b[15]);
+        Assert.Equal(0xaa, b[33]);
+        Assert.Equal(0xea, b[51]);
+        Assert.False(ProMixSections.ClearInputDucking(b, new Dictionary<int, int> { [0] = 0b0010, [36] = 0b1000 }));
+    }
+
+    [Fact]
     public void ClearingInputDuckingPutsOnlyFieldsAtThreeBackToTwo()
     {
         byte[] b = Desk();

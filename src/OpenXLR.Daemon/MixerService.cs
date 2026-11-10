@@ -746,7 +746,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         DuckingDeviceState? device = null;
         if (DuckingPort.Primary() is { } primary)
         {
-            DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, new DuckingView(false, false, [], []), primary.Support);
+            DuckingVerdict verdict = DuckingPlacement.Evaluate(setup, new DuckingView(false, [], []), primary.Support);
             DeviceDuckingStatus status = DuckingPort.Status(primary.Unit);
             device = new(primary.Unit, primary.Support.Name, primary.Support.Firmware, verdict.Ready, verdict.Reason, verdict.Note,
                 [.. verdict.Outputs], status.Phase == DeviceDuckingPhase.Verified, status.Readback);

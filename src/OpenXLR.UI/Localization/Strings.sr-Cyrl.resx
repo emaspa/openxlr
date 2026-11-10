@@ -2914,9 +2914,6 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="Ducking" xml:space="preserve">
     <value>Пригушивање</value>
   </data>
-  <data name="DuckingEnabled" xml:space="preserve">
-    <value>Смањи други звук док је окидачки микрофон гласан</value>
-  </data>
   <data name="DuckingSensitivity" xml:space="preserve">
     <value>Осетљивост</value>
   </data>
@@ -2947,21 +2944,6 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="DuckingMarkTip" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="DuckingSensitivityTip" xml:space="preserve">
-    <value>Колико гласан мора бити окидачки микрофон пре него што се канали смање. Даље удесно реагује на тиши глас.</value>
-  </data>
-  <data name="DuckingAmountTip" xml:space="preserve">
-    <value>Колико се канали смањују док је окидачки микрофон гласан.</value>
-  </data>
-  <data name="DuckingAttackTip" xml:space="preserve">
-    <value>Колико је каналима потребно да се смање кад окидачки микрофон постане гласан.</value>
-  </data>
-  <data name="DuckingReleaseTip" xml:space="preserve">
-    <value>Колико је каналима потребно да се врате кад окидачки микрофон утихне.</value>
-  </data>
-  <data name="DuckingHint" xml:space="preserve">
-    <value>Пригушивање смањује изабране канале у изабраним миксевима док је окидачки микрофон гласан. Извршава га овај рачунар, или Wave XLR Pro на свом процесору када подешавање одговара ономе што уређај може.</value>
-  </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Уређај још не задржава ову поставку; OpenXLR је поново уписује за неколико секунди.</value>
   </data>
@@ -2973,15 +2955,6 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   </data>
   <data name="DuckingNotRunning" xml:space="preserve">
     <value>Ништа не извршава ово подешавање.</value>
-  </data>
-  <data name="DuckingButtonTip" xml:space="preserve">
-    <value>Смањи други звук док је микрофон гласан: окидач, канали, миксеви, пресети и место обраде.</value>
-  </data>
-  <data name="DuckingKey" xml:space="preserve">
-    <value>Окидачки микрофон</value>
-  </data>
-  <data name="DuckingKeyTip" xml:space="preserve">
-    <value>Микрофон чији глас смањује други звук. Његов ниво се никада не смањује.</value>
   </data>
   <data name="DuckingChannels" xml:space="preserve">
     <value>Смањи ове канале</value>
@@ -3007,26 +2980,11 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="DuckingProcessingSoftware" xml:space="preserve">
     <value>Овом рачунару</value>
   </data>
-  <data name="DuckingProcessingDeviceTip" xml:space="preserve">
-    <value>Пригушуј на процесору уређаја {0}. Слуша XLR 1 како га уређај чује, пре USB-а, дакле пре софтверског EQ-а, ефеката и било ког гејта на овом рачунару. Гејт шума или потискивач на XLR 1 не спречава пригушивање због шума. Смањује готов микс на излазима уређаја, после свега на овом рачунару. Ако гејт на XLR 1 треба да спречи лажна окидања, изабери овај рачунар.</value>
-  </data>
-  <data name="DuckingProcessingSoftwareTip" xml:space="preserve">
-    <value>Пригушуј на овом рачунару. Окидач је микрофон после EQ-а, ефеката и Sound Check петље, пре његове јачине и слања, па гејт на њему спречава лажна окидања. Изабрани канали се смањују у сваком миксу, пре додатака и кашњења тог микса. Пригушивање уређаја је искључено.</value>
-  </data>
-  <data name="DuckingStatusOnUnit" xml:space="preserve">
-    <value>Укључено, ради на процесору уређаја {0}. Слуша XLR 1 пре USB-а, свих гејтова и додатака на овом рачунару, и смањује готов микс на излазима уређаја.</value>
-  </data>
-  <data name="DuckingStatusOnComputer" xml:space="preserve">
-    <value>Укључено, ради на овом рачунару. Слуша {0} после EQ-а, ефеката и Sound Check петље, и смањује изабране канале у сваком миксу, пре додатака тог микса.</value>
-  </data>
   <data name="DuckingMixerOff" xml:space="preserve">
     <value>Софтверски миксер је искључен, па пригушивање не ради. Укључи га у Опцијама, ЗВУК.</value>
   </data>
   <data name="DuckingNothingChosen" xml:space="preserve">
     <value>Укључено, али ништа се не смањује. Изабери бар један канал и један микс.</value>
-  </data>
-  <data name="DuckingDeviceKeyNotSupported" xml:space="preserve">
-    <value>{0} пригушује само са XLR 1 као окидачем.</value>
   </data>
   <data name="DuckingDeviceFailed" xml:space="preserve">
     <value>{0} није задржао уписано пригушивање. Искључи га па укључи да поново пробаш уређај.</value>

@@ -21,7 +21,7 @@ function replaceLayoutOptions(groups, wanted) {
     }
     place(element);
   }
-  if (/^(mixvol:|mixmute:|chvol:|chgain:|chmute:|chphantom:|chlowcut:|chclipguard:|eq:|eqband:|eqtype:|eqfreq:|eqgain:|eqq:|voice:|send:|sendmute:|group:|focus:|output:|outputup:|outputdown:|outputmute:|mainoutput:)/.test(selected) &&
+  if (/^(mixvol:|mixmute:|chvol:|chgain:|chmute:|chphantom:|chlowcut:|chclipguard:|eq:|eqband:|eqtype:|eqfreq:|eqgain:|eqq:|voice:|send:|sendmute:|group:|focus:|duckkey:|output:|outputup:|outputdown:|outputmute:|mainoutput:)/.test(selected) &&
       !Array.from(select.options).some(option => option.value === selected)) {
     const unavailable = document.createElement("option");
     unavailable.id = "unavailable-layout-target";

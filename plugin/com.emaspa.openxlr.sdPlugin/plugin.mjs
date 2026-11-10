@@ -8,7 +8,7 @@ import {ControlSocket} from "./control-socket.mjs";
 import { KeyCommands } from "./key-commands.mjs";
 import { channelName, mixName, mixShortName, defaultMonitorMix, monitorFeed, layoutChoices, controllableOutputs, outputKey, targetAppearance, openGroupMember } from "./layout-choices.mjs";
 import { SkinPalette } from "./skin-palette.mjs";
-import { captureGainOf, captureMuteOf, channelUnitControl, channelUnitTarget, deviceTargetSupported, duckingEnabled, duckingToggle, unitDialLabel, unitKeyLabel, unitMeterKey } from "./unit-inputs.mjs";
+import { captureGainOf, captureMuteOf, channelUnitControl, channelUnitTarget, deviceTargetSupported, duckingEnabled, duckingKeyOn, duckingKeyToggle, duckingToggle, withDucking, unitDialLabel, unitKeyLabel, unitMeterKey } from "./unit-inputs.mjs";
 import { isEqTarget, eqTarget, eqStep, eqCommand, eqLabel, eqDial } from "./microphone-eq.mjs";
 import { isVoiceTarget, voiceTarget, voiceMode, voicePress, voiceRelease, voiceLabel } from "./voice-changer.mjs";
 import { isEqProfileTarget, eqProfileTarget, eqProfilePress, eqProfileLabel } from "./eq-profiles.mjs";
@@ -577,6 +577,8 @@ function toggleValue(target, inst) {
   }
   // Ducking is the mixer's setup, present on any device, not a field of the state block.
   if (target === "ducking") return duckingEnabled(daemonState);
+  // Lit while the channel is one of ducking's keys; disabled once it is gone.
+  if (target.startsWith("duckkey:")) return duckingKeyOn(daemonState, target.slice(8));
   if (Object.hasOwn(DEVICE_TOGGLES, target) && !supported(target)) return null;
   return dev()?.[target] ?? null;
 }
@@ -659,6 +661,7 @@ function toggleLabel(target, inst) {
     return `${chainShort(ch)}\n${name}`;
   }
   if (target.startsWith("focus:")) return `Focus\n${channelName(mixer(), target.slice(6))}`;
+  if (target.startsWith("duckkey:")) return `Duck key\n${channelName(mixer(), target.slice(8))}`;
   if (target.startsWith("inschain|")) return `${chainShort(target.slice(9))}\nInserts`;
   if (isProfileTarget(target)) return `Profile\n${target.slice(8)}`;
   if (target === "auxPort") return "Aux\nPort";
@@ -1040,6 +1043,12 @@ function onKeyDown(context, inst, inMultiAction = false) {
   else if (t === "softClipGuard") cmd({ cmd: "setSoftClipGuard", value: !cur });
   else if (t === "gainLocked") cmd({ cmd: "set", control: "gainLock", value: !cur });
   else if (t === "ducking") cmd(duckingToggle(daemonState));
+  else if (t.startsWith("duckkey:")) {
+    // The last key stays and a ninth is not added: the key only alerts.
+    const payload = duckingKeyToggle(daemonState, t.slice(8));
+    if (!payload) send({ event: "showAlert", context });
+    else if (cmd(payload)) daemonState = withDucking(daemonState, payload.value);
+  }
   else if (t.startsWith("monitor:")) cmd({ cmd: "setMonitorOutputs", devices: [t.slice(8)] });
   else if (t.startsWith("feed:")) cmd({ cmd: "setMonitorFeed", device: t.slice(5), mix: nextFeed(feedOf(t.slice(5))) });
   else if (t.startsWith("mixmute:"))

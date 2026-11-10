@@ -19,13 +19,7 @@ public interface IDuckingCommands
     Task<string?> SetDuckingProcessingAsync(string value);
 }
 
-/// <summary>A microphone the key picker offers.</summary>
-public sealed record DuckingKeyChoice(string Id, string Name)
-{
-    public override string ToString() => Name;
-}
-
-/// <summary>A channel or a mix in one of the Ducking window's checklists.</summary>
+/// <summary>A key, a channel or a mix in one of the Ducking window's checklists.</summary>
 public sealed class DuckingChoice : ViewModelBase
 {
     private readonly Action<DuckingChoice> _toggled;
@@ -60,12 +54,13 @@ public sealed class DuckingChoice : ViewModelBase
 }
 
 /// <summary>
-/// The ducking setup as the Ducking window edits it: the switch, the key
-/// microphone, the channels lowered and the mixes they are lowered in, the
-/// sensitivity, amount and speed on sliders that mark the Wave XLR Pro's
-/// presets and send numbers, where it runs, and what runs it now. Every value is the
-/// daemon's, or one the user just set; a state that differs from an edit not
-/// yet reported back is taken as older than the edit, for a second at most,
+/// The ducking setup as the Ducking window edits it: the switch, the keys
+/// (any of them loud lowers the targets, the loudest counting), the
+/// channels lowered and the mixes they are lowered in, the sensitivity,
+/// amount and speed on sliders that mark the Wave XLR Pro's presets and send
+/// numbers, where it runs, and what runs it now. Every value is the daemon's,
+/// or one the user just set; a state that differs from an edit not yet
+/// reported back is taken as older than the edit, for a second at most,
 /// as the EQ editor does. A refused edit puts the daemon's state back and
 /// shows why.
 /// </summary>
@@ -92,13 +87,14 @@ public sealed class DuckingViewModel : ViewModelBase
     private bool _applying;
 
     // The layout the lists are drawn from, as the last state named it.
-    private sealed record LayoutChannel(string Id, string Name, bool Microphone, bool Application, bool Present);
+    // A channel can be a key unless it is a capture input on a stereo pair.
+    private sealed record LayoutChannel(string Id, string Name, bool CanKey, bool Application, bool Present);
     private List<LayoutChannel> _layoutChannels = [];
     private List<(string Id, string Name)> _layoutMixes = [];
 
     // The setup, as reported or as just edited.
     private bool _reported, _mixerRunning, _targetsReported, _enabled;
-    private string _key = "xlr1";
+    private List<string> _keys = ["xlr1"];
     private List<string> _channels = [], _mixes = [];
     private string _processing = "device";
 
@@ -110,7 +106,6 @@ public sealed class DuckingViewModel : ViewModelBase
 
     private double _reduction;
     private string? _refusal;
-    private DuckingKeyChoice? _selectedKey;
 
     /// <param name="time">The clock for the echo wait; a test passes one it moves by hand.</param>
     public DuckingViewModel(IDuckingCommands commands, TimeProvider? time = null)
@@ -122,14 +117,14 @@ public sealed class DuckingViewModel : ViewModelBase
         string low = Localizer.Text("DuckingLow"), medium = Localizer.Text("DuckingMedium"), high = Localizer.Text("DuckingHigh");
         string slow = Localizer.Text("DuckingSlow"), fast = Localizer.Text("DuckingFast");
         // Sensitivity rises to the right, so its threshold falls.
-        Sensitivity = new(Localizer.Text("DuckingSensitivity"), Localizer.Text("DuckingSensitivityTip"), MinThreshold, MaxThreshold,
+        Sensitivity = new(Localizer.Text("DuckingSensitivity"), Localizer.Text("DuckingKeysSensitivityTip"), MinThreshold, MaxThreshold,
             DuckingScale.Reversed, value => Localizer.Format("DuckingDbfs", DuckingSliderViewModel.Number(value)), -12,
             [(-3, low), (-12, medium), (-24, high)], SliderMoved);
-        Amount = new(Localizer.Text("DuckingAmount"), Localizer.Text("DuckingAmountTip"), MinDepth, MaxDepth,
+        Amount = new(Localizer.Text("DuckingAmount"), Localizer.Text("DuckingKeysAmountTip"), MinDepth, MaxDepth,
             DuckingScale.Linear, Db, 12, [(6, low), (12, medium), (24, high)], SliderMoved);
-        Attack = new(Localizer.Text("DynamicsAttack"), Localizer.Text("DuckingAttackTip"), MinAttack, MaxAttack,
+        Attack = new(Localizer.Text("DynamicsAttack"), Localizer.Text("DuckingKeysAttackTip"), MinAttack, MaxAttack,
             DuckingScale.Log, Ms, 80, [(100, slow), (80, medium), (30, fast)], SliderMoved, isPart: true);
-        Release = new(Localizer.Text("DynamicsRelease"), Localizer.Text("DuckingReleaseTip"), MinRelease, MaxRelease,
+        Release = new(Localizer.Text("DynamicsRelease"), Localizer.Text("DuckingKeysReleaseTip"), MinRelease, MaxRelease,
             DuckingScale.Log, Ms, 1200, [(2000, slow), (1200, medium), (200, fast)], SliderMoved, isPart: true);
     }
 
@@ -152,36 +147,48 @@ public sealed class DuckingViewModel : ViewModelBase
         }
     }
 
-    /// <summary>The microphones that can be the key, by name.</summary>
-    public ObservableCollection<DuckingKeyChoice> Keys { get; } = [];
+    /// <summary>
+    /// The channels that can be keys, by name: microphones, the unit's own
+    /// inputs and application channels, never a capture input on a stereo
+    /// pair. Ticked rows are the keys.
+    /// </summary>
+    public ObservableCollection<DuckingChoice> Keys { get; } = [];
 
-    /// <summary>The key microphone: picking one leaves it out of the channels in the same command.</summary>
-    public DuckingKeyChoice? SelectedKey
+    /// <summary>The key ids, in the order they were chosen; the first is the one an older client reads as <c>key</c>.</summary>
+    public IReadOnlyList<string> KeyIds => _keys;
+
+    /// <summary>
+    /// A key ticked or unticked: the keys go to the daemon in the order they
+    /// were chosen, a new key leaves the channels in the same command, and the
+    /// last key stays, since ducking needs one.
+    /// </summary>
+    private void KeyToggled(DuckingChoice choice)
     {
-        get => _selectedKey;
-        set
+        // A list being refilled can write its old rows back as it lets them go: that is not a choice.
+        if (_applying || !Keys.Contains(choice)) return;
+        List<string> keys = choice.IsChecked
+            ? [.. _keys.Where(k => k != choice.Id), choice.Id]
+            : [.. _keys.Where(k => k != choice.Id)];
+        if (keys.Count == 0)
         {
-            // A list being refilled clears its selection; that is not a choice.
-            if (_applying || value is null || value.Id == _key)
-            {
-                Raise();
-                return;
-            }
-            _selectedKey = value;
-            _key = value.Id;
-            var fields = new Dictionary<string, object> { ["key"] = value.Id };
-            if (_channels.Contains(value.Id))
-            {
-                _channels = [.. _channels.Where(c => c != value.Id)];
-                fields["channels"] = _channels.ToArray();
-            }
-            Send(fields);
-            RefreshLists();
-            RaiseState();
+            Refusal = Localizer.Text("DuckingKeysLast");
+            choice.Show(true);
+            return;
         }
+        if (keys.SequenceEqual(_keys)) return;
+        _keys = keys;
+        var fields = new Dictionary<string, object> { ["keys"] = _keys.ToArray() };
+        if (_channels.Contains(choice.Id))
+        {
+            _channels = [.. _channels.Where(c => c != choice.Id)];
+            fields["channels"] = _channels.ToArray();
+        }
+        Send(fields);
+        RefreshLists();
+        RaiseState();
     }
 
-    /// <summary>The channels that can be lowered, the key left out.</summary>
+    /// <summary>The channels that can be lowered, the keys left out.</summary>
     public ObservableCollection<DuckingChoice> Channels { get; } = [];
 
     /// <summary>The mixes they can be lowered in.</summary>
@@ -219,7 +226,7 @@ public sealed class DuckingViewModel : ViewModelBase
     public void ChooseAllApplications()
     {
         if (!CanEdit) return;
-        SetChannels([.. _layoutChannels.Where(c => c.Application && c.Id != _key).Select(c => c.Id)]);
+        SetChannels([.. _layoutChannels.Where(c => c.Application && !_keys.Contains(c.Id)).Select(c => c.Id)]);
     }
 
     /// <summary>Lower no channel: ducking then lowers nothing until one is ticked.</summary>
@@ -279,7 +286,7 @@ public sealed class DuckingViewModel : ViewModelBase
 
     /// <summary>The "This unit" side's tooltip: where the unit listens and what it lowers, or why it cannot run the setup.</summary>
     public string ProcessOnDeviceTip => (_deviceReady ? null : UnitReason)
-        ?? Localizer.Format("DuckingProcessingDeviceTip", DeviceName);
+        ?? Localizer.Format("DuckingKeysProcessingDeviceTip", DeviceName);
 
     /// <summary>
     /// A side of the switch was pressed: <c>device</c> or <c>software</c>.
@@ -312,21 +319,34 @@ public sealed class DuckingViewModel : ViewModelBase
 
     private string DeviceName => _deviceName ?? Localizer.Text("EqTheInterface");
 
-    private string KeyName => _layoutChannels.FirstOrDefault(c => c.Id == _key)?.Name ?? _key;
+    /// <summary>The keys by name, joined as a list: "XLR 1", "XLR 1 and Voice Chat", "XLR 1, XLR 2 and Voice Chat".</summary>
+    private string KeyNames
+    {
+        get
+        {
+            string[] names = [.. _keys.Select(k => _layoutChannels.FirstOrDefault(c => c.Id == k)?.Name ?? k)];
+            if (names.Length == 0) return "";
+            string list = names[0];
+            for (int i = 1; i < names.Length; i++)
+                list = i == names.Length - 1 ? Localizer.Format("DuckingKeysListLast", list, names[i])
+                    : Localizer.Format("DuckingKeysListMore", list, names[i]);
+            return list;
+        }
+    }
 
     /// <summary>
     /// Why the unit cannot run the setup, chosen or not, shown under the
     /// switch. The reasons that name no channel or mix read from the
-    /// catalogue; the others name them, so the daemon's own sentence is
-    /// shown, as it is for a reason this window does not know. A mixer that
-    /// is off is said by the status instead.
+    /// catalogue; the others name them (a key the unit cannot hear among
+    /// them), so the daemon's own sentence is shown, as it is for a reason
+    /// this window does not know. A mixer that is off is said by the status
+    /// instead.
     /// </summary>
     public string? Note => !_hasDevice || !CanEdit || _deviceReady || _reason == "mixerOff" ? null : UnitReason;
 
     private string UnitReason => _reason switch
     {
         "mixerOff" => Localizer.Text("DuckingMixerOff"),
-        "keyNotSupported" => Localizer.Format("DuckingDeviceKeyNotSupported", DeviceName),
         "failed" => Localizer.Format("DuckingDeviceFailed", DeviceName),
         "unsupportedBlock" => Localizer.Format("DuckingDeviceUnsupported", DeviceName),
         _ => _note ?? Localizer.Format("DuckingDeviceNotReady", DeviceName),
@@ -346,8 +366,8 @@ public sealed class DuckingViewModel : ViewModelBase
         : !_enabled ? Localizer.Text("DuckingStatusOff")
         : NothingChosen ? Localizer.Text("DuckingNothingChosen")
         : SoftwareBroken ? _error ?? Localizer.Text("DuckingNotRunning")
-        : _backend == "device" ? _held ? Localizer.Format("DuckingStatusOnUnit", DeviceName) : Localizer.Text("DuckingNotHeld")
-        : _backend == "software" ? Localizer.Format("DuckingStatusOnComputer", KeyName)
+        : _backend == "device" ? _held ? Localizer.Format("DuckingKeysStatusOnUnit", DeviceName) : Localizer.Text("DuckingNotHeld")
+        : _backend == "software" ? Localizer.Format("DuckingKeysStatusOnComputer", KeyNames)
         : Localizer.Text("DuckingNotRunning");
 
     /// <summary>The status says something is wrong: nothing runs a setup that is on, or the unit does not hold it.</summary>
@@ -431,7 +451,9 @@ public sealed class DuckingViewModel : ViewModelBase
                 bool capture = Text(c["captureSource"]) is not null;
                 // A daemon from before the field: XLR 1 and XLR 2 are the microphones.
                 bool microphone = Flag(c["microphone"]) ?? id is "xlr1" or "xlr2";
-                return new LayoutChannel(id, Text(c["name"]) ?? id, microphone, !hardware && !capture, Flag(c["present"]) ?? true);
+                // Microphones, the unit's own inputs and application channels can key; a stereo capture input cannot.
+                return new LayoutChannel(id, Text(c["name"]) ?? id, microphone || hardware || !capture, !hardware && !capture,
+                    Flag(c["present"]) ?? true);
             })];
         if (mixer?["mixes"] is JsonArray mixes)
             _layoutMixes = [.. mixes.OfType<JsonObject>().Where(m => Text(m["id"]) is not null)
@@ -444,7 +466,9 @@ public sealed class DuckingViewModel : ViewModelBase
         try
         {
             if (Fresh("enabled", ducking["enabled"])) _enabled = Flag(ducking["enabled"]) ?? false;
-            if (Fresh("key", ducking["key"])) _key = Text(ducking["key"]) ?? "xlr1";
+            // A daemon from before several keys reports one key alone.
+            JsonArray keys = ducking["keys"] is JsonArray reported ? reported : new JsonArray(Text(ducking["key"]) ?? "xlr1");
+            if (Fresh("keys", keys) && Words(keys) is { Count: > 0 } chosen) _keys = chosen;
             _targetsReported = ducking["channels"] is JsonArray && ducking["mixes"] is JsonArray;
             if (Fresh("channels", ducking["channels"])) _channels = Words(ducking["channels"]);
             if (Fresh("mixes", ducking["mixes"])) _mixes = Words(ducking["mixes"]);
@@ -522,18 +546,13 @@ public sealed class DuckingViewModel : ViewModelBase
         _applying = true;
         try
         {
-            List<DuckingKeyChoice> keys = [.. _layoutChannels.Where(c => c.Microphone && (c.Present || c.Id == _key))
-                .Select(c => new DuckingKeyChoice(c.Id, c.Name))];
-            if (_reported && keys.All(k => k.Id != _key)) keys.Add(new DuckingKeyChoice(_key, _key));
-            if (!keys.SequenceEqual(Keys))
-            {
-                Keys.Clear();
-                foreach (DuckingKeyChoice key in keys) Keys.Add(key);
-            }
-            _selectedKey = Keys.FirstOrDefault(k => k.Id == _key);
-            Raise(nameof(SelectedKey));
+            // Every channel that can key and is present, and a key whose channel is not shown by its id.
+            List<(string Id, string Name)> keys = [.. _layoutChannels.Where(c => c.CanKey && (c.Present || _keys.Contains(c.Id)))
+                .Select(c => (c.Id, c.Name))];
+            if (_reported) keys.AddRange(_keys.Where(k => keys.All(c => c.Id != k)).Select(k => (k, k)));
+            Sync(Keys, keys, _keys, KeyToggled);
 
-            Sync(Channels, [.. _layoutChannels.Where(c => c.Id != _key && (c.Present || _channels.Contains(c.Id))).Select(c => (c.Id, c.Name))],
+            Sync(Channels, [.. _layoutChannels.Where(c => !_keys.Contains(c.Id) && (c.Present || _channels.Contains(c.Id))).Select(c => (c.Id, c.Name))],
                 _channels, ChannelToggled);
             Sync(Mixes, _layoutMixes, _mixes, MixToggled);
         }
@@ -557,7 +576,7 @@ public sealed class DuckingViewModel : ViewModelBase
         Raise(nameof(IsReported));
         Raise(nameof(CanEdit));
         Raise(nameof(Enabled));
-        Raise(nameof(SelectedKey));
+        Raise(nameof(KeyIds));
         Raise(nameof(HasTargets));
         Raise(nameof(ReductionLevel));
         Raise(nameof(HasProcessingChoice));

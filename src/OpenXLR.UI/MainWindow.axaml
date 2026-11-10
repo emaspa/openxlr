@@ -1083,7 +1083,7 @@
               </Button.IsVisible>
             </Button>
             <Button Name="DuckingButton" Content="{loc:Text Key=Ducking}" Padding="8,1" FontSize="{DynamicResource UiText.FontSize11}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
-                    Click="OnDucking" ToolTip.Tip="{loc:Text Key=DuckingButtonTip}">
+                    Click="OnDucking" ToolTip.Tip="{loc:Text Key=DuckingKeysButtonTip}">
               <Button.IsVisible>
                 <MultiBinding Converter="{x:Static BoolConverters.And}">
                   <Binding Path="HasMixer"/>

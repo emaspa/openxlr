@@ -27,8 +27,10 @@ namespace OpenXLR.Core.Devices;
 /// Wave Link makes an input ducked by writing its field at 3 (USB captures
 /// of 2026-11-10: ae, XLR 2's field at 3, and af, XLR 1's and XLR 2's), so
 /// s+15 takes any value.
-/// OpenXLR never ducks an input: every write of the block puts an input
-/// field read at 3 back to 2 (<see cref="ClearInputDucking"/>).
+/// OpenXLR ducks an input only as a ducking target says
+/// (<see cref="ProDucking.ApplyFields"/>); every other write of the block
+/// puts an input field read at 3 back to 2 unless the ducking the unit is
+/// meant to hold keeps it there (<see cref="ClearInputDucking"/>).
 ///
 /// After the sections: bytes 90 to 93 the selectors of Headphones 1,
 /// Headphones 2, the USB Aux port and Line Out (1e to 22 play sections 0 to
@@ -210,27 +212,48 @@ public static class ProMixSections
     public static int InputTap(ReadOnlySpan<byte> block, int start, int input)
         => block[Base(start) + InputTapsOffset] >> 2 * CheckInput(input) & 0b11;
 
-    /// <summary>A byte of four input tap fields with each field at 3, after the ducker, put back to 2; the others as given.</summary>
-    public static byte WithoutInputDucking(byte taps)
+    /// <summary>
+    /// A byte of four input tap fields with each field at 3, after the
+    /// ducker, put back to 2, except the inputs in <paramref name="kept"/>
+    /// (bit M for input M), which stay as given; the others as given too.
+    /// </summary>
+    public static byte WithoutInputDucking(byte taps, int kept = 0)
     {
         int fields = taps;
         for (int input = 0; input < InputCount; input++)
-            if ((fields >> 2 * input & 0b11) == Ducked) fields = fields & ~(0b11 << 2 * input) | TapInsertReturn << 2 * input;
+            if ((kept & 1 << input) == 0 && (fields >> 2 * input & 0b11) == Ducked)
+                fields = fields & ~(0b11 << 2 * input) | TapInsertReturn << 2 * input;
+        return (byte)fields;
+    }
+
+    /// <summary>
+    /// A byte of four input tap fields with each input in
+    /// <paramref name="ducked"/> (bit M for input M) at 3, after the ducker,
+    /// and every other field read at 3 put back to 2; the rest as given.
+    /// </summary>
+    public static byte WithInputDucking(byte taps, int ducked)
+    {
+        int fields = WithoutInputDucking(taps);
+        for (int input = 0; input < InputCount; input++)
+            if ((ducked & 1 << input) != 0) fields |= Ducked << 2 * input;
         return (byte)fields;
     }
 
     /// <summary>
     /// Every input tap field at 3 in the five sections put back to 2, so no
-    /// input ducking another program left stays on; the other values stay as
-    /// read. True when a byte changed.
+    /// input ducking another program left, or a target that left the setup,
+    /// stays on; the inputs <paramref name="kept"/> names for a section
+    /// (section start to a mask, bit M for input M: the ducking the unit is
+    /// meant to hold) and every other value stay as read. True when a byte
+    /// changed.
     /// </summary>
-    public static bool ClearInputDucking(Span<byte> block)
+    public static bool ClearInputDucking(Span<byte> block, IReadOnlyDictionary<int, int>? kept = null)
     {
         if (block.Length != Length) throw new ArgumentException($"block 0x0001 is {Length} bytes", nameof(block));
         bool changed = false;
         foreach (int s in Starts)
         {
-            byte taps = WithoutInputDucking(block[s + InputTapsOffset]);
+            byte taps = WithoutInputDucking(block[s + InputTapsOffset], kept?.GetValueOrDefault(s) ?? 0);
             changed |= taps != block[s + InputTapsOffset];
             block[s + InputTapsOffset] = taps;
         }

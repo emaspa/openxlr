@@ -38,8 +38,9 @@ public static class ProJackFeeds
     /// <summary>
     /// The bytes of a section a restore puts back: its cells, membership,
     /// byte 14 and the inputs' tap fields, any input after the ducker put
-    /// back to 2 (see <see cref="ProMixSections.ClearInputDucking"/>). The
-    /// pairs' ducking fields stay with ducking.
+    /// back to 2 unless the ducking the unit is meant to hold keeps it
+    /// there (see <see cref="ProMixSections.ClearInputDucking"/>). The pairs'
+    /// ducking fields stay with ducking.
     /// </summary>
     public const int RestoredLength = ProMixSections.DuckingOffset;
 }
@@ -112,7 +113,8 @@ public sealed record ProMixPlan
     /// (the twelve level cells and the membership mask), written exactly.
     /// Byte 14 and the tap fields stay as read, except that the plan puts
     /// any input after the ducker back to 2 in every section, as a ducking
-    /// write does. A restore for
+    /// write does for an input it does not duck, leaving the inputs
+    /// <see cref="DuckedInputs"/> names. A restore for
     /// a section named here is skipped. With section 36 here,
     /// <see cref="UsbAux"/> sets the port's selector alone: the section's
     /// cells are the unit's Aux mix, not pair 5's stream.
@@ -132,6 +134,15 @@ public sealed record ProMixPlan
 
     /// <summary>The jacks' own levels in block 0x0005, written with the block by the driver (see <see cref="ProJackLevels"/>).</summary>
     public ProJackLevels? JackLevels { get; init; }
+
+    /// <summary>
+    /// The inputs the ducking the unit is meant to hold puts after the
+    /// ducker, by section start, as a mask with bit M for input M (see
+    /// <see cref="ProDucking.InputSections"/>). A unit-section write or a
+    /// restore leaves those fields as read instead of putting them back to
+    /// 2; it never sets one, which only a ducking write does. Null keeps none.
+    /// </summary>
+    public IReadOnlyDictionary<int, int>? DuckedInputs { get; init; }
 
     /// <summary>A plan that leaves every byte as the unit holds it.</summary>
     public static ProMixPlan Nothing { get; } = new();
@@ -336,6 +347,7 @@ public sealed record ProMixPlan
             {
                 if (Feeds?.ContainsKey(section) == true || UnitSections?.ContainsKey(section) == true) continue;
                 byte[] bytes = RestoreBytes(section, hex);
+                KeepDuckedInputs(bytes, held, section);
                 if (held.Slice(section, bytes.Length).SequenceEqual(bytes)) continue;
                 bytes.CopyTo(into[section..]);
                 changed = true;
@@ -373,6 +385,7 @@ public sealed record ProMixPlan
             if (section is not (0 or AuxSection)) throw new ArgumentException($"section {section} is not put back on leaving", nameof(EntryRestore));
             if (!IsRestore(hex)) throw new ArgumentException($"a restore is {ProJackFeeds.RestoredLength} bytes of hex", nameof(EntryRestore));
             byte[] bytes = Restored(hex);
+            KeepDuckedInputs(bytes, into, section);
             if (into.Slice(section, bytes.Length).SequenceEqual(bytes)) continue;
             bytes.CopyTo(into[section..]);
             changed = true;
@@ -401,7 +414,7 @@ public sealed record ProMixPlan
                 bytes.CopyTo(into[section..]);
                 changes |= ProMixChanges.UnitSections;
             }
-        if (UnitSections is not null && ProMixSections.ClearInputDucking(into)) changes |= ProMixChanges.UnitSections;
+        if (UnitSections is not null && ProMixSections.ClearInputDucking(into, DuckedInputs)) changes |= ProMixChanges.UnitSections;
         if (Section0Level is byte level && into[ProMixSections.Section0LevelOffset] != level)
         {
             into[ProMixSections.Section0LevelOffset] = level;
@@ -434,6 +447,23 @@ public sealed record ProMixPlan
 
     /// <summary>A checked restore's bytes with any input tap field at 3 put back to 2, as every write of the block leaves them.</summary>
     private static byte[] Restored(string hex) => Restored(Convert.FromHexString(hex));
+
+    /// <summary>
+    /// A restore's bytes for <paramref name="section"/> with each input
+    /// <see cref="DuckedInputs"/> keeps there taking its field as
+    /// <paramref name="held"/> holds it, so a restore never undoes the
+    /// ducking the unit is meant to hold.
+    /// </summary>
+    private void KeepDuckedInputs(Span<byte> bytes, ReadOnlySpan<byte> held, int section)
+    {
+        int kept = DuckedInputs?.GetValueOrDefault(section) ?? 0;
+        if (kept == 0) return;
+        int fields = 0;
+        for (int input = 0; input < ProMixSections.InputCount; input++)
+            if ((kept & 1 << input) != 0) fields |= 0b11 << 2 * input;
+        int at = ProMixSections.InputTapsOffset;
+        bytes[at] = (byte)(bytes[at] & ~fields | held[section + at] & fields);
+    }
 
     private static byte[] Restored(byte[] bytes)
     {

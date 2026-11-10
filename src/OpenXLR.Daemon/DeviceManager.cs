@@ -1285,6 +1285,7 @@ public sealed partial class DeviceManager : BackgroundService
             if (_device is null || !_device.Connected || !_device.Capabilities.OutputRouting) return false;
             DeviceState? s = _last;
             if (s is null) return false;
+            plan = KeepingDuckedInputs(_device, plan);
             bool duckWaiting;
             lock (_duckGate) duckWaiting = _device.Capabilities.Ducking && _duckPending is not null;
             if (!duckWaiting && Holds(s, plan)) { held = true; return false; }
@@ -1663,6 +1664,7 @@ public sealed partial class DeviceManager : BackgroundService
     /// </summary>
     private ProMixWrite? WriteMixLocked(IAudioDevice dev, ProMixPlan plan, string reason)
     {
+        plan = KeepingDuckedInputs(dev, plan);
         ProDuckingTarget? target = null;
         string owner = "";
         if (dev.Capabilities.Ducking)
@@ -1711,6 +1713,20 @@ public sealed partial class DeviceManager : BackgroundService
             reason, dev.Info.DisplayName, target, key,
             write.Wrote8 ? "written: " + write.Change8 : "unchanged", write.Wrote1 ? "written: " + write.Change1 : "unchanged");
         return write;
+    }
+
+    /// <summary>
+    /// The plan with the inputs the last ducking target posted puts after
+    /// the ducker, so a unit-section write or a restore leaves them there
+    /// instead of putting them back to 2 (see <see cref="ProMixPlan.DuckedInputs"/>).
+    /// </summary>
+    private ProMixPlan KeepingDuckedInputs(IAudioDevice dev, ProMixPlan plan)
+    {
+        if (!dev.Capabilities.Ducking) return plan;
+        ProDuckingTarget? wanted;
+        lock (_duckGate) wanted = _duckUnit == dev.Info.InstanceId ? _duckWanted : null;
+        return wanted is { Enabled: true } && ProDucking.InputSections(wanted) is { Count: > 0 } inputs
+            ? plan with { DuckedInputs = inputs } : plan;
     }
 
     /// <summary>

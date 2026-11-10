@@ -649,7 +649,11 @@ public static class CommandValidation
 
     /// <summary>
     /// <c>setDucking</c>: <c>value</c> is an object with at least one of
-    /// <c>enabled</c> (boolean), <c>key</c> (a microphone channel id),
+    /// <c>enabled</c> (boolean), <c>keys</c> (one to
+    /// <see cref="DuckingSetup.MaxKeys"/> distinct channels that can key:
+    /// microphones, Aux In, Line In and application channels), <c>key</c>
+    /// (one such channel, the form clients from before several keys send,
+    /// never with <c>keys</c>),
     /// <c>channels</c> (distinct channel ids, possibly none), <c>mixes</c>
     /// (distinct mix ids, possibly none), <c>sensitivity</c> (<c>low</c>,
     /// <c>medium</c>, <c>high</c> or whole dBFS), <c>amount</c> (<c>low</c>,
@@ -657,7 +661,7 @@ public static class CommandValidation
     /// <c>medium</c>, <c>fast</c> or an object of whole-ms <c>attack</c> and
     /// <c>release</c>), the numbers within <see cref="ProDucking"/>'s bounds. Any other
     /// field is refused, so a misspelt one is not silently ignored. Ids are
-    /// checked against the layout when one is given; the key's absence from
+    /// checked against the layout when one is given; the keys' absence from
     /// <c>channels</c> is checked here when both come in one command, and by
     /// the mixer against the merged setup otherwise.
     /// </summary>
@@ -666,7 +670,7 @@ public static class CommandValidation
         change = null;
         if (cmd.Value.ValueKind != JsonValueKind.Object) return "setDucking: value must be an object";
         bool? enabled = null;
-        string? key = null;
+        List<string>? keys = null;
         DuckingLevel? sensitivity = null, amount = null;
         DuckingSpeed? speed = null;
         List<string>? channels = null, mixes = null;
@@ -682,17 +686,24 @@ public static class CommandValidation
                     break;
                 case "key":
                     if (field.Value.ValueKind != JsonValueKind.String || field.Value.GetString() is not { Length: > 0 and <= 36 } k
-                        || layout is not null && !layout.IsSoundCheckChannel(k))
-                        return "setDucking: key must be a microphone channel";
-                    key = k;
+                        || layout is not null && !layout.IsDuckingKeyChannel(k))
+                        return $"setDucking: {DuckingSetup.KeyProblem}";
+                    if (keys is not null) return "setDucking: give key or keys, not both";
+                    keys = [k];
+                    break;
+                case "keys":
+                    if (Ids(field.Value, id => layout?.IsDuckingKeyChannel(id) ?? true) is not { Count: > 0 and <= DuckingSetup.MaxKeys } ks)
+                        return $"setDucking: {DuckingSetup.KeysProblem}";
+                    if (keys is not null) return "setDucking: give key or keys, not both";
+                    keys = ks;
                     break;
                 case "channels":
                     if (Ids(field.Value, id => layout?.HasChannel(id) ?? true) is not { } c)
-                        return "setDucking: channels must be distinct channel ids other than the key";
+                        return $"setDucking: {DuckingSetup.ChannelsProblem}";
                     channels = c;
                     break;
                 case "mixes":
-                    if (Ids(field.Value, id => layout?.HasMix(id) ?? true) is not { } m) return "setDucking: mixes must be distinct mix ids";
+                    if (Ids(field.Value, id => layout?.HasMix(id) ?? true) is not { } m) return $"setDucking: {DuckingSetup.MixesProblem}";
                     mixes = m;
                     break;
                 case "sensitivity":
@@ -713,9 +724,9 @@ public static class CommandValidation
                     return $"setDucking: unknown field '{Short(field.Name)}'";
             }
         }
-        if (fields == 0) return "setDucking: value needs at least one of enabled, key, channels, mixes, sensitivity, amount and speed";
-        if (key is not null && channels?.Contains(key) == true) return "setDucking: channels must be distinct channel ids other than the key";
-        change = new DuckingChange(enabled, key, channels, mixes, sensitivity, amount, speed);
+        if (fields == 0) return "setDucking: value needs at least one of enabled, keys, key, channels, mixes, sensitivity, amount and speed";
+        if (keys is not null && channels?.Any(keys.Contains) == true) return $"setDucking: {DuckingSetup.ChannelsProblem}";
+        change = new DuckingChange(enabled, keys, channels, mixes, sensitivity, amount, speed);
         return null;
 
         // A word, or a whole number; its range is checked by the caller.

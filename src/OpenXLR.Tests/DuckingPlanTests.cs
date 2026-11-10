@@ -8,7 +8,7 @@ namespace OpenXLR.Tests;
 public sealed class DuckingPlanTests
 {
     internal static DuckingPlan Plan(string key = "xlr1", params string[] cells)
-        => new(key, cells.ToHashSet(StringComparer.Ordinal), -12, 12, 30, 200, true);
+        => new([key], cells.ToHashSet(StringComparer.Ordinal), -12, 12, 30, 200, true);
 
     [Fact]
     public void BusNamesCannotCollideWithLayoutIdsAndTheHelperUsesTheDuckBackend()
@@ -150,6 +150,44 @@ public sealed class DuckingPlanTests
     }
 
     [Fact]
+    public void EachKeyIsOpenOnItsOwnBitAndAPausedMicrophoneClosesOnlyItsOwn()
+    {
+        using var f = new Sends();
+        f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor") with { Keys = ["xlr1", "chat", "xlr2"] });
+        f.Mixer.SetChannelMuted("xlr2", "stream", false);
+        Assert.Equal(0b111, f.KeyMask);
+        // Chat silenced everywhere: its bit alone closes.
+        foreach (string mix in new[] { "monitor", "stream" }) f.Mixer.SetLevel("chat", mix, 0);
+        Assert.Equal(0b101, f.KeyMask);
+        // The microphone pause closes the microphones and leaves an application key.
+        foreach (string mix in new[] { "monitor", "stream" }) f.Mixer.SetLevel("chat", mix, 1);
+        f.Mixer.SetMonitorMuted(true);
+        f.Mixer.SetMonitorMuteMicrophones(true);
+        Assert.Equal(0b010, f.KeyMask);
+    }
+
+    [Fact]
+    public void APlanTakesOneToEightDistinctKeysInTheLayoutAndNoneOfThemDucked()
+    {
+        using var f = new Sends();
+        f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor") with { Keys = ["xlr1", "chat"] });
+        Assert.Equal(["xlr1", "chat"], f.Field<DuckingPlan>("_duckPlan").Keys);
+        Assert.Throws<ArgumentException>(() => f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor") with { Keys = [] }));
+        Assert.Throws<ArgumentException>(() => f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor") with { Keys = ["xlr1", "xlr1"] }));
+        Assert.Throws<ArgumentException>(() => f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor") with { Keys = ["xlr1", "gone"] }));
+        Assert.Throws<ArgumentException>(() => f.Mixer.SetDuckingPlan(Plan("xlr1", "chat|monitor") with { Keys = ["xlr1", "chat"] }));
+        Assert.Throws<ArgumentException>(() => f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor")
+            with { Keys = [.. Enumerable.Range(0, DuckingSetup.MaxKeys + 1).Select(i => $"k{i}")] }));
+        // Pruning drops a deleted key and keeps the rest; the plan goes with the last.
+        DuckingPlan plan = Plan("xlr1", "music|monitor") with { Keys = ["xlr1", "music2"] };
+        MixerConfig config = MixerConfig.Default();
+        config = config with { Channels = [.. config.Channels, new("music2", "Music 2")] };
+        Assert.Equal(["xlr1"], plan.Prune(config.WithoutChannel("music2"))!.Keys);
+        MixerConfig noKeys = config.WithoutChannel("music2");
+        Assert.Null(plan.Prune(noKeys with { Channels = [.. noKeys.Channels.Where(c => c.Id != "xlr1")] }));
+    }
+
+    [Fact]
     public void AFailedInactiveLegWriteNeverOpensTheOtherPath()
     {
         using var f = new Sends();
@@ -255,7 +293,8 @@ public sealed class DuckingPlanTests
         public bool FailDirectMute { set { if (value) File.WriteAllText(Path.Combine(_dir, "fail"), ""); else File.Delete(Path.Combine(_dir, "fail")); } }
         public T Field<T>(string name) => (T)typeof(Mixer).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Mixer)!;
         public void Set(string name, object value) => typeof(Mixer).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Mixer, value);
-        public bool KeyOpen => (bool)Call("DuckKeyOpenLocked")!;
+        public bool KeyOpen => KeyMask != 0;
+        public int KeyMask => (int)Call("DuckKeyOpenLocked")!;
         public ((double Level, bool Muted) Direct, (double Level, bool Muted) Bus) Targets(string channel, string mix)
             => (((double, bool), (double, bool)))Call("CellLegTargetsLocked", channel, mix, false)!;
         private object? Call(string name, params object[] args)

@@ -8,7 +8,7 @@
 #include <assert.h>
 
 enum { RATE = 48000, BLOCK = 256, COUNT = 3 * RATE };
-static float input[2][COUNT], output[2][COUNT], key[COUNT];
+static float input[2][COUNT], output[2][COUNT], key[COUNT], second[COUNT];
 
 static Host *fresh(void) {
   Host *h = calloc(1, sizeof(*h));
@@ -44,7 +44,8 @@ static void run(Host *h, size_t start, size_t count) {
     uint32_t frames = (uint32_t)fmin(start + count - at, BLOCK);
     float *in[] = {input[0] + at, input[1] + at};
     float *out[] = {output[0] + at, output[1] + at};
-    h->key = key + at;
+    h->keys[0] = key + at;
+    h->keys[1] = second + at;
     h->backend->process(h, frames, in, out);
     const Duck *d = h->impl;
     assert(isfinite(d->envelope) && isfinite(d->gain));
@@ -75,12 +76,12 @@ static double check_steps(size_t count, double limit) {
 }
 
 static void check_controls(void) {
-  assert(backend_named("duck") == &duck_backend && duck_backend.key_inputs == 1);
+  assert(backend_named("duck") == &duck_backend && duck_backend.key_inputs == MAX_KEYS);
   Host *h = fresh();
   const struct { const char *name; float minimum, maximum, initial; bool output; } controls[] = {
       {"enabled", 0, 1, 0, false}, {"threshold", -60, 0, -12, false},
       {"depth", 0, 40, 12, false}, {"attack", 1, 5000, 80, false},
-      {"release", 1, 10000, 1200, false}, {"key_open", 0, 1, 1, false},
+      {"release", 1, 10000, 1200, false}, {"key_open", 0, 255, 1, false},
       {"reduction", 0, 40, 0, true}};
   assert(h->control_count == sizeof(controls) / sizeof(controls[0]));
   for (uint32_t i = 0; i < h->control_count; i++) {
@@ -174,6 +175,28 @@ static void check_key(void) {
   puts("key: Low ignores -6 dBFS; closed key ignores 0 dBFS; High triggers at -18 dBFS; equality and negative polarity trigger");
 }
 
+// Two keys: the detector follows the louder, never their sum, and a key
+// whose bit is clear in key_open is not heard at all.
+static void check_keys(void) {
+  const float below = (float)pow(10, -15.0 / 20);  // each under -12 dBFS; together +6 dB over it
+  struct { float first, second; float open; bool ducks; } cases[] = {
+      {below, below, 3, false}, {0, 1, 3, true}, {0, 1, 1, false},
+      {1, 0, 2, false}, {0, 1, 2, true}, {1, 1, 0, false}};
+  for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    Host *h = fresh();
+    fill(cases[i].first);
+    for (unsigned n = 0; n < COUNT; n++) second[n] = cases[i].second;
+    set(h, "enabled", 1);
+    set(h, "key_open", cases[i].open);
+    run(h, 0, RATE);
+    if (cases[i].ducks) assert(fabs(gain_at(RATE - 1) + 12) < 0.05);
+    else unity(RATE);
+    release(h);
+  }
+  memset(second, 0, sizeof(second));
+  puts("keys: two keys under the threshold do not add up; the louder open key ducks; a closed key is not heard");
+}
+
 static void check_nonfinite_key(void) {
   Host *h = fresh();
   fill(0);
@@ -258,6 +281,7 @@ int main(void) {
   check_idle();
   check_medium();
   check_key();
+  check_keys();
   check_nonfinite_key();
   check_presets();
   check_zero_depth();

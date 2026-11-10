@@ -2914,9 +2914,6 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="Ducking" xml:space="preserve">
     <value>Ducking</value>
   </data>
-  <data name="DuckingEnabled" xml:space="preserve">
-    <value>Hinaan ang ibang audio habang malakas ang key microphone</value>
-  </data>
   <data name="DuckingSensitivity" xml:space="preserve">
     <value>Sensitibidad</value>
   </data>
@@ -2947,21 +2944,6 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="DuckingMarkTip" xml:space="preserve">
     <value>{0}, {1}</value>
   </data>
-  <data name="DuckingSensitivityTip" xml:space="preserve">
-    <value>Gaano kalakas dapat ang key microphone bago humina ang mga channel. Ang mas pakanan ay tumutugon sa mas mahinang boses.</value>
-  </data>
-  <data name="DuckingAmountTip" xml:space="preserve">
-    <value>Gaano kalaki ang ihihina ng mga channel habang malakas ang key microphone.</value>
-  </data>
-  <data name="DuckingAttackTip" xml:space="preserve">
-    <value>Gaano katagal bago humina ang mga channel kapag malakas na ang key microphone.</value>
-  </data>
-  <data name="DuckingReleaseTip" xml:space="preserve">
-    <value>Gaano katagal bago bumalik ang mga channel kapag tahimik na ang key microphone.</value>
-  </data>
-  <data name="DuckingHint" xml:space="preserve">
-    <value>Pinahihina ng ducking ang napiling channel sa napiling mix habang malakas ang key microphone. Sa computer na ito ito tumatakbo, o sa sariling processor ng Wave XLR Pro kapag tugma ang setup sa kaya ng unit.</value>
-  </data>
   <data name="DuckingNotHeld" xml:space="preserve">
     <value>Hindi pa pinananatili ng unit ang setting na ito; isusulat muli ito ng OpenXLR sa loob ng ilang segundo.</value>
   </data>
@@ -2973,15 +2955,6 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   </data>
   <data name="DuckingNotRunning" xml:space="preserve">
     <value>Walang nagpapatakbo ng setting na ito.</value>
-  </data>
-  <data name="DuckingButtonTip" xml:space="preserve">
-    <value>Hinaan ang ibang audio habang malakas ang mikropono: key, channel, mix, preset at kung saan ito tumatakbo.</value>
-  </data>
-  <data name="DuckingKey" xml:space="preserve">
-    <value>Key microphone</value>
-  </data>
-  <data name="DuckingKeyTip" xml:space="preserve">
-    <value>Mikroponong ang boses ang nagpapahina sa ibang audio. Hindi nito pinahihina ang sarili nito.</value>
   </data>
   <data name="DuckingChannels" xml:space="preserve">
     <value>Hinaan ang mga channel na ito</value>
@@ -3007,26 +2980,11 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="DuckingProcessingSoftware" xml:space="preserve">
     <value>Computer na ito</value>
   </data>
-  <data name="DuckingProcessingDeviceTip" xml:space="preserve">
-    <value>Patakbuhin ang ducking sa sariling processor ng {0}. Naririnig nito ang XLR 1 gaya ng unit, bago ang USB, kaya bago ang software EQ, mga insert at anumang gate sa computer. Hindi mapipigil ng noise gate o suppressor sa XLR 1 ang pag-trigger nito sa ingay. Pinahihina nito ang tapos nang mix habang pinapatugtog ng unit sa mga output, pagkatapos ng lahat ng pagproseso sa computer. Piliin ang computer na ito kung dapat pigilan ng gate sa XLR 1 ang maling pag-trigger.</value>
-  </data>
-  <data name="DuckingProcessingSoftwareTip" xml:space="preserve">
-    <value>Patakbuhin ang ducking sa computer na ito. Ang key ay ang mikropono pagkatapos ng EQ, insert at Sound Check loop, bago ang volume at send nito, kaya pinipigilan ng gate dito ang maling pag-trigger. Humihina ang mga napiling channel sa loob ng bawat mix, bago ang sariling plugin at latency delay ng mix. Naka-off ang sariling ducking ng unit.</value>
-  </data>
-  <data name="DuckingStatusOnUnit" xml:space="preserve">
-    <value>Naka-on, tumatakbo sa sariling processor ng {0}. Naririnig nito ang XLR 1 bago ang USB, lahat ng gate at plugin sa computer na ito, at pinahihina ang tapos nang mix sa mga output ng unit.</value>
-  </data>
-  <data name="DuckingStatusOnComputer" xml:space="preserve">
-    <value>Naka-on, tumatakbo sa computer na ito. Naririnig nito ang {0} pagkatapos ng EQ, insert at Sound Check loop, at pinahihina ang mga napiling channel sa loob ng bawat mix, bago ang sariling plugin ng mix.</value>
-  </data>
   <data name="DuckingMixerOff" xml:space="preserve">
     <value>Naka-off ang software mixer, kaya hindi tumatakbo ang ducking. Paganahin ito sa Mga opsyon, AUDIO.</value>
   </data>
   <data name="DuckingNothingChosen" xml:space="preserve">
     <value>Naka-on, pero walang pinahihina. Pumili ng hindi bababa sa isang channel at mix.</value>
-  </data>
-  <data name="DuckingDeviceKeyNotSupported" xml:space="preserve">
-    <value>XLR 1 lang ang key na sinusuportahan ng {0} para sa ducking.</value>
   </data>
   <data name="DuckingDeviceFailed" xml:space="preserve">
     <value>Hindi pinanatili ng {0} ang ducking na isinulat dito. I-off at i-on ang ducking upang subukang muli ang unit.</value>

@@ -303,4 +303,46 @@ public sealed class HardwareMixingWriteTests
         ducked[18 + 15] = 0xae;
         Assert.Equal("0C0000000000000000000000C10000AA", ProMixPlan.RestoreOf(ducked, 18));
     }
+
+    [Fact]
+    public void HardwareMixingLeavesTheInputsTheDuckingIsMeantToHoldAndNeverSetsOne()
+    {
+        // The ducking posted ducks XLR 2 in sections 0 and 18; Wave Link left
+        // XLR 1 after the ducker in 18 and 72, which goes back to 2.
+        byte[] held = InputsDucked();
+        var plan = new ProMixPlan
+        {
+            UnitSections = new Dictionary<int, byte[]> { [0] = held[..ProMixPlan.UnitSectionLength] },
+            DuckedInputs = new Dictionary<int, int> { [0] = 0b10, [18] = 0b10, [36] = 0b10 },
+        };
+        byte[] after = Apply(plan, held, out ProMixChanges changes);
+        Assert.Equal(ProMixChanges.UnitSections, changes);
+        // Section 36's XLR 2 read at 2 stays at 2: only a ducking write sets 3.
+        Assert.Equal(new byte[] { 0xae, 0xae, 0xaa, 0xaa, 0x92 }, ProMixSections.Starts.Select(s => after[s + 15]));
+        // Held as it is now: no write every sweep.
+        Assert.Equal(ProMixChanges.None, plan.Needs(after));
+        // With the ducking target in the same write, it sets its inputs as it wants them.
+        var both = plan with { Ducking = ProDuckingTests.InSections(new() { [0] = [1], [36] = [1] }) with { Inputs = new HashSet<int> { 1 } } };
+        after = Apply(both, held, out _);
+        Assert.Equal(new byte[] { 0xae, 0xaa, 0xae, 0xaa, 0x92 }, ProMixSections.Starts.Select(s => after[s + 15]));
+    }
+
+    [Fact]
+    public void ARestoreLeavesAnInputTheDuckingIsMeantToHold()
+    {
+        const string kept = "0C0000000000000000000000C10000AA";
+        byte[] held = ProMixPlanTests.Neutral();
+        held[18 + 15] = 0xae;   // XLR 2 ducked in section 18 by the ducking posted
+        var plan = new ProMixPlan
+        {
+            Restore = new Dictionary<int, string> { [18] = kept },
+            DuckedInputs = new Dictionary<int, int> { [18] = 0b10 },
+        };
+        byte[] after = Apply(plan, held, out _);
+        Assert.Equal(Convert.FromHexString("0C0000000000000000000000C10000AE"), after[18..34]);
+        Assert.Equal(ProMixChanges.None, plan.Needs(after));
+        // Without that ducking the restore puts it back at 2.
+        after = Apply(plan with { DuckedInputs = null }, held, out _);
+        Assert.Equal(0xaa, after[18 + 15]);
+    }
 }

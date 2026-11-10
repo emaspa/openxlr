@@ -224,6 +224,32 @@ test("hardware keys stay unit controls and are named after the carrying channel"
     host.receive({event:"keyDown",context:"ducking"});
     assert.deepEqual(daemon.messages.at(-1), {cmd:"setDucking",value:{enabled:false}});
     assert.equal(alerted("ducking"), 1);
+
+    // A channel's ducking key: lit while it is a key, a press adds or takes
+    // it out, and the last key stays with only an alert. This daemon sends
+    // only `key`, which is the one key the presses start from.
+    key("duck-xlr2", "duckkey:xlr2");
+    key("duck-xlr1", "duckkey:xlr1");
+    assert.ok(keyImage("duck-xlr2").includes(">Duck key</text>"));
+    const unlit = keyImage("duck-xlr2");
+    const before = daemon.messages.length;
+    host.receive({event:"keyDown",context:"duck-xlr1"});
+    assert.equal(daemon.messages.length, before);
+    assert.equal(alerted("duck-xlr1"), 1);
+    host.receive({event:"keyDown",context:"duck-xlr2"});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"setDucking",value:{keys:["xlr1", "xlr2"]}});
+    // A second press before the daemon answers builds on the first.
+    host.receive({event:"keyDown",context:"duck-xlr1"});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"setDucking",value:{keys:["xlr2"]}});
+    state.ducking = {...state.ducking, keys:["xlr1", "xlr2"], channels:["music"]};
+    daemon.receive(state);
+    assert.notEqual(keyImage("duck-xlr2"), unlit);
+    host.receive({event:"keyDown",context:"duck-xlr1"});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"setDucking",value:{keys:["xlr2"]}});
+    // A channel the layout no longer has is unavailable.
+    key("duck-gone", "duckkey:gone");
+    host.receive({event:"keyDown",context:"duck-gone"});
+    assert.equal(alerted("duck-gone"), 1);
   }
   finally {
     if (oldSkin === undefined) delete process.env.OPENXLR_SKIN;

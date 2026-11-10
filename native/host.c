@@ -190,7 +190,8 @@ uint32_t host_max_block(const Host *h) {
   return h->own_block ? OWN_BLOCK_FRAMES : MAX_FRAMES;
 }
 unsigned host_channels(const Host *h) { return h->channels; }
-const float *host_key(const Host *h) { return h->key; }
+const float *host_key(const Host *h) { return h->keys[0]; }
+const float *host_key_at(const Host *h, unsigned index) { return index < MAX_KEYS ? h->keys[index] : NULL; }
 unsigned long host_window(const Host *h) { return h->window; }
 void *host_impl(const Host *h) { return h->impl; }
 void host_set_impl(Host *h, void *impl) { h->impl = impl; }
@@ -569,10 +570,11 @@ static void process_audio(void *data, struct spa_io_position *position) {
     else
       out[i] = host_fallback(h->scratch, frames, false);
   }
-  h->key = h->silence;
-  if (h->key_port) {
-    const float *buffer = pw_filter_get_dsp_buffer(h->key_port, frames);
-    h->key = buffer ? buffer : host_fallback(h->silence, frames, true);
+  for (unsigned k = 0; k < MAX_KEYS; ++k) {
+    h->keys[k] = h->silence;
+    if (!h->key_ports[k]) continue;
+    const float *buffer = pw_filter_get_dsp_buffer(h->key_ports[k], frames);
+    h->keys[k] = buffer ? buffer : host_fallback(h->silence, frames, true);
   }
   for (unsigned t = 0; t < MAX_TAPS; ++t) {
     h->taps[t] = NULL;
@@ -662,14 +664,19 @@ static bool add_audio_ports(Host *h) {
         h->in_ports[i] = port;
     }
   }
-  if (h->backend->key_inputs == 1) {
-    h->key_port = pw_filter_add_port(
+  // key_0 to key_7: one digit each, so no port name begins another and a
+  // link asked for by name reaches that port alone.
+  if (h->backend->key_inputs > MAX_KEYS) return false;
+  for (unsigned k = 0; k < h->backend->key_inputs; ++k) {
+    char name[8];
+    snprintf(name, sizeof(name), "key_%u", k);
+    h->key_ports[k] = pw_filter_add_port(
         h->filter, PW_DIRECTION_INPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS, 1,
         pw_properties_new(PW_KEY_FORMAT_DSP, "32 bit float mono audio",
-                          PW_KEY_PORT_NAME, "key_0", PW_KEY_AUDIO_CHANNEL,
+                          PW_KEY_PORT_NAME, name, PW_KEY_AUDIO_CHANNEL,
                           "MONO", NULL),
         NULL, 0);
-    if (!h->key_port) return false;
+    if (!h->key_ports[k]) return false;
   }
   h->tap_count = 0;
   for (const TapOutput *tap = h->backend->tap_outputs; tap && tap->port; ++tap) {

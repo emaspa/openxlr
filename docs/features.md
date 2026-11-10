@@ -44,14 +44,18 @@ Wave XLR Pro:
   layout loses; the terminal mixer's Options tab has the same choice
   ([manual](manual.md#hardware-mixing))
 - Ducking on the device, mapped from Wave Link on Windows: when the
-  [ducking](#submixer) setup fits what the unit can do (XLR 1 as the key, a
-  whole mix on the jacks and Line Out or on the USB Aux port), the Pro
+  [ducking](#submixer) setup fits what the unit can do (every key one of
+  its inputs, XLR 1, XLR 2, USB Aux or Line In, and a whole mix on the
+  jacks and Line Out or on the USB Aux port), the Pro
   runs it on its own processor; otherwise this computer does, and the
   state says why ([api.md](api.md#where-ducking-runs)). The unit is written with ducking off while
   this computer runs it, which clears ducking Wave Link left. In hardware
   mixing, where the unit builds the jacks' mixes from a USB pair per
-  channel, it ducks each chosen channel on its own, keyed by XLR 1, and
-  this computer ducks the mixes it builds alongside
+  channel, it ducks each chosen channel on its own, its own inputs
+  included. Any of its inputs or any channel on a USB pair can be a key
+  there, and this computer ducks the mixes it builds alongside. Nobody has
+  yet heard the unit duck with a key other than XLR 1, or lower its own
+  inputs
 
 Wave XLR MK.2 and XLR Dock MK.2: gain, mute, phantom power, low cut,
 expander, voice tune with strength, ClipGuard, compressor, headphone
@@ -115,7 +119,7 @@ older firmware run it in software. The Pro's EQ follows Wave Link
 captures and is verified on hardware by the maintainer and other owners.
 The Pro's mix
 maximizer, channel booster and remaining hardware mix matrix are
-unmapped, as is any ducking key but XLR 1. Wave Link configures those onboard effects on supported systems;
+unmapped. Wave Link configures those onboard effects on supported systems;
 OpenXLR's LV2, CLAP and VST3 inserts process audio on the Linux host.
 
 XLR Dock: gain, mute and headphone volume through the kernel's standard
@@ -413,20 +417,21 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   heads, under the gain on a hardware row; the terminal mixer and the
   OpenDeck dials change it too. The Wave XLR Pro's zero-latency headphone
   path takes its level from it, and the UI marks the channel it carries
-- Ducking on every device: a key microphone (XLR 1, XLR 2 or a mono
-  capture input) lowers chosen channels in chosen mixes while it is loud,
+- Ducking on every device: one to eight keys (microphones, Aux In, Line
+  In or application channels) lower chosen channels in chosen mixes while
+  the loudest of them is loud,
   by the Wave XLR Pro's presets (6, 12 or 24 dB, with its sensitivity and
   speed presets) or by custom values: a threshold from -60 to 0 dBFS, a
   depth from 1 to 40 dB, an attack from 1 to 1000 ms and a release from
   10 to 10000 ms.
-  The key is never lowered. A native stage per ducked mix runs it on this
+  A key is never lowered. A native stage per ducked mix runs it on this
   computer with no added latency. On a Wave XLR Pro whose setup fits what
   the unit can do, the unit runs it instead; otherwise the state says why
   it does not. Saved with the mixer, carried by profiles, and reported as a
   `duck:<mix>` reduction meter while software runs. Set up in the
   Ducking window, opened from the SUBMIXER header, the layout editor and
   Options, with
-  the key, a channel and a mix checklist, sliders for sensitivity, amount,
+  a key, a channel and a mix checklist, sliders for sensitivity, amount,
   attack and release with the presets marked on them, where it runs and
   a reduction bar ([manual](manual.md#ducking))
 - Bidirectional Linux volume and mute controls for every monitor mix,
@@ -1058,7 +1063,8 @@ lock, switching the monitor output to a specific device, and cycling
 an output's feed through Monitor A, Monitor B, Monitor A+B and then every other mix, an
 output's volume in 5% steps and its mute (red while muted), the enforced
 system output, routing the focused application to a channel, the
-next member of an exclusive group, ducking on or off on any device, and
+next member of an exclusive group, ducking on or off on any device, a
+channel as a ducking key or not, and
 loading an EQ profile on a microphone or a mix, lit while its EQ holds
 that profile. Each key
 can pick its icon, and a typed title replaces the built-in label. A key or
@@ -1141,8 +1147,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   the selection visible. F1 or `?` lists all keys. A plugin is added from
   a picker over the catalogue, narrowed by typing, of the plugins that fit
   the chain's width
-- Ducking in Inputs on any device: the switch, a key that cycles through
-  the microphones, a row of keys for the channels to lower and one for the
+- Ducking in Inputs on any device: the switch, a row of the channels that
+  can be keys, a row for the channels to lower and one for the
   mixes, the three presets (a custom value set elsewhere shows as a fourth
   choice), and on a Wave XLR Pro the choice between the
   unit and this computer with the reason the unit does not run it. A short

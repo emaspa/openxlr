@@ -44,6 +44,12 @@ public sealed partial class Mixer
         lock (_gate) return _config.Channels.Any(c => c.Id == channel && c.Microphone);
     }
 
+    /// <summary>The channels that can key ducking (see <see cref="DuckingSetup.CanKey"/>).</summary>
+    public bool IsDuckingKeyChannel(string channel)
+    {
+        lock (_gate) return _config.Channels.Any(c => c.Id == channel && DuckingSetup.CanKey(c));
+    }
+
     /// <summary>The longest a session runs before it ends by itself.</summary>
     internal static readonly TimeSpan SoundCheckSessionLimit = TimeSpan.FromMinutes(10);
 

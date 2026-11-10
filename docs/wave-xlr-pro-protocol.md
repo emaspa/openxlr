@@ -509,11 +509,13 @@ pairs by the configured depth (block 0x0002 meters, capture 28). Section
 The daemon writes the same fields
 (`src/OpenXLR.Core/Devices/ProDucking.cs`): the setup's sensitivity,
 amount and speed in bytes 0 to 5 of all twelve entries while ducking is
-on, the key mask `01 00` (XLR 1 alone) in bytes 6 and 7 of the target
-pairs' entries and `00 00` in every other entry, so the keys Wave Link
-leaves behind are cleared, and the high bit of each pair field in the
-three mix sections. Every write of block 0x0001 that carries ducking also
-puts an input tap field at `11` back to `10` (section 20). Every other
+on, the key mask of the setup's keys (`01 00` for XLR 1 alone, section
+20) in bytes 6 and 7 of the target pairs' and inputs' entries and `00 00`
+in every other entry, so the keys Wave Link leaves behind are cleared,
+and the high bit of each pair field in the three mix sections. Every
+write of block 0x0001 that carries ducking also sets the target inputs'
+tap fields to `11` and puts every other input tap field at `11` back to
+`10` (section 20). Every other
 byte of both blocks is copied from a fresh read.
 It writes 0x0008, then 0x0001, only the blocks that change, without the
 commit. Its targets are the pairs OpenXLR streams to: 2/3 (the jacks'
@@ -1257,11 +1259,16 @@ XLR 1 bit 0, in each ducked channel's entry.
   section 11). On such a unit XLR 2 ducks whatever those entries' fields
   mark.
 
-OpenXLR keys by XLR 1 alone: it writes `01 00` on the entries it ducks and
-`00 00` on every other entry, which clears the leftovers. The readback's
-`entries` lists the entries whose mask has bit 0 set; whether the unit
-holds OpenXLR's setting is decided on every byte, so an entry that also
-holds another key does not read as held and is written again.
+OpenXLR writes the union of the setup's keys on each entry it ducks, less
+that entry's own bit, and `00 00` on every other entry, which clears the
+leftovers. Keyed by XLR 1 alone that is `01 00`; keyed in hardware mixing by XLR 1, XLR 2
+and Voice Chat on pair 4 it is `03 01` on a pair's entry and `01 01` on
+XLR 2's own. A key is one of the four inputs, or in hardware mixing a
+channel's pair (bit 4 + k). The readback's `entries` lists the entries
+whose mask has a bit set beside their own, and `keys` the bits set across
+them; whether the unit holds OpenXLR's setting is decided on every byte,
+so an entry that also holds a key OpenXLR did not write does not read as
+held and is written again.
 
 ### The tap fields in block 0x0001
 
@@ -1283,7 +1290,19 @@ Wave Link's usual `aa` at `s+15` is all four inputs at `10`. It wrote `ae`
 inputs ducked channels. The pairs' fields follow the same table, which
 is why a ducked pair reads `11`.
 
-OpenXLR never ducks an input. Its decode takes any value at `s+15`, and
-every write of block 0x0001 that carries ducking or hardware mixing, and
-every section it puts back, sets an input field read at `11` to `10` and
-leaves the other input fields as read.
+An input's field at `11` in a section ducks that input in that section's
+mix, by the depth and keys of the input's own entry in block 0x0008.
+That is confirmed for XLR 1 and XLR 2. USB Aux and Line In use the same
+layout (fields 2 and 3 at `s+15`, entries 2 and 3), but no capture shows
+them ducked, so OpenXLR's writes for them are not confirmed on a unit.
+
+OpenXLR ducks an input when the setup lowers it: the input's field goes
+to `11` in each section the setup ducks (the section of each ducked jack
+feed and of the Aux mix, or each section of a ducked mix the unit builds
+in hardware mixing), and its entry takes the keys. Its decode takes any
+value at `s+15`. Every write that carries ducking sets every other input
+field read at `11` to `10`, so an input that leaves the setup is put back
+at once. A hardware mixing write and every section it puts back do the
+same, except for the inputs the ducking posted to the unit puts after the
+ducker, which they leave as read; they never set a field to `11`. The
+other input fields stay as read.

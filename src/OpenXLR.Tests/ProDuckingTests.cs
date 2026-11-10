@@ -195,12 +195,17 @@ public sealed class ProDuckingTests
     public void TheJournalNamesThePairsAndPresetsOfATarget()
     {
         Assert.Equal("off", Off.ToString());
-        Assert.Equal("on, pairs 1 5, sensitivity medium, amount medium, speed medium", On(5, 1).ToString());
-        Assert.Equal("on, pairs none, sensitivity high, amount low, speed fast",
+        Assert.Equal("on, pairs 1 5, keys XLR 1, sensitivity medium, amount medium, speed medium", On(5, 1).ToString());
+        Assert.Equal("on, pairs 1 5, inputs XLR 2 and Line In, keys XLR 1, pair 4, sensitivity medium, amount medium, speed medium",
+            (On(5, 1) with { Inputs = new HashSet<int> { 3, 1 }, Keys = 1 << 0 | 1 << 8 }).ToString());
+        Assert.NotEqual(On(1), On(1) with { Keys = 1 << 1 });
+        Assert.NotEqual(On(1), On(1) with { Inputs = new HashSet<int> { 1 } });
+        Assert.Equal(On(1) with { Inputs = new HashSet<int> { 1, 3 } }, On(1) with { Inputs = new HashSet<int> { 3, 1 } });
+        Assert.Equal("on, pairs none, keys XLR 1, sensitivity high, amount low, speed fast",
             (On() with { Sensitivity = "high", Amount = "low", Speed = "fast" }).ToString());
         Assert.Equal(On(1, 5), On(5, 1));
         Assert.NotEqual(On(1), On(1, 5));
-        Assert.Equal("on, pairs 1 2 in section 0; 1 in section 18, sensitivity medium, amount medium, speed medium",
+        Assert.Equal("on, pairs 1 2 in section 0; 1 in section 18, keys XLR 1, sensitivity medium, amount medium, speed medium",
             InSections(new() { [18] = [1], [0] = [2, 1] }).ToString());
         Assert.Equal(InSections(new() { [0] = [1, 2], [18] = [1] }), InSections(new() { [18] = [1], [0] = [2, 1] }));
         Assert.NotEqual(InSections(new() { [0] = [1] }), On(1));
@@ -333,7 +338,9 @@ public sealed class ProDuckingTests
         byte[] b1 = Block1(0x00, 0xa0);
         byte[] before1 = (byte[])b1.Clone();
         DuckingReadback left = ProDucking.Decode(b8, b1);
-        Assert.Equal([3, 4, 5, 9, 11], left.Entries);   // XLR 1 among their keys
+        // Every entry holds a key beside its own bit, and between them every bit is set.
+        Assert.Equal(Enumerable.Range(0, 12), left.Entries);
+        Assert.Equal(Enumerable.Range(0, 16), left.Keys);
         Assert.False(ProDucking.Holds(left, On(1, 5)));
 
         ProDucking.Apply(b8, b1, On(1, 5));
@@ -497,7 +504,10 @@ public sealed class ProDuckingTests
         var readback = new DuckingReadback(-30, "custom", DuckingSpeed.Times(45, 900), [1], [4]);
         string json = System.Text.Json.JsonSerializer.Serialize(readback,
             new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
-        Assert.Equal("""{"sensitivity":-30,"amount":"custom","speed":{"attack":45,"release":900},"pairs":[1],"entries":[4]}""", json);
+        Assert.Equal("""{"sensitivity":-30,"amount":"custom","speed":{"attack":45,"release":900},"pairs":[1],"entries":[4],"inputs":[],"keys":[]}""", json);
+        json = System.Text.Json.JsonSerializer.Serialize(readback with { Inputs = [1], Keys = [0, 9] },
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+        Assert.EndsWith("\"inputs\":[1],\"keys\":[0,9]}", json);
     }
 
     [Theory]
@@ -529,6 +539,101 @@ public sealed class ProDuckingTests
         // Off leaves the presets alone, so that unit holds "off" all the same.
         Assert.True(ProDucking.Holds(unit, Off));
         Assert.False(ProDucking.Holds(new DuckingReadback("medium", "medium", "medium", [], []), Off));
+    }
+
+    /// <summary>The key mask an entry holds in block 0x0008, LE16.</summary>
+    private static int MaskOf(byte[] b8, int entry) => b8[entry * 8 + 6] | b8[entry * 8 + 7] << 8;
+
+    [Fact]
+    public void SeveralKeysAreWrittenAsTheirUnionLessEachEntrysOwnBit()
+    {
+        // Keyed by XLR 1, XLR 2 and Voice Chat on pair 4 (source 8); pairs 1
+        // and 4 ducked, and XLR 2 ducked as an input: its own bit is left off
+        // its own entry, as is pair 4's on entry 8.
+        ushort keys = 1 << 0 | 1 << 1 | 1 << 8;
+        var target = On(1, 4) with { Keys = keys, Inputs = new HashSet<int> { 1 } };
+        byte[] b8 = Block8(MediumBytes, IdleFlags);
+        for (int e = 0; e < 12; e++) b8[e * 8 + 7] = 0x0f;   // leftover keys in the high bytes too
+        byte[] b1 = Block1();
+        ProDucking.Apply(b8, b1, target);
+        for (int e = 0; e < 12; e++)
+        {
+            int wanted = e switch { 1 => keys & ~(1 << 1), 5 => keys, 8 => keys & ~(1 << 8), _ => 0 };
+            Assert.Equal(wanted, MaskOf(b8, e));
+        }
+        // XLR 2 at 3 in section 0, the section pair 1 plays as a whole output
+        // (pair 4 plays none), every other input field as read.
+        Assert.Equal(0xae, b1[15]);
+        foreach (int at in new[] { 33, 51, 69, 87 }) Assert.Equal(0xaa, b1[at]);
+        DuckingReadback unit = ProDucking.Decode(b8, b1);
+        Assert.Equal([1, 5, 8], unit.Entries);
+        Assert.Equal([0, 1, 8], unit.Keys);
+        Assert.Equal([1], unit.Inputs);
+        Assert.Equal([1, 4], unit.Pairs);
+        Assert.True(ProDucking.Holds(unit, target));
+        // Another key beside them is not held, and neither is a missing input.
+        Assert.False(ProDucking.Holds(unit, target with { Keys = 1 << 0 | 1 << 1 }));
+        Assert.False(ProDucking.Holds(unit, target with { Inputs = new HashSet<int>() }));
+
+        // Off clears every mask and puts the input back to 2.
+        ProDucking.Apply(b8, b1, Off);
+        for (int e = 0; e < 12; e++) Assert.Equal(0, MaskOf(b8, e));
+        foreach (int at in new[] { 15, 33, 51, 69, 87 }) Assert.Equal(0xaa, b1[at]);
+        Assert.Empty(ProDucking.Decode(b8, b1).Inputs);
+    }
+
+    [Fact]
+    public void AnInputIsDuckedInEverySectionAPairOfTheTargetPlaysAsAWholeOutput()
+    {
+        // Pairs 1, 2, 3 and 5: the jacks' three feeds and the Aux mix.
+        var target = On(1, 2, 3, 5) with { Inputs = new HashSet<int> { 2, 3 } };
+        Assert.Equal(new Dictionary<int, int> { [0] = 0b1100, [18] = 0b1100, [36] = 0b1100, [54] = 0b1100 }, ProDucking.InputSections(target));
+        byte[] b8 = Block8(MediumBytes, NoKeys), b1 = Block1();
+        ProDucking.Apply(b8, b1, target);
+        // USB Aux and Line In (fields 2 and 3) at 3: aa becomes fa.
+        foreach (int at in new[] { 15, 33, 51, 69 }) Assert.Equal(0xfa, b1[at]);
+        Assert.Equal(0xaa, b1[87]);   // section 72 plays no pair of the target
+        Assert.Equal(1, MaskOf(b8, 2));
+        Assert.Equal(1, MaskOf(b8, 3));
+        Assert.Equal([2, 3], ProDucking.Decode(b8, b1).Inputs);
+
+        // Pair 1 alone ducks the inputs in section 0 alone; no pair, nowhere,
+        // and then the inputs' entries take no key either.
+        Assert.Equal(new Dictionary<int, int> { [0] = 0b1100 }, ProDucking.InputSections(On(1) with { Inputs = new HashSet<int> { 2, 3 } }));
+        var none = On() with { Inputs = new HashSet<int> { 2, 3 } };
+        Assert.Empty(ProDucking.InputSections(none));
+        ProDucking.Apply(b8, b1, none);
+        Assert.Equal(0, MaskOf(b8, 2));
+        foreach (int at in new[] { 15, 33, 51, 69, 87 }) Assert.Equal(0xaa, b1[at]);
+        // Switched off, a target ducks no input.
+        Assert.Empty(ProDucking.InputSections(target with { Enabled = false }));
+    }
+
+    [Fact]
+    public void InHardwareMixingAnInputIsDuckedInTheSectionsTheTargetNames()
+    {
+        // Section 18 holds no ducked pair but is a target mix's section all the same.
+        var target = InSections(new() { [0] = [2], [18] = [] }) with { Inputs = new HashSet<int> { 0, 1 } };
+        Assert.Equal(new Dictionary<int, int> { [0] = 0b11, [18] = 0b11 }, ProDucking.InputSections(target));
+        byte[] b8 = Block8(MediumBytes, NoKeys), b1 = Block1();
+        b1[51] = 0xab;   // XLR 1 left at 3 in section 36 by another program
+        ProDucking.Apply(b8, b1, target with { Keys = 1 << ProMixSections.FirstPair + 4 });
+        Assert.Equal(0xaf, b1[15]);
+        Assert.Equal(0xaf, b1[33]);
+        Assert.Equal(0xaa, b1[51]);
+        Assert.Equal(1 << 8, MaskOf(b8, 0));
+        Assert.Equal(1 << 8, MaskOf(b8, 1));
+        Assert.Equal(1 << 8, MaskOf(b8, 6));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(4)]
+    public void AnInputOrKeyTheUnitDoesNotHaveIsRefused(int input)
+    {
+        Assert.NotNull(ProDucking.Valid(On(1) with { Inputs = new HashSet<int> { input } }));
+        Assert.NotNull(ProDucking.Valid(On(1) with { Keys = 1 << 12 }));
+        Assert.Null(ProDucking.Valid(On(1) with { Keys = ProDucking.AllSourcesMask, Inputs = new HashSet<int> { 0, 1, 2, 3 } }));
     }
 
     [Theory]

@@ -9,8 +9,10 @@ namespace OpenXLR.Tests;
 /// <summary>
 /// The Ducking window's model, with no window: the daemon's setup shows as
 /// it is and sends nothing back, each control sends the one field it changes,
-/// the key is left out of the channels both in the list and in the command
-/// that picks it, a daemon from before the per-channel setup keeps the switch
+/// the keys are left out of the channels both in the list and in the command
+/// that ticks them and the last one stays, a daemon from before several keys
+/// reads as one key, a stereo capture input never keys, a daemon from before
+/// the per-channel setup keeps the switch
 /// and the presets, an older echo does not undo an edit, a refused edit puts
 /// the daemon's setup back, the "Runs on" choice follows the unit, the note
 /// and the line that says what runs it and where it sits in the signal, and
@@ -47,9 +49,11 @@ public sealed class DuckingViewModelTests
     }
 
     /// <summary>The default layout's nine channels, a capture microphone in place of SFX, and its five mixes.</summary>
-    internal static JsonObject Mixer(bool microphoneField = true, bool xlr2Present = true)
+    internal static JsonObject Mixer(bool microphoneField = true, bool xlr2Present = true, bool stereoCapture = false)
     {
         string Mic(bool on) => microphoneField ? $",\"microphone\":{(on ? "true" : "false")}" : "";
+        // A capture input on a stereo pair, which can be ducked but never key.
+        string deck = stereoCapture ? $",\n{{\"id\":\"deck\",\"name\":\"Deck\",\"captureSource\":\"usb-deck\"{Mic(false)}}}" : "";
         return JsonNode.Parse($$"""
         {"channels":[
           {"id":"xlr1","name":"XLR 1","hardware":true,"present":true{{Mic(true)}}},
@@ -60,7 +64,7 @@ public sealed class DuckingViewModelTests
           {"id":"browser","name":"Browser"{{Mic(false)}}},
           {"id":"system","name":"System"{{Mic(false)}}},
           {"id":"voicechat","name":"Voice Chat"{{Mic(false)}}},
-          {"id":"headset","name":"Headset","captureSource":"usb-headset","captureMonoChannel":0{{Mic(true)}}}],
+          {"id":"headset","name":"Headset","captureSource":"usb-headset","captureMonoChannel":0{{Mic(true)}}}{{deck}}],
          "mixes":[
           {"id":"monitor","name":"Monitor A","kind":"monitor"},
           {"id":"monitor2","name":"Monitor B","kind":"monitor"},
@@ -71,10 +75,12 @@ public sealed class DuckingViewModelTests
     }
 
     /// <summary>A ducking state; <paramref name="device"/> is the <c>device</c> object's JSON, or null.</summary>
+    /// <param name="key">The first key, which <paramref name="keys"/> follows; alone, from a daemon before several keys, when <paramref name="keys"/> is null.</param>
+    /// <param name="keys">The <c>keys</c> list's JSON items; the default is <paramref name="key"/> alone.</param>
     internal static JsonObject Ducking(bool enabled = false, string key = "xlr1", string? channels = "\"game\",\"music\",\"browser\",\"system\",\"voicechat\"",
         string? mixes = "\"monitor\"", string backend = "null", string processing = "device", string? device = null,
-        bool available = true, string? error = null) => JsonNode.Parse($$"""
-        {"enabled":{{(enabled ? "true" : "false")}},"key":"{{key}}",
+        bool available = true, string? error = null, string? keys = "") => JsonNode.Parse($$"""
+        {"enabled":{{(enabled ? "true" : "false")}},"key":"{{key}}",{{(keys is null ? "" : $"\"keys\":[{(keys.Length == 0 ? $"\"{key}\"" : keys)}],")}}
          {{(channels is null ? "" : $"\"channels\":[{channels}],")}}{{(mixes is null ? "" : $"\"mixes\":[{mixes}],")}}
          "sensitivity":"medium","amount":"high","speed":"fast","processing":"{{processing}}","backend":{{backend}},
          "available":{{(available ? "true" : "false")}},"error":{{(error is null ? "null" : $"\"{error}\"")}},
@@ -104,10 +110,12 @@ public sealed class DuckingViewModelTests
         Assert.True(model.CanEdit);
         Assert.True(model.Enabled);
         Assert.True(model.HasTargets);
-        // Every microphone by name, the capture input on one mono port too; never Aux In or an application channel.
-        Assert.Equal(["xlr1", "xlr2", "headset"], model.Keys.Select(k => k.Id));
-        Assert.Equal(["XLR 1", "XLR 2", "Headset"], model.Keys.Select(k => k.Name));
-        Assert.Equal("xlr1", model.SelectedKey?.Id);
+        // Every channel that can key, by name: microphones (the capture input on one mono port too),
+        // the unit's own inputs and application channels. XLR 1 is the key.
+        Assert.Equal(["xlr1", "xlr2", "aux", "game", "music", "browser", "system", "voicechat", "headset"], model.Keys.Select(k => k.Id));
+        Assert.Equal(["XLR 1", "XLR 2", "Aux In", "Game", "Music", "Browser", "System", "Voice Chat", "Headset"], model.Keys.Select(k => k.Name));
+        Assert.Equal(["xlr1"], model.Keys.Where(k => k.IsChecked).Select(k => k.Id));
+        Assert.Equal(["xlr1"], model.KeyIds);
         // Every channel but the key, in layout order.
         Assert.Equal(["xlr2", "aux", "game", "music", "browser", "system", "voicechat", "headset"], model.Channels.Select(c => c.Id));
         Assert.Equal(["xlr2", "music"], model.Channels.Where(c => c.IsChecked).Select(c => c.Id));
@@ -172,40 +180,109 @@ public sealed class DuckingViewModelTests
     }
 
     [Fact]
-    public void TheKeyIsLeftOutOfTheChannelsInTheListAndInTheCommandThatPicksIt()
+    public void KeysAreLeftOutOfTheChannelsInTheListAndInTheCommandThatTicksThem()
     {
-        var (model, sent, _) = Model(Ducking(channels: "\"xlr2\",\"music\""));
+        var (model, sent, _) = Model(Ducking(channels: "\"xlr2\",\"music\",\"voicechat\""));
         Assert.DoesNotContain(model.Channels, c => c.Id == "xlr1");
         DuckingChoice[] stale = [.. model.Channels.Where(c => c.Id == "xlr2")];
 
-        model.SelectedKey = model.Keys.Single(k => k.Id == "xlr2");
+        // A target ticked as a key leaves the channels in the same command.
+        model.Keys.Single(k => k.Id == "xlr2").IsChecked = true;
         JsonObject picked = sent.One();
-        Assert.Equal("xlr2", picked["key"]!.GetValue<string>());
-        Assert.Equal(["music"], Ids(picked["channels"]));
-        // XLR 1 is a channel again, unticked; XLR 2 left the list.
-        Assert.Equal(["xlr1", "aux", "game", "music", "browser", "system", "voicechat", "headset"], model.Channels.Select(c => c.Id));
-        Assert.False(model.Channels.Single(c => c.Id == "xlr1").IsChecked);
+        Assert.Equal(["keys", "channels"], picked.Select(f => f.Key));
+        Assert.Equal(["xlr1", "xlr2"], Ids(picked["keys"]));
+        Assert.Equal(["music", "voicechat"], Ids(picked["channels"]));
+        Assert.Equal(["xlr1", "xlr2"], model.KeyIds);
+        Assert.Equal(["aux", "game", "music", "browser", "system", "voicechat", "headset"], model.Channels.Select(c => c.Id));
 
         // A row the new key replaced, written back as its list lets it go, sends nothing.
         DuckingChoice gone = Assert.Single(stale);
         gone.IsChecked = !gone.IsChecked;
         Assert.Empty(sent.Sent);
 
+        // An application channel keys too, after the others, in the order chosen.
+        model.Keys.Single(k => k.Id == "voicechat").IsChecked = true;
+        JsonObject chat = sent.One();
+        Assert.Equal(["xlr1", "xlr2", "voicechat"], Ids(chat["keys"]));
+        Assert.Equal(["music"], Ids(chat["channels"]));
         // A key that is not among the channels goes alone.
-        model.SelectedKey = model.Keys.Single(k => k.Id == "headset");
-        Assert.Equal("""{"key":"headset"}""", sent.One().ToJsonString());
+        model.Keys.Single(k => k.Id == "headset").IsChecked = true;
+        Assert.Equal("""{"keys":["xlr1","xlr2","voicechat","headset"]}""", sent.One().ToJsonString());
 
-        // A list being refilled clears its selection: that is not a choice.
-        model.SelectedKey = null;
+        // XLR 1 unticked: it is a channel again, unticked, and the other keys keep their order.
+        model.Keys.Single(k => k.Id == "xlr1").IsChecked = false;
+        Assert.Equal("""{"keys":["xlr2","voicechat","headset"]}""", sent.One().ToJsonString());
+        Assert.Equal(["xlr1", "aux", "game", "music", "browser", "system"], model.Channels.Select(c => c.Id));
+        Assert.False(model.Channels.Single(c => c.Id == "xlr1").IsChecked);
+
+        // Every application channel leaves out the ones that are keys.
+        model.ChooseAllApplications();
+        Assert.Equal(["game", "music", "browser", "system"], Ids(sent.One()["channels"]));
+
+        // The status names every key while this computer runs it.
+        model.Apply(Ducking(enabled: true, key: "xlr2", keys: "\"xlr2\",\"voicechat\",\"headset\"", backend: "\"software\""), Mixer());
+        Assert.Equal(Localizer.Format("DuckingKeysStatusOnComputer",
+            Localizer.Format("DuckingKeysListLast", Localizer.Format("DuckingKeysListMore", "XLR 2", "Voice Chat"), "Headset")), model.Status);
+    }
+
+    [Fact]
+    public void TheLastKeyCannotBeUnticked()
+    {
+        var (model, sent, _) = Model();
+        DuckingChoice xlr1 = model.Keys.Single(k => k.Id == "xlr1");
+        xlr1.IsChecked = false;
         Assert.Empty(sent.Sent);
-        Assert.Equal("headset", model.SelectedKey?.Id);
+        Assert.True(xlr1.IsChecked);
+        Assert.Equal(["xlr1"], model.KeyIds);
+        Assert.Equal(Localizer.Text("DuckingKeysLast"), model.Refusal);
+
+        // With a second key ticked, it can go; the next change clears the refusal.
+        model.Keys.Single(k => k.Id == "music").IsChecked = true;
+        Assert.Equal(["xlr1", "music"], Ids(sent.One()["keys"]));
+        Assert.Null(model.Refusal);
+        xlr1.IsChecked = false;
+        Assert.Equal("""{"keys":["music"]}""", sent.One().ToJsonString());
+    }
+
+    [Fact]
+    public void AnOlderDaemonsSingleKeyReadsAsOneKeyAndItsEchoClearsTheWait()
+    {
+        // A daemon from before several keys names one key and no list.
+        var (model, sent, time) = Model(Ducking(key: "xlr2", keys: null, channels: "\"music\""));
+        Assert.Equal(["xlr2"], model.KeyIds);
+        Assert.Equal(["xlr2"], model.Keys.Where(k => k.IsChecked).Select(k => k.Id));
+        Assert.DoesNotContain(model.Channels, c => c.Id == "xlr2");
+
+        // A newer daemon's echo of a second key; an older report before it does not undo the edit.
+        model.Keys.Single(k => k.Id == "xlr1").IsChecked = true;
+        Assert.Equal(["xlr2", "xlr1"], Ids(sent.One()["keys"]));
+        model.Apply(Ducking(key: "xlr2", keys: null, channels: "\"music\""), Mixer());
+        Assert.Equal(["xlr2", "xlr1"], model.KeyIds);
+        model.Apply(Ducking(key: "xlr2", keys: "\"xlr2\",\"xlr1\"", channels: "\"music\""), Mixer());
+        Assert.Equal(["xlr2", "xlr1"], model.KeyIds);
+        // Once the echo came, a later report wins.
+        time.Advance(DuckingViewModel.EchoWait);
+        model.Apply(Ducking(key: "xlr1", keys: null, channels: "\"music\""), Mixer());
+        Assert.Equal(["xlr1"], model.KeyIds);
+        Assert.Empty(sent.Sent);
+    }
+
+    [Fact]
+    public void AStereoCaptureInputIsNeverOfferedAsAKeyButCanBeDucked()
+    {
+        var (model, _, _) = Model(mixer: Mixer(stereoCapture: true));
+        Assert.DoesNotContain(model.Keys, k => k.Id == "deck");
+        Assert.Contains(model.Channels, c => c.Id == "deck");
+        // A key the layout no longer has shows by its id, ticked, so it can be unticked.
+        model.Apply(Ducking(key: "xlr1", keys: "\"xlr1\",\"gone\""), Mixer(stereoCapture: true));
+        Assert.Contains(model.Keys, k => k.Id == "gone" && k.Name == "gone" && k.IsChecked);
     }
 
     [Fact]
     public void AnOlderDaemonWithoutChannelsKeepsTheSwitchAndThePresets()
     {
         // The shape before the per-channel setup: targets, no channels or mixes, no microphone field.
-        JsonObject older = Ducking(enabled: true, channels: null, mixes: null, backend: "\"device\"", device: Pro());
+        JsonObject older = Ducking(enabled: true, channels: null, mixes: null, backend: "\"device\"", device: Pro(), keys: null);
         older["targets"] = new JsonArray("monitor");
         var (model, sent, _) = Model(older, Mixer(microphoneField: false));
 
@@ -214,9 +291,10 @@ public sealed class DuckingViewModelTests
         Assert.False(model.NothingChosen);
         Assert.True(model.Enabled);
         Assert.True(model.OnDevice);
-        Assert.Equal(Localizer.Format("DuckingStatusOnUnit", "Wave XLR Pro"), model.Status);
-        // Without the field, XLR 1 and XLR 2 are the microphones.
-        Assert.Equal(["xlr1", "xlr2"], model.Keys.Select(k => k.Id));
+        Assert.Equal(Localizer.Format("DuckingKeysStatusOnUnit", "Wave XLR Pro"), model.Status);
+        // Without the field, XLR 1 and XLR 2 are the microphones: the capture input is not offered as a key.
+        Assert.Equal(["xlr1", "xlr2", "aux", "game", "music", "browser", "system", "voicechat"], model.Keys.Select(k => k.Id));
+        Assert.Equal(["xlr1"], model.KeyIds);
 
         model.Amount.Choose(model.Amount.Marks[1]);
         Assert.Equal("""{"amount":12}""", sent.One().ToJsonString());
@@ -292,30 +370,30 @@ public sealed class DuckingViewModelTests
         Assert.False(model.ProcessInSoftware);
         Assert.True(model.OnDevice);
         Assert.Equal(Localizer.Format("DuckingHardwareBadgeTip", "Wave XLR Pro"), model.BadgeTip);
-        Assert.Equal(Localizer.Format("DuckingStatusOnUnit", "Wave XLR Pro"), model.Status);
+        Assert.Equal(Localizer.Format("DuckingKeysStatusOnUnit", "Wave XLR Pro"), model.Status);
         Assert.False(model.Warns);
         Assert.Null(model.Note);
         Assert.False(model.ShowReduction);
-        Assert.Equal(Localizer.Format("DuckingProcessingDeviceTip", "Wave XLR Pro"), model.ProcessOnDeviceTip);
-        Assert.Contains("XLR 1", model.ProcessOnDeviceTip);
+        Assert.Equal(Localizer.Format("DuckingKeysProcessingDeviceTip", "Wave XLR Pro"), model.ProcessOnDeviceTip);
 
         // Not holding it yet.
         model.Apply(Ducking(enabled: true, backend: "\"device\"", device: Pro(held: false)), Mixer());
         Assert.Equal(Localizer.Text("DuckingNotHeld"), model.Status);
         Assert.True(model.Warns);
 
-        // Chosen but not ready: the catalogue's sentence for a reason it knows, software running it. The
-        // switch lights this computer, the unit's side cannot be pressed, and its tooltip says why.
+        // Chosen but not ready, for a key the unit cannot hear: the daemon's sentence names it, software
+        // running it. The switch lights this computer, the unit's side cannot be pressed, and its tooltip says why.
+        const string key = "Headset cannot key the Wave XLR Pro's ducking: it is not one of the unit's inputs.";
         model.Apply(Ducking(enabled: true, key: "xlr2", channels: "\"music\"", backend: "\"software\"",
-            device: Pro(ready: false, reason: "keyNotSupported", note: "The Wave XLR Pro ducks only with XLR 1 as the key.")), Mixer());
+            device: Pro(ready: false, reason: "keyNotSupported", note: key)), Mixer());
         Assert.False(model.OnDevice);
         Assert.Equal("device", model.Processing);
         Assert.False(model.ProcessOnDevice);
         Assert.True(model.ProcessInSoftware);
         Assert.False(model.CanProcessOnDevice);
-        Assert.Equal(Localizer.Format("DuckingDeviceKeyNotSupported", "Wave XLR Pro"), model.Note);
+        Assert.Equal(key, model.Note);
         Assert.Equal(model.Note, model.ProcessOnDeviceTip);
-        Assert.Equal(Localizer.Format("DuckingStatusOnComputer", "XLR 2"), model.Status);
+        Assert.Equal(Localizer.Format("DuckingKeysStatusOnComputer", "XLR 2"), model.Status);
         Assert.False(model.Warns);
         Assert.True(model.ShowReduction);
 
@@ -342,7 +420,7 @@ public sealed class DuckingViewModelTests
         Assert.True(model.ProcessInSoftware);
         Assert.True(model.CanProcessOnDevice);
         Assert.Null(model.Note);
-        Assert.Equal(Localizer.Format("DuckingProcessingDeviceTip", "Wave XLR Pro"), model.ProcessOnDeviceTip);
+        Assert.Equal(Localizer.Format("DuckingKeysProcessingDeviceTip", "Wave XLR Pro"), model.ProcessOnDeviceTip);
 
         // No unit with hardware ducking: no choice, whatever the processing word says.
         model.Apply(Ducking(enabled: true, backend: "\"software\""), Mixer());

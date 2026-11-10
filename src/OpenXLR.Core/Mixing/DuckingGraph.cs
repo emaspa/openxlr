@@ -3,17 +3,21 @@ using System.Collections.Frozen;
 
 namespace OpenXLR.Core.Mixing;
 
-/// <summary>A key channel and the channel|mix cells carried through native duck stages. Never saved.</summary>
-internal sealed record DuckingPlan(string Key, IReadOnlySet<string> Cells,
+/// <summary>
+/// The key channels, each on a key input of the stage in order, and the
+/// channel|mix cells carried through native duck stages. Never saved.
+/// </summary>
+internal sealed record DuckingPlan(IReadOnlyList<string> Keys, IReadOnlySet<string> Cells,
     double ThresholdDb, double DepthDb, double AttackMs, double ReleaseMs, bool Enabled)
 {
-    /// <summary>Layout edits keep surviving cells and drop the plan when its key is removed.</summary>
+    /// <summary>Layout edits keep surviving keys and cells, and drop the plan when its last key is removed.</summary>
     internal DuckingPlan? Prune(MixerConfig config)
     {
-        if (!config.Channels.Any(c => c.Id == Key)) return null;
-        var cells = config.Channels.Where(c => c.Id != Key)
+        List<string> keys = [.. Keys.Where(k => config.Channels.Any(c => c.Id == k))];
+        if (keys.Count == 0) return null;
+        var cells = config.Channels.Where(c => !keys.Contains(c.Id))
             .SelectMany(c => config.Mixes.Select(m => $"{c.Id}|{m.Id}")).ToHashSet(StringComparer.Ordinal);
-        return this with { Cells = Cells.Where(cells.Contains).ToFrozenSet(StringComparer.Ordinal) };
+        return this with { Keys = keys, Cells = Cells.Where(cells.Contains).ToFrozenSet(StringComparer.Ordinal) };
     }
 }
 
@@ -38,8 +42,10 @@ public sealed partial class Mixer
         public MixDefinition Mix { get; } = mix;
         public uint Module { get; } = module;
         public FilterHandle? Stage;
-        public PortLink? Input, Key, Output, Bypass;
-        public string? KeyChannel;
+        public PortLink? Input, Output, Bypass;
+        // One link per key, on the stage's key input of the same index.
+        public readonly PortLink?[] Keys = new PortLink?[DuckingSetup.MaxKeys];
+        public string[]? KeyChannels;
         public readonly Dictionary<string, double> Written = new(StringComparer.Ordinal);
         public bool Ready;
     }
@@ -78,8 +84,9 @@ public sealed partial class Mixer
         {
             if (plan is not null)
             {
-                if (!_config.Channels.Any(c => c.Id == plan.Key))
-                    throw new ArgumentException("Ducking needs a key channel in the layout.");
+                if (plan.Keys.Count is 0 or > DuckingSetup.MaxKeys || plan.Keys.Distinct(StringComparer.Ordinal).Count() != plan.Keys.Count
+                    || plan.Keys.Any(k => !_config.Channels.Any(c => c.Id == k)))
+                    throw new ArgumentException($"Ducking needs one to {DuckingSetup.MaxKeys} distinct key channels in the layout.");
                 if (plan.Prune(_config) is not { } pruned || !pruned.Cells.SetEquals(plan.Cells))
                     throw new ArgumentException("Ducking cells must exist in the layout and cannot belong to the key.");
                 Check(plan.ThresholdDb, -60, 0, nameof(plan.ThresholdDb));
@@ -96,7 +103,7 @@ public sealed partial class Mixer
             _duckPlan = plan;
             if (plan is { Enabled: true } && previous is not { Enabled: true })
                 foreach (MixDefinition mix in _config.Mixes) _restarts.Forget(DuckKey(mix.Id));
-            if (plan is not null && previous is not null && plan.Key == previous.Key && plan.Cells.SetEquals(previous.Cells)
+            if (plan is not null && previous is not null && plan.Keys.SequenceEqual(previous.Keys) && plan.Cells.SetEquals(previous.Cells)
                 && plan.Cells.Count > 0 && _duckBuses.Count > 0
                 && _config.Mixes.Where(m => DuckCells(plan, m.Id).Count > 0).All(m =>
                     _duckBuses.TryGetValue(m.Id, out DuckBus? bus) && bus.Ready && bus.Stage is { IsAlive: true }))
@@ -134,16 +141,28 @@ public sealed partial class Mixer
         return UsesDuckBusLocked(Cell(channel, mix), mix) ? ((0, true), target) : (target, (0, true));
     }
 
-    /// <summary>The key is heard in at least one send, after channel, group and mix controls and the microphone pause.</summary>
-    private bool DuckKeyOpenLocked()
+    /// <summary>
+    /// The stage's key_open mask: bit i set while key i is heard in at least
+    /// one send, after channel, group and mix controls and the microphone
+    /// pause. The stage follows the loudest open key.
+    /// </summary>
+    private int DuckKeyOpenLocked()
     {
-        if (_duckPlan is not { } plan) return false;
+        if (_duckPlan is not { } plan) return 0;
+        int open = 0;
+        for (int i = 0; i < plan.Keys.Count; i++)
+            if (DuckKeyHeardLocked(plan.Keys[i])) open |= 1 << i;
+        return open;
+    }
+
+    private bool DuckKeyHeardLocked(string key)
+    {
         // The pause mutes a microphone's channel sink, but the sink's monitor,
         // which feeds the key, still carries the speech.
-        if (MicrophonesPausedLocked && _config.Channels.Any(c => c.Id == plan.Key && c.Microphone)) return false;
+        if (MicrophonesPausedLocked && _config.Channels.Any(c => c.Id == key && c.Microphone)) return false;
         foreach (MixDefinition mix in _config.Mixes)
         {
-            (double level, bool muted) = CellTargetLocked(plan.Key, mix.Id, out _);
+            (double level, bool muted) = CellTargetLocked(key, mix.Id, out _);
             if (level > 0 && !muted && !_mixMuted.Contains(mix.Id) && _mixVolume.GetValueOrDefault(mix.Id, 1) > 0)
                 return true;
         }
@@ -157,7 +176,7 @@ public sealed partial class Mixer
         ["depth"] = _duckPlan.DepthDb,
         ["attack"] = _duckPlan.AttackMs,
         ["release"] = _duckPlan.ReleaseMs,
-        ["key_open"] = DuckKeyOpenLocked() ? 1 : 0,
+        ["key_open"] = DuckKeyOpenLocked(),
     };
 
     private void WriteDuckControlsLocked(DuckBus bus, IReadOnlyDictionary<string, double> controls)
@@ -176,7 +195,7 @@ public sealed partial class Mixer
     private void PushDuckKeyOpenLocked()
     {
         if (_duckBuses.Count == 0 || _duckPlan is null) return;
-        var controls = new Dictionary<string, double> { ["key_open"] = DuckKeyOpenLocked() ? 1 : 0 };
+        var controls = new Dictionary<string, double> { ["key_open"] = DuckKeyOpenLocked() };
         foreach (DuckBus bus in _duckBuses.Values)
             try { WriteDuckControlsLocked(bus, controls); }
             catch (InvalidOperationException ex) { FailDuckStageLocked(bus, ex.Message); }
@@ -296,16 +315,20 @@ public sealed partial class Mixer
     {
         FilterHandle stage = bus.Stage!;
         bool changed = EnsureDuckLinkLocked(ref bus.Input, bus.Mix.DuckBusName, "monitor", stage.SinkName, "playback", 2);
-        string key = _duckPlan!.Key;
-        if (bus.KeyChannel != key)
+        IReadOnlyList<string> keys = _duckPlan!.Keys;
+        if (bus.KeyChannels is null || !bus.KeyChannels.SequenceEqual(keys))
         {
-            if (bus.Key is not null) _pw.Unlink(bus.Key);
-            bus.Key = null;
-            bus.KeyChannel = key;
+            UnlinkDuckKeysLocked(bus);
+            bus.KeyChannels = [.. keys];
             changed = true;
         }
-        string keySink = _config.Channels.First(c => c.Id == key).SinkName;
-        changed |= EnsureDuckLinkLocked(ref bus.Key, keySink, "monitor", stage.SinkName, "key", 1, fromChannel: 0);
+        // Each key's first channel on a key input of its own: the stage
+        // takes the loudest, so two keys never add up.
+        for (int i = 0; i < keys.Count; i++)
+        {
+            string keySink = _config.Channels.First(c => c.Id == keys[i]).SinkName;
+            changed |= EnsureDuckLinkLocked(ref bus.Keys[i], keySink, "monitor", stage.SinkName, $"key_{i}", 1, fromChannel: 0);
+        }
         // Break before make: even a partial old output must go before a
         // different path starts feeding the same mix.
         if (bus.Bypass is not null) { _pw.Unlink(bus.Bypass); bus.Bypass = null; changed = true; }
@@ -347,12 +370,21 @@ public sealed partial class Mixer
         _duckMeterHosts.TryRemove(bus.Mix.Id, out _);
         if (bus.Output is not null) _pw.Unlink(bus.Output);
         if (bus.Input is not null) _pw.Unlink(bus.Input);
-        if (bus.Key is not null) _pw.Unlink(bus.Key);
+        UnlinkDuckKeysLocked(bus);
         if (bus.Stage is not null) _pw.StopFilter(bus.Stage);
-        bus.Output = bus.Input = bus.Key = null;
+        bus.Output = bus.Input = null;
         bus.Stage = null;
-        bus.KeyChannel = null;
+        bus.KeyChannels = null;
         bus.Written.Clear();
+    }
+
+    private void UnlinkDuckKeysLocked(DuckBus bus)
+    {
+        for (int i = 0; i < bus.Keys.Length; i++)
+        {
+            if (bus.Keys[i] is { } link) _pw.Unlink(link);
+            bus.Keys[i] = null;
+        }
     }
 
     private void FailDuckStageLocked(DuckBus bus, string? reason)

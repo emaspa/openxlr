@@ -141,3 +141,19 @@ test("channel hardware selections survive a missing carrier and return with its 
     assert.equal(document.getElementById("unavailable-layout-target"), undefined);
   }
 });
+
+test("a ducking key whose channel is deleted stays selected as unavailable", () => {
+  const select = new Element("select"); select.id = "target";
+  const all = node => [node, ...node.children.flatMap(all)];
+  const document = {createElement: tag => new Element(tag), getElementById: id => all(select).find(node => node.id === id)};
+  const context = vm.createContext({document});
+  vm.runInContext(readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/layout-options.js", import.meta.url), "utf8"), context);
+  const mixes = [{id:"monitor", name:"Monitor A"}];
+  const voice = {id:"voicechat", name:"Voice Chat"};
+  context.replaceLayoutOptions(layoutChoices({channels:[{id:"xlr1", name:"XLR 1", hardware:true}, voice], mixes}).toggleGroups);
+  select.value = "duckkey:voicechat";
+  assert.equal(select.value, "duckkey:voicechat");
+  context.replaceLayoutOptions(layoutChoices({channels:[{id:"xlr1", name:"XLR 1", hardware:true}], mixes}).toggleGroups);
+  assert.equal(select.value, "duckkey:voicechat");
+  assert.equal(document.getElementById("unavailable-layout-target").disabled, true);
+});

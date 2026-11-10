@@ -112,7 +112,23 @@ public sealed record MixerScene
 public record DuckingScene
 {
     public bool Enabled { get; init; }
-    public string Key { get; init; } = ProDucking.KeyXlr1;
+
+    /// <summary>
+    /// The channels whose level ducks, one to <see cref="DuckingSetup.MaxKeys"/>
+    /// in the order chosen; the loudest at each moment ducks. A file or a
+    /// profile from before several keys holds <see cref="LegacyKey"/>
+    /// instead, which <see cref="KeysOf"/> reads.
+    /// </summary>
+    public IReadOnlyList<string> Keys { get; init; } = UnsavedKeys;
+
+    /// <summary>
+    /// The one key, <c>key</c>, of a file or a profile written before several
+    /// keys: read only while <see cref="Keys"/> is absent, and never written,
+    /// since loading turns it into <see cref="Keys"/>.
+    /// </summary>
+    [JsonPropertyName("key"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyKey { get; init; }
+
     public IReadOnlyList<string> Channels { get; init; } = [];
     /// <summary>
     /// The mixes to lower in. A file without this field keeps the
@@ -123,6 +139,13 @@ public record DuckingScene
 
     /// <summary>The mixes of a scene that never named any; Monitor A until a layout resolves it.</summary>
     internal static readonly IReadOnlyList<string> UnsavedMixes = ["monitor"];
+
+    /// <summary>The keys of a scene that never named any; XLR 1, unless it holds a <see cref="LegacyKey"/>.</summary>
+    internal static readonly IReadOnlyList<string> UnsavedKeys = [ProDucking.KeyXlr1];
+
+    /// <summary>The keys a scene names: <see cref="Keys"/>, or the one <see cref="LegacyKey"/> of a file from before several keys; null when a file held null.</summary>
+    public static IReadOnlyList<string>? KeysOf(DuckingScene scene)
+        => ReferenceEquals(scene.Keys, UnsavedKeys) && scene.LegacyKey is { } key ? [key] : scene.Keys;
 
     /// <summary>A preset word or the key threshold in whole dBFS.</summary>
     public DuckingLevel Sensitivity { get; init; } = ProDucking.Medium;
