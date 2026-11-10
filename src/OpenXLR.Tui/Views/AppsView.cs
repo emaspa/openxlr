@@ -34,7 +34,8 @@ internal sealed class AppsView : View
     private static List<Row> Build(App app, Snapshot state)
     {
         List<Row> rows = [];
-        List<ChannelEntry> targets = state.Mixer.Channels.Where(channel => !channel.Hardware).ToList();
+        List<ChannelEntry> targets = state.Mixer.Channels
+            .Where(channel => !channel.Hardware && channel.CaptureSource is null).ToList();
         List<StreamEntry> streams = state.Mixer.Streams
             .OrderByDescending(stream => stream.Active)
             .ThenBy(stream => stream.Label, StringComparer.OrdinalIgnoreCase)

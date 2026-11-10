@@ -108,6 +108,31 @@ public sealed class TuiViewTests
     }
 
     [Theory]
+    [InlineData(true, "music", "system")]
+    [InlineData(false, "system", "music")]
+    public void AppsSkipCaptureChannelsWhenSteppingTheRoute(bool forward, string channel, string target)
+    {
+        (App app, List<string> sent) = Ready(tab: 4);
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        var channels = state["mixer"]!["channels"]!.AsArray();
+        channels.Add(System.Text.Json.Nodes.JsonNode.Parse("""
+            {"id":"headset","name":"Headset","hardware":false,"captureSource":"alsa_input.headset"}
+            """));
+        channels.Add(System.Text.Json.Nodes.JsonNode.Parse("""
+            {"id":"system","name":"System","hardware":false}
+            """));
+        state["mixer"]!["streams"]![0]!["channelId"] = channel;
+        app.Link.Receive(state.ToJsonString());
+        app.Draw(new Screen(140, 36));
+        app.Handle(new KeyPress(forward ? Key.Right : Key.Left));
+
+        JsonElement command = Command(sent);
+        Assert.Equal("assignApp", Text(command, "cmd"));
+        Assert.Equal("spotify", Text(command, "identity"));
+        Assert.Equal(target, Text(command, "channel"));
+    }
+
+    [Theory]
     [InlineData(null, null, '-', 0.95)]
     [InlineData(null, 0.6, '-', 0.55)]
     [InlineData(null, 0.6, ']', 0.61)]
