@@ -5886,7 +5886,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Toggles and choices | Space, Enter, Left/Right | toggle or choose a value |
 | Outputs, on a sink | Space, Left/Right, Enter | select the sink, choose its feed (a summed feed asks for a second press), or make it the main output |
 | Outputs, on a sink | `-`, `+`, `m` | change its volume or toggle its mute |
-| Apps | Left/Right, `i`, `f` | assign a channel, leave routing to the desktop, or forget the assignment |
+| Apps | Left/Right, `i`, `f` | step through application channels, leave routing to the desktop, or forget the assignment |
 | Apps | `-`, `+`, `[`, `]`, `r` | lower or raise the application's playback volume by five points or by one, or reset it to 100% |
 | Inserts | Space, Ctrl+Up/Down, `d`, `e` | bypass, reorder, remove, or open the plugin's native editor, with generated controls when blocked or refused |
 | Inserts | `a` | add a plugin: the picker lists plugins that fit the reported chain width: mono for a microphone, stereo for a capture pair or mix |
