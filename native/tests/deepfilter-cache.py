@@ -123,6 +123,21 @@ else:
         unavailable.touch()
         self.assertEqual(self.build_dir(workspace, OPENXLR_DEEPFILTER_BUILD_CACHE=str(unavailable)), "")
 
+    def test_cargo_template_paths_fall_back_without_creating_a_cache(self):
+        workspace = self.workspace("openxlr-release", 100)
+        for name in ("parent{lab}", "parent{", "parent}"):
+            with self.subTest(name=name):
+                cache = self.root / name / "cache"
+                self.assertEqual(self.build_dir(workspace, OPENXLR_DEEPFILTER_BUILD_CACHE=str(cache)), "")
+                self.assertFalse(cache.parent.exists())
+
+        resolved = self.root / "resolved{lab}"
+        resolved.mkdir()
+        link = self.root / "configured"
+        link.symlink_to(resolved, target_is_directory=True)
+        self.assertEqual(self.build_dir(workspace, OPENXLR_DEEPFILTER_BUILD_CACHE=str(link / "cache")), "")
+        self.assertFalse((resolved / "cache").exists())
+
     def test_cargo_config_keeps_its_build_directory(self):
         workspace = self.workspace("openxlr-release", 100)
         self.assertEqual(self.build_dir(workspace, TEST_CONFIG_BUILD_DIR="/configured"), "")

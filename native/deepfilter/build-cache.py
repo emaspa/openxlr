@@ -55,10 +55,14 @@ def make_cache_directory(path):
 
 
 def cached_manifest(cache, paths):
-    root = Path.cwd()
-    key = input_key(root, paths)
     cache = Path(cache).expanduser()
     parent = cache.parent.resolve()
+    cache = parent / cache.name
+    # Cargo treats braces in its build directory as template syntax.
+    if any(brace in str(cache) for brace in "{}"):
+        return None
+    root = Path.cwd()
+    key = input_key(root, paths)
     # A directory other users can replace is unsafe even if its own mode
     # looks private. The sticky bit protects user-owned children in /tmp.
     for ancestor in (*reversed(parent.parents), parent):
@@ -70,7 +74,7 @@ def cached_manifest(cache, paths):
         if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in (0, os.geteuid())
                 or (info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX)):
             return None
-    cache = make_cache_directory(parent / cache.name)
+    make_cache_directory(cache)
     directory = make_cache_directory(make_cache_directory(cache / "v1") / key)
     source = directory / "source"
     if not source.exists() and not source.is_symlink():

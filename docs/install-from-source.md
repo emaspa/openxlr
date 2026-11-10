@@ -187,8 +187,9 @@ compiled binaries.
 precedence over the OpenXLR Rust cache.
 `OPENXLR_DEEPFILTER_BUILD_CACHE` can set a different location. The cache
 must be owned by the build user and protected from writes by other users.
-Untrusted cache directories fall back to building in the checkout. Automatic
-native caches apply to local builds as a regular user outside CI.
+Untrusted cache directories or cache paths containing braces fall back
+to building in the checkout. Automatic native caches apply to local builds
+as a regular user outside CI.
 Vendored Rust builds keep their normal Cargo directory.
 
 ## 3. Device access
