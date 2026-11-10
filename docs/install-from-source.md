@@ -170,9 +170,11 @@ package download caches. Re-extracting the package or running the usual
 package update does not remove them. Their contents can be reclaimed by
 clearing the respective user caches.
 
-The external AUR recipe can add `ccache` to `makedepends` to have the
-AUR helper install it with the other build tools. The OpenXLR Makefile
-detects it directly, independently of makepkg's `BUILDENV`.
+The [AUR recipe patch](../packaging/aur/openxlr-ccache.patch) adds `ccache`
+to `makedepends`. The package maintainer applies it in the AUR checkout
+and regenerates `.SRCINFO` with `makepkg --printsrcinfo > .SRCINFO`. The
+AUR helper then installs ccache with the other build tools. The OpenXLR
+Makefile detects it directly, independently of makepkg's `BUILDENV`.
 
 Local Debian and RPM source builds also use the user caches. Offline PPA
 and Flatpak builds use their vendored dependencies. Nix reuses the
