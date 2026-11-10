@@ -71,14 +71,17 @@ public sealed partial class MonitorVolumeIntegrationTests
             });
             PortLink link = pw.LinkNodes("link_source", "monitor", "link_target", "playback");
             Assert.Equal(2, link.Pairs.Count);
-            Assert.True(SpinWait.SpinUntil(() => pw.EnsureLinks(link) == LinkHealth.Healthy, TimeSpan.FromSeconds(3)));
             ExecutableScript.Write(Path.Combine(directory, "pw-link"), """
                 printf called >> "${0%/*}/calls"
                 exit 1
                 """);
             Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + path);
+            // With the helper disabled, Healthy confirms the registry has seen both links.
+            WaitForRecovery(() => pw.EnsureLinks(link) == LinkHealth.Healthy);
+            string calls = Path.Combine(directory, "calls");
+            File.Delete(calls);
             for (int i = 0; i < 100; i++) Assert.Equal(LinkHealth.Healthy, pw.EnsureLinks(link));
-            Assert.False(File.Exists(Path.Combine(directory, "calls")));
+            Assert.False(File.Exists(calls));
         }
         finally
         {
