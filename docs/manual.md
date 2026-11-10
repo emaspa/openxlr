@@ -1412,10 +1412,13 @@ scale as the channel meters. Speak as you will on air and set the gain so
 your voice peaks inside the band drawn under the bar, -18 to -6 dBFS. The
 clipping warning comes on when a sample reaches -0.1 dBFS and stays on until
 you press **Clear warning**. The warning only reports a peak. ClipGuard, in
-**Shape**, is the protection. Under **Input gain (dB)**, turn
-off **Lock input gain** if checked, then drag the slider or type a value and
-press Enter. The same lock is in **Options → Audio** and applies to the
-primary interface and its other input if present. The control uses the
+**Shape**, is the protection. Under **Input gain (dB)**, drag the slider or
+type a value and press Enter. The gain lock disables both until you turn
+off **Lock input gain** above them. On an XLR Dock the checkbox is always
+there. On a unit with a gain dial it shows only while a lock set from a
+Deck key, the terminal mixer or the API is on, and it goes away once you
+turn it off. The same checkbox is in **Options → Audio**, and the lock
+covers both inputs of the primary interface. The control uses the
 same gain and range as the mixer,
 including an external mono capture input that reports a gain. Its gain is
 shared with other apps recording that source. If the microphone has no
