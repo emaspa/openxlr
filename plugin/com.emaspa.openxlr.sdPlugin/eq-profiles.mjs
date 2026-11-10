@@ -13,7 +13,7 @@ import { carriesEq, eqHeldByUnit } from "./microphone-eq.mjs";
 // keeps the daemon's English name.
 const BUILTIN_NAMES = {
   clear: "Clear", warm: "Warm", broadcast: "Broadcast", podcast: "Podcast",
-  "deep-voice": "Deep voice", "soft-sibilants": "Soft sibilants",
+  "higher-voice": "Higher voice", "deep-voice": "Deep voice", "soft-sibilants": "Soft sibilants",
   "voices-forward": "Voices forward", footsteps: "Footsteps", "bass-boost": "Bass boost", "soft-treble": "Soft treble",
 };
 const PREFIX = "eqprofile:";

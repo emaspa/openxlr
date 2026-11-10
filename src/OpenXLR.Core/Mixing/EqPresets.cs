@@ -81,6 +81,13 @@ public static class EqPresets
         Band(MicEq.Peak, 1900, 1.75, 0.8),
         Band(MicEq.HighShelf, 7000, -1.5)));
 
+    /// <summary>More body and clearer words for a higher voice, with a dip in the middle.</summary>
+    public static EqPreset HigherVoice { get; } = new("higher-voice", "Higher voice", Eq(
+        Band(MicEq.LowCut, 90),
+        Band(MicEq.LowShelf, 270, 1.5),
+        Band(MicEq.Peak, 700, -2.5, 1.4),
+        Band(MicEq.Peak, 2400, 2, 1.0)));
+
     /// <summary>Less boom and mud on a deep voice, keeping its low fundamentals.</summary>
     public static EqPreset DeepVoice { get; } = new("deep-voice", "Deep voice", Eq(
         Band(MicEq.LowCut, 70),
@@ -114,7 +121,7 @@ public static class EqPresets
         Band(MicEq.HighShelf, 4500, -4)));
 
     /// <summary>The voice curves, in the order Mic setup offers them.</summary>
-    public static IReadOnlyList<EqPreset> Voices { get; } = [Clear, Warm, Broadcast, Podcast, DeepVoice, SoftSibilants];
+    public static IReadOnlyList<EqPreset> Voices { get; } = [Clear, Warm, Broadcast, Podcast, HigherVoice, DeepVoice, SoftSibilants];
 
     /// <summary>The listening curves, for what an output plays.</summary>
     public static IReadOnlyList<EqPreset> Listening { get; } = [VoicesForward, Footsteps, BassBoost, SoftTreble];

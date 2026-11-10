@@ -2363,10 +2363,11 @@ Each band is `{enabled, type, frequency, gain, q}` as `setEq` takes it.
 - The built-in profiles come in two groups, in this order. The voice
   curves are Mic setup's starting presets: `builtin:clear`,
   `builtin:warm`, `builtin:broadcast`, `builtin:podcast`,
-  `builtin:deep-voice` and `builtin:soft-sibilants`, four bands each. The
-  listening curves are for what an output plays: `builtin:voices-forward`
-  and `builtin:footsteps`, two shelves each, then `builtin:bass-boost` and
-  `builtin:soft-treble`, one shelf each; every one cuts and none adds gain
+  `builtin:higher-voice`, `builtin:deep-voice` and `builtin:soft-sibilants`,
+  four bands each. The listening curves are for what an output plays:
+  `builtin:voices-forward` and `builtin:footsteps`, two shelves each, then
+  `builtin:bass-boost` and `builtin:soft-treble`, one shelf each; every one
+  cuts and none adds gain
   (the [manual](manual.md#output-eq) lists their bands). Every built-in
   profile loads on every EQ, a microphone's or a mix's; Mic setup offers
   only the voice curves.

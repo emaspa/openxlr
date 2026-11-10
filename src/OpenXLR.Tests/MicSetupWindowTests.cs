@@ -308,38 +308,38 @@ internal static class MicSetupWindowTests
         ToggleButton[] presets = [.. window.GetVisualDescendants().OfType<ToggleButton>().Where(b => b.Name == "MicSetupPreset")];
         Assert.Equal(MicSetupPresets.All.Select(p => p.Name), presets.Select(b => b.Content));
         Assert.All(presets, b => Assert.False(b.IsChecked));
-        MicSetupPreset podcastPreset = MicSetupPresets.All.Single(p => p.Id == "podcast");
-        ToggleButton podcast = Preset(window, "MicSetupPresetPodcast");
-        podcast.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        MicSetupPreset higherVoicePreset = MicSetupPresets.All.Single(p => p.Id == "higher-voice");
+        ToggleButton higherVoice = Preset(window, "MicSetupPresetHigherVoice");
+        higherVoice.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         await Until(() => eqCommands.Count == 1);
         JsonNode applied = eqCommands.Single();
         Assert.Equal("setEq", applied["cmd"]!.GetValue<string>());
         Assert.Equal("guest", applied["channel"]!.GetValue<string>());
         Assert.True(applied["eq"]!["enabled"]!.GetValue<bool>());
-        Assert.Equal(podcastPreset.Eq.Bands.Select(b => b.Frequency),
+        Assert.Equal(higherVoicePreset.Eq.Bands.Select(b => b.Frequency),
             applied["eq"]!["bands"]!.AsArray().Select(b => b!["frequency"]!.GetValue<double>()));
-        Assert.Equal(podcastPreset.Eq, eq.Current);
-        Assert.Equal(Localizer.Format("MicSetupPresetApplied", podcastPreset.Name),
+        Assert.Equal(higherVoicePreset.Eq, eq.Current);
+        Assert.Equal(Localizer.Format("MicSetupPresetApplied", higherVoicePreset.Name),
             window.FindControl<TextBlock>("MicSetupPresetStatus")!.Text);
         // The chosen preset is lit as the step bar's chosen step is, with the
         // same toggle and the same checked colour, and it stays lit once the
         // daemon has reported the preset back.
-        await Until(() => podcast.IsChecked == true);
-        Assert.All(presets.Where(b => b != podcast), b => Assert.False(b.IsChecked));
+        await Until(() => higherVoice.IsChecked == true);
+        Assert.All(presets.Where(b => b != higherVoice), b => Assert.False(b.IsChecked));
         ToggleButton step = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => Equals(b.Content, Localizer.Text("MicSetupStepShape")));
         Assert.True(step.IsChecked);
-        Assert.Same(step.Theme, podcast.Theme);
+        Assert.Same(step.Theme, higherVoice.Theme);
         // The theme paints the checked state on the template's presenter, not on the control.
         static Avalonia.Controls.Presenters.ContentPresenter Face(ToggleButton b)
             => b.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>().First(p => p.Name == "PART_ContentPresenter");
         window.UpdateLayout();
-        Assert.Equal(Face(step).Background, Face(podcast).Background);
-        Assert.Equal(Face(step).Foreground, Face(podcast).Foreground);
-        Assert.NotEqual(Face(podcast).Background, Face(presets[0]).Background);
+        Assert.Equal(Face(step).Background, Face(higherVoice).Background);
+        Assert.Equal(Face(step).Foreground, Face(higherVoice).Foreground);
+        Assert.NotEqual(Face(higherVoice).Background, Face(presets[0]).Background);
         // Pressed again it sends nothing and stays lit.
-        podcast.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        higherVoice.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.Single(eqCommands);
-        Assert.True(podcast.IsChecked);
+        Assert.True(higherVoice.IsChecked);
         Assert.True(window.FindControl<Button>("MicSetupUndoPreset")!.IsEffectivelyEnabled);
         window.FindControl<Button>("MicSetupUndoPreset")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         await Until(() => eqCommands.Count == 2);
