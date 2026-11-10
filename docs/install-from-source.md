@@ -149,6 +149,26 @@ intermediate directory shared by different checkouts can reuse an old
 artifact when source timestamps predate it. The cache lives in the
 directory you set and can be removed when you want to reclaim the space.
 
+#### AUR build cache
+
+AUR updates extract each release into its own source directory. To reuse
+DeepFilterNet intermediates across those directories, export the following
+before running your AUR helper. This option needs Cargo 1.91 or newer and
+Python 3.
+
+```sh
+export OPENXLR_DEEPFILTER_BUILD_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/openxlr/deepfilter-build"
+```
+
+The first build fills the cache. Later releases with byte-identical Rust
+sources, manifests, lock file and model reuse a verified source snapshot
+and its intermediates. Changes to those files select a new cache. Cargo
+checks the toolchain and build flags.
+Each release still gets its own output directory and packaged helper.
+Use this option in place of the per-checkout setting above for AUR
+updates. An explicit `CARGO_BUILD_BUILD_DIR` takes precedence, and
+vendored builds use their normal Cargo directory.
+
 ## 3. Device access
 
 ```sh

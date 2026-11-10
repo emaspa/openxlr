@@ -94,6 +94,7 @@ jobs:
       - name: DeepFilterNet built into every package
         run: |
           python3 packaging/check-deepfilter.py
+          python3 native/tests/deepfilter-cache.py
           python3 packaging/ppa/test-prune-cargo-vendor.py
 
       - name: Validate Stream Deck/OpenDeck plugin

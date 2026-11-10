@@ -149,6 +149,8 @@ openxlr               # the mixer UI, also in your application menu
 ```
 
 On Omarchy, run `openxlr-omarchy-enable` once for the bar plugin.
+For repeated AUR updates, the [AUR build cache](docs/install-from-source.md#aur-build-cache)
+can reuse the DeepFilterNet build between releases.
 
 **Ubuntu** 24.04 and 26.04, from the
 [PPA](https://launchpad.net/~sparvoli/+archive/ubuntu/openxlr):

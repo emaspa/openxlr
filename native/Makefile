@@ -49,6 +49,10 @@ DF_MODEL = deepfilter/model/DeepFilterNet3_onnx.tar.gz
 DF_MODEL_URL = https://raw.githubusercontent.com/Rikorose/DeepFilterNet/v$(DF_VERSION)/models/DeepFilterNet3_onnx.tar.gz
 DF_MODEL_SHA256 = c94d91f70911001c946e0fabb4aa9adc37045f45a03b56008cb0c8244cb63616
 CARGO ?= cargo
+DF_CARGO = $(CARGO)
+ifneq ($(strip $(OPENXLR_DEEPFILTER_BUILD_CACHE)),)
+DF_CARGO = python3 build-cache.py $(CARGO)
+endif
 DF_CARGO_FLAGS = --release --locked --target-dir target $(if $(wildcard deepfilter/vendor/),--offline \
                  --config 'source.crates-io.replace-with="vendored"' \
                  --config 'source.vendored.directory="vendor"')
@@ -114,7 +118,7 @@ deepfilter/model/verified: $(DF_MODEL)
 
 deepfilter/target/release/libopenxlr_deepfilter.a: deepfilter/model/verified deepfilter/Cargo.toml \
 		deepfilter/Cargo.lock deepfilter/src/lib.rs deepfilter/libdf/Cargo.toml $(wildcard deepfilter/libdf/src/*.rs)
-	cd deepfilter && $(CARGO) build $(DF_CARGO_FLAGS)
+	cd deepfilter && $(DF_CARGO) build $(DF_CARGO_FLAGS)
 	touch $@
 
 .PHONY: FORCE deepfilter
