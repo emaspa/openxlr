@@ -3189,7 +3189,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Walang global shortcut ang desktop na ito sa pamamagitan ng portal. Magagamit pa rin ang focus routing ng OpenDeck.</value>
   </data>
   <data name="MicSetup" xml:space="preserve">
-    <value>Setup ng mic</value>
+    <value>Mikropono (setup)</value>
   </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>I-set up ang mikropono nang hakbang-hakbang: saan ito ilalagay, ang level nito, isang take na pinakikinggan nang raw at naproseso, at ang EQ at mga plugin nito. Bubukas sa XLR 1, o sa unang mikropono sa mixer.</value>
@@ -3237,16 +3237,16 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>Karaniwang level</value>
   </data>
   <data name="MicSetupClip" xml:space="preserve">
-    <value>Clip</value>
+    <value>I-clear ang babala</value>
   </data>
   <data name="MicSetupClipTip" xml:space="preserve">
-    <value>Iilaw kapag umabot sa full scale ang mikropono, at mananatiling nakailaw hanggang pindutin mo ito.</value>
+    <value>I-clear ang babala hanggang sa susunod na clipping.</value>
   </data>
   <data name="MicSetupClipLit" xml:space="preserve">
-    <value>Clip light, nakailaw: umabot sa full scale ang mikropono. Pindutin upang i-clear.</value>
+    <value>May clipping</value>
   </data>
   <data name="MicSetupClipDark" xml:space="preserve">
-    <value>Clip light, patay</value>
+    <value>Walang clipping</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
     <value>Input gain (dB)</value>
@@ -4228,5 +4228,11 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Ibalik</value>
+  </data>
+  <data name="MicSetupGainLock" xml:space="preserve">
+    <value>I-lock ang input gain</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>Naka-lock ang input gain.</value>
   </data>
 </root>

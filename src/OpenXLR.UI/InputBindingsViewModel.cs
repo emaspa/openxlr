@@ -176,7 +176,8 @@ public sealed class UnitInputViewModel : ViewModelBase
     // --- the controls, the window's own properties for this input ---
 
     public int GainMaxDb => _main.GainMaxDb;
-    public bool GainLocked => _main.GainLocked;
+    public bool GainLocked { get => _main.GainLocked; set { if (CanSetGainLock) _main.GainLocked = value; } }
+    public bool CanSetGainLock => _main.DeviceConnected && (_main.ShowGainLock || _main.GainLocked);
     public bool ShowGainLock => Input == 1 && _main.ShowGainLock;
     public int GainDb { get => Input == 1 ? _main.GainDb : _main.Gain2Db; set { if (Input == 1) _main.GainDb = value; else _main.Gain2Db = value; } }
     public string GainText => Input == 1 ? _main.GainText : _main.Gain2Text;
@@ -228,6 +229,8 @@ public sealed class UnitInputViewModel : ViewModelBase
             Raise(mine);
             if (SummaryNames.Contains(mine)) { Raise(nameof(HasSwitches)); Raise(nameof(SwitchesOn)); Raise(nameof(PhantomShown)); }
         }
+        if (e.PropertyName is nameof(MainViewModel.DeviceConnected) or nameof(MainViewModel.ShowGainLock) or nameof(MainViewModel.GainLocked))
+            Raise(nameof(CanSetGainLock));
         if (e.PropertyName == nameof(MainViewModel.UnitXlrJacks)) { Raise(nameof(GainName)); Raise(nameof(GainLabel)); }
     }
 }

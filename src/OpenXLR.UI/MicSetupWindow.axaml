@@ -119,16 +119,15 @@
               </Grid>
               <skin:LevelMeter Name="MicSetupRms" Level="{Binding InputLevel}" AutomationProperties.Name="{loc:Text Key=MicSetupAverage}"
                                ToolTip.Tip="{loc:Text Key=MicSetupAverage}"/>
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <TextBlock Text="{loc:Text Key=MicSetupTargetTip}" Classes="hint" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                <!-- the clip light holds until it is pressed -->
-                <Button Grid.Column="1" Name="MicSetupClip" Click="OnClearClip" Padding="10,4"
-                        AutomationProperties.Name="{Binding ClipName}" ToolTip.Tip="{loc:Text Key=MicSetupClipTip}">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <skin:StatusLed IsOn="{Binding Clipped}" Kind="Power"/>
-                    <TextBlock Text="{loc:Text Key=MicSetupClip}" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </Button>
+              <TextBlock Text="{loc:Text Key=MicSetupTargetTip}" Classes="hint" TextWrapping="Wrap"/>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" VerticalAlignment="Center">
+                  <skin:StatusLed Name="MicSetupClipLed" IsOn="{Binding Clipped}" Kind="Power" AutomationProperties.AccessibilityView="Raw"/>
+                  <TextBlock Grid.Column="1" Name="MicSetupClipStatus" Text="{Binding ClipStatus}" Classes="body"
+                             Classes.warn="{Binding Clipped}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                </Grid>
+                <Button Grid.Column="1" Name="MicSetupClip" Content="{loc:Text Key=MicSetupClip}" Click="OnClearClip"
+                        IsEnabled="{Binding Clipped}" ToolTip.Tip="{loc:Text Key=MicSetupClipTip}" Padding="10,4"/>
               </Grid>
             </StackPanel>
           </Border>
@@ -136,6 +135,10 @@
           <Border Classes="tile" Padding="12">
             <StackPanel Spacing="8">
               <TextBlock Text="{loc:Text Key=MicSetupGain}" Classes="h"/>
+              <CheckBox Name="MicSetupGainLock" Content="{loc:Text Key=MicSetupGainLock}"
+                        IsVisible="{Binding Unit.CanSetGainLock, FallbackValue=False}"
+                        IsChecked="{Binding Unit.GainLocked, Mode=TwoWay, FallbackValue=False}"
+                        ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CarriesUnit}">
                 <Slider Name="MicSetupUnitGain" vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Unit.GainMaxDb, FallbackValue=80}"
                         Value="{Binding Unit.GainDb, Mode=TwoWay, FallbackValue=0}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
@@ -166,6 +169,8 @@
                                FormatString="0.#" Increment="1" MinWidth="92" VerticalAlignment="Center"
                                AutomationProperties.Name="{Binding CaptureInput.CaptureGainName, FallbackValue=''}"/>
               </Grid>
+              <TextBlock Text="{loc:Text Key=MicSetupGainLocked}" Classes="hint" TextWrapping="Wrap"
+                         IsVisible="{Binding ExtraUnit.Unit.GainLocked, FallbackValue=False}"/>
               <TextBlock Name="MicSetupNoGain" Text="{loc:Text Key=MicSetupNoGain}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding NoGain}"/>
             </StackPanel>
           </Border>
@@ -309,13 +314,13 @@
                 <ToggleButton Content="{loc:Text Key=LowCut}" IsChecked="{Binding Unit.LowCut, Mode=TwoWay, FallbackValue=False}"
                               IsVisible="{Binding Unit.CapLowCut, FallbackValue=False}" AutomationProperties.Name="{loc:Text Key=MicSetupUnitLowCut}"
                               ToolTip.Tip="{loc:Text Key=MicSetupUnitLowCut}"/>
-                <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding Unit.ClipGuard, Mode=TwoWay, FallbackValue=False}"
+                <CheckBox Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding Unit.ClipGuard, Mode=TwoWay, FallbackValue=False}"
                               IsVisible="{Binding Unit.CapClipGuard, FallbackValue=False}" AutomationProperties.Name="{loc:Text Key=MicSetupUnitClipGuard}"
                               ToolTip.Tip="{loc:Text Key=MicSetupUnitClipGuard}"/>
                 <ToggleButton Content="{loc:Text Key=LowCut}" IsChecked="{Binding ExtraUnit.LowCut, Mode=TwoWay, FallbackValue=False}"
                               IsVisible="{Binding ExtraUnit.HasLowCut, FallbackValue=False}" IsEnabled="{Binding ExtraUnit.CanControl, FallbackValue=False}"
                               AutomationProperties.Name="{loc:Text Key=MicSetupUnitLowCut}" ToolTip.Tip="{loc:Text Key=MicSetupUnitLowCut}"/>
-                <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ExtraUnit.ClipGuard, Mode=TwoWay, FallbackValue=False}"
+                <CheckBox Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ExtraUnit.ClipGuard, Mode=TwoWay, FallbackValue=False}"
                               IsVisible="{Binding ExtraUnit.HasClipGuard, FallbackValue=False}" IsEnabled="{Binding ExtraUnit.CanControl, FallbackValue=False}"
                               AutomationProperties.Name="{loc:Text Key=MicSetupUnitClipGuard}" ToolTip.Tip="{loc:Text Key=MicSetupUnitClipGuard}"/>
               </WrapPanel>
@@ -324,7 +329,7 @@
                 <ToggleButton Content="{Binding Software.SoftLowCutText, FallbackValue=''}" IsVisible="{Binding Software.ShowSoftLowCut, FallbackValue=False}"
                               IsChecked="{Binding Software.SoftLowCutOn, Mode=OneWay, FallbackValue=False}" Click="OnCycleSoftLowCut"
                               AutomationProperties.Name="{loc:Text Key=MicSetupSoftwareLowCut}" ToolTip.Tip="{loc:Text Key=HostSideLowCutForThisDeviceIts}"/>
-                <ToggleButton Content="{loc:Text Key=ClipGuard}" IsVisible="{Binding Software.ShowSoftClipGuard, FallbackValue=False}"
+                <CheckBox Content="{loc:Text Key=ClipGuard}" IsVisible="{Binding Software.ShowSoftClipGuard, FallbackValue=False}"
                               IsChecked="{Binding Software.SoftClipGuard, Mode=TwoWay, FallbackValue=False}"
                               IsEnabled="{Binding Software.SoftClipGuardAvailable, FallbackValue=False}"
                               AutomationProperties.Name="{loc:Text Key=MicSetupSoftwareClipGuard}" ToolTip.Tip="{Binding Software.SoftClipGuardTip, FallbackValue=''}"/>

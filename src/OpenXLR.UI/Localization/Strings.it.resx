@@ -3198,7 +3198,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Questo desktop non può riaprire l'editor delle scorciatoie. Cambia le associazioni nelle impostazioni delle scorciatoie del desktop.</value>
   </data>
   <data name="MicSetup" xml:space="preserve">
-    <value>Configurazione microfono</value>
+    <value>Microfono (impostazioni)</value>
   </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>Configura un microfono passo per passo: dove metterlo, il livello, una ripresa ascoltata grezza ed elaborata, l'EQ e i plugin. Si apre su XLR 1 o sul primo microfono del mixer.</value>
@@ -3250,16 +3250,16 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Livello medio</value>
   </data>
   <data name="MicSetupClip" xml:space="preserve">
-    <value>Clip</value>
+    <value>Azzera avviso</value>
   </data>
   <data name="MicSetupClipTip" xml:space="preserve">
-    <value>Si accende quando il microfono raggiunge il fondo scala e resta accesa finché non la premi.</value>
+    <value>Cancella l'avviso fino al prossimo clipping.</value>
   </data>
   <data name="MicSetupClipLit" xml:space="preserve">
-    <value>Spia di clip accesa: il microfono ha raggiunto il fondo scala. Premi per spegnerla.</value>
+    <value>Clipping rilevato</value>
   </data>
   <data name="MicSetupClipDark" xml:space="preserve">
-    <value>Spia di clip spenta</value>
+    <value>Nessun clipping rilevato</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
     <value>Guadagno in ingresso (dB)</value>
@@ -4304,5 +4304,11 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Ripristina</value>
+  </data>
+  <data name="MicSetupGainLock" xml:space="preserve">
+    <value>Blocca il guadagno di ingresso</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>Il guadagno di ingresso è bloccato.</value>
   </data>
 </root>

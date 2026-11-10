@@ -3241,7 +3241,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>This desktop does not offer global shortcuts through the portal. OpenDeck focus routing remains available.</value>
   </data>
   <data name="MicSetup" xml:space="preserve">
-    <value>Mic setup</value>
+    <value>Mic (setup)</value>
   </data>
   <data name="MonitorDry" xml:space="preserve">
     <value>Dry</value>
@@ -3298,16 +3298,16 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Average level</value>
   </data>
   <data name="MicSetupClip" xml:space="preserve">
-    <value>Clip</value>
+    <value>Clear warning</value>
   </data>
   <data name="MicSetupClipTip" xml:space="preserve">
-    <value>Lights when the microphone reaches full scale, and stays lit until you press it.</value>
+    <value>Clears the warning until the next clipped sample.</value>
   </data>
   <data name="MicSetupClipLit" xml:space="preserve">
-    <value>Clip light, lit: the microphone reached full scale. Press to clear it.</value>
+    <value>Clipping detected</value>
   </data>
   <data name="MicSetupClipDark" xml:space="preserve">
-    <value>Clip light, dark</value>
+    <value>No clipping detected</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
     <value>Input gain (dB)</value>
@@ -4564,5 +4564,11 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Restore</value>
+  </data>
+  <data name="MicSetupGainLock" xml:space="preserve">
+    <value>Lock input gain</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>Input gain is locked.</value>
   </data>
 </root>

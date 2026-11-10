@@ -53,8 +53,17 @@ internal static class MicSetupWindowTests
             Assert.Equal(0, main.Inserts.MicSetup.InputPeak);
             Assert.Equal(Localizer.Format("MicSetupPeak", .8 * 60 - 60), window.FindControl<TextBlock>("MicSetupPeakValue")!.Text);
             Assert.True(window.FindControl<TextBlock>("MicSetupNoGain")!.IsEffectivelyVisible);
-            window.FindControl<Button>("MicSetupClip")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var clip = window.FindControl<Button>("MicSetupClip")!;
+            var status = window.FindControl<TextBlock>("MicSetupClipStatus")!;
+            var led = window.FindControl<StatusLed>("MicSetupClipLed")!;
+            Assert.Equal(Localizer.Text("MicSetupClipLit"), status.Text);
+            Assert.True(led.IsOn);
+            Assert.True(clip.IsEnabled);
+            clip.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.False(model.Clipped);
+            Assert.Equal(Localizer.Text("MicSetupClipDark"), status.Text);
+            Assert.False(led.IsOn);
+            Assert.False(clip.IsEnabled);
             // Suggest gain on a microphone OpenXLR sets no gain for: it
             // listens, says the change on the device, and offers no Accept.
             var time = new ManualTime();
@@ -168,6 +177,25 @@ internal static class MicSetupWindowTests
             var unitGain = window.FindControl<NumericUpDown>("MicSetupUnitGainValue")!;
             Assert.True(unitGain.IsEffectivelyVisible);
             Assert.False(window.FindControl<NumericUpDown>("MicSetupCaptureGainValue")!.IsEffectivelyVisible);
+            var lockGain = window.FindControl<CheckBox>("MicSetupGainLock")!;
+            var unitSlider = window.FindControl<Slider>("MicSetupUnitGain")!;
+            Assert.True(lockGain.IsEffectivelyVisible);
+            Assert.Equal(false, lockGain.IsChecked);
+            main.GainLocked = true;
+            await Until(() => gainCommands.Any(c => c["control"]?.GetValue<string>() == "gainLock"));
+            gainCommands.Clear();
+            Assert.Equal(true, lockGain.IsChecked);
+            Assert.False(unitGain.IsEnabled);
+            Assert.False(unitSlider.IsEnabled);
+
+            lockGain.IsChecked = false;
+            await Until(() => !gainCommands.IsEmpty);
+            JsonNode unlock = Assert.Single(gainCommands);
+            Assert.Equal("gainLock", unlock["control"]!.GetValue<string>());
+            Assert.False(unlock["value"]!.GetValue<bool>());
+            Assert.True(unitGain.IsEnabled);
+            Assert.True(unitSlider.IsEnabled);
+            gainCommands.Clear();
             EnterGain(unitGain, "27");
             await Until(() => !gainCommands.IsEmpty);
             JsonNode unitWrite = Assert.Single(gainCommands);

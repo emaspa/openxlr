@@ -49,6 +49,7 @@ public sealed partial class SkinWindowTests
             EveryBuiltInSkinKeepsTheMainLabelsReadable(main);
             ChannelTileAlignmentWindowTests.CheckSkins();
             EveryWindowWearsTheSkin(main);
+            ClipStatusAndGainLockAreVisibleInEveryBuiltInSkin();
             ACheckBoxLabelTakesItsOwnToken(options);
             IndicatorsAndMetersDrawInsideTheBoxTheyAreGiven();
             AMeterIsColouredByPositionAndNotByItsReading();
@@ -1040,6 +1041,49 @@ public sealed partial class SkinWindowTests
             { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Left, KeyModifiers = KeyModifiers.None });
         Pump(main);
         Assert.True(fader.Value < restored, "the keyboard stopped working after the skin was taken off");
+    }
+
+    private static void ClipStatusAndGainLockAreVisibleInEveryBuiltInSkin()
+    {
+        var client = new DaemonClient();
+        var vm = new MainViewModel(client);
+        JsonNode state = CaptureInputWindowTests.State();
+        state["state"] ??= new JsonObject();
+        state["state"]!["gainLocked"] = true;
+        CaptureInputWindowTests.Apply(vm, state);
+        var setup = new MicSetupViewModel(client, "xlr1") { Unit = vm.UnitInput1, Step = MicSetupStep.Level };
+        var window = new MicSetupWindow { DataContext = setup };
+        window.Show();
+        try
+        {
+            var status = window.FindControl<TextBlock>("MicSetupClipStatus")!;
+            var reset = window.FindControl<Button>("MicSetupClip")!;
+            var led = window.FindControl<StatusLed>("MicSetupClipLed")!;
+            var gainLock = window.FindControl<CheckBox>("MicSetupGainLock")!;
+            foreach (SkinEntry skin in SkinCatalog.BuiltIn())
+            {
+                Assert.Empty(SkinService.Apply(skin));
+                setup.ApplyInputLevel(new JsonArray(.5, .8, 1));
+                Pump(window);
+                Assert.Equal(Localizer.Text("MicSetupClipLit"), status.Text);
+                Assert.True(reset.IsEnabled && led.IsOn, skin.Id);
+                Assert.True(gainLock.IsEffectivelyVisible && gainLock.IsChecked == true, skin.Id);
+                Assert.False(window.FindControl<Slider>("MicSetupUnitGain")!.IsEnabled);
+                AssertInside(status, window, skin.Id);
+                AssertInside(reset, window, skin.Id);
+
+                reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Pump(window);
+                Assert.Equal(Localizer.Text("MicSetupClipDark"), status.Text);
+                Assert.False(reset.IsEnabled || led.IsOn, skin.Id);
+            }
+        }
+        finally
+        {
+            window.Close();
+            client.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+        }
     }
 
     /// <summary>A Mic setup on its Listen step with a session, a take and every note showing, so the skin reaches them all.</summary>

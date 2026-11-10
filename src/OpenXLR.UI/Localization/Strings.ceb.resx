@@ -3189,7 +3189,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Walay global shortcut nga gitanyag niining desktop pinaagi sa portal. Magamit gihapon ang focus routing sa OpenDeck.</value>
   </data>
   <data name="MicSetup" xml:space="preserve">
-    <value>Setup sa mic</value>
+    <value>Mikropono (setup)</value>
   </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>I-setup ang mikropono lakang sa lakang: asa kini ibutang, ang level niini, usa ka take nga madungog nga raw ug naproseso, ug ang EQ ug mga plugin niini. Maabli sa XLR 1, o sa unang mikropono sa mixer.</value>
@@ -3237,16 +3237,16 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>Average nga level</value>
   </data>
   <data name="MicSetupClip" xml:space="preserve">
-    <value>Clip</value>
+    <value>Hawani ang pasidaan</value>
   </data>
   <data name="MicSetupClipTip" xml:space="preserve">
-    <value>Mosiga kon moabot sa full scale ang mikropono, ug magpabiling nagsiga hangtod imo kining pislitan.</value>
+    <value>Hawani ang pasidaan hangtod sa sunod nga clipping.</value>
   </data>
   <data name="MicSetupClipLit" xml:space="preserve">
-    <value>Clip light, nagsiga: miabot sa full scale ang mikropono. Pislita aron mapalong.</value>
+    <value>Adunay clipping</value>
   </data>
   <data name="MicSetupClipDark" xml:space="preserve">
-    <value>Clip light, patay</value>
+    <value>Walay clipping</value>
   </data>
   <data name="MicSetupGain" xml:space="preserve">
     <value>Gain sa input (dB)</value>
@@ -4228,5 +4228,11 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   </data>
   <data name="RestoreWindow" xml:space="preserve">
     <value>Ibalik</value>
+  </data>
+  <data name="MicSetupGainLock" xml:space="preserve">
+    <value>I-lock ang input gain</value>
+  </data>
+  <data name="MicSetupGainLocked" xml:space="preserve">
+    <value>Naka-lock ang input gain.</value>
   </data>
 </root>
