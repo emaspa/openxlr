@@ -214,6 +214,31 @@ public sealed class MonitorVolumeSyncTests
         Assert.Equal(2, sinks.Writes[before..].Count(write => write == restore));
     }
 
+    [Fact]
+    public void TheSharedOutputVolumeIsRefusedWhileItsFirstOutputIsLocked()
+    {
+        using var sinks = new Sinks();
+        var mixer = sinks.Mixer;
+        sinks.Dump(1, externalMuted: false);
+        sinks.OutputVolume(60, 60);
+        mixer.SetMonitorOutputs(["external"]);
+        mixer.SetMainOutput("external");
+        mixer.SetOutputVolumeLock(true, _ => null);
+        Assert.True(mixer.Snapshot().MonitorVolumeLocked);
+
+        int before = sinks.Writes.Length;
+        string named = Assert.Throws<InvalidOperationException>(() => mixer.SetOutputDeviceVolume("external", .3)).Message;
+        Assert.Equal(named, Assert.Throws<InvalidOperationException>(() => mixer.SetSharedOutputVolume(.3)).Message);
+        // A profile recall carries an output volume too. It leaves the locked output alone and is not an error.
+        mixer.SetOutputVolume(.3);
+        Assert.DoesNotContain(sinks.Writes[before..], write => write.StartsWith("set-sink-volume ", StringComparison.Ordinal));
+        Assert.Equal(.6, mixer.Snapshot().OutputVolume);
+
+        mixer.SetOutputVolumeLock(false, _ => null);
+        mixer.SetSharedOutputVolume(.3);
+        Assert.Contains("set-sink-volume external 30%", sinks.Writes[before..]);
+    }
+
     [Theory]
     [InlineData(0.665, 0.66)]
     [InlineData(0.675, 0.68)]

@@ -1594,7 +1594,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     SyncOutputSelectors();   // the jacks may now follow another mix's XLR 1 send
                     break;
                 case "setOutputVolume":
-                    _mixer.SetOutputVolume(cmd.Value.GetDouble());
+                    _mixer.SetSharedOutputVolume(cmd.Value.GetDouble());
                     SyncOutputSelectors();   // the Pro's microphone paths follow the output volume on the jacks
                     break;
                 case "setEnforcedDefaults":

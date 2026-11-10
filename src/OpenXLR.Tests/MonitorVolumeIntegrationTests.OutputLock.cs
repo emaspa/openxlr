@@ -40,13 +40,17 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(.45, pw.GetSinkVolume(speakers));
             Assert.Equal(nativeMute, pw.GetSinkMuted(headphones));
 
+            // A client's shared volume is refused while its first output is locked and moves nothing.
+            Assert.Throws<InvalidOperationException>(() => mixer.SetSharedOutputVolume(.42));
+            Assert.Equal(.45, pw.GetSinkVolume(speakers));
+            // A profile recall skips the locked output and still reaches the others.
             mixer.SetOutputVolume(.42);
             Assert.Equal(1.5, pw.GetSinkVolume(headphones));
             Assert.Equal(.42, pw.GetSinkVolume(speakers));
             mixer.SetMonitorOutputs([speakers, headphones]);
             mixer.EnforceDefaults();
             Assert.False(mixer.Snapshot().MonitorVolumeLocked);
-            mixer.SetOutputVolume(.62);
+            mixer.SetSharedOutputVolume(.62);
             Assert.Equal(.62, pw.GetSinkVolume(speakers));
             Assert.Equal(1.5, pw.GetSinkVolume(headphones));
 

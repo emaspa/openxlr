@@ -24,6 +24,21 @@ public sealed partial class Mixer
             throw new InvalidOperationException("output volume is locked in Options, Audio");
     }
 
+    /// <summary>
+    /// The shared output volume as a client sets it. Refused while the first
+    /// output is locked, since that is the output the volume belongs to and the
+    /// one the state reports; a profile recall goes through
+    /// <see cref="SetOutputVolume"/>, which leaves a locked output alone.
+    /// </summary>
+    public void SetSharedOutputVolume(double volume)
+    {
+        lock (_gate)
+        {
+            if (_monitorOutputs.FirstOrDefault() is { } first) RequireEditableOutputVolume(StripMarker(first));
+            SetOutputVolume(volume);
+        }
+    }
+
     /// <summary>Hold the current output's volume, or release the existing lock, after saving the choice.</summary>
     public void SetOutputVolumeLock(bool enabled, Func<MixerSettings, string?> save)
     {

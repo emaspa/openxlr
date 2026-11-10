@@ -717,7 +717,11 @@ public sealed partial class MainViewModel : ViewModelBase
         set
         {
             OutputVolumeRange.Include(value);
-            if (Set(ref _outputVolume, value) && !_applying)
+            // The daemon refuses the shared volume while its first output is
+            // locked. The slider is disabled then, and a value the range
+            // coerces (the desktop can close the boost range) is not sent:
+            // the next state brings the held level back.
+            if (Set(ref _outputVolume, value) && !_applying && !MonitorVolumeLocked)
             {
                 double v = value;
                 SliderSync.Touch("outvol");
