@@ -1207,6 +1207,13 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   tab to tab. Ctrl+Tab and Ctrl+Page Down move between the tabs, and
   Options opens again on the tab it showed last while the UI runs. The
   welcome guide's shortcuts open the tab that holds their card.
+- Output volume lock: Options, Audio can hold one output at its current
+  volume, with its channel balance. The daemon puts the level back on its
+  one-second sweep after a change from the desktop, across restarts and
+  reconnections of the same sink. The MONITOR volume, the terminal mixer and
+  the Deck's dials and volume keys show the lock and send no change for
+  that output, and the API refuses one. On a Wave XLR Pro the lock waits
+  while the unit mixes its jacks ([manual](manual.md#default-devices))
 - Enforced defaults: the daemon re-asserts the chosen system default
   sink and source on its one-second sweep, undoing WirePlumber's
   auto-switch to newly created nodes. The defaults to restore are read
