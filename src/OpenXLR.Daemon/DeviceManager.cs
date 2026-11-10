@@ -626,6 +626,7 @@ public sealed partial class DeviceManager : BackgroundService
             ForgetDynamics();
             ForgetDucking();
             ConnectDuckingLocked(dev);
+            ConnectUnitGainLockLocked(dev);
             if (dev.EqSupport is { Ready: false } eqSupport && eqSupport.Note is { } eqNote)
                 _log.LogInformation("{dev}: {note}", dev.Info.DisplayName, eqNote);
             if (_unansweredId is not null && _unansweredId != dev.Info.InstanceId) ClearUnansweredLocked();
@@ -1084,7 +1085,11 @@ public sealed partial class DeviceManager : BackgroundService
                         _device.SetGain2Db(value.GetInt32());
                         break;
                     case "gainLock":
-                        if (value.GetBoolean()) _gainLocked.Add(DevId(_device));
+                        bool locking = value.GetBoolean();
+                        // The unit's own lock first: a failed write leaves
+                        // both locks as they were.
+                        if (_device.Capabilities.HardwareGainLock) _device.SetUnitGainLock(locking);
+                        if (locking) _gainLocked.Add(DevId(_device));
                         else _gainLocked.Remove(DevId(_device));
                         SaveGainLocks();
                         break;
@@ -1558,6 +1563,30 @@ public sealed partial class DeviceManager : BackgroundService
                 : _duckVerified is { } held ? new(_duckDrifted ? DeviceDuckingPhase.Pending : DeviceDuckingPhase.Verified, held)
                 : DeviceDuckingStatus.None;
             return status with { Readback = _duckReadback };
+        }
+    }
+
+    /// <summary>
+    /// A unit just opened that has a gain lock of its own gets it as
+    /// OpenXLR's gain lock stands: set while that lock is on, cleared while
+    /// it is off, whoever set it (Wave Link, or the ClipGuard switch of an
+    /// earlier release). A failed write leaves the software lock in force
+    /// and is tried again at the next connect.
+    /// </summary>
+    private void ConnectUnitGainLockLocked(IAudioDevice dev)
+    {
+        if (!dev.Capabilities.HardwareGainLock) return;
+        bool locked = _gainLocked.Contains(DevId(dev));
+        try
+        {
+            if (dev.SetUnitGainLock(locked))
+                _log.LogInformation("{dev}: the unit's gain lock {action} to follow OpenXLR's gain lock",
+                    dev.Info.DisplayName, locked ? "set" : "cleared");
+        }
+        catch (UsbHungException) { throw; }
+        catch (Exception ex)
+        {
+            _log.LogWarning("{dev}: the unit's gain lock was not written: {msg}", dev.Info.DisplayName, ex.Message);
         }
     }
 

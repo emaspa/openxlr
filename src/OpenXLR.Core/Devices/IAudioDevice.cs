@@ -107,6 +107,16 @@ public interface IAudioDevice : IDisposable
     void SetClipGuard2(bool on) { }
     void SetCompressor2(bool on) { }
 
+    /// <summary>
+    /// Hold or release the unit's own gain lock, which refuses gain set
+    /// through its USB volume control while OpenXLR's writes still apply. A
+    /// unit whose capabilities report
+    /// <see cref="DeviceCapabilities.HardwareGainLock"/> overrides it. False
+    /// when the unit already held it and nothing was written.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The unit has no gain lock of its own, or a transfer failed.</exception>
+    bool SetUnitGainLock(bool on) => throw new InvalidOperationException("this unit has no gain lock of its own");
+
     // The microphone EQ on the unit's own DSP. Default no-ops, like the
     // second-input setters; a unit whose capabilities report HardwareEq
     // overrides them.
@@ -276,6 +286,18 @@ public sealed record DeviceCapabilities
     /// the Wave XLR Pro hold the same fields and are driven the same way.
     /// </summary>
     public bool HardwareDynamics { get; init; }
+
+    /// <summary>
+    /// The unit has a gain lock of its own and the daemon holds it with
+    /// OpenXLR's gain lock: while set, the unit ignores gain written through
+    /// its USB volume control (the desktop's input volume, WirePlumber
+    /// putting back a saved volume) and still takes OpenXLR's gain writes.
+    /// The Wave XLR MK.2 from firmware 1.0.15, measured on hardware, and the
+    /// XLR Dock MK.2 from the same firmware, driven the same way and not
+    /// checked. False on every other model, on older firmware, where the
+    /// same bit is ClipGuard, and on a unit whose version was not read.
+    /// </summary>
+    public bool HardwareGainLock { get; init; }
 
     /// <summary>
     /// The unit ducks its own outputs while the key input is loud and the

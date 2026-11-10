@@ -149,8 +149,8 @@ Audio → INTERFACE has **Recover microphone** for a stall it misses
 On the Wave XLR MK.2 and the XLR Dock MK.2 with firmware 1.0.15 or
 later, OpenXLR up to 0.6.5 did not turn ClipGuard off: the switch set the
 unit's gain lock, the one Wave Link offers, and ClipGuard stayed on.
-Switching ClipGuard once with a newer release clears that lock. Older
-firmware is not affected.
+A newer release clears that lock when it connects to the unit, unless
+OpenXLR's own gain lock is on. Older firmware is not affected.
 
 If you only want hardware control and no mixer, turn off "Enable software
 mixer" in Options, AUDIO ([section 3.8](#hardware-only)). The daemon restarts in hardware-control mode
@@ -1471,6 +1471,17 @@ including an external mono capture input that reports a gain. Its gain is
 shared with other apps recording that source. If the microphone has no
 gain control here, set it on the microphone or its interface. The meter
 runs while the window is open and changes nothing in the channel's route.
+
+On a Wave XLR MK.2 or an XLR Dock MK.2 with firmware 1.0.15 or later, the
+gain lock also sets the unit's own gain lock, the one Wave Link offers.
+The desktop's input volume and the volume WirePlumber puts back when the
+unit appears then cannot change the gain either. OpenXLR's own writes,
+such as a recalled profile, still reach it. At every connect OpenXLR sets
+the unit's lock while its own lock is on and clears it while it is off, so
+a lock you set in Wave Link goes away when OpenXLR's lock is off. This was
+measured on a Wave XLR MK.2. The dock is driven the same way and has not
+been checked. On older firmware and on the Wave:3 MK.2 only OpenXLR's lock
+applies.
 
 **Suggest gain** works out a gain for you. Press it and talk for five seconds
 as you will on air. OpenXLR measures two figures from the meter. One is
