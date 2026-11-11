@@ -103,7 +103,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(0x1e, mode[90]);
             Assert.Equal(0x00, mode[98]);
             Assert.Equal(0xf0, mode[12]);                       // pairs 0 to 3; XLR 1, Aux In and Line In muted in Monitor A
-            Assert.Equal(0x0d, mode[13]);                       // pairs 4 and 6, and the cue on pair 7
+            Assert.Equal(0x1d, mode[13]);                       // pairs 4 and 6, the cue on pair 7, and the maximizer bypassed
             Assert.Equal(7, service.Snapshot()!.HardwareMixing!.CuePair);
             Assert.Equal(unchecked((byte)(sbyte)-36), mode[ProMixSections.SourceOfPair(1)]);   // Game at 0.5
             Assert.Equal(unchecked((byte)(sbyte)-27), mode[ProMixSections.SourceOfPair(0)]);   // System at 0.6
@@ -126,6 +126,29 @@ public sealed partial class MonitorVolumeIntegrationTests
                 Convert.ToHexString(mode, 36, ProMixPlan.UnitSectionLength));
             WaitForRecovery(() => Into("playback_AUX10").Length == 0 && Into("playback_AUX11").Length == 0);
             PrimaryWait(() => MixerSettings.Load()?.HardwarePairs.GetValueOrDefault("game", -1) == 1);
+
+            // The Aux mix's volume and mute are section 36's level and mute
+            // bytes (102 and 103), its cells and memberships unchanged; the
+            // maximizer on Monitor A is byte 14 with the bypass cleared.
+            byte[] cells36 = mode[36..50];
+            Run(new() { Cmd = "setMixVolume", Mix = "auxout", Value = JsonSerializer.SerializeToElement(0.5) });
+            Run(new() { Cmd = "setMixMuted", Mix = "auxout", Value = JsonSerializer.SerializeToElement(true) });
+            Run(new() { Cmd = "setMixMaximizer", Mix = "monitor", Value = JsonSerializer.SerializeToElement(40) });
+            Sweep();
+            byte[] mastered = pro.Block;
+            Assert.Equal(ProSectionMaster.LevelOf(60 * Math.Log10(0.5)), mastered[102]);
+            Assert.Equal(0x01, mastered[103] & 0x01);
+            Assert.Equal(cells36, mastered[36..50]);
+            Assert.Equal(40, mastered[14]);
+            Assert.Equal(0, mastered[13] & 0x10);
+            Assert.Equal(40, service.Snapshot()!.Mixes.Single(m => m.Id == "monitor").Maximizer);
+            Run(new() { Cmd = "setMixMuted", Mix = "auxout", Value = JsonSerializer.SerializeToElement(false) });
+            Run(new() { Cmd = "setMixVolume", Mix = "auxout", Value = JsonSerializer.SerializeToElement(1.0) });
+            Run(new() { Cmd = "setMixMaximizer", Mix = "monitor", Value = JsonSerializer.SerializeToElement(0) });
+            Sweep();
+            Assert.Equal(mode[100..108], pro.Block[100..108]);
+            Assert.Equal(0x10, pro.Block[13] & 0x10);
+            Assert.Equal(0, pro.Block[14]);
 
             // The output volume moves the headphone volume, not the sink.
             Run(new() { Cmd = "setOutputVolume", Value = JsonSerializer.SerializeToElement(1.0) });
@@ -256,6 +279,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Equal(0x54, after[98]);
             Assert.Equal(before[..16], after[..16]);
             Assert.Equal(before[36..52], after[36..52]);
+            Assert.Equal(new byte[8], after[100..108]);
             Assert.Equal(0x20, after[ProMixSections.SelectorUsbAux]);
             Assert.Equal(ProJackLevels.ByteOf(-16), pro.Levels[0]);
             Assert.False(service.Snapshot()!.HardwareMixing!.Active);

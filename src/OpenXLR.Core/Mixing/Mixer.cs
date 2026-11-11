@@ -1695,6 +1695,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Expander = new Dictionary<string, MicExpander>(_expander, StringComparer.Ordinal),
                 MonitorDry = ExportMonitorDryLocked(),
                 MixEq = ExportMixEqLocked(),
+                MixMaximizer = ExportMaximizersLocked(),
                 Ducking = DuckingSetupLocked().Copy(),
                 Appearance = ExportAppearanceLocked(),
             };
@@ -1762,6 +1763,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     && ProJackFeeds.SlotOfSection(at) is 1 or 2 && ProMixPlan.IsRestore(hex))
                     _hardwareRestore[at] = hex.ToUpperInvariant();
             RestoreHardwareMixingLocked(s);
+            // The maximizer amounts are the model's alone, read whether or not the mixer runs.
+            RestoreMaximizersLocked(s.MixMaximizer);
             if (!_built) { SyncDuckingLocked(); return; }
             if (_config.RepairedMonitorMix is { } repaired)
             {
@@ -3647,6 +3650,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                         Deletable = m.IsEditable && (m.Kind != MixKind.Monitor || monitorCount > 1),
                         MonitorDry = m.Kind == MixKind.Monitor ? _dryMonitors.Contains(m.Id) : null,
                         Eq = MixEqStateLocked(m.Id),
+                        Maximizer = _maximizers.GetValueOrDefault(m.Id),
                     })],
                 Channels = [.. _config.Channels.Select(c => new ChannelStatus(
                     c.Id, ChannelNameLocked(c),

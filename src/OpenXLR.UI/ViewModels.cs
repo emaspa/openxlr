@@ -1402,6 +1402,11 @@ public sealed partial class MainViewModel : ViewModelBase
         if (levels is not JsonObject obj) return;
         Ducking.ApplyMeters(obj);
         Soundboard.ApplyMeters(obj);
+        // A maximizer the unit runs carries max:<id>, one value in dB; any
+        // other mix reads no reduction.
+        foreach (MixViewModel mix in Mixes)
+            mix.MaximizerReduction = obj[$"max:{mix.Id}"] is JsonArray { Count: > 0 } max && max[0] is JsonValue v
+                && v.TryGetValue(out double db) && double.IsFinite(db) ? db : 0;
         foreach (KeyValuePair<string, JsonNode?> kv in obj)
         {
             double l = 0, r = 0;
@@ -1462,6 +1467,7 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             mix.Inserts.UnitNote = HardwareMixing.DisabledSentence($"inserts:mix:{mix.Id}");
             if (mix.Eq is { } eq) eq.UnitNote = HardwareMixing.DisabledSentence($"eq:mix:{mix.Id}");
+            mix.MaximizerNote = HardwareMixing.DisabledSentence($"maximizer:{mix.Id}");
         }
         string? soundCheck = HardwareMixing.DisabledSentence("soundCheck");
         foreach (MicSetupViewModel setup in MicSetups())
@@ -1886,6 +1892,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
     {
         Detached = true;
         SliderSync.Forget($"mixvol:{Id}");
+        SliderSync.Forget($"mixmax:{Id}");
     }
 
     public LayoutAppearanceViewModel Appearance { get; } = new();
@@ -2035,6 +2042,8 @@ public sealed class MixViewModel : ViewModelBase, IHasId
             Muted = (n["muted"]?.GetValue<bool>() ?? false) || IsMonitor && monitorMuted;
             if (n["name"]?.GetValue<string>() is { Length: > 0 } name) Name = name;
             HardwareSection = n["hardwareSection"] is JsonValue section && section.TryGetValue(out int start) ? start : null;
+            if (!SliderSync.RecentlyTouched($"mixmax:{Id}"))
+                Maximizer = n["maximizer"] is JsonValue max && max.TryGetValue(out int amount) ? amount : 0;
             bool? dry = n["monitorDry"] is JsonValue d && d.TryGetValue(out bool on) ? on : null;
             if (dry != _monitorDry)
             {
@@ -2070,7 +2079,72 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     private int? _hardwareSection;
     /// <summary>The Wave XLR Pro's section that builds this mix for a jack while hardware mixing runs, or null.</summary>
-    public int? HardwareSection { get => _hardwareSection; private set => Set(ref _hardwareSection, value); }
+    public int? HardwareSection
+    {
+        get => _hardwareSection;
+        private set { if (Set(ref _hardwareSection, value)) Raise(nameof(ShowMaximizer)); }
+    }
+
+    private int _maximizer;
+    /// <summary>
+    /// The unit's maximizer on this mix, 0 (off) to 100. A move goes to the
+    /// daemon as <c>setMixMaximizer</c>, held back while the slider moves as
+    /// the volume is; the next state push confirms it.
+    /// </summary>
+    public int Maximizer
+    {
+        get => _maximizer;
+        set
+        {
+            if (Detached) return;
+            value = Math.Clamp(value, 0, MaximizerMaximum);
+            if (!Set(ref _maximizer, value)) return;
+            Raise(nameof(MaximizerText));
+            Raise(nameof(MaximizerOn));
+            if (_applying) return;
+            int amount = value;
+            SliderSync.Touch($"mixmax:{Id}");
+            SliderSync.Send($"mixmax:{Id}", () => _ = _client.SetMixMaximizerAsync(Id, amount));
+        }
+    }
+
+    public const int MaximizerMaximum = 100;
+
+    /// <summary>The amount as the button and the flyout say it: Off at 0.</summary>
+    public string MaximizerText => _maximizer == 0 ? Localizer.Text("MaximizerOff") : _maximizer.ToString(System.Globalization.CultureInfo.CurrentCulture);
+
+    public bool MaximizerOn => _maximizer > 0;
+
+    /// <summary>The unit builds this mix while hardware mixing runs, so its maximizer can be offered.</summary>
+    public bool ShowMaximizer => _hardwareSection is not null;
+
+    private string? _maximizerNote;
+    /// <summary>Why the unit runs no maximizer on this mix (the daemon's <c>maximizer:&lt;id&gt;</c> sentence), or null.</summary>
+    public string? MaximizerNote
+    {
+        get => _maximizerNote;
+        set
+        {
+            if (!Set(ref _maximizerNote, value)) return;
+            Raise(nameof(CanMaximize));
+            Raise(nameof(MaximizerTip));
+        }
+    }
+
+    public bool CanMaximize => _maximizerNote is null;
+
+    public string MaximizerTip => _maximizerNote ?? Localizer.Text("MaximizerTip");
+
+    private double _maximizerReduction;
+    /// <summary>How far the unit's maximizer lowers the mix now, in dB, from the <c>max:&lt;id&gt;</c> meter; 0 while it does not run.</summary>
+    public double MaximizerReduction
+    {
+        get => _maximizerReduction;
+        set { if (Set(ref _maximizerReduction, Math.Max(0, value))) Raise(nameof(MaximizerReductionText)); }
+    }
+
+    public string MaximizerReductionText => Localizer.Format("MaximizerReduction",
+        _maximizerReduction.ToString("0.0", System.Globalization.CultureInfo.CurrentCulture));
 
     public void ApplyAuxPort(bool enabled)
     {

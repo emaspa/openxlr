@@ -34,6 +34,7 @@ internal sealed class DaemonLink : IAsyncDisposable
     private readonly Lock _meterGate = new();
     private readonly Dictionary<string, MeterTrace> _meters = [];
     private readonly Dictionary<string, (double Decibels, double At)> _reductions = [];
+    private readonly Dictionary<string, (double Decibels, double At)> _maximizers = [];
     private readonly Dictionary<string, (double Position, int Voices, double At)> _clips = [];
     private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
     private ClientWebSocket? _socket;
@@ -214,6 +215,20 @@ internal sealed class DaemonLink : IAsyncDisposable
             double now = _clock.Elapsed.TotalSeconds;
             return _reductions.Values.Where(reading => now - reading.At < 1)
                 .Select(reading => reading.Decibels).DefaultIfEmpty(0).Max();
+        }
+    }
+
+    /// <summary>
+    /// How far the Wave XLR Pro's maximizer lowers a mix now, in dB, from its
+    /// <c>max:&lt;id&gt;</c> meter; null while it does not run and once a
+    /// reading is a second old.
+    /// </summary>
+    public double? MaximizerReduction(string mix)
+    {
+        lock (_meterGate)
+        {
+            return _maximizers.TryGetValue($"max:{mix}", out var reading) && _clock.Elapsed.TotalSeconds - reading.At < 1
+                ? reading.Decibels : null;
         }
     }
 
@@ -575,6 +590,12 @@ internal sealed class DaemonLink : IAsyncDisposable
                         _reductions[entry.Name] = (Math.Clamp(pair[0], 0, 120), now);
                         continue;
                     }
+                    // So does the Wave XLR Pro's maximizer on a mix it builds.
+                    if (entry.Name.StartsWith("max:", StringComparison.Ordinal))
+                    {
+                        _maximizers[entry.Name] = (Math.Clamp(pair[0], 0, 120), now);
+                        continue;
+                    }
                     // A soundboard clip reports where it is and how many voices play it, not a level.
                     if (entry.Name.StartsWith("clip:", StringComparison.Ordinal))
                     {
@@ -590,6 +611,8 @@ internal sealed class DaemonLink : IAsyncDisposable
                     _meters.Remove(missing);
                 foreach (string missing in _reductions.Keys.Where(key => !present.Contains(key)).ToArray())
                     _reductions.Remove(missing);
+                foreach (string missing in _maximizers.Keys.Where(key => !present.Contains(key)).ToArray())
+                    _maximizers.Remove(missing);
                 foreach (string missing in _clips.Keys.Where(key => !present.Contains(key)).ToArray())
                     _clips.Remove(missing);
             }

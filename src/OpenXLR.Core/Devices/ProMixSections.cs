@@ -12,8 +12,11 @@ namespace OpenXLR.Core.Devices;
 ///   s to s+11   one level cell per source, int8 in half dB, 00 unity. 89
 ///               (-59.5 dB) and up play their value, held at +12 dB (18)
 ///               and above; 88 and below are off, digital zero.
-///   s+12, s+13  membership, LE16, one bit per source
-///   s+14        unknown, 00 on every unit read so far, kept
+///   s+12, s+13  membership, LE16, one bit per source; bit 12 (s+13 bit
+///               4) bypasses the section's maximizer
+///   s+14        the section's maximizer amount, 0 to 100 (desk, 2026-11-11:
+///               about 0.2 dB of make-up gain a step, a ceiling near -1
+///               dBFS); 00 with the bypass clear on every unit read so far
 ///   s+15 to s+17  twelve 2-bit tap fields, LE, field M for source M, the
 ///               point the section takes the source at: 0 before the
 ///               unit's processing, 1 after it, 2 after the insert return,
@@ -37,9 +40,14 @@ namespace OpenXLR.Core.Devices;
 /// 72, 23 nothing); bytes 94, 95 and 97 the USB capture taps of XLR 1, XLR 2
 /// and Line In in bits 0 and 1 (<see cref="CaptureTap"/>: 00 before the
 /// unit's processing), byte 96 one for USB Aux that showed no effect on the
-/// desk (2026-11-11) and is not driven; byte 98 section 0's level in quarter-dB attenuation (54, -21 dB, on
-/// every unit read so far). Every other byte is unknown and carried as
-/// read.
+/// desk (2026-11-11) and is not driven; byte 98 section 0's level in
+/// quarter-dB attenuation (54, -21 dB, on every unit read so far); bytes
+/// 100, 102, 104 and 106 the levels of sections 18 to 72 in the same
+/// encoding, and bytes 99, 101, 103, 105 and 107 the mutes of sections 0 to
+/// 72, bit 0 (desk, 2026-11-11: byte 100 at 28 lowered section 18 by 9.9
+/// dB, byte 101 bit 0 silenced it, both live without the commit; byte 99
+/// follows the pattern and was not measured). Every other byte is unknown
+/// and carried as read.
 ///
 /// A level or membership write applies live, with or without the 0x0003
 /// commit, ramped by the unit over 12 to 16 ms. A change in a cell's linear
@@ -69,7 +77,11 @@ public static class ProMixSections
         => pair is >= 0 and < PairCount ? FirstPair + pair : throw new ArgumentOutOfRangeException(nameof(pair));
 
     public const int MaskOffset = 12;
-    public const int Byte14Offset = 14;
+    /// <summary>The membership bit that bypasses the section's maximizer: set, the section plays dry at any amount.</summary>
+    public const int MaximizerBypassBit = 12;
+    /// <summary>The byte of the section's maximizer amount, 0 to <see cref="MaximizerMaximum"/>.</summary>
+    public const int MaximizerOffset = 14;
+    public const int MaximizerMaximum = 100;
     /// <summary>The byte of the four inputs' 2-bit tap fields, field M for input M.</summary>
     public const int InputTapsOffset = 15;
     public const int InputCount = 4;
@@ -169,6 +181,29 @@ public static class ProMixSections
     /// <summary>The byte 98 value for a level, 0 to -63.75 dB to the nearest quarter dB.</summary>
     public static byte Section0LevelByte(double db)
         => double.IsFinite(db) ? (byte)Math.Clamp((int)Math.Round(-db * 4, MidpointRounding.AwayFromZero), 0, 255) : (byte)255;
+
+    /// <summary>The level byte of the section starting at <paramref name="start"/>: 98 for section 0, 100, 102, 104 and 106 for sections 18 to 72.</summary>
+    public static int MasterOffset(int start) => Section0LevelOffset + 2 * IndexOf(start);
+
+    /// <summary>The mute byte of the section starting at <paramref name="start"/>, the byte after its level; bit 0 silences the section.</summary>
+    public static int MuteOffset(int start) => MasterOffset(start) + 1;
+
+    public const byte MuteMask = 0x01;
+
+    /// <summary>Whether the section's mute bit is set.</summary>
+    public static bool IsMuted(ReadOnlySpan<byte> block, int start) => (block[MuteOffset(start)] & MuteMask) != 0;
+
+    /// <summary>The section's level byte in dB, quarter-dB attenuation, as byte 98 is.</summary>
+    public static double MasterDb(ReadOnlySpan<byte> block, int start) => Section0LevelDb(block[MasterOffset(start)]);
+
+    /// <summary>The section's maximizer amount, byte 14 of the section.</summary>
+    public static byte MaximizerAmount(ReadOnlySpan<byte> block, int start) => block[Base(start) + MaximizerOffset];
+
+    /// <summary>Whether the section's maximizer is bypassed: membership bit 12.</summary>
+    public static bool MaximizerBypassed(ReadOnlySpan<byte> block, int start) => (Members(block, start) & 1 << MaximizerBypassBit) != 0;
+
+    /// <summary>The maximizer index in block 0x0002 of the section starting at <paramref name="start"/>: 0 to 4 in section order.</summary>
+    public static int MaximizerOf(int start) => IndexOf(start);
 
     /// <summary>The section a selector value plays: its start, or null for 23 and values that played nothing.</summary>
     public static int? SectionOf(byte selector)
@@ -301,9 +336,10 @@ public static class ProMixSections
 
     /// <summary>
     /// The block decoded for tester diagnostics: one entry per section
-    /// (<c>section0</c> to <c>section72</c>), the outputs' selectors, section
-    /// 0's level and the capture taps of XLR 1, XLR 2, USB Aux and Line In;
-    /// or <c>sections</c> alone saying why it does not decode.
+    /// (<c>section0</c> to <c>section72</c>, with its maximizer, and its level
+    /// and mute bytes), the outputs' selectors, section 0's level and the
+    /// capture taps of XLR 1, XLR 2, USB Aux and Line In; or <c>sections</c>
+    /// alone saying why it does not decode.
     /// </summary>
     public static IReadOnlyDictionary<string, string> Describe(ReadOnlySpan<byte> block)
     {
@@ -363,7 +399,16 @@ public static class ProMixSections
         text.Append("; ducks ").Append(ducked.Count == 0 ? "nothing" : string.Join(", ", ducked));
         int b = start;
         text.Append(CultureInfo.InvariantCulture,
-            $"; inputs {block[b + InputTapsOffset]:x2}, fields {block[b + DuckingOffset]:x2}{block[b + DuckingOffset + 1]:x2}, byte {b + Byte14Offset} {block[b + Byte14Offset]:x2}");
+            $"; inputs {block[b + InputTapsOffset]:x2}, fields {block[b + DuckingOffset]:x2}{block[b + DuckingOffset + 1]:x2}");
+        text.Append(CultureInfo.InvariantCulture, $"; maximizer {MaximizerAmount(block, start)}");
+        if (MaximizerBypassed(block, start)) text.Append(" bypassed");
+        int level = MasterOffset(start), mute = MuteOffset(start);
+        // Section 0's level is byte 98, described on its own line; its mute
+        // byte follows the pattern of the others but was never measured.
+        if (start != 0)
+            text.Append(CultureInfo.InvariantCulture, $"; level {Db(MasterDb(block, start))} (byte {level} {block[level]:x2})")
+                .Append(IsMuted(block, start) ? ", muted" : "");
+        text.Append(CultureInfo.InvariantCulture, $"{(start == 0 ? ";" : ",")} byte {mute} {block[mute]:x2}");
         return text.ToString();
     }
 

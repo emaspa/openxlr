@@ -616,6 +616,14 @@
                     "value": true
                   }
                 },
+                "mixMaximizer": {
+                  "summary": "Set the Wave XLR Pro's maximizer on Monitor A to 50, which runs while hardware mixing builds Monitor A alone on the unit",
+                  "value": {
+                    "cmd": "setMixMaximizer",
+                    "mix": "monitor",
+                    "value": 50
+                  }
+                },
                 "mixEqProfile": {
                   "summary": "Put the built-in Footsteps curve on the Stream mix's output EQ and switch it on",
                   "value": {

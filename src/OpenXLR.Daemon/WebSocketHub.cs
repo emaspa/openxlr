@@ -498,6 +498,7 @@ public sealed class WebSocketHub
             case "setCompressor":
             case "setExpander":
             case "setMonitorDry":
+            case "setMixMaximizer":
             case "setDynamicsProcessing":
             case "watchDynamics":
             case "setDucking":

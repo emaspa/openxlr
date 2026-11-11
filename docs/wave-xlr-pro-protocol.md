@@ -29,9 +29,11 @@ transport and is not maintained.
 
 The mix sections of block 0x0001 (sections 12 and 15 to 19) have their own
 codec, `src/OpenXLR.Core/Devices/ProMixSections.cs`: the five sections'
-levels, membership and ducking fields, the output selectors, the capture
-taps at bytes 94 to 97 (sections 17 and 22) and byte 98, the cell law with its floor and ceiling, and the small low-level
-changes the unit drops. Diagnostics show the block decoded with it.
+levels, membership and ducking fields, the maximizers (section 22), the
+output selectors, the capture taps at bytes 94 to 97 (sections 17 and
+23), the sections' levels and mutes from byte 98 (section 22), the cell
+law with its floor and ceiling, and the small low-level changes the unit
+drops. Diagnostics show the block decoded with it.
 
 Block 0x0002, the unit's meters (section 21), has its own codec,
 `src/OpenXLR.Core/Devices/ProMeters.cs`. Diagnostics show it decoded, and
@@ -48,7 +50,7 @@ block is written once for all of them, block 0x0008 first when ducking
 changed, and the commit follows only when a selector or a membership bit
 changed. At steady state the plan matches the last poll and nothing is
 read or written. The one other write of the block is raw capture's, the
-capture taps at bytes 94, 95 and 97 (section 22), one byte at a time under
+capture taps at bytes 94, 95 and 97 (section 23), one byte at a time under
 the same lock.
 
 ## 0. HARDWARE-CONFIRMED (2026-08-25, live on the device)
@@ -1374,15 +1376,107 @@ of the inputs and pairs it ducks as the ducking reduction meter
 mix alone (channels 30 to 34) as that mix's meter
 ([api.md](api.md#hardware-mixing)). It takes the section, not the jack
 level at bytes 142 to 149, so the headphone volume and Line Out level stay
-out of the mix meter, as they are in software mixing. Diagnostics decode
-the whole block. The maximizers, expanders, compressors and Voice Tune
-bytes are read for diagnostics only.
+out of the mix meter, as they are in software mixing. In hardware mixing
+the same read gives each running maximizer's reduction (section 22).
+Diagnostics decode the whole block. The expanders, compressors and Voice
+Tune bytes are read for diagnostics only.
 
 ### Open
 
-- Which input each maximizer, expander and compressor belongs to.
+- Which input each expander and compressor belongs to. The maximizers are
+  the mix sections' (section 22).
 
-## 22. The capture taps of XLR 2, USB Aux and Line In (desk probe of 2026-11-11)
+## 22. Section levels, mutes and maximizers (desk measurements of 2026-11-11)
+
+Firmware 1.0.14, the desk unit, the daemon stopped. Test tones played on
+USB pairs that were members of a section, and each section was read on its
+own capture pair. Every write below applied live, with or without the
+0x0003 commit.
+
+### Levels and mutes
+
+Byte 98 is section 0's level (section 17). The bytes after it hold the
+same for every section, two bytes each:
+
+| Byte | Field |
+|---|---|
+| 98 | section 0's level, quarter-dB attenuation (dB = -byte/4), `54` on every unit read so far |
+| 99 | section 0's mute, bit 0 (not measured; it follows the pattern below) |
+| 100, 101 | section 18's level and mute |
+| 102, 103 | section 36's level and mute |
+| 104, 105 | section 54's level and mute |
+| 106, 107 | section 72's level and mute |
+
+Measured on section 18:
+
+- Byte 100 at `28` lowered the section by 9.9 dB on its capture.
+- Byte 101 bit 0 silenced it completely.
+- Byte 98 did not move section 18.
+
+Bytes 99 and 101 to 107 read `00` on the desk unit. The section's level
+meter in block 0x0002 (channel 30 plus the section's index, section 21)
+reads after its level and mute.
+
+### The maximizer
+
+Each section has a maximizer:
+
+| Byte | Field |
+|---|---|
+| `s+14` | the amount, 0 to 100 |
+| `s+12`, `s+13` bit 12 (`s+13` bit 4) | the bypass: set, the section plays dry at any amount |
+
+Measured on section 18 with a 1 kHz tone:
+
+- Amount 50 raised the output by 10 dB and 100 by 20 dB: make-up gain of
+  about 0.2 dB a step.
+- The output has a ceiling near -1 dBFS: a -12 dBFS input at amount 100
+  came out near -1 dBFS, with 9.2 dB of reduction.
+- With the bypass set the output was the dry tone again, even at amount
+  100.
+
+Every unit read so far holds `00` with the bypass clear, in all five
+sections.
+
+The maximizers' meters are block 0x0002 bytes 0 to 9: maximizer M, the
+one of section M in block 0x0001's order (0, 18, 36, 54, 72), has its
+reduction at byte 2M (byte/4 dB) and its input level at byte 2M+1 (-byte/4
+dBFS, `f0` the floor). Section 18's, bytes 2 and 3, was measured; the
+others follow the order.
+
+### What OpenXLR does with it
+
+In hardware mixing (see [api.md](api.md#hardware-mixing)):
+
+- A mix built alone in section 18, 36 or 54 has its volume in the
+  section's level byte and its mute in the section's mute bit, and its
+  cells hold the sends alone. A volume above 0 dB goes into the cells,
+  which the level byte cannot raise. Section 0 keeps the mix volume in its
+  cells: byte 98 stays at 0 dB in the mode, the level the jacks' entry
+  offset rests on. A summed feed keeps every mix's volume in its cells.
+  The mode holds bytes 100 to 105 for sections 18, 36 and 54, at 0 dB and
+  unmuted for a section it does not build that way, and leaving puts
+  them at `00`. Byte 99 and bytes 106 and 107 are never written.
+- A mix built alone in a section gets its maximizer amount in `s+14` with
+  the bypass clear. Every other section the mode builds has the bypass set
+  and the amount at 0, the state measured dry. Leaving puts `s+14` and the
+  bypass back as they were, with the rest of the section.
+- Each running maximizer's reduction is the mix's `max:<id>` meter.
+
+### Open
+
+- Whether the level byte acts before or after the maximizer. The mode puts
+  a mix's volume in the level byte; if the level comes first, a lower mix
+  volume feeds the maximizer less and it reduces less, so the mix's output
+  falls by less than the fader. Measured: the level and the mute act
+  before the section's level meter.
+- Whether amount 0 with the bypass clear is dry, or still holds peaks at
+  the ceiling.
+- Byte 99 as section 0's mute.
+- The maximizers of sections 0, 36, 54 and 72, measured only through the
+  pattern of section 18's.
+
+## 23. The capture taps of XLR 2, USB Aux and Line In (desk probe of 2026-11-11)
 
 Firmware 1.0.14, the desk unit. Bytes 95, 96 and 97 of block 0x0001 sit
 after XLR 1's tap at byte 94 (section 17) and read `02` on the desk unit,

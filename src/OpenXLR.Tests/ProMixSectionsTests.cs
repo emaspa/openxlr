@@ -271,8 +271,8 @@ public sealed class ProMixSectionsTests
         Assert.Equal([3, 3, 2, 2], Enumerable.Range(0, 4).Select(input => ProMixSections.InputTap(b, 36, input)));
         Assert.Equal([0, 0, 0, 0], Enumerable.Range(0, 4).Select(input => ProMixSections.InputTap(b, 72, input)));
         IReadOnlyDictionary<string, string> d = ProMixSections.Describe(b);
-        Assert.Equal("USB Aux 0 dB, pair 1 0 dB; ducks XLR 2; inputs ae, fields 5501, byte 14 00", d["section0"]);
-        Assert.Equal("pair 5 0 dB; ducks XLR 1, XLR 2; inputs af, fields 5501, byte 50 00", d["section36"]);
+        Assert.Equal("USB Aux 0 dB, pair 1 0 dB; ducks XLR 2; inputs ae, fields 5501; maximizer 0; byte 99 00", d["section0"]);
+        Assert.Equal("pair 5 0 dB; ducks XLR 1, XLR 2; inputs af, fields 5501; maximizer 0; level 0 dB (byte 102 00), byte 103 00", d["section36"]);
         Assert.Throws<ArgumentOutOfRangeException>(() => ProMixSections.InputTap(b, 0, 4));
     }
 
@@ -316,11 +316,11 @@ public sealed class ProMixSectionsTests
     public void DiagnosticsDescribeTheDeskBlock()
     {
         IReadOnlyDictionary<string, string> d = ProMixSections.Describe(Desk());
-        Assert.Equal("USB Aux 0 dB, pair 1 0 dB; ducks nothing; inputs aa, fields 5501, byte 14 00", d["section0"]);
-        Assert.Equal("XLR 1 0 dB, XLR 2 0 dB, pair 0 0 dB; ducks nothing; inputs aa, fields 5501, byte 32 00", d["section18"]);
-        Assert.Equal("pair 5 0 dB; ducks nothing; inputs aa, fields 5501, byte 50 00", d["section36"]);
-        Assert.Equal("no members; ducks nothing; inputs aa, fields 5555, byte 68 00", d["section54"]);
-        Assert.Equal("no members; ducks nothing; inputs aa, fields 5555, byte 86 00", d["section72"]);
+        Assert.Equal("USB Aux 0 dB, pair 1 0 dB; ducks nothing; inputs aa, fields 5501; maximizer 0; byte 99 00", d["section0"]);
+        Assert.Equal("XLR 1 0 dB, XLR 2 0 dB, pair 0 0 dB; ducks nothing; inputs aa, fields 5501; maximizer 0; level 0 dB (byte 100 00), byte 101 00", d["section18"]);
+        Assert.Equal("pair 5 0 dB; ducks nothing; inputs aa, fields 5501; maximizer 0; level 0 dB (byte 102 00), byte 103 00", d["section36"]);
+        Assert.Equal("no members; ducks nothing; inputs aa, fields 5555; maximizer 0; level 0 dB (byte 104 00), byte 105 00", d["section54"]);
+        Assert.Equal("no members; ducks nothing; inputs aa, fields 5555; maximizer 0; level 0 dB (byte 106 00), byte 107 00", d["section72"]);
         Assert.Equal("Headphones 1 nothing, Headphones 2 nothing, USB Aux port section 36, Line Out nothing", d["outputs"]);
         Assert.Equal("-21 dB (byte 98 54)", d["section0Level"]);
         Assert.Equal("processed (byte 94 02)", d["xlr1Capture"]);
@@ -337,7 +337,7 @@ public sealed class ProMixSectionsTests
         b[ProMixSections.Section0LevelOffset] = 0x00;
         IReadOnlyDictionary<string, string> d = ProMixSections.Describe(b);
         Assert.Equal("Line In -31 dB, pair 1 0 dB, pair 2 -27.5 dB, pair 3 -27.5 dB, pair 4 -27.5 dB, pair 6 -45 dB, pair 7 off; "
-            + "ducks pair 1; inputs aa, fields 5d01, byte 14 00", d["section0"]);
+            + "ducks pair 1; inputs aa, fields 5d01; maximizer 0; byte 99 00", d["section0"]);
         Assert.Equal("Headphones 1 section 0, Headphones 2 2f, plays nothing known, USB Aux port section 36, Line Out nothing", d["outputs"]);
         Assert.Equal("0 dB (byte 98 00)", d["section0Level"]);
         Assert.Equal("before the unit's processing (byte 94 00)", d["xlr1Capture"]);
@@ -353,7 +353,7 @@ public sealed class ProMixSectionsTests
         int writes = unit.Calls.Count(c => c.Type == 0x41);
         IReadOnlyDictionary<string, string> dump = pro.DumpBlocks();
         Assert.Equal(DeskBlock, dump["0x0001"], ignoreCase: true);
-        Assert.Equal("pair 5 0 dB; ducks nothing; inputs aa, fields 5501, byte 50 00", dump["section36"]);
+        Assert.Equal("pair 5 0 dB; ducks nothing; inputs aa, fields 5501; maximizer 0; level 0 dB (byte 102 00), byte 103 00", dump["section36"]);
         Assert.Equal("Headphones 1 nothing, Headphones 2 nothing, USB Aux port section 36, Line Out nothing", dump["outputs"]);
         Assert.Equal("-21 dB (byte 98 54)", dump["section0Level"]);
         Assert.Equal(writes, unit.Calls.Count(c => c.Type == 0x41));
@@ -369,6 +369,6 @@ public sealed class ProMixSectionsTests
         pro.Connect();
         IReadOnlyDictionary<string, string> dump = pro.DumpBlocks();
         Assert.False(dump.ContainsKey("sections"));
-        Assert.Equal("no members; ducks nothing; inputs 00, fields 0000, byte 14 00", dump["section0"]);
+        Assert.Equal("no members; ducks nothing; inputs 00, fields 0000; maximizer 0; byte 99 00", dump["section0"]);
     }
 }

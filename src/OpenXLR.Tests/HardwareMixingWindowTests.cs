@@ -28,6 +28,7 @@ internal static class HardwareMixingWindowTests
     private const string InsertSentence = "The Wave XLR Pro builds Monitor A for its jacks, so no insert runs on it there.";
     private const string SoundCheckSentence = "Mic setup's checks are not available while the Wave XLR Pro builds the mixes.";
     private const string AuditionSentence = "Auditions are not available while the Wave XLR Pro builds the mixes.";
+    private const string MaximizerSentence = "The Wave XLR Pro builds Monitor A summed with another mix, so it runs no maximizer on it. Give a jack Monitor A alone to use one.";
     private const string EqSentence = "The Wave XLR Pro builds Monitor A for its jacks, so its EQ is off while hardware mixing runs. It comes back with software mixing.";
     private const string MixEq = """, "eq": { "enabled": true, "bands": [{ "enabled": true, "type": "highShelf", "frequency": 4500, "gain": -4, "q": 0.707 }], "backend": "software", "available": true, "processing": "software" }""";
 
@@ -40,7 +41,7 @@ internal static class HardwareMixingWindowTests
           "devices": [], "profiles": [],
           "mixer": {
             "mixes": [
-              { "id": "monitor", "name": "Monitor A", "volume": 1, "muted": false, "kind": "monitor", "hardwareSection": {{(built ? "0" : "null")}}{{MixEq}} },
+              { "id": "monitor", "name": "Monitor A", "volume": 1, "muted": false, "kind": "monitor", "hardwareSection": {{(built ? "0" : "null")}}, "maximizer": 40{{MixEq}} },
               { "id": "stream", "name": "Stream", "volume": 1, "muted": false, "kind": "virtualMic"{{MixEq}} }
             ],
             "channels": [
@@ -190,6 +191,29 @@ internal static class HardwareMixingWindowTests
             Assert.Equal(LatencySentence, latency.Text);
             AssertInside(latency, card);
 
+            // The unit's maximizer on the mix it builds: its amount, whether
+            // its button on the mix's master shows, and the reduction the
+            // unit reports.
+            Assert.Equal(40, monitor.Maximizer);
+            Assert.True(monitor.ShowMaximizer);
+            Assert.True(monitor.CanMaximize);
+            Assert.True(monitor.MaximizerOn);
+            Assert.Equal(Localizer.Text("MaximizerTip"), monitor.MaximizerTip);
+            Assert.False(vm.Mixes.Single(m => m.Id == "stream").ShowMaximizer);
+            MethodInfo meters = typeof(MainViewModel).GetMethod("ApplyMeters", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            meters.Invoke(vm, [JsonNode.Parse("""{"max:monitor":[6.5]}""")!]);
+            Assert.Equal(6.5, monitor.MaximizerReduction);
+            meters.Invoke(vm, [JsonNode.Parse("""{"mix:monitor":[0.5,0.5]}""")!]);
+            Assert.Equal(0, monitor.MaximizerReduction);
+            // A mix the unit builds only summed: greyed, with the daemon's sentence.
+            JsonObject summed = Running();
+            summed["disabled"]!["maximizer:monitor"] = MaximizerSentence;
+            Push(State(capable: true, mode: summed, built: true));
+            Settle(main);
+            Assert.False(monitor.CanMaximize);
+            Assert.Equal(MaximizerSentence, monitor.MaximizerTip);
+            Push(State(capable: true, mode: Running(), built: true));
+
             var chain = new MixInsertsWindow { DataContext = monitor.Inserts };
             chain.Show(main);
             Settle(chain);
@@ -210,6 +234,8 @@ internal static class HardwareMixingWindowTests
             Assert.Null(vm.Soundboard.AuditionNote);
             Assert.All(vm.MicSetups(), setup => Assert.Null(setup.UnitNote));
             Assert.Null(monitor.HardwareSection);
+            Assert.False(monitor.ShowMaximizer);
+            Assert.True(monitor.CanMaximize);
             options.Close();
         }
         finally { main.Quit(); Assert.Null(previous.Save()); }

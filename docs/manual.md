@@ -4244,6 +4244,8 @@ profiles work as before. What changes on the mixes the unit builds:
 | Soundboard auditions | Play on a free USB pair, heard on the jacks only, never on the USB Aux port or the stream. With none free they are refused and the Soundboard window says why. On a layout of seven channels a processed XLR 1 takes the last pair, so auditions stop until a channel goes or the processing is off. |
 | Exclusive groups and the monitoring pause | Work, by taking channels out of the unit's mix. |
 | The USB Aux port | Plays the Aux mix, which the unit builds too while the port is on, at the same balance as the jacks and without Aux In. Your output volume no longer turns it down, and the monitoring pause leaves it playing. |
+| Mix volume and mute | On a mix the unit builds on its own for Headphones 2, Line Out or the USB Aux port, the mix's fader and mute move one level and one mute on the unit for the whole mix, and the channel faders stay where they are. The first jack's mix, and two mixes summed on a jack, still carry the mix volume in each channel's level. |
+| Maximizer | Each mix the unit builds on its own has the unit's maximizer, a **Max** button on the mix's master. See below. |
 | Mix meters | A mix the unit builds on its own, for a jack or the USB Aux port, shows the unit's own meter. It follows the faders and the mix volume, not the headphone volume or the output volume. The unit shows peaks, so a mix reads a little higher than in software mixing on the same audio. When a jack plays two mixes summed, each of them keeps this computer's meter, and so do Stream, Chat and every other mix the computer builds. The input meters are unchanged: they show each input as the unit sends it. |
 
 A greyed control says why in its tooltip. The plugin chain window, Mic
@@ -4251,6 +4253,26 @@ setup and the Options card say it under the control as well. The terminal
 mixer offers the same choice on its Options tab, and the Deck greys a key
 on a plugin of a mix the unit builds. Scripts use `setMixing` in the
 [control API](api.md#hardware-mixing), which also has the dry run.
+
+<a name="pro-maximizer"></a>
+**The maximizer.** The unit has a maximizer on each mix it builds: it
+raises the mix and holds its peaks under about -1 dBFS, so a quiet mix
+comes up without clipping. While the unit builds a mix on its own, for a
+jack or the USB Aux port, the mix's master shows a **Max** button with the
+amount, or Off. Press it and move the slider from 0 (off) to 100. Each step
+adds about 0.2 dB, so 50 raises the mix by about 10 dB and 100 by about 20
+dB before the ceiling holds it back. Under the slider, **Reduction** shows
+how far the unit is holding the mix down right now. A high reduction means
+the mix is being squeezed hard; lower the amount if it pumps.
+
+The amount is kept per mix with the mixer, not in profiles, and does
+nothing while this computer builds the mix. When a jack plays two mixes
+summed, the unit builds them together and runs no maximizer on them; their
+**Max** button is greyed and says so. Switching back to this computer puts
+the unit's maximizers back as they were. The terminal mixer has the same
+amounts on its Outputs tab, under **Maximizer on the unit**, and
+`setMixMaximizer` in the [control API](api.md#hardware-mixing) sets one
+from a script.
 
 <a name="stream-deck"></a>
 ## 4. Stream Deck (OpenDeck)

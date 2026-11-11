@@ -293,6 +293,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
             JackSections = new ProJackSections(SectionOf("hp1"), SectionOf("hp2"), SectionOf("lineout")),
             UnitSections = sections,
             Section0Level = ProMixSections.Section0LevelByte(0),
+            SectionMasters = SectionMastersOf(plan),
+            UnitMaximizers = plan.Content.ToDictionary(c => c.Section, c => c.Maximizer),
             JackLevels = levels,
             Restore = restore,
         };
@@ -416,12 +418,29 @@ public sealed partial class MixerService : IHostedService, IDisposable
         };
     }
 
+    /// <summary>
+    /// The sections whose level and mute the mode holds: 18, 36 and 54, the
+    /// ones it can build besides section 0. A section the plan builds takes
+    /// the plan's (its mix's volume and mute while it builds one mix alone);
+    /// any other is held at 0 dB and not muted, as leaving puts it.
+    /// </summary>
+    internal static Dictionary<int, ProSectionMaster> SectionMastersOf(HardwareMixingPlan? plan)
+    {
+        var masters = new Dictionary<int, ProSectionMaster>();
+        foreach (int section in MasteredSections)
+            masters[section] = plan?.Content.FirstOrDefault(c => c.Section == section)?.Master ?? ProSectionMaster.Unity;
+        return masters;
+    }
+
+    private static readonly int[] MasteredSections = [18, HardwareMixingPlanner.AuxSection, 54];
+
     /// <summary>The software plan's part of putting the unit back after the mode, or null when there is none.</summary>
     private static ProMixPlan WithLeaveParts(ProMixPlan plan, HardwareEntry? entry)
         => entry is not { Leaving: true } ? plan : plan with
         {
             EntryRestore = new Dictionary<int, string> { [0] = entry.Section0, [ProMixPlan.AuxSection] = entry.Section36 },
             Section0Level = (byte)entry.Section0Level,
+            SectionMasters = SectionMastersOf(null),
             JackLevels = new ProJackLevels(LeaveLevel(entry, "hp1"), LeaveLevel(entry, "hp2"), LeaveLevel(entry, "lineout")),
         };
 
@@ -1776,6 +1795,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 case "setMonitorDry":
                     _mixer.SetMonitorDry(cmd.Mix!, cmd.Value.GetBoolean());   // checked by CommandValidation
                     SyncOutputSelectors();   // a dry monitor on the jacks keeps the Pro's hardware path with effects on
+                    break;
+                case "setMixMaximizer":
+                    _mixer.SetMixMaximizer(cmd.Mix!, cmd.Value.GetInt32());   // checked by CommandValidation
+                    SyncOutputSelectors();   // a mix the unit builds takes its amount in this sweep's write
                     break;
                 case "setDucking":
                 case "setDuckingProcessing":

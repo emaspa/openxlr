@@ -250,7 +250,7 @@ public sealed class HardwareMixingPlanTests
     public void TheMonitoringPauseLeavesTheAuxMixPlaying()
     {
         HardwareMixingPlan plan = HardwareMixingPlanner.Plan(AuxSetup() with { MonitorMuted = true });
-        Assert.Equal(0, plan.Content.Single(c => c.Section == 0).Members);
+        Assert.Equal(0, plan.Content.Single(c => c.Section == 0).Sources);
         Assert.True(MemberAt(plan, 36, ProMixSections.Xlr1));
         Assert.True(MemberAt(plan, 36, ProMixSections.SourceOfPair(1)));
     }
@@ -276,7 +276,7 @@ public sealed class HardwareMixingPlanTests
         HardwareMixingPlan plan = HardwareMixingPlanner.Plan(Setup(new Dictionary<string, double> { ["xlr1|monitor"] = 0, ["game|monitor"] = -6 })
             with { MonitorMuted = true });
         HardwareSectionContent section = Assert.Single(plan.Content);
-        Assert.Equal(0, section.Members);
+        Assert.Equal(0, section.Sources);
         Assert.Equal(0x00, section.Cells[ProMixSections.Xlr1]);
         Assert.Equal(unchecked((byte)(sbyte)-12), section.Cells[ProMixSections.SourceOfPair(1)]);
     }
@@ -310,6 +310,7 @@ public sealed class HardwareMixingPlanTests
         [
             "ducking:key",
             "eq:mix:monitor", "eq:mix:monitor2", "inserts:mix:monitor", "inserts:mix:monitor2", "latencyCompensation",
+            "maximizer:monitor", "maximizer:monitor2",
         ], disabled.Keys.Order(StringComparer.Ordinal));
         Assert.All(disabled.Values, sentence => Assert.DoesNotContain("\u2014", sentence));
         Assert.Contains("Monitor A", disabled["inserts:mix:monitor"]);

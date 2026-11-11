@@ -225,6 +225,14 @@ public sealed record MixerSettings
     /// </summary>
     public Dictionary<string, MicEq> MixEq { get; init; } = [];
 
+    /// <summary>
+    /// The Wave XLR Pro's maximizer amount of each mix by mix id, 1 to 100,
+    /// which runs while hardware mixing builds the mix alone in a section. A
+    /// mix absent here has it off; an amount out of range is dropped when
+    /// the file is read.
+    /// </summary>
+    public Dictionary<string, int> MixMaximizer { get; init; } = [];
+
     /// <summary>The ducking setup and processing choice. Absent takes the layout's default targets, switched off.</summary>
     public DuckingSetup? Ducking { get; init; }
 

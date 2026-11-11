@@ -416,6 +416,7 @@ public sealed partial class Mixer
             CellSnapshot cells = TakeMixCellsLocked(id);
             bool wasDry = _dryMonitors.Remove(id);
             _mixEq.Remove(id, out MicEq? savedEq);
+            bool hadMaximizer = _maximizers.Remove(id, out int savedMaximizer);
             bool wasPaused = _monitorMuted;
             // The unmuted monitor ids are the selection a pause will resume.
             // Deleting its last member clears the pause, never the other mutes.
@@ -437,6 +438,7 @@ public sealed partial class Mixer
                 _monitorMuted = wasPaused;
                 if (wasDry) _dryMonitors.Add(id);
                 if (savedEq is not null) _mixEq[id] = savedEq;
+                if (hadMaximizer) _maximizers[id] = savedMaximizer;
                 cells.Restore(this);
                 if (savedInserts is not null) _inserts[key] = savedInserts;
                 _enforcedSource = previousSource;

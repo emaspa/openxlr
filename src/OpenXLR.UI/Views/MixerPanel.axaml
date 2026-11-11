@@ -161,6 +161,31 @@
                     HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixEq"
                     IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
                     AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
+            <!-- the Wave XLR Pro's maximizer, while hardware mixing builds the mix on the unit -->
+            <Button Name="MixMaximizer" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.MaximizerOn}"
+                    HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}"
+                    IsVisible="{Binding Mix.ShowMaximizer}" IsEnabled="{Binding Mix.CanMaximize}" ToolTip.ShowOnDisabled="True"
+                    AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}" ToolTip.Tip="{Binding Mix.MaximizerTip}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="{loc:Text Key=Maximizer}"/>
+                <TextBlock Text="{Binding Mix.MaximizerText}"/>
+              </StackPanel>
+              <Button.Flyout>
+                <Flyout Placement="Bottom">
+                  <StackPanel Name="MixMaximizerPanel" Width="240" Spacing="6">
+                    <TextBlock Text="{loc:Text Key=MaximizerTitle}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                      <Slider Name="MixMaximizerAmount" Minimum="0" Maximum="100" SmallChange="1" LargeChange="10"
+                              TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Mix.Maximizer, Mode=TwoWay}"
+                              AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}"/>
+                      <TextBlock Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
+                    </Grid>
+                    <TextBlock Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
+                    <TextBlock Text="{loc:Text Key=MaximizerTip}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
             <Button Content="{Binding Mix.Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Mix.Inserts.IsProcessing}" Classes.fxOff="{Binding Mix.Inserts.IsOff}"
                     HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixInserts"
                     ToolTip.Tip="{Binding Mix.Inserts.ButtonTip}"/>
@@ -288,6 +313,31 @@
                       HorizontalContentAlignment="Center" Click="OnMixEq"
                       IsVisible="{Binding Mix.HasEq}" IsEnabled="{Binding Mix.Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
                       AutomationProperties.Name="{Binding Mix.Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Mix.Eq.ButtonTip, FallbackValue=''}"/>
+              <!-- the Wave XLR Pro's maximizer, as the mix card has it -->
+              <Button Name="MixMaximizerCompact" Padding="4,2" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Stretch" Classes="fx"
+                      Classes.fxOn="{Binding Mix.MaximizerOn}" HorizontalContentAlignment="Center"
+                      IsVisible="{Binding Mix.ShowMaximizer}" IsEnabled="{Binding Mix.CanMaximize}" ToolTip.ShowOnDisabled="True"
+                      AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}" ToolTip.Tip="{Binding Mix.MaximizerTip}">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <TextBlock Text="{loc:Text Key=Maximizer}"/>
+                  <TextBlock Text="{Binding Mix.MaximizerText}"/>
+                </StackPanel>
+                <Button.Flyout>
+                  <Flyout Placement="Right">
+                    <StackPanel Width="240" Spacing="6">
+                      <TextBlock Text="{loc:Text Key=MaximizerTitle}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Slider Minimum="0" Maximum="100" SmallChange="1" LargeChange="10"
+                                TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Mix.Maximizer, Mode=TwoWay}"
+                                AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
+                      </Grid>
+                      <TextBlock Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
+                      <TextBlock Text="{loc:Text Key=MaximizerTip}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
               <!-- compact effects access: the chain's button and one lamp per
                    plugin, failing ones lit in the alert colour; bypass and the
                    rest live in the chain window -->
