@@ -303,6 +303,10 @@ public sealed class Mk2LedDaemonTests
             Assert.Equal(("#0000ff", 50), (led.GainColour, led.MeterBrightness));
             // Kept per unit, only the fields set.
             Assert.Equal(new DeviceLedChange { GainColour = "#0000ff", MeterBrightness = 50 }, DeviceManager.LoadLeds()["0fd9:00b6"]);
+            // The file holds the fields set and nothing derived from them.
+            using (JsonDocument file = JsonDocument.Parse(File.ReadAllText(path)))
+                Assert.Equal(["gainColour", "meterBrightness"],
+                    file.RootElement.GetProperty("0fd9:00b6").EnumerateObject().Select(p => p.Name).Order());
             // Neither a profile nor a saved state carries them.
             Assert.Null(manager.SavedState()!.Led);
         }
