@@ -17,10 +17,11 @@ public readonly record struct ProFeedSection(int Pair, ProMicPath Mic1, ProMicPa
 /// jacks play takes a slot, in the jack order Headphones 1, Headphones 2,
 /// Line Out: slot 0 is pair 1 on section 0 (the jacks' mix as before), slot
 /// 1 pair 2 on section 18 and slot 2 pair 3 on section 54. The Aux mix keeps
-/// pair 5 on section 36. Sections 18 and 54 have no level byte of their own,
-/// so a feed there takes <see cref="TrimDb"/> into its cells, the level byte
-/// 98 gives section 0 (protocol notes, sections 16 to 18): two jacks at
-/// equal faders and equal headphone volumes are equally loud.
+/// pair 5 on section 36. A feed on section 18 or 54 takes <see cref="TrimDb"/>
+/// into its cells, the level byte 98 gives section 0 (protocol notes,
+/// sections 16 to 18), with the section's own level byte (100 or 104,
+/// section 22) left at 0 dB as every unit read so far holds it: two jacks
+/// at equal faders and equal headphone volumes are equally loud.
 /// </summary>
 public static class ProJackFeeds
 {
@@ -36,8 +37,9 @@ public static class ProJackFeeds
     public static int SlotOfSection(int section) => section switch { 0 => 0, 18 => 1, 54 => 2, _ => -1 };
 
     /// <summary>
-    /// The bytes of a section a restore puts back: its cells, membership,
-    /// byte 14 and the inputs' tap fields, any input after the ducker put
+    /// The bytes of a section a restore puts back: its cells, membership
+    /// (with the maximizer's bypass), the maximizer's amount (byte 14) and
+    /// the inputs' tap fields, any input after the ducker put
     /// back to 2 unless the ducking the unit is meant to hold keeps it
     /// there (see <see cref="ProMixSections.ClearInputDucking"/>). The pairs'
     /// ducking fields stay with ducking.
@@ -110,8 +112,9 @@ public sealed record ProMixPlan
     /// <summary>
     /// Hardware mixing: the sections the unit builds, by section start (a
     /// jack's 0, 18 or 54, and 36 for the Aux mix), as their first 14 bytes
-    /// (the twelve level cells and the membership mask), written exactly.
-    /// Byte 14 and the tap fields stay as read, except that the plan puts
+    /// (the twelve level cells and the membership mask, with the maximizer's
+    /// bypass in bit 12), written exactly. <see cref="UnitMaximizers"/>
+    /// writes byte 14. The tap fields stay as read, except that the plan puts
     /// any input after the ducker back to 2 in every section, as a ducking
     /// write does for an input it does not duck, leaving the inputs
     /// <see cref="DuckedInputs"/> names. A restore for
@@ -123,6 +126,24 @@ public sealed record ProMixPlan
 
     /// <summary>Byte 98, section 0's level in quarter-dB attenuation, as written; null leaves it.</summary>
     public byte? Section0Level { get; init; }
+
+    /// <summary>
+    /// Hardware mixing: the level and mute of sections 18 to 72, by section
+    /// start (bytes 100 to 107, see <see cref="ProMixSections.MasterOffset"/>).
+    /// The level byte is written exactly and the mute byte's bit 0 set or
+    /// cleared, its other bits as read. Section 0 is not taken: its level is
+    /// <see cref="Section0Level"/>, and its mute byte was never measured.
+    /// Applies live, no commit (desk, 2026-11-11).
+    /// </summary>
+    public IReadOnlyDictionary<int, ProSectionMaster>? SectionMasters { get; init; }
+
+    /// <summary>
+    /// Hardware mixing: each section's maximizer amount, 0 to 100, by section
+    /// start, written exactly in byte 14 of the section. The bypass is
+    /// membership bit 12, which <see cref="UnitSections"/> carries. Applies
+    /// live, no commit (desk, 2026-11-11).
+    /// </summary>
+    public IReadOnlyDictionary<int, byte>? UnitMaximizers { get; init; }
 
     /// <summary>
     /// Sections 0 and 36 as they were before hardware mixing, by section
@@ -398,7 +419,8 @@ public sealed record ProMixPlan
 
     /// <summary>
     /// Hardware mixing's edits on <paramref name="into"/>: the unit-built
-    /// sections, no input after the ducker in any section, and byte 98.
+    /// sections, no input after the ducker in any section, byte 98, the
+    /// levels and mutes of sections 18 to 72 and the maximizer amounts.
     /// Returns the parts that changed a byte.
     /// </summary>
     private ProMixChanges ApplyUnit(Span<byte> into)
@@ -420,6 +442,23 @@ public sealed record ProMixPlan
             into[ProMixSections.Section0LevelOffset] = level;
             changes |= ProMixChanges.Section0Level;
         }
+        if (SectionMasters is { } masters)
+            foreach ((int section, ProSectionMaster master) in masters)
+            {
+                if (section == 0 || !ProMixSections.Starts.Contains(section))
+                    throw new ArgumentException($"section {section} has no level byte a plan writes", nameof(SectionMasters));
+                int mute = ProMixSections.MuteOffset(section);
+                byte muted = (byte)(master.Muted ? into[mute] | ProMixSections.MuteMask : into[mute] & ~ProMixSections.MuteMask);
+                if (Set(into, ProMixSections.MasterOffset(section), master.Level) | Set(into, mute, muted)) changes |= ProMixChanges.SectionMasters;
+            }
+        if (UnitMaximizers is { } maximizers)
+            foreach ((int section, byte amount) in maximizers)
+            {
+                if (!ProMixSections.Starts.Contains(section)) throw new ArgumentException($"section {section} is not a section start", nameof(UnitMaximizers));
+                if (amount > ProMixSections.MaximizerMaximum)
+                    throw new ArgumentException($"a maximizer amount is 0 to {ProMixSections.MaximizerMaximum}", nameof(UnitMaximizers));
+                if (Set(into, section + ProMixSections.MaximizerOffset, amount)) changes |= ProMixChanges.Maximizers;
+            }
         return changes;
     }
 
@@ -509,7 +548,8 @@ public sealed record ProMixPlan
         Span<byte> restored = stackalloc byte[ProMixSections.Length];
         into.CopyTo(restored);
         ProMixHeld was = Read(restored);
-        ProMixChanges changes = NeedsCore(restored) & ~(ProMixChanges.FeedSections | ProMixChanges.UnitSections | ProMixChanges.Section0Level);
+        ProMixChanges changes = NeedsCore(restored) & ~(ProMixChanges.FeedSections | ProMixChanges.UnitSections | ProMixChanges.Section0Level
+            | ProMixChanges.SectionMasters | ProMixChanges.Maximizers);
         if (unwound) changes |= ProMixChanges.FeedSections;
 
         if (JackSections is null)
@@ -611,6 +651,27 @@ public enum ProMixChanges
     UnitSections = 64,
     /// <summary>Byte 98, section 0's level; committed, as a selector is.</summary>
     Section0Level = 128,
+    /// <summary>The level or mute of a section from 18 to 72 (bytes 100 to 107); applies live, no commit.</summary>
+    SectionMasters = 256,
+    /// <summary>A section's maximizer amount (byte 14 of the section); applies live, no commit.</summary>
+    Maximizers = 512,
+}
+
+/// <summary>
+/// A section's level and mute as hardware mixing writes them: the level byte
+/// in quarter-dB attenuation (dB = -byte/4, 0 to -63.75 dB) and the mute's
+/// bit 0, which silences the section.
+/// </summary>
+public readonly record struct ProSectionMaster(byte Level, bool Muted)
+{
+    /// <summary>0 dB and not muted: what every unit read so far holds, and what leaving the mode puts back.</summary>
+    public static ProSectionMaster Unity { get; } = new(0, false);
+
+    /// <summary>The lowest level the byte holds, in dB; below it a mix is muted.</summary>
+    public const double FloorDb = -63.75;
+
+    /// <summary>The level byte for a level at or under 0 dB, to the nearest quarter dB; 0 dB for a level above it.</summary>
+    public static byte LevelOf(double db) => ProMixSections.Section0LevelByte(Math.Min(db, 0));
 }
 
 /// <summary>

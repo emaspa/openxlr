@@ -3297,6 +3297,24 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="MonitorDryTip" xml:space="preserve">
     <value>Hear your microphones in this monitor mix before their effects, so your own voice reaches your headphones earlier. Stream, Chat, the virtual microphones, recordings and the other monitor mixes keep the processed voice.</value>
   </data>
+  <data name="Maximizer" xml:space="preserve">
+    <value>Max</value>
+  </data>
+  <data name="MaximizerName" xml:space="preserve">
+    <value>Maximizer of {0}</value>
+  </data>
+  <data name="MaximizerTitle" xml:space="preserve">
+    <value>Maximizer on the Wave XLR Pro</value>
+  </data>
+  <data name="MaximizerOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="MaximizerTip" xml:space="preserve">
+    <value>The Wave XLR Pro's maximizer on this mix: it raises the mix by up to 20 dB and holds its peaks under about -1 dBFS. It runs while the unit builds the mix.</value>
+  </data>
+  <data name="MaximizerReduction" xml:space="preserve">
+    <value>Reduction {0} dB</value>
+  </data>
   <data name="MicSetupButtonTip" xml:space="preserve">
     <value>Set up a microphone step by step: where it goes, its level, a take heard raw and processed, and its EQ and plugins. Opens on XLR 1, or the first microphone in the mixer.</value>
   </data>

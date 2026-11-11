@@ -51,7 +51,15 @@ Wave XLR Pro:
   under "Mixes on the Pro's outputs", after a check that lists what the
   layout loses; the terminal mixer's Options tab has the same choice
   ([manual](manual.md#hardware-mixing)). A mix the unit builds shows the
-  unit's own meter
+  unit's own meter. A mix it builds alone for Headphones 2, Line Out or
+  the USB Aux port has its volume and mute in the unit's own level and
+  mute for that mix
+- The Pro's maximizer, per mix, in hardware mixing: an amount from 0 to
+  100 on each mix the unit builds alone, about 0.2 dB of make-up gain a
+  step against a ceiling near -1 dBFS, with its reduction as a meter. The
+  **Max** button on the mix's master, the terminal mixer's Outputs tab and
+  `setMixMaximizer` set it ([manual](manual.md#pro-maximizer)); not yet
+  heard on a unit as OpenXLR drives it
 - Ducking on the device, mapped from Wave Link on Windows: when the
   [ducking](#submixer) setup fits what the unit can do (every key one of
   its inputs, XLR 1, XLR 2, USB Aux or Line In, and a whole mix on the
@@ -134,10 +142,11 @@ way Wave Link 3.5 does ([findings](mk2-eq-findings.md),
 [Pro](hardware-support.md#wave-xlr-pro-0fd900b4)); every other model and
 older firmware run it in software. The Pro's EQ follows Wave Link
 captures and is verified on hardware by the maintainer and other owners.
-The Pro's mix
-maximizer, channel booster and remaining hardware mix matrix are
-unmapped. Wave Link configures those onboard effects on supported systems;
-OpenXLR's LV2, CLAP and VST3 inserts process audio on the Linux host.
+The Pro's
+channel booster and remaining hardware mix matrix are unmapped, and Wave
+Link configures them on supported systems; its mix maximizer runs in
+hardware mixing ([manual](manual.md#pro-maximizer)). OpenXLR's LV2, CLAP
+and VST3 inserts process audio on the Linux host.
 
 XLR Dock: gain, mute and headphone volume through the kernel's standard
 ALSA controls, plus phantom power and headphone low impedance over the

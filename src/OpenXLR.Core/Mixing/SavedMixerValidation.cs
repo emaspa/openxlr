@@ -67,6 +67,7 @@ internal static class SavedMixerValidation
             Expander = Dynamics(settings.Expander, "expander", MicExpander.Check, MicExpander.Snap, notes),
             MonitorDry = MonitorDry(settings.MonitorDry, notes),
             MixEq = Eq(settings.MixEq, notes, "mixEq"),
+            MixMaximizer = Maximizers(settings.MixMaximizer, notes),
             Ducking = Ducking(settings, notes),
             Appearance = Appearance(settings.Appearance, notes),
             BlockSize = BlockSize(settings.BlockSize, notes),
@@ -336,6 +337,19 @@ internal static class SavedMixerValidation
     /// dropped and named; the others, including one for a channel that is
     /// not a microphone today, are kept.
     /// </summary>
+    /// <summary>The maximizer amounts, each 1 to 100; an entry out of range is dropped and named, so that mix has it off.</summary>
+    private static Dictionary<string, int> Maximizers(Dictionary<string, int>? entries, List<string> notes)
+    {
+        if (entries is null) { notes.Add($"mixMaximizer: {NullEntry}"); return []; }
+        var kept = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach ((string mix, int amount) in entries)
+        {
+            if (amount is >= 1 and <= Devices.ProMixSections.MaximizerMaximum) kept[mix] = amount;
+            else notes.Add($"mixMaximizer.{mix}: {amount} is not 1 to {Devices.ProMixSections.MaximizerMaximum}");
+        }
+        return kept;
+    }
+
     private static Dictionary<string, MicEq> Eq(Dictionary<string, MicEq>? entries, List<string> notes, string field = "eq")
     {
         if (entries is null) { notes.Add($"{field}: {NullEntry}"); return []; }

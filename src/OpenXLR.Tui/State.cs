@@ -51,6 +51,12 @@ internal sealed record MixEntry
 
     /// <summary>The mix's output EQ, in a microphone EQ's shape, or null from a daemon that predates it.</summary>
     public EqEntry? Eq { get; init; }
+
+    /// <summary>The Wave XLR Pro's section that builds the mix while hardware mixing runs, or null.</summary>
+    public int? HardwareSection { get; init; }
+
+    /// <summary>The Wave XLR Pro's maximizer on the mix, 0 (off) to 100; 0 from a daemon that predates it.</summary>
+    public int Maximizer { get; init; }
 }
 
 /// <summary>One channel strip and its send into every mix.</summary>

@@ -172,6 +172,46 @@ public sealed class TuiHardwareMixingTests
     }
 
     [Fact]
+    public void TheMaximizerOfEachMixTheUnitBuildsIsSetOnTheOutputsTab()
+    {
+        const string why = "The Wave XLR Pro builds Stream summed with another mix, so it runs no maximizer on it. Give a jack Stream alone to use one.";
+        (App app, List<string> sent) = Ready(Edit(root =>
+        {
+            root["mixer"]!["mixes"]![0]!["hardwareSection"] = 0;
+            root["mixer"]!["mixes"]![0]!["maximizer"] = 40;
+            root["mixer"]!["mixes"]![1]!["hardwareSection"] = 18;
+            root["mixer"]!["hardwareMixing"] = new JsonObject
+            {
+                ["wanted"] = true, ["active"] = true,
+                ["disabled"] = new JsonObject { ["maximizer:stream"] = why },
+            };
+        }), tab: 3);
+        Select(app, "Monitor A maximizer");
+        Assert.Contains(Draw(app), line => line.Contains("maximizer on the unit", StringComparison.OrdinalIgnoreCase));
+        app.Handle(new KeyPress(Key.Right));
+        JsonElement command = Command(sent);
+        Assert.Equal("setMixMaximizer", command.GetProperty("cmd").GetString());
+        Assert.Equal("monitor", command.GetProperty("mix").GetString());
+        Assert.Equal(45, command.GetProperty("value").GetInt32());
+        // The reduction the unit reports now, beside the amount.
+        app.Link.Receive("""{"type":"meters","levels":{"max:monitor":[6.5]}}""");
+        Assert.True(Shows(app, "-6.5 dB now"));
+        // A mix the unit builds only summed says why and takes no amount.
+        Select(app, "Stream maximizer");
+        Assert.True(Shows(app, why[..60]));
+        app.Handle(new KeyPress(Key.Right));
+        Assert.Empty(sent);
+    }
+
+    [Fact]
+    public void TheMaximizerIsNotOfferedWhileTheComputerBuildsTheMixes()
+    {
+        (App app, _) = Ready(Edit(root => root["mixer"]!["mixes"]![0]!["maximizer"] = 40), tab: 3);
+        for (int i = 0; i < 20; i++) app.Handle(new KeyPress(Key.Down));
+        Assert.DoesNotContain(Draw(app), line => line.Contains("maximizer", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void AChainTheModeTurnsOffSaysWhyAndTakesNoPlugin()
     {
         const string why = "The Wave XLR Pro builds Monitor A for its jacks, so no insert runs on it there.";

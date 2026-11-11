@@ -82,6 +82,28 @@ public sealed record HardwareMixingSetup
     /// </summary>
     public IReadOnlyDictionary<string, double> MixVolumesDb { get; init; } = new Dictionary<string, double>();
 
+    /// <summary>
+    /// Each mix's fader in dB on the desktop's cubic scale whether or not it
+    /// is muted, negative infinity at 0. A mix built alone in section 18, 36
+    /// or 54 takes it in the section's own level byte, and its mute in the
+    /// section's mute bit, with <see cref="SendsDb"/> in the cells. A mix
+    /// absent here keeps its fader and mute in the cells (<see cref="LevelsDb"/>).
+    /// </summary>
+    public IReadOnlyDictionary<string, double> MixFadersDb { get; init; } = new Dictionary<string, double>();
+
+    /// <summary>The mixes whose mute is on.</summary>
+    public IReadOnlySet<string> MutedMixes { get; init; } = new HashSet<string>();
+
+    /// <summary>
+    /// <see cref="LevelsDb"/> without the mix's fader and mute: the send and
+    /// the channel volume, negative infinity while the send or an exclusive
+    /// group mutes it. Read for a mix in <see cref="MixFadersDb"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, double> SendsDb { get; init; } = new Dictionary<string, double>();
+
+    /// <summary>Each mix's maximizer amount, 1 to 100; a mix absent here, or at 0, has it off.</summary>
+    public IReadOnlyDictionary<string, int> Maximizers { get; init; } = new Dictionary<string, int>();
+
     /// <summary>Channels whose input reaches the jacks through the unit's direct path in software mode.</summary>
     public IReadOnlySet<string> DirectPath { get; init; } = new HashSet<string>();
 
@@ -110,10 +132,21 @@ public sealed record HardwareMixingClamp(string Channel, string Feed, double Wan
 /// <summary>
 /// One section the unit builds: the twelve level cells and the membership
 /// mask (bytes 0 to 13 of the section), in source order (0 XLR 1, 1 XLR 2,
-/// 2 USB Aux, 3 Line In, 4 + k pair k).
+/// 2 USB Aux, 3 Line In, 4 + k pair k), with bit 12 the maximizer's bypass;
+/// the maximizer's amount (byte 14), and for sections 18 to 72 the
+/// section's level and mute.
 /// </summary>
 public sealed record HardwareSectionContent(string Feed, int Section, IReadOnlyList<byte> Cells, ushort Members)
 {
+    /// <summary>The maximizer amount, 0 to 100; 0 is off, with the bypass set in <see cref="Members"/>.</summary>
+    public byte Maximizer { get; init; }
+
+    /// <summary>The section's level and mute; null for section 0, whose level is byte 98.</summary>
+    public ProSectionMaster? Master { get; init; }
+
+    /// <summary>The source bits of <see cref="Members"/>, without the maximizer's bypass.</summary>
+    public ushort Sources => (ushort)(Members & ((1 << ProMixSections.SourceCount) - 1));
+
     /// <summary>Bytes 0 to 13 of the section as hex, cells then the mask low byte first.</summary>
     public string Hex => Convert.ToHexString([.. Cells, (byte)Members, (byte)(Members >> 8)]);
 }
@@ -188,7 +221,9 @@ public sealed record HardwareMixingPlan
 /// (<c>hardwareSections</c>).
 ///
 /// Each level cell is the fader's: the send, the channel volume and the mix
-/// volume, in half-dB steps. A pair plays 7.94 dB below its cell on the unit
+/// volume, in half-dB steps; a mix built alone in section 18, 36 or 54 has
+/// its volume and mute in the section's level byte and mute bit instead
+/// (bytes 100 to 105, desk, 2026-11-11). A pair plays 7.94 dB below its cell on the unit
 /// and a cell above 0 dB does not make that up (protocol notes, section 16),
 /// so pairs and unit inputs keep the balance Wave Link gives them, a pair cell
 /// never goes above 0 dB, and a unit input's cell stops at +12 dB.
@@ -382,6 +417,14 @@ public static class HardwareMixingPlanner
     /// is never heard twice; on a jack's section whose mixes are all dry a
     /// dry input plays from its own source instead, and its pair stays out. The cue pair is in the jacks' sections only, at
     /// the volume of the feed's mixes, as an audition into those mixes is.
+    ///
+    /// A section of one mix other than section 0 takes the mix's fader in
+    /// its own level byte and the mix's mute in its mute bit (see
+    /// <see cref="MasterOf"/>): the cells hold the sends alone, so a fader
+    /// or mute moves one byte and a send stays in the cells' range at any
+    /// fader. A fader above 0 dB adds what is above to the cells, which the
+    /// level byte cannot raise. A section of one mix also takes the mix's
+    /// maximizer; every other section has it bypassed.
     /// </summary>
     private static HardwareSectionContent Build(HardwareMixingSetup setup, string feed, int section,
         IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> returns, int? cue, List<HardwareMixingClamp> clamped)
@@ -391,7 +434,12 @@ public static class HardwareMixingPlanner
         IReadOnlyList<string> parts = MonitorFeed.Parts(feed);
         bool aux = section == AuxSection;
         bool paused = setup.MonitorMuted && !aux;
-        void Source(int source, string channel, double ceilingDb) => Level(source, channel, FeedLevelDb(setup, channel, parts), ceilingDb);
+        string? alone = parts is [string only] ? only : null;
+        ProSectionMaster? master = MasterOf(setup, section, alone, out double boost);
+        bool onMaster = master is not null && alone is not null && setup.MixFadersDb.ContainsKey(alone);
+        double LevelIn(string channel) => !onMaster ? FeedLevelDb(setup, channel, parts)
+            : setup.SendsDb.TryGetValue($"{channel}|{alone}", out double send) && double.IsFinite(send) ? send + boost : double.NegativeInfinity;
+        void Source(int source, string channel, double ceilingDb) => Level(source, channel, LevelIn(channel), ceilingDb);
         void Level(int source, string channel, double db, double ceilingDb)
         {
             if (!double.IsFinite(db)) return;
@@ -410,9 +458,34 @@ public static class HardwareMixingPlanner
         }
         foreach ((string channel, int pair) in pairs)
             Source(ProMixSections.SourceOfPair(pair), channel, 0);
-        if (cue is int cuePair && !aux) Level(ProMixSections.SourceOfPair(cuePair), CueName, FeedVolumeDb(setup, parts), 0);
-        return new HardwareSectionContent(feed, section, cells, members);
+        if (cue is int cuePair && !aux) Level(ProMixSections.SourceOfPair(cuePair), CueName, onMaster ? boost : FeedVolumeDb(setup, parts), 0);
+        byte maximizer = MaximizerOf(setup, alone);
+        if (maximizer == 0) members |= (ushort)(1 << ProMixSections.MaximizerBypassBit);
+        return new HardwareSectionContent(feed, section, cells, members) { Maximizer = maximizer, Master = master };
     }
+
+    /// <summary>
+    /// A section's level and mute: for sections 18 to 72 building one mix
+    /// whose fader the setup gives, the fader at or under 0 dB in quarter-dB
+    /// steps, muted while the mix is muted or its fader is under the byte's
+    /// floor (-63.75 dB, or 0); every other section of 18 to 72 at 0 dB
+    /// and not muted. Null for section 0. <paramref name="boost"/> is the
+    /// part of the fader above 0 dB, which the cells carry.
+    /// </summary>
+    internal static ProSectionMaster? MasterOf(HardwareMixingSetup setup, int section, string? alone, out double boost)
+    {
+        boost = 0;
+        if (section == 0) return null;
+        if (alone is null || !setup.MixFadersDb.TryGetValue(alone, out double fader)) return ProSectionMaster.Unity;
+        if (fader > 0) boost = fader;
+        bool muted = setup.MutedMixes.Contains(alone) || !(fader >= ProSectionMaster.FloorDb);
+        return new ProSectionMaster(ProSectionMaster.LevelOf(fader), muted);
+    }
+
+    /// <summary>The maximizer amount for a section of one mix, 0 to 100; 0 for a summed feed.</summary>
+    private static byte MaximizerOf(HardwareMixingSetup setup, string? alone)
+        => alone is not null && setup.Maximizers.TryGetValue(alone, out int amount)
+            ? (byte)Math.Clamp(amount, 0, ProMixSections.MaximizerMaximum) : (byte)0;
 
     /// <summary>The name the cue's held level carries in <see cref="HardwareMixingPlan.Clamped"/>.</summary>
     public const string CueName = "cue";
@@ -542,15 +615,38 @@ public static class HardwareMixingPlanner
         return Math.Max(ProJackLevels.DbOf(240), Math.Round(leaving * 4, MidpointRounding.AwayFromZero) / 4);
     }
 
+    /// <summary>The <c>disabled</c> key of a mix the unit builds only summed with another, which runs no maximizer.</summary>
+    public static string MaximizerDisabledKey(string mix) => "maximizer:" + mix;
+
+    /// <summary>
+    /// The mixes whose maximizer runs: each mix the unit builds alone in a
+    /// section with an amount above 0, to that section. Empty while the
+    /// plan does not run.
+    /// </summary>
+    public static IReadOnlyDictionary<string, int> RunningMaximizers(HardwareMixingPlan plan)
+    {
+        var running = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (!plan.Active) return running;
+        foreach (HardwareSectionContent content in plan.Content.OrderBy(c => c.Section))
+            if (content.Maximizer > 0 && MonitorFeed.Parts(content.Feed) is [string mix]) running.TryAdd(mix, content.Section);
+        return running;
+    }
+
     /// <summary>The fixed keys of what the mode turns off for this layout, with each sentence.</summary>
     private static Dictionary<string, string> Disabled(HardwareMixingSetup setup, IEnumerable<string> feeds,
         IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> returns, int? cue)
     {
         var disabled = new SortedDictionary<string, string>(StringComparer.Ordinal);
         HashSet<string> unitMixes = [.. feeds.SelectMany(MonitorFeed.Parts)];
+        HashSet<string> alone = [.. feeds.Select(MonitorFeed.Parts).Where(p => p.Count == 1).Select(p => p[0])];
         foreach (string mix in unitMixes)
         {
             MixDefinition? definition = setup.Mixes.FirstOrDefault(m => m.Id == mix);
+            // A section of summed mixes has one maximizer for the sum, so it
+            // runs on none of them; a mix also built alone keeps its own.
+            if (!alone.Contains(mix))
+                disabled[MaximizerDisabledKey(mix)] =
+                    $"The Wave XLR Pro builds {definition?.Name ?? mix} summed with another mix, so it runs no maximizer on it. Give a jack {definition?.Name ?? mix} alone to use one.";
             string name = definition?.Name ?? mix;
             string where = definition?.Kind == MixKind.AuxPort ? "its USB Aux port" : "its jacks";
             disabled[$"inserts:mix:{mix}"] = $"The Wave XLR Pro builds {name} for {where}, so no insert runs on it there.";

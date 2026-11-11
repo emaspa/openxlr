@@ -131,6 +131,41 @@ internal sealed class OutputsView : View
         }
     }
 
+    /// <summary>
+    /// While hardware mixing runs, the Wave XLR Pro's maximizer on each mix
+    /// the unit builds: its amount, and how far it lowers the mix now, or
+    /// why the unit runs none on that mix.
+    /// </summary>
+    private static void Maximizers(List<Row> rows, App app, Snapshot state)
+    {
+        if (state.Mixer.HardwareMixing is not { Active: true }) return;
+        List<MixEntry> mixes = [.. state.Mixer.Mixes.Where(mix => mix.HardwareSection is not null)];
+        if (mixes.Count == 0) return;
+        rows.Add(new HeadingRow("Maximizer on the unit"));
+        foreach (MixEntry mix in mixes)
+        {
+            string id = mix.Id;
+            if (state.Mixer.Disabled("maximizer:" + id) is { } sentence)
+            {
+                rows.Add(new TextRow($"{mix.Name} maximizer", sentence));
+                continue;
+            }
+            double? reduction = app.Link.MaximizerReduction(id);
+            rows.Add(new NumberRow($"{mix.Name} maximizer", mix.Maximizer, 0, 100, 5,
+                value => value <= 0 ? "off" : value.ToString("0", System.Globalization.CultureInfo.InvariantCulture),
+                value => app.Link.Send("setMixMaximizer", body =>
+                {
+                    body["mix"] = id;
+                    body["value"] = (int)Math.Round(value);
+                }))
+            {
+                Integer = true,
+                FineStep = 1,
+                Note = reduction is { } db ? "-" + db.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " dB now" : null,
+            });
+        }
+    }
+
     public override string Title => "Outputs";
 
     // A mix's output EQ, open over the list until Esc.
@@ -206,6 +241,7 @@ internal sealed class OutputsView : View
         }
 
         OutputEqs(rows, app, state);
+        Maximizers(rows, app, state);
 
         rows.Add(new HeadingRow("Outputs"));
         if (sinks.Count == 0) rows.Add(new TextRow("None found", "is PipeWire running"));

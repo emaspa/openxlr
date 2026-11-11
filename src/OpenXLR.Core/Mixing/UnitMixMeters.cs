@@ -10,7 +10,8 @@ namespace OpenXLR.Core.Mixing;
 /// A mix reads the level of the section that builds it (channels 30 to 34),
 /// not the jack it plays on (bytes 142 to 149). The section level comes
 /// after the faders, the channel volumes and the mix volume, which the unit
-/// holds in its cells, and before the jack's headphone volume or Line Out
+/// holds in its cells or, for a mix built alone in sections 18 to 54, in the
+/// section's own level and mute (desk, 2026-11-11), and before the jack's headphone volume or Line Out
 /// level, which the output volume moves in the mode. The computer's copy is
 /// metered on its mix sink, after the sends and before any output, so the
 /// output volume moves neither meter. A jack's own level would also follow
@@ -58,4 +59,24 @@ public static class UnitMixMeters
 
     /// <summary>The meters key of a mix.</summary>
     public static string MixKey(string mix) => "mix:" + mix;
+
+    /// <summary>The meters key of a mix's maximizer on the unit: its reduction in dB.</summary>
+    public static string MaximizerKey(string mix) => "max:" + mix;
+
+    /// <summary>
+    /// Put each running maximizer's reduction now, in dB, under its
+    /// <c>max:&lt;id&gt;</c> key: <paramref name="sections"/> maps each mix
+    /// to the section that builds it, whose maximizer is block 0x0002's
+    /// maximizer of the same index. With no reading the keys stay out, as a
+    /// duck stage's do while it is not read.
+    /// </summary>
+    public static void ApplyMaximizers(IDictionary<string, double[]> meters, IReadOnlyDictionary<string, int> sections, ProMeterReading? reading)
+    {
+        if (reading is null) return;
+        foreach ((string mix, int section) in sections)
+        {
+            int m = ProMixSections.MaximizerOf(section);
+            if (m < reading.Maximizers.Count) meters[MaximizerKey(mix)] = [reading.Maximizers[m].ReductionDb];
+        }
+    }
 }

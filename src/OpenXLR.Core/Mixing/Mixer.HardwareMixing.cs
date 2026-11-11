@@ -102,9 +102,13 @@ public sealed partial class Mixer
     private HardwareMixingSetup HardwareSetupLocked(HardwareMixingUnit? unit, bool failed, string mixing, double section0LevelDb)
     {
         var levels = new Dictionary<string, double>(StringComparer.Ordinal);
+        var sends = new Dictionary<string, double>(StringComparer.Ordinal);
         foreach (ChannelDefinition channel in _config.Channels)
             foreach (MixDefinition mix in _config.Mixes)
+            {
                 levels[Cell(channel.Id, mix.Id)] = HardwareLevelDbLocked(channel.Id, mix.Id);
+                sends[Cell(channel.Id, mix.Id)] = HardwareSendDbLocked(channel.Id, mix.Id);
+            }
         var unitSources = new Dictionary<int, string>();
         if (_drivenUnit is not null)
         {
@@ -151,6 +155,10 @@ public sealed partial class Mixer
                 .ToHashSet(StringComparer.Ordinal),
             DryMixes = DryMonitorsLocked(),
             MixVolumesDb = _config.Mixes.ToDictionary(m => m.Id, m => HardwareMixVolumeDbLocked(m.Id), StringComparer.Ordinal),
+            MixFadersDb = _config.Mixes.ToDictionary(m => m.Id, m => HardwareMixFaderDbLocked(m.Id), StringComparer.Ordinal),
+            MutedMixes = _config.Mixes.Where(m => _mixMuted.Contains(m.Id)).Select(m => m.Id).ToHashSet(StringComparer.Ordinal),
+            SendsDb = sends,
+            Maximizers = _config.Mixes.Where(m => _maximizers.ContainsKey(m.Id)).ToDictionary(m => m.Id, m => _maximizers[m.Id], StringComparer.Ordinal),
             DirectPath = _hardwareMicChannels.OfType<string>().ToHashSet(StringComparer.Ordinal),
             MixChains = _config.Mixes.Where(m => InsertsFor(MixKey(m)).Count > 0).Select(m => m.Id).ToHashSet(StringComparer.Ordinal),
             MonitorMuted = _monitorMuted,
@@ -169,8 +177,21 @@ public sealed partial class Mixer
     /// </summary>
     private double HardwareLevelDbLocked(string channel, string mix)
     {
+        double send = HardwareSendDbLocked(channel, mix);
+        double master = HardwareMixVolumeDbLocked(mix);
+        return double.IsFinite(send) && double.IsFinite(master) ? send + master : double.NegativeInfinity;
+    }
+
+    /// <summary>
+    /// A channel's send into a mix in dB, without the mix's volume and mute:
+    /// the send and the channel volume on the desktop's cubic scale; negative
+    /// infinity while the send is muted or an exclusive peer's mute is still
+    /// waiting.
+    /// </summary>
+    private double HardwareSendDbLocked(string channel, string mix)
+    {
         string cell = Cell(channel, mix);
-        if (_mixMuted.Contains(mix) || ExclusivePeerPendingLocked(channel)) return double.NegativeInfinity;
+        if (ExclusivePeerPendingLocked(channel)) return double.NegativeInfinity;
         double level = _levels.GetValueOrDefault(cell, 0.0);
         if (HearsMyselfLocked(channel, mix))
         {
@@ -180,14 +201,16 @@ public sealed partial class Mixer
         }
         else if (_muted.Contains(cell)) return double.NegativeInfinity;
         double send = SendGain(level, ChannelVolumeLocked(channel), 1);
-        double master = HardwareMixVolumeDbLocked(mix);
-        return send > 0 && double.IsFinite(master) ? 60 * Math.Log10(send) + master : double.NegativeInfinity;
+        return send > 0 ? 60 * Math.Log10(send) : double.NegativeInfinity;
     }
 
     /// <summary>A mix's volume in dB on the desktop's cubic scale, negative infinity while it is muted or at 0.</summary>
     private double HardwareMixVolumeDbLocked(string mix)
+        => _mixMuted.Contains(mix) ? double.NegativeInfinity : HardwareMixFaderDbLocked(mix);
+
+    /// <summary>A mix's volume in dB on the desktop's cubic scale whether or not it is muted, negative infinity at 0.</summary>
+    private double HardwareMixFaderDbLocked(string mix)
     {
-        if (_mixMuted.Contains(mix)) return double.NegativeInfinity;
         double master = Math.Clamp(_mixVolume.GetValueOrDefault(mix, 1.0), 0, MixVolumeMaximumLocked(mix));
         return master > 0 ? 60 * Math.Log10(master) : double.NegativeInfinity;
     }
@@ -264,25 +287,35 @@ public sealed partial class Mixer
     /// while no client takes meters. A mix keeps the computer's copy for any
     /// frame the unit's meters are not there for.
     /// </summary>
-    private void AddUnitMixLevels(Dictionary<string, double[]> meters, (IDeviceDuckingPort Port, string Unit, IReadOnlyDictionary<string, int> Channels)? unit)
+    private void AddUnitMixLevels(Dictionary<string, double[]> meters, UnitMixMeterSource? unit)
     {
         if (unit is not { } u) return;
-        UnitMixMeters.Apply(meters, u.Channels, u.Port.Meters(u.Unit));
+        ProMeterReading? reading = u.Port.Meters(u.Unit);
+        UnitMixMeters.Apply(meters, u.Channels, reading);
+        UnitMixMeters.ApplyMaximizers(meters, u.Maximizers, reading);
     }
 
     /// <summary>
-    /// The port, unit and level channels the meters read the unit's mixes
-    /// from now; null while the unit builds none. Reads the fields without
-    /// the gate, as the meter push does.
+    /// What the meters read from the unit's own meters now: the level
+    /// channel of each mix the unit builds alone, and the section of each
+    /// running maximizer (see <see cref="HardwareMixingPlanner.RunningMaximizers"/>).
     /// </summary>
-    private (IDeviceDuckingPort Port, string Unit, IReadOnlyDictionary<string, int> Channels)? UnitMixMeterNow()
+    private sealed record UnitMixMeterSource(IDeviceDuckingPort Port, string Unit, IReadOnlyDictionary<string, int> Channels,
+        IReadOnlyDictionary<string, int> Maximizers);
+
+    /// <summary>
+    /// The port, unit, level channels and maximizers the meters read from
+    /// the unit now; null while the unit builds no mix alone. Reads the
+    /// fields without the gate, as the meter push does.
+    /// </summary>
+    private UnitMixMeterSource? UnitMixMeterNow()
     {
         if (Volatile.Read(ref _hardwarePlan) is not { Active: true } plan
             || Volatile.Read(ref _hardwareEntry) is not { Leaving: false } || !Volatile.Read(ref _hardwareGraphEntered)
             || Volatile.Read(ref _duckingPort) is not { } port || Volatile.Read(ref _drivenUnit) is not { } unit)
             return null;
         IReadOnlyDictionary<string, int> channels = UnitMixMeters.Channels(plan);
-        return channels.Count == 0 ? null : (port, unit, channels);
+        return channels.Count == 0 ? null : new(port, unit, channels, HardwareMixingPlanner.RunningMaximizers(plan));
     }
 
     /// <summary>

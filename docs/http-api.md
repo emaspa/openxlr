@@ -192,6 +192,10 @@ now in `voice.active`.
 the microphones [dry](api.md#dry-monitor), before their effects, while Stream
 and Chat keep the processed voice; `GET /api/v1/mixes/monitor` reads it back
 as `monitorDry`.
+`{"cmd":"setMixMaximizer","mix":"monitor","value":50}` sets the Wave XLR
+Pro's maximizer on Monitor A to 50, which runs while
+[hardware mixing](api.md#hardware-mixing) builds Monitor A alone on the
+unit; `GET /api/v1/mixes/monitor` reads it back as `maximizer`.
 The EQ commands take a mix in place of a microphone for its
 [output EQ](api.md#output-eq):
 `{"cmd":"loadEqProfile","mix":"stream","profile":"builtin:footsteps"}` puts

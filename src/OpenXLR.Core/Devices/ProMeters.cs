@@ -9,10 +9,16 @@ public sealed record ProDuckerMeter(double ReductionDb, double? KeyDb, double? L
 /// <summary>A stereo level in dBFS; null at the floor, silence.</summary>
 public sealed record ProStereoMeter(double? LeftDb, double? RightDb);
 
+/// <summary>One of the unit's five maximizers, one per mix section: how far it lowers the section now, and its input level.</summary>
+public sealed record ProMaximizerMeter(double ReductionDb, double? InputDb);
+
 /// <summary>Block 0x0002 decoded: the duckers, the 35 stereo levels and the four outputs.</summary>
 public sealed record ProMeterReading(IReadOnlyList<ProDuckerMeter> Duckers, IReadOnlyList<ProStereoMeter> Levels,
     IReadOnlyList<ProStereoMeter> Outputs)
 {
+    /// <summary>The five maximizers, maximizer M the one of section M in block 0x0001's order (0, 18, 36, 54, 72); empty when not decoded.</summary>
+    public IReadOnlyList<ProMaximizerMeter> Maximizers { get; init; } = [];
+
     /// <summary>
     /// The largest reduction across <paramref name="entries"/>, in dB: the
     /// duckers in block 0x0008's numbering (0 to 3 the inputs, 4 + k pair
@@ -31,7 +37,9 @@ public sealed record ProMeterReading(IReadOnlyList<ProDuckerMeter> Duckers, IRea
 /// The Wave XLR Pro's meters, block 0x0002: 150 bytes, read only, never
 /// written.
 ///
-///   0 to 9      five maximizers, two bytes each: reduction, input level
+///   0 to 9      five maximizers, two bytes each: reduction, input level.
+///               Maximizer M is the one of mix section M (0, 18, 36, 54,
+///               72), measured for section 18 (2026-11-11, bytes 2 and 3)
 ///   10 to 57    twelve duckers, four bytes each, ducker N at 10 + 4N:
 ///               reduction, key level, output left, output right. Ducker N
 ///               is block 0x0008's entry N (0 XLR 1, 1 XLR 2, 2 USB Aux,
@@ -54,7 +62,8 @@ public sealed record ProMeterReading(IReadOnlyList<ProDuckerMeter> Duckers, IRea
 /// A level byte is -4 times dBFS, f0 the floor (silence); a reduction byte
 /// is 4 times dB. Measured on the desk (2026-11-10): a level is a peak
 /// reading, rises within about 40 ms, holds nothing and falls in a straight
-/// line at about 34 dB a second. The maximizers, expanders, compressors and
+/// line at about 34 dB a second. A maximizer's reduction is the section
+/// maximizer's meter in hardware mixing; the expanders, compressors and
 /// Voice Tune bytes are decoded for diagnostics only.
 /// </summary>
 public static class ProMeters
@@ -136,7 +145,13 @@ public static class ProMeters
         for (int k = 0; k < LevelCount; k++) levels[k] = Stereo(block, LevelOffset + 2 * k);
         var outputs = new ProStereoMeter[OutputCount];
         for (int o = 0; o < OutputCount; o++) outputs[o] = Stereo(block, OutputOffset + 2 * o);
-        return new(duckers, levels, outputs);
+        var maximizers = new ProMaximizerMeter[MaximizerCount];
+        for (int m = 0; m < MaximizerCount; m++)
+        {
+            int at = MaximizerOffset + MaximizerLength * m;
+            maximizers[m] = new(ReductionDb(block[at]), LevelDb(block[at + 1]));
+        }
+        return new(duckers, levels, outputs) { Maximizers = maximizers };
     }
 
     private static ProStereoMeter Stereo(ReadOnlySpan<byte> block, int at) => new(LevelDb(block[at]), LevelDb(block[at + 1]));

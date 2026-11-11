@@ -623,6 +623,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task SetMonitorDryAsync(string mix, bool value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMonitorDry", ["mix"] = mix, ["value"] = value });
 
+    /// <summary>Set the Wave XLR Pro's maximizer on a mix it builds in hardware mixing, 0 (off) to 100.</summary>
+    public Task SetMixMaximizerAsync(string mix, int amount)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setMixMaximizer", ["mix"] = mix, ["value"] = amount });
+
     /// <summary>Part of a microphone's voice changer: the fields given change, the others keep their values.</summary>
     public Task SetVoiceChangerAsync(string channel, bool? enabled = null, string? voice = null, double? pitch = null, double? formant = null)
     {

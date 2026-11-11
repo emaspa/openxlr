@@ -164,7 +164,7 @@ public sealed class HardwareMixingClaimsTests
     public void TheMonitoringPauseTakesTheCueAndTheReturnPairOutOfTheJacksOnly()
     {
         HardwareMixingPlan plan = HardwareMixingPlanner.Plan(Setup() with { Processed = new HashSet<string> { "xlr1" }, MonitorMuted = true });
-        Assert.Equal(0, Section(plan, 0).Members);
+        Assert.Equal(0, Section(plan, 0).Sources);
         Assert.True(Member(plan, HardwareMixingPlanner.AuxSection, ProMixSections.SourceOfPair(7)));
     }
 

@@ -162,6 +162,8 @@ public static class CommandValidation
                 return CheckDynamicsProcessing(cmd, layout);
             case "setMonitorDry":
                 return CheckMonitorDry(cmd, layout);
+            case "setMixMaximizer":
+                return CheckMixMaximizer(cmd, layout);
             case "watchDynamics":
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
                     return "watchDynamics: need a microphone channel";
@@ -798,6 +800,20 @@ public static class CommandValidation
            || cmd.Name is { Length: > 200 } || cmd.Name?.Any(char.IsControl) == true
             ? "setNativeEditorRule: need a valid kind, plugin id and optional name"
             : null;
+
+    /// <summary>
+    /// <c>setMixMaximizer</c>: a mix of the layout and a whole <c>value</c>
+    /// from 0 (off) to 100. Taken on any mix and in either mixing mode; it
+    /// runs only while the Wave XLR Pro builds the mix alone.
+    /// </summary>
+    internal static string? CheckMixMaximizer(Command cmd, ILayoutInfo layout)
+    {
+        if (cmd.Mix is null) return "setMixMaximizer: need 'mix'";
+        if (TooLong(cmd.Mix, 36) || !layout.HasMix(cmd.Mix)) return $"setMixMaximizer: '{Short(cmd.Mix)}' is not a mix";
+        return cmd.Value.ValueKind == JsonValueKind.Number && cmd.Value.TryGetInt32(out int amount)
+            && amount is >= 0 and <= ProMixSections.MaximizerMaximum
+            ? null : $"setMixMaximizer: value must be a whole number from 0 to {ProMixSections.MaximizerMaximum}";
+    }
 
     /// <summary>
     /// <c>setMonitorDry</c>: a monitor mix and a boolean <c>value</c>. It
