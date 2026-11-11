@@ -1,0 +1,50 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:loc="using:OpenXLR.UI.Localization"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenXLR.UI"
+        x:Class="OpenXLR.UI.LedRingWindow" x:DataType="vm:LedRingViewModel"
+        Title="{loc:Text Key=LedRingTitle}" Width="460" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" Classes="dialog">
+  <!-- The unit's LED ring: the ring's and the level meter's brightness, and the ring's colour
+       in each of the dial's modes. Every change goes to the unit at once. -->
+  <StackPanel Margin="18" Spacing="10">
+    <TextBlock Text="{loc:Text Key=LedRingHint}" Classes="hint" TextWrapping="Wrap"/>
+
+    <TextBlock Text="{loc:Text Key=LedRingBrightness}" Classes="h"/>
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+      <Slider Name="LedRingBrightness" vm:FaderInput.Step="1" Minimum="0" Maximum="100" Value="{Binding RingBrightness, Mode=TwoWay}"
+              AutomationProperties.Name="{loc:Text Key=LedRingBrightness}" ToolTip.Tip="{loc:Text Key=LedRingBrightnessTip}"/>
+      <TextBlock Grid.Column="1" Text="{Binding RingBrightnessText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
+    </Grid>
+
+    <TextBlock Text="{loc:Text Key=LedMeterBrightness}" Classes="h"/>
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+      <Slider Name="LedMeterBrightness" vm:FaderInput.Step="1" Minimum="0" Maximum="100" Value="{Binding MeterBrightness, Mode=TwoWay}"
+              AutomationProperties.Name="{loc:Text Key=LedMeterBrightness}" ToolTip.Tip="{loc:Text Key=LedMeterBrightnessTip}"/>
+      <TextBlock Grid.Column="1" Text="{Binding MeterBrightnessText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
+    </Grid>
+
+    <!-- each colour: the swatches fill the field, which also takes a colour of the user's own -->
+    <TextBlock Text="{loc:Text Key=LedGainColour}" Classes="h"/>
+    <WrapPanel Name="LedGainSwatches" ItemSpacing="2" LineSpacing="2"/>
+    <TextBox Name="LedGainColour" Text="{Binding GainColour, Mode=TwoWay}" MaxLength="7"
+             PlaceholderText="{loc:Text Key=LedColourPlaceholder}" AutomationProperties.Name="{loc:Text Key=LedGainColour}"/>
+
+    <TextBlock Text="{loc:Text Key=LedHeadphoneColour}" Classes="h"/>
+    <WrapPanel Name="LedHeadphoneSwatches" ItemSpacing="2" LineSpacing="2"/>
+    <TextBox Name="LedHeadphoneColour" Text="{Binding HeadphoneColour, Mode=TwoWay}" MaxLength="7"
+             PlaceholderText="{loc:Text Key=LedColourPlaceholder}" AutomationProperties.Name="{loc:Text Key=LedHeadphoneColour}"/>
+
+    <TextBlock Text="{loc:Text Key=LedMixColour}" Classes="h"/>
+    <WrapPanel Name="LedMixSwatches" ItemSpacing="2" LineSpacing="2"/>
+    <TextBox Name="LedMixColour" Text="{Binding MixColour, Mode=TwoWay}" MaxLength="7"
+             PlaceholderText="{loc:Text Key=LedColourPlaceholder}" AutomationProperties.Name="{loc:Text Key=LedMixColour}"/>
+
+    <TextBlock Name="LedRingError" Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="warn" TextWrapping="Wrap"/>
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <Button Grid.Column="1" Name="LedRingReset" Content="{loc:Text Key=LedRingReset}" Click="OnReset"
+              ToolTip.Tip="{loc:Text Key=LedRingResetTip}"/>
+      <Button Grid.Column="2" Name="LedRingClose" Content="{loc:Text Key=Close}" IsCancel="True" IsDefault="True" Click="OnClose"/>
+    </Grid>
+  </StackPanel>
+</Window>

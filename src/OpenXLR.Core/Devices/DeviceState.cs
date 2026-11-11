@@ -136,6 +136,14 @@ public sealed record DeviceState
     public bool? HeadphonesConnected { get; init; }
 
     /// <summary>
+    /// The unit's LEDs as it reads them back, block 0x0016 on a unit with
+    /// <see cref="DeviceCapabilities.LedRing"/>. Kept by the daemon in a file
+    /// of its own and left out of saved settings and profiles. Null on every
+    /// other unit.
+    /// </summary>
+    public DeviceLed? Led { get; init; }
+
+    /// <summary>
     /// Daemon-enforced software gain lock (Wave Link's Gain Lock for devices
     /// that keep it app-side). Not a hardware field: the daemon stamps it
     /// onto every snapshot and rejects gain writes while it is set.

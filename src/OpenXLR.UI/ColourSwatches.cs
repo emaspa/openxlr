@@ -23,7 +23,14 @@ public static class ColourSwatches
     private sealed record Entry(string Value, Border Ring);
 
     /// <summary>Fill <paramref name="row"/> with the swatches, each writing into <paramref name="field"/>.</summary>
-    public static void Fill(Panel row, TextBox field)
+    public static void Fill(Panel row, TextBox field) => Fill(row, field, null);
+
+    /// <summary>
+    /// Fill <paramref name="row"/> with <paramref name="colours"/> alone, as
+    /// <c>#rrggbb</c> and the name a tooltip says, without the no-colour
+    /// swatch: for a field that always holds a colour. Null for the palette.
+    /// </summary>
+    public static void Fill(Panel row, TextBox field, IReadOnlyList<(string Hex, string Name)>? colours)
     {
         ArgumentNullException.ThrowIfNull(row);
         ArgumentNullException.ThrowIfNull(field);
@@ -62,9 +69,15 @@ public static class ColourSwatches
             Margin = new Thickness(5), IsHitTestVisible = false,
         };
         strike.Bind(Shape.FillProperty, strike.GetResourceObservable("Ox.Text.Secondary"));
-        Add("", "ColourSwatchNone", new Panel { Children = { Face(null), strike } }, Localizer.Text("ColourNone"));
-        foreach (LayoutColourDefinition colour in LayoutColours.Palette)
-            Add(colour.Hex, "ColourSwatch", Face(colour.Hex), Name(colour.Name));
+        if (colours is not null)
+            foreach ((string hex, string name) in colours)
+                Add(hex, "ColourSwatch", Face(hex), name);
+        else
+        {
+            Add("", "ColourSwatchNone", new Panel { Children = { Face(null), strike } }, Localizer.Text("ColourNone"));
+            foreach (LayoutColourDefinition colour in LayoutColours.Palette)
+                Add(colour.Hex, "ColourSwatch", Face(colour.Hex), Name(colour.Name));
+        }
 
         void Update()
         {

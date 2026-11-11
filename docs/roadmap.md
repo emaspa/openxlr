@@ -198,8 +198,13 @@ top.
   OpenXLR drives bytes 3 to 17 of the settings block as the compressor
   and expander settings, at the Wave:3 MK.2's layout; a check on the dock
   is still owed.
-- [ ] LED controls where captures show the registers; nothing is
-  guessed.
+- [x] LED controls on the Wave XLR MK.2 from firmware 1.0.15: the ring's
+  and the level meter's brightness and the ring's colour in each dial
+  mode, block 0x0016, measured on the desk on 2026-11-11.
+- [ ] LED controls on the other models where captures or desk
+  measurements show the registers; nothing is guessed. Block 0x0016 byte
+  1 and the rest of that block, and the mute button's lights, are still
+  open on the Wave XLR MK.2.
 - [ ] The Pro's UCM profile upstreamed to alsa-ucm-conf once a second
   owner confirms the split.
 

@@ -1165,6 +1165,7 @@ public sealed partial class SkinWindowTests
             ("updates", new UpdatesWindow { DataContext = vm.Updates }),
             ("wave-interfaces", new WaveInterfacesWindow(vm)),
             ("hardware-mixing", new HardwareMixingWindow(new HardwareMixingConfirmViewModel(vm.HardwareMixing))),
+            ("led-ring", new LedRingWindow(vm.LedRing)),
         ];
         try
         {

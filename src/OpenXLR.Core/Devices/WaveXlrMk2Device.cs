@@ -46,6 +46,12 @@ namespace OpenXLR.Core.Devices;
 /// of the same lengths, which have not been checked on them, so neither
 /// block is read there.
 ///
+/// Block 0x0016 (61 bytes on 1.0.15) holds the LED ring: the ring's and the
+/// level meter's brightness and the ring's colour in each of the dial's
+/// modes (<see cref="WaveFxLed"/>), measured on a Wave XLR MK.2 on 1.0.15.
+/// Only that model is driven there; the XLR Dock MK.2 and the Wave:3 MK.2
+/// have not been measured and are left alone.
+///
 /// The XLR Dock MK.2 (<see cref="XlrDockMk2Device"/>) presents the same USB
 /// descriptor layout (five interfaces, vendor interface 3 whose alternate
 /// setting 0 has no endpoints; we never leave that setting)
@@ -142,6 +148,15 @@ public class WaveXlrMk2Device : IAudioDevice
     // Whether this unit's meter and status blocks are read, decided at connect.
     private bool _statusBlocks;
 
+    // The first firmware the model's LED block is driven on, null on a model
+    // whose block has not been measured, where it is never read or written.
+    private readonly Version? _ledFirmware;
+
+    // The LED block as the connect or the last LED write left it, which
+    // ReadState decodes without a transfer; null on a unit without LEDs
+    // OpenXLR sets. Nothing but OpenXLR changes it while the unit is driven.
+    private byte[]? _led;
+
     // Whether OpenXLR holds the unit's gain lock, set by SetUnitGainLock
     // after each connect; a ClipGuard write keeps byte 2 bit 0x04 to it.
     private bool _gainLockHeld;
@@ -159,10 +174,10 @@ public class WaveXlrMk2Device : IAudioDevice
     // and ReadDynamics decode without a transfer.
     private byte[]? _settings;
 
-    public WaveXlrMk2Device() : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, statusFirmware: StatusFirmware) { }
+    public WaveXlrMk2Device() : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, statusFirmware: StatusFirmware, ledFirmware: WaveFxLed.Mk2Firmware) { }
 
     internal WaveXlrMk2Device(IUsbTransport usb)
-        : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, usb: usb, statusFirmware: StatusFirmware) { }
+        : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, usb: usb, statusFirmware: StatusFirmware, ledFirmware: WaveFxLed.Mk2Firmware) { }
 
     /// <param name="model">Must match the device's iProduct string minus the
     /// vendor, since the daemon derives the PipeWire node-name hint from it.</param>
@@ -170,10 +185,12 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="statusFirmware">The first firmware on which the unit's
     /// meter and status blocks (0x0002 and 0x0006) are read; null on a model
     /// whose blocks have not been checked, which reads neither.</param>
+    /// <param name="ledFirmware">The first firmware on which the model's LED
+    /// block is driven; null to leave the block alone.</param>
     protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true,
-        ushort? alternateVIndex = null, IUsbTransport? usb = null, Version? statusFirmware = null)
+        ushort? alternateVIndex = null, IUsbTransport? usb = null, Version? statusFirmware = null, Version? ledFirmware = null)
         : this(productId, model, vIndex, Mk2Capabilities(physicalControls, retainsSettings), WaveFxEq.Mk2EqFirmware, alternateVIndex, usb,
-            limiterModeFirmware: LimiterModeFirmware, statusFirmware: statusFirmware) { }
+            limiterModeFirmware: LimiterModeFirmware, statusFirmware: statusFirmware, ledFirmware: ledFirmware) { }
 
     /// <summary>The Wave XLR MK.2's and the XLR Dock MK.2's first firmware with the limiter mode and the gain lock in byte 2.</summary>
     public static Version LimiterModeFirmware { get; } = new(1, 0, 15);
@@ -197,12 +214,15 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="limiterModeFirmware">The first firmware on which byte 2
     /// carries ClipGuard at 0x10 and the gain lock at 0x04; null to keep
     /// 0x04 as ClipGuard on every firmware.</param>
+    /// <param name="ledFirmware">The first firmware on which the model's LED
+    /// block 0x0016 is driven (<see cref="WaveFxLed"/>); null to leave it alone.</param>
     protected WaveXlrMk2Device(ushort productId, string model, ushort vIndex, DeviceCapabilities capabilities, Version? eqFirmware,
         ushort? alternateVIndex = null, IUsbTransport? usb = null, bool crossfadeReversed = false, byte lowCutMask = LowCutMask,
-        Version? limiterModeFirmware = null, Version? statusFirmware = null)
+        Version? limiterModeFirmware = null, Version? statusFirmware = null, Version? ledFirmware = null)
     {
         _limiterModeFirmware = limiterModeFirmware;
         _statusFirmware = statusFirmware;
+        _ledFirmware = ledFirmware;
         _preferredVIndex = _vIndex = vIndex;
         _alternateVIndex = alternateVIndex;
         _usb = usb ?? UsbTransport.Create();
@@ -210,7 +230,7 @@ public class WaveXlrMk2Device : IAudioDevice
         _crossfadeReversed = crossfadeReversed;
         _lowCutMask = lowCutMask;
         Info = UsbTransport.WithLocation(new DeviceInfo("Elgato", model, VendorId, productId));
-        Capabilities = _modelCapabilities = capabilities with { HardwareEq = false, HardwareGainLock = false };
+        Capabilities = _modelCapabilities = capabilities with { HardwareEq = false, HardwareGainLock = false, LedRing = false };
     }
 
     private static DeviceCapabilities Mk2Capabilities(bool physicalControls, bool retainsSettings) => new()
@@ -249,7 +269,8 @@ public class WaveXlrMk2Device : IAudioDevice
             try
             {
                 bool answered = SelectBank();
-                ReadEqSupport(answered);
+                Version? version = ReadEqSupport(answered);
+                ReadLedSupport(version);
             }
             catch
             {
@@ -273,6 +294,7 @@ public class WaveXlrMk2Device : IAudioDevice
         DynamicsSupport = null;
         Capabilities = _modelCapabilities;
         _settings = null;
+        _led = null;
         _vIndex = _preferredVIndex;
     }
 
@@ -306,7 +328,7 @@ public class WaveXlrMk2Device : IAudioDevice
     /// refused: only its EQ runs in software. A model without the EQ reads
     /// the version alone and has no EQ support to report.
     /// </summary>
-    private void ReadEqSupport(bool bankAnswered)
+    private Version? ReadEqSupport(bool bankAnswered)
     {
         Version? version = null;
         if (bankAnswered)
@@ -322,7 +344,7 @@ public class WaveXlrMk2Device : IAudioDevice
         // The gain lock bit exists only in the limiter-mode layout; below it
         // 0x04 is ClipGuard off and is never written for the lock.
         Capabilities = _modelCapabilities with { HardwareGainLock = _limiterMode };
-        if (_eqFirmware is null) return;
+        if (_eqFirmware is null) return version;
         byte[]? block = null;
         EqSupport = WaveFxEq.Gate(Info.Model, version, _eqFirmware, () =>
         {
@@ -343,6 +365,22 @@ public class WaveXlrMk2Device : IAudioDevice
             HardwareGainLock = _limiterMode,
             DynamicsMeters = _statusBlocks && DynamicsSupport?.Ready == true,
         };
+        return version;
+    }
+
+    /// <summary>
+    /// The LED gate, after the firmware is read: on a model whose LED block
+    /// was measured, a version at least the measured one and a read of the
+    /// block that answers in full. Anything else leaves the LEDs alone, and
+    /// a unit that stalls or answers short here is not refused.
+    /// </summary>
+    private void ReadLedSupport(Version? version)
+    {
+        if (_ledFirmware is null || version is null || version < _ledFirmware) return;
+        var block = new byte[WaveFxLed.Length];
+        if (TransferWithRetry(RtRead, VReq, WaveFxLed.Block, block, WaveFxLed.Length) != WaveFxLed.Length) return;
+        _led = block;
+        Capabilities = Capabilities with { LedRing = true };
     }
 
     // A successful settings read alone is not enough to authorize writes, so
@@ -474,6 +512,7 @@ public class WaveXlrMk2Device : IAudioDevice
             Crossfade = CrossfadeByte(xf[0]),
             MicConnected = status?.MicConnected,
             HeadphonesConnected = status?.HeadphonesConnected,
+            Led = LedLocked(),
         };
     }
 
@@ -501,6 +540,12 @@ public class WaveXlrMk2Device : IAudioDevice
         if (!Capabilities.DynamicsMeters) return null;
         try { return Mk2Meters.Decode(Read(Mk2Meters.Block, Mk2Meters.Length, used: 0)); }
         catch (InvalidOperationException) { return null; }
+    }
+
+
+    private DeviceLed? LedLocked()
+    {
+        lock (_lock) return _led is { } led ? WaveFxLed.Decode(led) : null;
     }
 
     /// <summary>Refuse a control the model does not advertise before anything is read or written.</summary>
@@ -615,6 +660,32 @@ public class WaveXlrMk2Device : IAudioDevice
         }
     }
 
+    /// <summary>
+    /// Write the LEDs <paramref name="change"/> sets: one read of block
+    /// 0x0016 and one write of the whole block with only those fields
+    /// changed, none when the unit already holds them. The unit applies the
+    /// write at once.
+    /// </summary>
+    public bool SetLed(DeviceLedChange change)
+    {
+        if (!Capabilities.LedRing)
+            throw new InvalidOperationException($"{Info.Model}: this unit has no LEDs OpenXLR can set");
+        lock (_lock)
+        {
+            byte[] b = Read(WaveFxLed.Block, WaveFxLed.Length, WaveFxLed.Length);
+            byte[] held = (byte[])b.Clone();
+            WaveFxLed.Encode(b, change);
+            if (b.AsSpan().SequenceEqual(held))
+            {
+                _led = held;
+                return false;
+            }
+            Write(WaveFxLed.Block, b);
+            _led = b;
+            return true;
+        }
+    }
+
     public bool SetEq(int input, DeviceEq eq)
     {
         if (input != 1 || EqSupport?.Ready != true)
@@ -678,7 +749,8 @@ public class WaveXlrMk2Device : IAudioDevice
         var blocks = new Dictionary<string, string>();
         foreach ((string name, ushort block, int len) in new[]
                  { ("identity", BlockIdentity, IdentityLen), ("settings", BlockSettings, SettingsLen), ("hp", BlockHp, HpLen),
-                   ("crossfade", BlockCrossfade, CrossfadeLen) })
+                   ("crossfade", BlockCrossfade, CrossfadeLen) }
+                     .Concat(_ledFirmware is null ? [] : new[] { ("led", WaveFxLed.Block, WaveFxLed.Length) }))
         {
             try
             {
@@ -711,6 +783,9 @@ public class WaveXlrMk2Device : IAudioDevice
                 catch (Exception ex) { blocks[name] = $"error: {ex.Message}"; }
             }
         blocks["firmware"] = Firmware ?? "not read";
+        if (_ledFirmware is not null)
+            blocks["ledSupport"] = Capabilities.LedRing ? "set by OpenXLR"
+                : $"left alone: firmware {Firmware ?? "not read"}, driven from {WaveFxEq.Format(_ledFirmware)}";
         blocks["eqSupport"] = _eqFirmware is null ? "in software: the model has no hardware EQ"
             : EqSupport is { } support ? support.Ready ? "on the unit" : $"in software: {support.Reason}" : "not decided";
         if (DynamicsSupport is { } dynamicsSupport)

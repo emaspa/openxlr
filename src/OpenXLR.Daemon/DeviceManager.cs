@@ -280,6 +280,58 @@ public sealed partial class DeviceManager : BackgroundService
 
     private bool GainIsLocked => _device is not null && _gainLocked.Contains(DevId(_device));
 
+    // The LEDs a user set through setLed, per unit by the same id as the
+    // gain lock, and only the fields set: a connect writes them back, so a
+    // unit set elsewhere meanwhile comes back as OpenXLR left it. A unit
+    // never set from OpenXLR, or reset to its factory LEDs, has no entry and
+    // is left as it is.
+    private static string LedPath => OpenXlrPaths.ConfigFile("leds.json");
+    private static readonly object LedWriteGate = new();
+    private static readonly JsonSerializerOptions LedJson = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    internal static Dictionary<string, DeviceLedChange> LoadLeds()
+    {
+        try
+        {
+            var saved = JsonSerializer.Deserialize<Dictionary<string, DeviceLedChange>>(File.ReadAllText(LedPath), LedJson) ?? [];
+            // A hand edit outside the command's ranges is dropped field by field.
+            return saved.Where(pair => pair.Value is not null).ToDictionary(pair => pair.Key, pair => Valid(pair.Value), StringComparer.Ordinal);
+        }
+        catch (Exception) { return []; }
+
+        static DeviceLedChange Valid(DeviceLedChange led) => new()
+        {
+            RingBrightness = led.RingBrightness is >= 0 and <= 100 ? led.RingBrightness : null,
+            MeterBrightness = led.MeterBrightness is >= 0 and <= 100 ? led.MeterBrightness : null,
+            GainColour = WaveFxLed.Normalize(led.GainColour),
+            HeadphoneColour = WaveFxLed.Normalize(led.HeadphoneColour),
+            MixColour = WaveFxLed.Normalize(led.MixColour),
+        };
+    }
+
+    // Every device manager writes the one file; each changes only its own unit's entry.
+    private void SaveLed(string id, DeviceLedChange? led)
+    {
+        try
+        {
+            lock (LedWriteGate)
+            {
+                Dictionary<string, DeviceLedChange> saved = LoadLeds();
+                if (led is null || led.IsEmpty) saved.Remove(id); else saved[id] = led;
+                OpenXlrPaths.WriteAtomic(LedPath, JsonSerializer.Serialize(saved, LedJson));
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning("the LED settings were not saved: {msg}", ex.Message);
+        }
+    }
+
     // The Pro's firmware mutes an XLR input for ~13 s around every 48V
     // transition (anti-thump) and unmutes it itself, ignoring host unmutes
     // meanwhile. Stamp a settling flag for 15 s after each phantom write so
@@ -647,6 +699,7 @@ public sealed partial class DeviceManager : BackgroundService
             ForgetDucking();
             ConnectDuckingLocked(dev);
             ConnectUnitGainLockLocked(dev);
+            ConnectLedLocked(dev);
             if (dev.EqSupport is { Ready: false } eqSupport && eqSupport.Note is { } eqNote)
                 _log.LogInformation("{dev}: {note}", dev.Info.DisplayName, eqNote);
             if (_unansweredId is not null && _unansweredId != dev.Info.InstanceId) ClearUnansweredLocked();
@@ -1409,8 +1462,9 @@ public sealed partial class DeviceManager : BackgroundService
 
     private DeviceState SavedStateLocked(IAudioDevice device, DeviceState state)
     {
-        // What is plugged into the unit is read, never written back.
-        state = state with { MicConnected = null, HeadphonesConnected = null };
+        // What is plugged into the unit is read, never written back, and the
+        // LEDs are kept per unit in leds.json.
+        state = state with { MicConnected = null, HeadphonesConnected = null, Led = null };
         return EffectiveCapabilitiesLocked(device).OutputRouting && HardwareMixingEntry?.Invoke() is { } entry
             ? HardwareMixingPlanner.ToSavedJackLevels(state, entry) : state;
     }
@@ -1645,6 +1699,67 @@ public sealed partial class DeviceManager : BackgroundService
         catch (Exception ex)
         {
             _log.LogWarning("{dev}: the unit's gain lock was not written: {msg}", dev.Info.DisplayName, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// A unit just opened with LEDs OpenXLR sets gets the ones a user set
+    /// for it, the fields it does not hold already. A failed write is said
+    /// once and tried again at the next connect.
+    /// </summary>
+    private void ConnectLedLocked(IAudioDevice dev)
+    {
+        if (!dev.Capabilities.LedRing || !LoadLeds().TryGetValue(DevId(dev), out DeviceLedChange? saved) || saved.IsEmpty) return;
+        try
+        {
+            if (dev.SetLed(saved)) _log.LogInformation("{dev}: the LEDs set in OpenXLR written back", dev.Info.DisplayName);
+        }
+        catch (UsbHungException) { throw; }
+        catch (Exception ex)
+        {
+            _log.LogWarning("{dev}: the LEDs were not written back: {msg}", dev.Info.DisplayName, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// The setLed command, after <see cref="CommandValidation.CheckLed"/>:
+    /// write <paramref name="change"/> to the active unit and keep it for
+    /// that unit, or with null write the unit's factory LEDs and forget what
+    /// was kept. Null on success, else the reason.
+    /// </summary>
+    public string? ApplyLed(DeviceLedChange? change)
+    {
+        lock (_gate)
+        {
+            if (_device is null || !_device.Connected) return "no device connected";
+            if (!_device.Capabilities.LedRing) return "setLed: the active device has no LEDs OpenXLR can set";
+            string id = DevId(_device);
+            try
+            {
+                _device.SetLed(change ?? WaveFxLed.Factory);
+            }
+            catch (UsbHungException ex)
+            {
+                NoteHung(ex);
+                return ex.Message;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+            SaveLed(id, change is null ? null : (LoadLeds().GetValueOrDefault(id) ?? new DeviceLedChange()).With(change));
+            try { _last = Stamp(_device.ReadState()); }
+            catch (UsbHungException ex)
+            {
+                NoteHung(ex);
+                return ex.Message;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+            RaiseFromLocked();
+            return null;
         }
     }
 

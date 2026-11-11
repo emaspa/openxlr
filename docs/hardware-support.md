@@ -360,6 +360,7 @@ read.
 | Phantom 48V, ClipGuard, compressor | verified | at the Pro's bit positions; community tester, 0.1.12. Dock: phantom confirmed with a condenser mic going silent when switched off, ClipGuard and compressor by ear. From firmware 1.0.15 ClipGuard off is byte 2 bit 0x10 and 0x04 is the unit's gain lock, read from Wave Link's writes on a Wave XLR MK.2 on 1.0.15; the dock on 1.0.15 is driven the same way, not yet captured. Older firmware keeps 0x04 for ClipGuard off |
 | Gain lock | software, and on the unit from firmware 1.0.15 | the daemon rejects gain changes while set. From firmware 1.0.15 it also sets the unit's own lock, byte 2 bit 0x04, as Wave Link does, and reports it as `unitGainLock`. Measured on a Wave XLR MK.2 on 1.0.15 on 2026-11-10: with the bit set an ALSA capture volume write left the gain at 37 dB while ALSA went to 30, without it the gain followed ALSA, and a write of the block's gain byte still applied with the ALSA control following. OpenXLR's lock owns the bit. It is set or cleared with the lock and brought to it at every connect, so a lock set in Wave Link is cleared while OpenXLR's is off, and ClipGuard writes keep it. The dock on 1.0.15 is driven the same way and has not been checked. On older firmware and on an unread version 0x04 is ClipGuard off and the lock stays in software. Whether the unit's lock also holds the Wave XLR MK.2's dial is not checked, so the UI still offers the lock only to release it there |
 | Microphone EQ on the unit, firmware 1.0.15 or later | verified | four bands and a switch in the settings block, written whole per change as Wave Link 3.5 writes it; the encoder reproduces 67 of Wave Link's captured writes byte for byte. The dock's filters were measured from Linux against the software EQ's curves, within about 1 dB for every type, and OpenXLR runs the EQ on the unit. On older firmware, or when the version or the EQ fields cannot be read, the EQ runs in software |
+| LED ring, Wave XLR MK.2 on firmware 1.0.15 | desk-measured | block 0x0016: the ring's and the level meter's brightness and the ring's colour in each dial mode, [below](#mk2-led-ring). The XLR Dock MK.2 is not driven |
 | Compressor and expander settings on the unit | inferred, not checked | the Wave:3 MK.2's fields at bytes 3 to 17 of the settings block ([layout](wave-xlr-pro-protocol.md#compressor-and-expander-on-the-unit)), which a Wave XLR MK.2 on 1.0.15 holds with the same factory values. OpenXLR drives them as the Wave:3 MK.2's, behind the EQ's firmware gate and only when the fields hold values the unit takes. Not yet checked on either unit |
 
 Every exposed control listed above was confirmed on the dock on
@@ -421,6 +422,40 @@ diagnostics archive carries both blocks, raw and decoded. On older
 firmware OpenXLR reads neither. The XLR Dock MK.2 and the Wave:3 MK.2 answer blocks of the
 same lengths, which have not been checked against these layouts, so
 OpenXLR reads neither block on them.
+
+<a name="mk2-led-ring"></a>
+**LED ring.** Block 0x0016 holds the Wave XLR MK.2's LED ring: 61 bytes
+on firmware 1.0.15, read and written whole at the unit's bank, `0x0203`.
+A write applies at once and reads back. Measured on the desk on 2026-11-11
+on a Wave XLR MK.2 on firmware 1.0.15, with the owner looking at the unit
+while each field was written:
+
+| Bytes | What the unit showed | Factory value on the desk unit |
+|---|---|---|
+| 0 | brightness of the ring's steady display: `08` visibly dim, `ff` full. The moving level meter kept its brightness | `ff` |
+| 1 | nothing at `08`, muted, unmuted and while turning the dial in each mode | `ff` |
+| 2 | brightness of the moving microphone level meter on the ring | `ff` |
+| 11 to 14 | the ring's colour while the dial sets the gain | `00 00 00 ff` |
+| 19 to 22 | the ring's colour while the dial sets the headphone level | `00 00 00 ff` |
+| 27 to 30 | the ring's colour while the dial sets the mix | `00 00 00 ff` |
+
+A colour is four bytes in the order blue, green, red, white: `ff 00 00 00`
+showed blue, `00 ff 00 00` green and `00 00 ff 00` red, and the factory
+`00 00 00 ff` is white. Writing the three slots at once showed blue, red and
+green in the three modes as written. The mute button's lights did not
+change with any of them. The other four-byte slots (from bytes 3, 7, 15, 23
+and 31 on), bytes 59 and 60 and byte 1 were not tested.
+
+OpenXLR drives bytes 0 and 2 and the three colour slots on a Wave XLR MK.2
+whose firmware reads 1.0.15 or later and whose block answers all 61 bytes
+at connect, and writes every other byte back as it read it
+([`setLed`](api.md#led-ring)). A brightness is written from `08` to `ff`.
+`#ffffff` writes the white LED alone, as the factory value; any other
+colour writes the red, green and blue bytes with white at `00`. Mixed
+colours follow from the three channels and were not looked at on the
+unit. The XLR Dock MK.2 has the block too and is left alone until it is
+measured, as is the Wave:3 MK.2. The diagnostics archive carries the
+block on a Wave XLR MK.2.
 
 ## Wave:3 (0fd9:0070)
 

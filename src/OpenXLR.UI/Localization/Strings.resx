@@ -4622,4 +4622,49 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="MicSetupGainLocked" xml:space="preserve">
     <value>Input gain is locked.</value>
   </data>
+  <data name="ColourWhite" xml:space="preserve">
+    <value>White</value>
+  </data>
+  <data name="LedRingButton" xml:space="preserve">
+    <value>LEDs</value>
+  </data>
+  <data name="LedRingButtonTip" xml:space="preserve">
+    <value>The unit's LED ring: brightness and the colour in each dial mode</value>
+  </data>
+  <data name="LedRingTitle" xml:space="preserve">
+    <value>LED ring</value>
+  </data>
+  <data name="LedRingHint" xml:space="preserve">
+    <value>Each change goes to the unit at once. OpenXLR keeps what you set here and writes it back whenever the unit connects.</value>
+  </data>
+  <data name="LedRingBrightness" xml:space="preserve">
+    <value>Ring brightness</value>
+  </data>
+  <data name="LedRingBrightnessTip" xml:space="preserve">
+    <value>The ring's steady display. Below 3% it stays at 3%, the dimmest level tried on a unit.</value>
+  </data>
+  <data name="LedMeterBrightness" xml:space="preserve">
+    <value>Meter brightness</value>
+  </data>
+  <data name="LedMeterBrightnessTip" xml:space="preserve">
+    <value>The moving microphone level meter on the ring. Below 3% it stays at 3%, the dimmest level tried on a unit.</value>
+  </data>
+  <data name="LedGainColour" xml:space="preserve">
+    <value>Ring colour, gain mode</value>
+  </data>
+  <data name="LedHeadphoneColour" xml:space="preserve">
+    <value>Ring colour, headphone mode</value>
+  </data>
+  <data name="LedMixColour" xml:space="preserve">
+    <value>Ring colour, mix mode</value>
+  </data>
+  <data name="LedColourPlaceholder" xml:space="preserve">
+    <value>#RRGGBB</value>
+  </data>
+  <data name="LedRingReset" xml:space="preserve">
+    <value>Factory LEDs</value>
+  </data>
+  <data name="LedRingResetTip" xml:space="preserve">
+    <value>Full brightness and white in every mode, as the unit ships. OpenXLR stops writing its own LEDs back.</value>
+  </data>
 </root>

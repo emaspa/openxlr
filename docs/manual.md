@@ -976,6 +976,31 @@ all five mixes of the default layout adds 50 sends, which a stock
 pipewire-pulse may refuse for lack of open files; the error says so (see
 [open-file limit](#open-files)).
 
+<a name="led-ring"></a>
+#### Set the Wave XLR MK.2's LED ring
+
+On a Wave XLR MK.2 with firmware 1.0.15 or later, the HEADPHONES card
+has an **LEDs** button. It opens the LED ring window:
+
+- **Ring brightness** dims the ring's steady display. **Meter
+  brightness** dims the moving microphone level meter on the ring, which
+  keeps its own brightness when the ring is dimmed. Below 3% the unit
+  stays at 3%, the dimmest level tried on a unit so far.
+- **Ring colour, gain mode**, **headphone mode** and **mix mode** set the
+  ring's colour while the dial sets the gain, the headphone level and the
+  mix. Pick a swatch or type a colour as `#RRGGBB`. The field sends it once
+  all six digits are in. White uses the unit's white LED, as it ships; any
+  other colour uses its red, green and blue LEDs. The mute button's lights
+  stay as they are.
+- **Factory LEDs** puts back full brightness and white in every mode.
+
+Each change shows on the unit at once. OpenXLR remembers what you set and
+writes it back each time the unit connects, so a colour changed in Wave
+Link on another computer comes back as you left it here. After **Factory
+LEDs** it leaves the unit's LEDs alone again. Profiles do not carry the
+LEDs. The XLR Dock MK.2, the Wave:3 MK.2 and older firmware have no
+button: their LEDs have not been measured.
+
 <a name="audio-flow"></a>
 ### Audio flow
 
@@ -5121,6 +5146,7 @@ settings. See
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference and the added plugin folders |
 | `~/.config/openxlr/active-device.json` | the interface picked last in the header, driven again after a restart |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
+| `~/.config/openxlr/leds.json` | the LED ring set from OpenXLR on a Wave XLR MK.2, written back each time it connects |
 | `~/.config/openxlr/soundboard.json` | the soundboard's clip library and whether it is on, written by the daemon ([api.md](api.md#soundboard)) |
 | `~/.local/share/openxlr/soundboard/` | the soundboard's clips, copied in when imported |
 | `~/.config/openxlr/wave-interfaces.json` | the units driven as additional interfaces, by instance id ([Multiple Wave interfaces](wave-interfaces.md)) |

@@ -43,6 +43,33 @@ public static class CommandValidation
             : cmd.Check.ValueKind is JsonValueKind.Undefined or JsonValueKind.True or JsonValueKind.False ? null
             : "setMixing: check must be a boolean";
 
+    /// <summary>
+    /// <c>setLed</c>: a <c>control</c> of <c>ringBrightness</c> or
+    /// <c>meterBrightness</c> with a whole percentage from 0 to 100,
+    /// <c>gainColour</c>, <c>headphoneColour</c> or <c>mixColour</c> with a
+    /// colour as <c>#rrggbb</c>, or <c>reset</c> with no value.
+    /// </summary>
+    internal static string? CheckLed(Command cmd) => cmd.Control switch
+    {
+        "ringBrightness" or "meterBrightness" => cmd.Value.ValueKind == JsonValueKind.Number && cmd.Value.TryGetInt32(out int percent)
+            && percent is >= 0 and <= 100 ? null : $"setLed: {cmd.Control} must be a whole number from 0 to 100",
+        "gainColour" or "headphoneColour" or "mixColour" => cmd.Value.ValueKind == JsonValueKind.String && WaveFxLed.IsColour(cmd.Value.GetString())
+            ? null : $"setLed: {cmd.Control} must be a colour as #rrggbb",
+        "reset" => null,
+        _ => "setLed: control must be ringBrightness, meterBrightness, gainColour, headphoneColour, mixColour or reset",
+    };
+
+    /// <summary>The change a <c>setLed</c> that passed <see cref="CheckLed"/> asks for; null for <c>reset</c>.</summary>
+    internal static DeviceLedChange? LedChange(Command cmd) => cmd.Control switch
+    {
+        "ringBrightness" => new() { RingBrightness = cmd.Value.GetInt32() },
+        "meterBrightness" => new() { MeterBrightness = cmd.Value.GetInt32() },
+        "gainColour" => new() { GainColour = WaveFxLed.Normalize(cmd.Value.GetString()) },
+        "headphoneColour" => new() { HeadphoneColour = WaveFxLed.Normalize(cmd.Value.GetString()) },
+        "mixColour" => new() { MixColour = WaveFxLed.Normalize(cmd.Value.GetString()) },
+        _ => null,
+    };
+
     /// <summary><c>setAudioClock</c>: a value null or absent for Automatic, or an ALSA node name (<see cref="AudioClockRule.IsValidNode"/>).</summary>
     internal static string? CheckAudioClock(Command cmd)
         => cmd.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
@@ -329,6 +356,8 @@ public static class CommandValidation
                 return null;   // no arguments
             case "setAudioClock":
                 return CheckAudioClock(cmd);
+            case "setLed":
+                return CheckLed(cmd);
             case "restartAudioServices":
                 return null;   // no arguments
             case "setMonitorFeed":
