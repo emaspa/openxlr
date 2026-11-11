@@ -123,6 +123,88 @@ public sealed class DeviceDynamicsWriterTests
         return 0;
     });
 
+    /// <summary>The mixer's way to the units: each post goes to whichever manager drives the unit now, as the daemon's port routes them.</summary>
+    private sealed class RoutedPort(Func<string, DeviceManager?> route) : IDeviceEqPort
+    {
+        public Func<string, DeviceManager?> Route = route;
+        public void Post(string unit, int input, DeviceEq eq, string owner) => Route(unit)?.PostEq(input, eq, owner);
+        public DeviceEqStatus Status(string unit, int input) => Route(unit)?.EqStatus(input) ?? DeviceEqStatus.None;
+        public void PostDynamics(string unit, int input, DeviceDynamics dynamics, string owner) => Route(unit)?.PostDynamics(input, dynamics, owner);
+        public DeviceDynamicsStatus DynamicsStatus(string unit, int input) => Route(unit)?.DynamicsStatus(input) ?? DeviceDynamicsStatus.None;
+        public DeviceDynamics? HeldDynamics(string unit, int input) => Route(unit)?.HeldDynamics(input);
+        public void ForgetDynamics(string unit, int input) => Route(unit)?.ForgetDynamics(input);
+    }
+
+    /// <summary>
+    /// The desk's sequence on 2026-11-11: a Wave XLR MK.2 on 1.0.15 is made
+    /// the primary and XLR 1's compressor and expander run on it, then a Pro
+    /// is made the primary and the MK.2 is an additional interface again,
+    /// driven by a manager of its own. XLR 1 leaves the unit: its switches are
+    /// written off, and once the unit confirms that the mixer holds nothing
+    /// on it, so the additional interface offers its own compressor and
+    /// expander again and writes nothing back over them.
+    /// </summary>
+    [Fact]
+    public void AUnitTheMicrophoneLeftOffersItsOwnSwitchesAgain() => WithConfigDir(() =>
+    {
+        const string Pro = "0fd9:00b4@00112233445566aa";
+        var time = new ManualTime();
+        var usb = new Mk2HardwareEqTests.Unit();
+        DeviceManager primary = Manager(new WaveXlrMk2Device(usb), time);
+        string mk2 = primary.PublishedInfo!.InstanceId;
+        var port = new RoutedPort(id => id == mk2 ? primary : null);
+        using var mixer = new Mixer { Time = time };
+        mixer.SetCompressor("xlr1", new MicCompressorChange(Enabled: true));
+        mixer.SetDrivenUnit(mk2);
+        mixer.SetDeviceEqPort(port);
+        mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [mk2] = primary.PublishedEqSupport! });
+        for (int i = 0; i < 4; i++)
+        {
+            time.Advance(DeviceManager.EqWriteSpacing);
+            primary.SweepOnce();
+            mixer.SyncDeviceEq();
+        }
+        Assert.True(mixer.DynamicsRunOnDevice("xlr1"));
+        Assert.True(WaveFxDynamics.Decode(usb.Blocks[0x0004])!.Compressor);
+        Assert.False(primary.Snapshot().Capabilities!.Compressor);
+
+        // The Pro is chosen: the primary lets the MK.2 go, and its additional
+        // interface manager opens it, offering the unit's own switches.
+        primary.SuspendSession();
+        primary.Dispose();
+        using DeviceManager session = Manager(new WaveXlrMk2Device(usb), time);
+        port.Route = id => id == mk2 ? session : null;
+        Assert.True(session.Snapshot().Capabilities!.Compressor);
+        mixer.SetDrivenUnit(Pro);
+        mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [mk2] = session.PublishedEqSupport! });
+        for (int i = 0; i < 6; i++)
+        {
+            time.Advance(DeviceManager.EqWriteSpacing);
+            mixer.SyncDeviceEq();
+            session.SweepOnce();
+        }
+        Assert.False(mixer.DynamicsRunOnDevice("xlr1"));
+        Assert.True(mixer.DynamicsWantsSoftwareStage("xlr1"));
+        // XLR 1 left with its switches written off, and nothing of the mixer's is left on the unit.
+        Assert.False(WaveFxDynamics.Decode(usb.Blocks[0x0004])!.Compressor);
+        Assert.Equal(DeviceDynamicsStatus.None, session.DynamicsStatus(1));
+        Assert.True(session.Snapshot().Capabilities!.Compressor);
+        Assert.True(session.Snapshot().Capabilities!.Expander);
+        Assert.True(session.Snapshot().Capabilities!.HardwareDynamics);
+        using JsonDocument on = JsonDocument.Parse("true");
+        Assert.Null(session.Apply("compressor", on.RootElement));
+        Assert.True(WaveFxDynamics.Decode(usb.Blocks[0x0004])!.Compressor);
+        // Switched on from the additional interface's controls, it stays on.
+        for (int i = 0; i < 6; i++)
+        {
+            time.Advance(DeviceManager.EqRewriteSpacing);
+            mixer.SyncDeviceEq();
+            session.SweepOnce();
+        }
+        Assert.True(WaveFxDynamics.Decode(usb.Blocks[0x0004])!.Compressor);
+        return 0;
+    });
+
     /// <summary>A unit whose writes are answered but not kept.</summary>
     private sealed class Forgetful(DeviceDynamics held) : IAudioDevice
     {

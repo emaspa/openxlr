@@ -31,6 +31,7 @@ public sealed class DeviceDynamicsMixerTests
         private readonly Dictionary<(string, int), DeviceDynamicsStatus> _status = [];
         public readonly Dictionary<(string, int), DeviceDynamics> Held = [];
         public readonly List<(string Unit, int Input, DeviceDynamics Value)> Posts = [];
+        public readonly List<(string Unit, int Input)> Forgotten = [];
         public bool AutoSweep;
         /// <summary>Whether the unit has been read, so what it holds is known.</summary>
         public bool Read = true;
@@ -60,6 +61,16 @@ public sealed class DeviceDynamicsMixerTests
         }
 
         public DeviceDynamics? HeldDynamics(string unit, int input) { lock (this) return Read ? Held.GetValueOrDefault((unit, input)) : null; }
+
+        public void ForgetDynamics(string unit, int input)
+        {
+            lock (this)
+            {
+                Forgotten.Add((unit, input));
+                _pending.Remove((unit, input));
+                _status.Remove((unit, input));
+            }
+        }
 
         public void Sweep()
         {
@@ -366,6 +377,50 @@ public sealed class DeviceDynamicsMixerTests
         Assert.True(mixer.DynamicsWantsSoftwareStage("xlr1"));
         Assert.Null(Compressor(mixer).Device);
         Assert.False(port.UnitOn(W3, 1));
+        // The primary's input stays held off while no microphone carries it.
+        Assert.Empty(port.Forgotten);
+    }
+
+    /// <summary>
+    /// The primary moves to another unit and the one XLR 1 ran on stays
+    /// driven as an additional interface: its switches are written off,
+    /// and once it confirms that, the mixer forgets the input, so the unit
+    /// offers its own switches again. Software chosen on a unit that still
+    /// carries the microphone keeps them held off.
+    /// </summary>
+    [Fact]
+    public void AUnitNoMicrophoneHoldsAfterTheHandOverIsForgotten()
+    {
+        var port = new Port();
+        using Mixer mixer = Wave3(port);
+        port.Sweep();
+        mixer.SetCompressor("xlr1", new MicCompressorChange(Enabled: true));
+        port.Sweep();
+        mixer.SetDynamicsProcessing("xlr1", "software");
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.True(mixer.DynamicsWantsSoftwareStage("xlr1"));
+        Assert.Empty(port.Forgotten);
+        mixer.SetDynamicsProcessing("xlr1", "device");
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.True(mixer.DynamicsRunOnDevice("xlr1"));
+        Assert.True(port.UnitOn(W3, 1));
+
+        mixer.SetDrivenUnit(Pro);
+        mixer.SyncDeviceEq();
+        Assert.Equal((W3, 1, DeviceDynamics.Off), port.Posts[^1]);
+        Assert.Empty(port.Forgotten);   // not before the unit confirms
+        NeverDoubled(mixer, port);
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.Equal([(W3, 1)], port.Forgotten);
+        Assert.True(mixer.DynamicsWantsSoftwareStage("xlr1"));
+        Assert.False(port.UnitOn(W3, 1));
+        // Nothing more is posted to it.
+        int posts = port.Posts.Count;
+        mixer.SyncDeviceEq();
+        Assert.Equal(posts, port.Posts.Count);
     }
 
     [Fact]

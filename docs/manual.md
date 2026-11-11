@@ -1922,6 +1922,11 @@ expander together.
   setting yet takes the unit's switches and settings the first time, so a
   compressor you had switched on stays on. One that already has a setting,
   saved from an earlier session, writes that setting to the unit instead.
+- When the microphone leaves a unit, for example when you make another
+  interface the primary and the one it ran on stays an additional
+  interface, OpenXLR turns that unit's switches off. Once the unit
+  confirms it, the unit's own **Compressor** and **Expander** switches are
+  back in its controls, and OpenXLR leaves them as you set them.
 - A Mic setup session moves them to this computer while it runs, and
   moving between the unit and this computer switches the old place off
   first, as for the EQ.

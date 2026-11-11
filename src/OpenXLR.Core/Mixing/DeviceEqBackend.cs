@@ -54,6 +54,14 @@ public interface IDeviceEqPort
     DeviceDynamics? HeldDynamics(string unit, int input) => null;
 
     /// <summary>
+    /// No microphone holds this input's compressor and expander any more:
+    /// what was posted to it is forgotten, nothing is written back over a
+    /// change made elsewhere, and the unit's own switches are its controls
+    /// again once no input of it is held.
+    /// </summary>
+    void ForgetDynamics(string unit, int input) { }
+
+    /// <summary>
     /// The unit's own meters, for the levels of the compressor and expander
     /// it runs on this input. Asking keeps them read for a second; null
     /// while none is read yet, after a read that failed, on a unit that does
