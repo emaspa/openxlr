@@ -606,9 +606,9 @@ What changes while it is on:
   to the interface if that is your choice.
 - On XLR 1 the software low cut appears, since the interface's low cut is
   no longer in front of it.
-- The gain is the preamp's and works as before. Whether the interface's
-  mute and ClipGuard act before the raw signal has not been measured yet, so
-  check the mute in your recording application before you rely on it.
+- The gain is the preamp's and works as before, and the interface's mute
+  still silences the computer's capture. Nobody has measured yet whether
+  ClipGuard acts before the raw signal.
 
 On Line In, Raw Capture sends the jack to the computer as it arrives,
 before the interface's ducking.
@@ -4263,7 +4263,9 @@ amount, or Off. Press it and move the slider from 0 (off) to 100. Each step
 adds about 0.2 dB, so 50 raises the mix by about 10 dB and 100 by about 20
 dB before the ceiling holds it back. Under the slider, **Reduction** shows
 how far the unit is holding the mix down right now. A high reduction means
-the mix is being squeezed hard; lower the amount if it pumps.
+the mix is being squeezed hard; lower the amount if it pumps. The mix's
+fader comes before the maximizer. While the maximizer is holding the mix
+down, the fader turns what you hear down by less than it moves.
 
 The amount is kept per mix with the mixer, not in profiles, and does
 nothing while this computer builds the mix. When a jack plays two mixes

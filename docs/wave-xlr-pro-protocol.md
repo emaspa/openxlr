@@ -1463,13 +1463,28 @@ In hardware mixing (see [api.md](api.md#hardware-mixing)):
   bypass back as they were, with the rest of the section.
 - Each running maximizer's reduction is the mix's `max:<id>` meter.
 
+### As OpenXLR drives it (desk check of 2026-11-11)
+
+Section 36 built the Aux mix alone, holding USB pair 5, with a 1 kHz tone
+on that pair read on the section's capture pair:
+
+- The mix volume at 0.5 wrote byte 102 as `48` (-18 dB) and the capture
+  fell by 18.0 dB, the cells unchanged. The mute set byte 103 bit 0 and
+  the capture went to digital silence; unmuting brought the level back to
+  the same 0.01 dB with the membership kept.
+- Amount 50 raised the tone by 10.0 dB and 100 by 19.5 dB; with a hotter
+  tone at 100 the reduction meter read 8.5 dB. Amount 0 reads back as
+  bypassed and the tone is dry.
+- The level byte acts before the maximizer. With the maximizer at 100 and
+  holding a -12 dBFS tone, a 30 dB cut of the mix volume lowered the output
+  by 21.5 dB and the reduction went to 0; with the maximizer off the same
+  cut lowered it by 30.0 dB. The cells are inputs to the section, so no
+  place for the volume comes after the maximizer: while it holds a mix
+  down, the fader moves the output by less than its travel.
+- Switching to software mixing and back left every section byte as it was.
+
 ### Open
 
-- Whether the level byte acts before or after the maximizer. The mode puts
-  a mix's volume in the level byte; if the level comes first, a lower mix
-  volume feeds the maximizer less and it reduces less, so the mix's output
-  falls by less than the fader. Measured: the level and the mute act
-  before the section's level meter.
 - Whether amount 0 with the bypass clear is dry, or still holds peaks at
   the ceiling.
 - Byte 99 as section 0's mute.
@@ -1540,6 +1555,8 @@ held before, or `02`. Diagnostics decode the four bytes as `xlr1Capture`,
 
 ### Open
 
-- Whether the unit's mute, ClipGuard and the capture limiter act before or
-  after the tap.
+- Whether ClipGuard and the capture limiter act before or after the tap.
+  The unit's mute does act before it: with XLR 1 at `00` the mute took the
+  capture to digital silence (desk, 2026-11-11), and the Wave XLR MK.2's
+  mute does the same on its tap.
 - What byte 96 does.

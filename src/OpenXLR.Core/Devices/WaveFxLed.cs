@@ -49,6 +49,7 @@ public sealed record DeviceLedChange
     };
 
     /// <summary>True when no field is set.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool IsEmpty => RingBrightness is null && MeterBrightness is null
         && GainColour is null && HeadphoneColour is null && MixColour is null;
 }
