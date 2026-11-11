@@ -203,7 +203,7 @@ public sealed class WaveFxEqTests
             byte[] before = (byte[])block.Clone();
             DeviceEq eq = run % 3 == 0 ? (run % 2 == 0 ? DeviceEq.Off : new DeviceEq(true, null))
                 : new DeviceEq(random.Next(2) == 1, [.. Enumerable.Range(0, 4).Select(_ => new DeviceEqBand(random.Next(2) == 1,
-                    random.Next(6), random.Next(-48, 49), random.Next(20, 20001), random.Next(-64, 65)))]);
+                    random.Next(6), random.Next(-80, 81), random.Next(20, 20001), random.Next(-64, 65)))]);
             WaveFxEq.Encode(block, eq);
             for (int i = 0; i < block.Length; i++)
                 Assert.Equal(before[i] & ~owned[i], block[i] & ~owned[i]);
@@ -235,7 +235,8 @@ public sealed class WaveFxEqTests
         byte[] block = new byte[WaveFxEq.StructLength];
         DeviceEqBand ok = new(true, 2, 0, 1000, -10);
         Assert.Throws<ArgumentException>(() => WaveFxEq.Encode(block, new DeviceEq(true, [ok, ok, ok, ok with { Type = 6 }])));
-        Assert.Throws<ArgumentException>(() => WaveFxEq.Encode(block, new DeviceEq(true, [ok, ok, ok, ok with { Gain = 49 }])));
+        Assert.Throws<ArgumentException>(() => WaveFxEq.Encode(block, new DeviceEq(true, [ok, ok, ok, ok with { Gain = 81 }])));
+        Assert.Throws<ArgumentException>(() => WaveFxEq.Encode(block, new DeviceEq(true, [ok, ok, ok, ok with { Gain = -81 }])));
         Assert.Throws<ArgumentException>(() => WaveFxEq.Encode(block, new DeviceEq(true, [ok, ok, ok, ok with { Frequency = 19 }])));
         Assert.Throws<ArgumentException>(() => WaveFxEq.Encode(block, new DeviceEq(true, [ok, ok, ok, ok with { Q = 65 }])));
         Assert.Throws<ArgumentException>(() => WaveFxEq.Encode(block, new DeviceEq(true, [ok, ok, ok])));
@@ -244,6 +245,39 @@ public sealed class WaveFxEqTests
         // An all-zero block holds frequency 0: it does not decode.
         Assert.False(WaveFxEq.Decodes(WaveFxEq.Decode(block)));
         Assert.All(block, b => Assert.Equal(0, b));
+    }
+
+    [Fact]
+    public void BandGainsDecodeFromMinusToPlusTwentyDecibelsOnEveryModel()
+    {
+        // XLR Dock MK.2 capture 14's block, band 3 at +12 dB (byte 19 + 10 = 29).
+        byte[] block = Hex("251801d4200a00c8001800f4040a0064000601003c00f60300c600ff0530bf02f22507fd27e8");
+        const int band3Gain = WaveFxEq.FirstBand + 2 * WaveFxEq.BandStride + 1;
+        Assert.Equal(0x30, block[band3Gain]);
+        // +15 dB, as another program may store it, and the ends of the range
+        // the Wave XLR MK.2 was measured applying: 0x50 and 0xb0.
+        foreach ((byte raw, double db) in new[] { ((byte)0x3c, 15.0), ((byte)0x50, 20.0), ((byte)0xb0, -20.0), ((byte)0xc4, -15.0) })
+        {
+            block[band3Gain] = raw;
+            DeviceEq eq = WaveFxEq.Decode(block)!;
+            Assert.True(WaveFxEq.Decodes(eq), $"byte {raw:x2}");
+            Assert.Equal(db, DeviceEqMapping.FromDevice(eq)!.Bands[2].Gain);
+            Assert.Equal(Math.Abs(db) <= 12, WaveFxEq.FitsGain(eq, WaveFxEq.DefaultMaxGainDb));
+            Assert.True(WaveFxEq.FitsGain(eq, WaveFxEq.MeasuredMaxGainDb));
+            byte[] written = new byte[WaveFxEq.StructLength];
+            WaveFxEq.Encode(written, eq);
+            Assert.Equal(raw, written[band3Gain]);
+        }
+        // Beyond 20 dB a block still does not decode.
+        foreach (byte raw in new byte[] { 0x51, 0xaf, 0x7f, 0x80 })
+        {
+            block[band3Gain] = raw;
+            Assert.False(WaveFxEq.Decodes(WaveFxEq.Decode(block)), $"byte {raw:x2}");
+        }
+        Assert.True(WaveFxEq.FitsGain(DeviceEq.Off, 0));
+        // The microphone EQ maps its ends to those bytes.
+        Assert.Equal(80, DeviceEqMapping.ToDevice(new EqBand { Gain = MicEq.MaxGain }).Gain);
+        Assert.Equal(-80, DeviceEqMapping.ToDevice(new EqBand { Gain = MicEq.MinGain }).Gain);
     }
 
     [Fact]

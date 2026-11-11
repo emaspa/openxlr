@@ -492,7 +492,7 @@ static void check_controls(void) {
     }
   assert(!set_control(h, "band5_gain", 0) && !set_control(h, "band1_gain", NAN));
   assert(set_control(h, "band1_gain", 99));
-  assert(atomic_load(&((Eq *)h->impl)->bands[0].gain->desired) == 12);
+  assert(atomic_load(&((Eq *)h->impl)->bands[0].gain->desired) == 20);
   assert(set_control(h, "band1_type", 9));
   assert(atomic_load(&((Eq *)h->impl)->bands[0].type->desired) == HIGH_CUT);
   release(h);

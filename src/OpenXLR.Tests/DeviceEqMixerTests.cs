@@ -130,14 +130,71 @@ public sealed class DeviceEqMixerTests
         port.Sweep(); mixer.SyncDeviceEq();
         Assert.True(mixer.EqWantsSoftwareStage("xlr1"));
         Assert.Equal("device", mixer.EqProcessingFor("xlr1"));
-        Assert.False(mixer.CanRunEqOnDevice("xlr1", 16));
-        Assert.True(mixer.CanRunEqOnDevice("xlr1", 2));
+        Assert.False(mixer.CanRunEqOnDevice("xlr1", large));
+        Assert.True(mixer.CanRunEqOnDevice("xlr1", small));
         var command = JsonSerializer.Deserialize<Command>(JsonSerializer.Serialize(new { cmd = "setEq", channel = "xlr1", eq = small },
             new JsonSerializerOptions(JsonSerializerDefaults.Web)), new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
         Assert.Null(CommandValidation.Check(command, mixer, _ => null, nativeHostInstalled: false));
         mixer.SetEq("xlr1", small); port.Sweep();
         Assert.True(mixer.EqRunsOnDevice("xlr1"));
         NeverDoubled(mixer, port);
+    }
+
+    [Fact]
+    public void ABandGainBeyondTheUnitsRangeRunsInSoftwareAndComesBackWhenItFits()
+    {
+        var port = new Port();
+        using Mixer mixer = Dock1(port);
+        port.Sweep();
+        Assert.True(mixer.EqRunsOnDevice("xlr1"));
+        MicEq eq = mixer.EqFor("xlr1");
+        // The dock is written 12 dB at most: a band at +15 leaves it, and
+        // so does a cut type whose kept gain is beyond, as the unit stores it.
+        MicEq loud = eq.WithBand(2, eq.Bands[1] with { Gain = 15 });
+        Assert.False(mixer.CanRunEqOnDevice("xlr1", loud));
+        Assert.False(mixer.CanRunEqOnDevice("xlr1", eq.WithBand(1, eq.Bands[0] with { Gain = -12.25 })));
+        Assert.True(mixer.CanRunEqOnDevice("xlr1", eq.WithBand(2, eq.Bands[1] with { Gain = -12 })));
+        mixer.SetEqBand("xlr1", 2, new EqBandChange(Gain: 15));
+        Assert.False(mixer.EqRunsOnDevice("xlr1"));
+        NeverDoubled(mixer, port);
+        port.Sweep(); mixer.SyncDeviceEq();
+        Assert.True(mixer.EqWantsSoftwareStage("xlr1"));
+        Assert.DoesNotContain(port.Posts, p => p.Eq.Bands?.Any(b => Math.Abs(b.Gain) > 48) == true);
+        Assert.False(port.UnitOn(Dock, 1));
+        Assert.Equal(15, mixer.EqFor("xlr1").Bands[1].Gain);
+        Assert.Equal("device", mixer.EqProcessingFor("xlr1"));
+        Assert.Equal(12, Eq(mixer).Device!.MaxGain);
+        var web = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var command = JsonSerializer.Deserialize<Command>(JsonSerializer.Serialize(new { cmd = "setEq", channel = "xlr1", eq = loud }, web), web)!;
+        Assert.Equal(Mixer.EqNeedsHost, CommandValidation.Check(command, mixer, _ => null, nativeHostInstalled: false));
+        mixer.SetEqBand("xlr1", 2, new EqBandChange(Gain: 12));
+        port.Sweep();
+        Assert.True(mixer.EqRunsOnDevice("xlr1"));
+        Assert.Equal(48, port.Held[(Dock, 1)].Bands![1].Gain);
+        NeverDoubled(mixer, port);
+    }
+
+    [Fact]
+    public void AUnitMeasuredToTwentyDecibelsTakesTheWholeRange()
+    {
+        var port = new Port();
+        using var mixer = new Mixer { Time = new ManualTime() };
+        mixer.SetDrivenUnit(Mk2);
+        mixer.SetDeviceEqPort(port);
+        mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport>
+        {
+            [Mk2] = new("Wave XLR MK.2", "1.0.15", true) { MaxGain = WaveFxEq.MeasuredMaxGainDb },
+        });
+        mixer.SetEqEnabled("xlr1", true);
+        mixer.SetEqBand("xlr1", 2, new EqBandChange(Gain: 20));
+        mixer.SetEqBand("xlr1", 3, new EqBandChange(Gain: -20));
+        port.Sweep();
+        Assert.True(mixer.EqRunsOnDevice("xlr1"));
+        DeviceEq held = port.Held[(Mk2, 1)];
+        Assert.Equal(80, held.Bands![1].Gain);
+        Assert.Equal(-80, held.Bands[2].Gain);
+        Assert.Equal(20, Eq(mixer).Device!.MaxGain);
+        Assert.True(DeviceEqMapping.FromDevice(held)!.Holds(mixer.EqFor("xlr1")));
     }
 
     [Fact]
@@ -158,7 +215,7 @@ public sealed class DeviceEqMixerTests
         Assert.True(state.Available, "a unit-run EQ needs no native helper");
         Assert.Null(state.Error);
         Assert.Equal("device", state.Processing);
-        Assert.Equal(new MicEqDevice(Dock, 1, "Wave XLR Dock MK.2", "1.0.15", true), state.Device);
+        Assert.Equal(new MicEqDevice(Dock, 1, "Wave XLR Dock MK.2", "1.0.15", true) { MaxGain = 12 }, state.Device);
         // Switched off, the unit still has it: the backend stays the device.
         mixer.SetEqEnabled("xlr1", false);
         Assert.Equal("device", Eq(mixer).Backend);
@@ -518,7 +575,7 @@ public sealed class DeviceEqMixerTests
         Assert.True(port.UnitOn(Pro, 2));
         Assert.Equal(48, port.Held[(Pro, 2)].Bands![1].Gain);
         Assert.NotEqual(48, port.Held[(Pro, 1)].Bands![1].Gain);
-        Assert.Equal(new MicEqDevice(Pro, 2, "Wave XLR Pro", "1.0.14", true) { MinimumFirmware = "1.0.14" }, Eq(mixer, "xlr2").Device);
+        Assert.Equal(new MicEqDevice(Pro, 2, "Wave XLR Pro", "1.0.14", true) { MinimumFirmware = "1.0.14", MaxGain = 12 }, Eq(mixer, "xlr2").Device);
         Assert.Equal(1, Eq(mixer).Device!.Input);
 
         // XLR 2 in software: its input alone switches off, XLR 1 keeps the unit.

@@ -56,6 +56,13 @@ public sealed record DeviceEqSupport(bool Ready, string? Reason = null, string? 
 
     /// <summary>The first firmware the model runs the EQ on, as major.minor.patch; null where the gate did not run.</summary>
     public string? MinimumFirmware { get; init; }
+
+    /// <summary>
+    /// The widest band gain, in dB either way, the unit is written: 20 on a
+    /// model measured holding and applying it, 12 on one measured to 12 only.
+    /// A microphone whose EQ holds a band beyond it runs the EQ in software.
+    /// </summary>
+    public double MaxGain { get; init; } = WaveFxEq.DefaultMaxGainDb;
 }
 
 /// <summary>
@@ -93,8 +100,29 @@ public static class WaveFxEq
     /// <summary>Where input 1 or 2's struct starts in a settings block that holds one per input.</summary>
     public static int InputBase(int input) => (input - 1) * StructLength;
 
-    /// <summary>The ranges a band must decode into, the ranges the EQ itself takes.</summary>
-    public const int MaxType = 5, MinGain = -48, MaxGain = 48, MinFrequency = 20, MaxFrequency = 20000, MinQ = -64, MaxQ = 64;
+    /// <summary>
+    /// The ranges a band must decode into, the ranges the EQ itself takes.
+    /// Gain is -80 to 80 quarter decibels, -20 to +20 dB, read from every
+    /// model; what each model is written is held to its
+    /// <see cref="DeviceEqSupport.MaxGain"/>.
+    /// </summary>
+    public const int MaxType = 5, MinGain = -80, MaxGain = 80, MinFrequency = 20, MaxFrequency = 20000, MinQ = -64, MaxQ = 64;
+
+    /// <summary>
+    /// The widest band gain, in dB either way, written to a model whose EQ was
+    /// measured to that range: the Wave XLR MK.2 on firmware 1.0.15, where a
+    /// bell at 703 Hz read +21 dB at +20 (byte <c>50</c>) and -19 dB at -20
+    /// (byte <c>b0</c>) on the USB capture, and both bytes read back as
+    /// written (desk measurement, 2026-11-11).
+    /// </summary>
+    public const double MeasuredMaxGainDb = 20;
+
+    /// <summary>
+    /// The widest band gain, in dB either way, written to a model whose EQ was
+    /// measured only from -12 to +12 dB: the Wave XLR Pro, the XLR Dock MK.2
+    /// and the Wave:3 MK.2.
+    /// </summary>
+    public const double DefaultMaxGainDb = 12;
 
     /// <summary>Read the EQ from an input struct, raw, whatever the values. Null when the struct is too short.</summary>
     public static DeviceEq? Decode(ReadOnlySpan<byte> input)
@@ -113,12 +141,22 @@ public static class WaveFxEq
 
     /// <summary>
     /// Whether every band holds a value the EQ takes: a known type, a
-    /// frequency from 20 to 20000 Hz, a gain from -12 to +12 dB and a Q
-    /// from 0.1 to 10. A unit whose block does not is not driven.
+    /// frequency from 20 to 20000 Hz, a gain from -20 to +20 dB and a Q
+    /// from 0.1 to 10. A unit whose block does not is not driven. Any model
+    /// is read across the whole gain range, so a band another program
+    /// stored beyond what OpenXLR writes to that model still decodes.
     /// </summary>
     public static bool Decodes(DeviceEq? eq)
         => eq?.Bands is { Count: Bands } bands && bands.All(b => b.Type is >= 0 and <= MaxType
             && b.Frequency is >= MinFrequency and <= MaxFrequency && b.Gain is >= MinGain and <= MaxGain && b.Q is >= MinQ and <= MaxQ);
+
+    /// <summary>
+    /// Whether every band of <paramref name="eq"/> stays within
+    /// <paramref name="maxGainDb"/> either way; a value that names the switch
+    /// alone always does.
+    /// </summary>
+    public static bool FitsGain(DeviceEq eq, double maxGainDb)
+        => eq.Bands is not { } bands || bands.All(b => Math.Abs(b.Gain) <= maxGainDb * 4);
 
     /// <summary>
     /// Write an EQ into an input struct: the switch, and the bands when the

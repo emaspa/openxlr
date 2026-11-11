@@ -3124,6 +3124,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="EqAddBand" xml:space="preserve"><value>Magdagdag ng band</value></data>
   <data name="EqRemoveBandName" xml:space="preserve"><value>Alisin ang EQ band {0}</value></data>
   <data name="EqDeviceBandLimit" xml:space="preserve"><value>Hanggang {1} EQ band ang suportado ng {0}. Tumatakbo sa software ang EQ na ito hanggang magkasya muli sa unit ang bilang ng mga band.</value></data>
+  <data name="EqDeviceGainLimit" xml:space="preserve"><value>Tumatanggap ang {0} ng band gain mula -{1} hanggang +{1} dB. Tumatakbo sa software ang EQ na ito hanggang magkasya muli sa saklaw na iyon ang gain ng bawat band.</value></data>
   <data name="EqRemoveBand" xml:space="preserve"><value>Alisin</value></data>
   <data name="OlderDaemonCannotConnectNote" xml:space="preserve">
     <value>Tumatakbo pa ang daemon mula bago ang update, at hindi makakonekta rito ang UI na ito (v{0}). I-restart ang daemon upang kumonekta.</value>

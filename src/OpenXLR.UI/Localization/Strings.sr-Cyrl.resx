@@ -3124,6 +3124,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="EqAddBand" xml:space="preserve"><value>Додај појас</value></data>
   <data name="EqRemoveBandName" xml:space="preserve"><value>Уклони EQ појас {0}</value></data>
   <data name="EqDeviceBandLimit" xml:space="preserve"><value>{0} подржава највише {1} EQ појаса. Овај EQ ради у софтверу док број појасева поново не стане на уређај.</value></data>
+  <data name="EqDeviceGainLimit" xml:space="preserve"><value>{0} прихвата појачање појаса од -{1} до +{1} dB. Овај EQ ради у софтверу док појачање сваког појаса поново не стане у тај опсег.</value></data>
   <data name="EqRemoveBand" xml:space="preserve"><value>Уклони</value></data>
   <data name="OlderDaemonCannotConnectNote" xml:space="preserve">
     <value>Сервис покренут пре ажурирања и даље ради, а овај кориснички интерфејс (v{0}) не може да се повеже с њим. Поново покрени сервис да се повежеш.</value>

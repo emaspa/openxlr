@@ -43,6 +43,12 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     // The unit the channel carries, while its model has a hardware EQ.
     private bool _hasDevice, _deviceReady;
     private string? _deviceName, _deviceFirmware, _deviceReason, _deviceNote, _minimumFirmware;
+    // The widest band gain the unit is written, either way; a daemon that
+    // does not report it wrote 12 dB at most to every unit.
+    private double _deviceMaxGain = DefaultDeviceMaxGain;
+
+    /// <summary>The widest band gain, in dB, a unit whose daemon reports none takes.</summary>
+    internal const double DefaultDeviceMaxGain = 12;
     private string _processing = "device";
     // The state names the choice: a daemon from before the hardware EQ does not.
     private bool _processingReported;
@@ -234,10 +240,14 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// The unit can take the EQ now: it is ready and holds the bands. While it
     /// cannot (older firmware, settings it cannot read, a write it did not
-    /// keep, more bands than it holds), the EQ runs in software whatever the
-    /// choice, and the choice is kept for when it can.
+    /// keep, more bands than it holds, a band gain beyond what it is
+    /// written), the EQ runs in software whatever the choice, and the choice
+    /// is kept for when it can.
     /// </summary>
-    private bool UnitTakesEq => _deviceReady && Bands.Count <= MicEq.BandCount;
+    private bool UnitTakesEq => _deviceReady && Bands.Count <= MicEq.BandCount && !BeyondUnitGain;
+
+    /// <summary>A band's gain is beyond the widest the unit is written.</summary>
+    private bool BeyondUnitGain => Bands.Any(b => Math.Abs(b.Band.Gain) > _deviceMaxGain);
 
     /// <summary>The switch's "On the unit" side is lit: the unit is chosen and can take the EQ.</summary>
     public bool ProcessOnDevice => _processing == "device" && UnitTakesEq;
@@ -290,6 +300,7 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
             if (!_hasDevice || OnDevice) return null;
             string name = _deviceName ?? Localizer.Text("EqTheInterface");
             if (Bands.Count > MicEq.BandCount) return Localizer.Format("EqDeviceBandLimit", name, MicEq.BandCount);
+            if (_deviceReady && BeyondUnitGain) return Localizer.Format("EqDeviceGainLimit", name, _deviceMaxGain);
             if (_deviceReady) return _processing == "software" ? Localizer.Format("EqDeviceBySoftware", name) : null;
             return _deviceReason switch
             {
@@ -428,6 +439,8 @@ public sealed class MicEqViewModel : ViewModelBase, IDisposable
         _deviceReason = device?["reason"]?.GetValue<string>();
         _deviceNote = device?["note"]?.GetValue<string>();
         _minimumFirmware = device?["minimumFirmware"]?.GetValue<string>();
+        _deviceMaxGain = device?["maxGain"] is JsonValue maxGain && maxGain.TryGetValue(out double widest) && double.IsFinite(widest) && widest > 0
+            ? widest : DefaultDeviceMaxGain;
         if (_awaitingEnabled is bool expected && Waiting(_awaitingEnabledSince)) enabled = expected;
         else _awaitingEnabled = null;
         if (_comparing)

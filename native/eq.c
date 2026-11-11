@@ -228,7 +228,7 @@ static bool eq_load_count(Host *h, unsigned bands) {
     EQ_CONTROL(enabled, "enabled", 0, 1, i < EQ_BANDS && defaults[i].on)
     EQ_CONTROL(type, "type", 0, EQ_TYPES - 1, i < EQ_BANDS ? defaults[i].type : PEAK)
     EQ_CONTROL(frequency, "frequency", 20, 20000, i < EQ_BANDS ? defaults[i].frequency : 1000)
-    EQ_CONTROL(gain, "gain", -12, 12, 0)
+    EQ_CONTROL(gain, "gain", -20, 20, 0)
     EQ_CONTROL(qlog10, "qlog10", -1, 1, -0.152f)
 #undef EQ_CONTROL
   }

@@ -231,6 +231,12 @@ public sealed class Wave3Mk2DeviceTests
         // Put back as it was: the original block, byte for byte.
         Assert.True(device.SetEq(1, held));
         Assert.Equal(SettingsBlock, Convert.ToHexString(unit.Blocks[0x0004]).ToLowerInvariant());
+        // Measured to 12 dB only: a band beyond it is never written.
+        Assert.Equal(12, device.EqSupport!.MaxGain);
+        bands[0] = bands[0] with { Gain = 49 };
+        unit.Calls.Clear();
+        Assert.Throws<ArgumentException>(() => device.SetEq(1, new DeviceEq(true, bands)));
+        Assert.Empty(unit.Writes);
     }
 
     [Fact]

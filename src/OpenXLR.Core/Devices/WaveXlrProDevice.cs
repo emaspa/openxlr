@@ -203,7 +203,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             block = new byte[SettingsLen];
             return Transfer(RtRead, VReq, BlockSettings, block, SettingsLen) == SettingsLen
                 && WaveFxEq.Decodes(EqOf(block, 1)) && WaveFxEq.Decodes(EqOf(block, 2));
-        });
+        }) with { MaxGain = WaveFxEq.DefaultMaxGainDb };
         if (EqSupport.Ready) _settings = block;
         else if (EqSupport.Reason == DeviceEqSupport.UnsupportedBlock) ConnectionNote = WaveFxEq.UnsupportedBlockNote;
         // Each input's compressor and expander, in the same struct as its EQ.
@@ -543,8 +543,10 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
     /// </summary>
     public bool SetEq(int input, DeviceEq eq)
     {
-        if (input is not (1 or 2) || EqSupport?.Ready != true)
+        if (input is not (1 or 2) || EqSupport is not { Ready: true } support)
             throw new InvalidOperationException($"{Info.Model}: this unit does not run the EQ on input {input}");
+        if (!WaveFxEq.FitsGain(eq, support.MaxGain))
+            throw new ArgumentException($"{Info.Model}: a band gain is beyond the {support.MaxGain} dB this unit is written", nameof(eq));
         lock (_lock)
         {
             byte[] b = Read(BlockSettings, SettingsLen);

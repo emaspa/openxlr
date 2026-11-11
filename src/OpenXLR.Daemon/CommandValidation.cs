@@ -493,7 +493,7 @@ public static class CommandValidation
                 return cmd.Value.GetBoolean() && !hostInstalled && !layout.EqRunsOnDevice(cmd.Channel!) ? Mixer.EqNeedsHost : null;
             case "setEq":
                 if (MicEq.Read(cmd.Eq, out string? error) is not { } eq) return $"setEq: {error}";
-                return eq.Enabled && !hostInstalled && !layout.CanRunEqOnDevice(cmd.Channel!, eq.Bands.Count) ? Mixer.EqNeedsHost : null;
+                return eq.Enabled && !hostInstalled && !layout.CanRunEqOnDevice(cmd.Channel!, eq) ? Mixer.EqNeedsHost : null;
             case "setEqProcessing":
                 if (layout.EqRunsInSoftwareOnly(cmd.Channel!)) return Mixer.EqSoftwareOnly(Short(cmd.Channel!));
                 return cmd.Value.ValueKind == JsonValueKind.String && MicEqProcessing.IsValid(cmd.Value.GetString())

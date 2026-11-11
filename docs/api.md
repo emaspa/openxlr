@@ -2209,9 +2209,11 @@ holds 1 to 16 `{enabled, type, frequency, gain, q}` objects:
 - `type`: `lowCut` (high pass), `lowShelf`, `peak` (a bell, which Wave Link
   calls Band Pass), `notch`, `highShelf` or `highCut` (low pass).
 - `frequency`: 20 to 20000 Hz, in whole hertz.
-- `gain`: -12 to +12 dB, in quarter decibels. It is kept for every type and
+- `gain`: -20 to +20 dB, in quarter decibels. It is kept for every type and
   ignored by `lowCut`, `notch` and `highCut`, so a band changed to one of
-  those and back keeps its gain.
+  those and back keeps its gain. Settings and profiles saved by a version
+  that took -12 to +12 dB load unchanged. A unit may take a narrower range;
+  see `maxGain` under [where the EQ runs](#where-the-eq-runs).
 - `q`: linear, 0.1 to 10, on Wave Link's grid, where log10(q) moves in steps
   of 0.016 from -1. A value is snapped to the nearest point; a value already
   on the grid comes back unchanged.
@@ -2323,13 +2325,18 @@ software otherwise:
    read from block `0x0000` bytes 5 to 7, is 1.0.15 or later, a Wave:3 MK.2
    on its firmware 0.2.3 or later, or a Wave XLR
    Pro on 1.0.14 or later, and whose EQ fields decode (on the Pro, both
-   inputs'). Its `capabilities.hardwareEq`, and the one in its
-   `waveInterfaces` entry, is then true. XLR 1's EQ goes to the Pro's
+   inputs'). On every model a band gain from -20 to +20 dB decodes. A band
+   another program stored past what OpenXLR writes to that model does not
+   stop the unit from running the EQ. Its `capabilities.hardwareEq`, and
+   the one in its `waveInterfaces` entry, is then true. XLR 1's EQ goes to the Pro's
    input 1 and XLR 2's to its input 2, each with its own switch.
-3. The channel's `processing` is `device`, the default. `setEqProcessing`
+3. The unit can hold the channel's EQ: four bands or fewer, and every
+   band's `gain` within the unit's `maxGain` either way, whatever the
+   band's type, since the unit stores every band's gain.
+4. The channel's `processing` is `device`, the default. `setEqProcessing`
    sets it.
-4. No Sound Check session runs on the channel.
-5. The unit has not failed to keep the EQ written to it in this run.
+5. No Sound Check session runs on the channel.
+6. The unit has not failed to keep the EQ written to it in this run.
 
 `processing` is the channel's choice, `device` or `software`. `device` is
 non-null while the channel carries an input of a unit whose model has a
@@ -2337,10 +2344,17 @@ hardware EQ (the MK.2 family, the Wave:3 MK.2 and the Wave XLR Pro). A one-input
 input 2, so on one
 XLR 2's `device` is null and its EQ runs in software with no `reason`.
 Otherwise `device` is `{unit, input, name, firmware, ready, reason, note,
-minimumFirmware}`. `unit` is the instance id `waveInterfaces` gives, `input`
+minimumFirmware, maxGain}`. `unit` is the instance id `waveInterfaces` gives, `input`
 1 or 2, `name` the model, `firmware` the version the unit reports or null,
 `minimumFirmware` the first version the model runs it on: `1.0.15` on the
-MK.2 family, `0.2.3` on the Wave:3 MK.2, `1.0.14` on the Pro. `ready` is true while the unit runs the EQ
+MK.2 family, `0.2.3` on the Wave:3 MK.2, `1.0.14` on the Pro. `maxGain` is
+the widest band gain in dB, either way, the unit is written: 20 on the Wave
+XLR MK.2, measured on the desk on firmware 1.0.15 (2026-11-11), and 12 on
+the Pro, the XLR Dock MK.2 and the Wave:3 MK.2, which have been measured to
+12 dB only. While a band of the channel's EQ is past it, condition 3 fails
+and the EQ runs in software with `ready` still true. It returns to the unit
+when every band fits again. An older daemon sends no `maxGain`; a client
+then takes 12. `ready` is true while the unit runs the EQ
 now. When it is false, `reason` says why in a word a client can explain and
 `note` in a sentence: `firmwareOld` (older than `minimumFirmware`; Elgato's updater is
 in Wave Link on Windows or macOS), `firmwareUnknown` (the version could not
@@ -2850,7 +2864,7 @@ of [where the EQ runs](#where-the-eq-runs):
 `device` in each of the two objects is non-null while the channel carries
 an input of a unit whose model has them, with the fields of the EQ's
 `device`: `{unit, input, name, firmware, ready, reason, note,
-minimumFirmware}`, and `levels`: whether the unit reports their levels
+minimumFirmware}`, without the EQ's `maxGain`, and `levels`: whether the unit reports their levels
 while it runs them (true on the Wave XLR MK.2 from firmware 1.0.15, see
 above). `reason` is `firmwareOld`, `firmwareUnknown`,
 `unsupportedBlock` (the compressor or expander fields, or the EQ's, hold

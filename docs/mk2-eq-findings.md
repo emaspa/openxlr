@@ -89,8 +89,16 @@ The layout is the same on both devices:
 
 The filter type uses Wave Link's own numbers: 0 high pass, 1 low shelf,
 2 bell (Wave Link calls it "Band Pass"), 3 notch, 4 high shelf, 5 low
-pass. Wave Link's ranges give gain bytes from -48 to +48 (-12 to +12 dB),
-frequencies from 20 to 20000 Hz and Q bytes from -64 to +64 (Q 0.1 to 10).
+pass. Wave Link's EQ offers -20 to +20 dB on screen, gain bytes from -80
+to +80, frequencies from 20 to 20000 Hz and Q bytes from -64 to +64 (Q 0.1
+to 10). The Wave XLR MK.2 on firmware 1.0.15 holds and applies the whole
+gain range, measured on the desk on 2026-11-11: with the EQ switch on, a
+bell at 703 Hz read on the USB capture against the same band at 0 dB gave
++12.2 dB at +12, +21 dB at +20 (`50`), -12.6 dB at -12 and -19 dB at -20
+(`b0`), and `50` and `b0` read back as written. OpenXLR reads any gain
+from -80 to +80 on every model and writes beyond -48 to +48 only to the
+Wave XLR MK.2; the XLR Dock MK.2, the Wave:3 MK.2 and the Pro have not
+been measured beyond 12 dB.
 
 Gain and frequency fit every write Wave Link made while a band was being
 dragged, 23 on the Wave XLR MK.2 and 33 on the updated dock, each against

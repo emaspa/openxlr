@@ -92,6 +92,38 @@ public sealed class Mk2HardwareEqTests
     }
 
     [Fact]
+    public void TheWaveXlrMk2IsWrittenTwentyDecibelsAndTheDockTwelve()
+    {
+        var unit = new Unit();
+        using (var mk2 = new WaveXlrMk2Device(unit))
+        {
+            mk2.Connect();
+            Assert.Equal(20, mk2.EqSupport!.MaxGain);
+            // The bytes the desk measured, read back as written: 0x50 is +20 dB, 0xb0 -20 dB.
+            Assert.True(mk2.SetEq(1, Eq(true, gain: 80)));
+            Assert.Equal(0x50, unit.SettingsWrites.Last()[29]);
+            Assert.True(mk2.SetEq(1, Eq(true, gain: -80)));
+            Assert.Equal(0xb0, unit.SettingsWrites.Last()[29]);
+            Assert.Equal(Eq(true, gain: -80), mk2.ReadEq(1));
+        }
+        unit = new Unit();
+        // A dock whose band 3 another program left at +15 dB still runs the EQ.
+        unit.Blocks[0x0004][29] = 0x3c;
+        using (var dock = new XlrDockMk2Device(unit))
+        {
+            dock.Connect();
+            Assert.True(dock.Capabilities.HardwareEq);
+            Assert.DoesNotContain(WaveFxEq.UnsupportedBlockNote, dock.ConnectionNote ?? "");
+            Assert.Equal(12, dock.EqSupport!.MaxGain);
+            Assert.Equal(60, dock.ReadEq(1)!.Bands![2].Gain);
+            Assert.Throws<ArgumentException>(() => dock.SetEq(1, Eq(true, gain: 49)));
+            Assert.Empty(unit.SettingsWrites);
+            Assert.True(dock.SetEq(1, Eq(true, gain: -48)));
+            Assert.Equal(0xd0, unit.SettingsWrites.Last()[29]);
+        }
+    }
+
+    [Fact]
     public void AnEqTheUnitAlreadyHoldsIsNotWrittenAgain()
     {
         var unit = new Unit();

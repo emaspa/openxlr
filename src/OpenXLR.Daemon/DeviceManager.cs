@@ -1528,6 +1528,7 @@ public sealed partial class DeviceManager : BackgroundService
             {
                 Inputs = dev.Capabilities.XlrInputs,
                 MinimumFirmware = support.MinimumFirmware ?? WaveFxEq.Format(WaveFxEq.Mk2EqFirmware),
+                MaxGain = support.MaxGain,
                 Dynamics = dev.DynamicsSupport,
                 DynamicsLevels = dev.Capabilities.DynamicsMeters,
             }

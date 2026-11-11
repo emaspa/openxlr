@@ -172,7 +172,7 @@ public sealed class EqProfileStoreTests : IDisposable
         SavedEqProfile profile = Assert.Single(EqProfileStore.Read().Profiles);
         Assert.Equal("Edited", profile.Name);
         Assert.Equal([20d, 20000, 1000], profile.Bands.Select(b => b.Frequency));
-        Assert.Equal([12d, -12, 1], profile.Bands.Select(b => b.Gain));
+        Assert.Equal([20d, -20, 1], profile.Bands.Select(b => b.Gain));
         Assert.Equal([MicEq.MaxQ, MicEq.MinQ, MicEq.SnapQ(0.71)], profile.Bands.Select(b => b.Q));
         Assert.All(profile.Bands, b => Assert.Null(MicEq.Check(b)));
     }
@@ -305,7 +305,7 @@ public sealed class EqProfileStoreTests : IDisposable
     [InlineData("""{"cmd":"saveEqProfile","name":"Voice","replace":true,"bands":[{"enabled":true,"type":"peak","frequency":1000,"gain":3,"q":1}]}""", null)]
     [InlineData("""{"cmd":"saveEqProfile","name":"Voice"}""", "saveEqProfile: need 'bands'")]
     [InlineData("""{"cmd":"saveEqProfile","name":"Voice","bands":[]}""", "saveEqProfile: need 1 to 16 bands")]
-    [InlineData("""{"cmd":"saveEqProfile","name":"Voice","bands":[{"enabled":true,"type":"peak","frequency":1000,"gain":30,"q":1}]}""", "saveEqProfile: band 1: gain must be -12 to +12 dB")]
+    [InlineData("""{"cmd":"saveEqProfile","name":"Voice","bands":[{"enabled":true,"type":"peak","frequency":1000,"gain":30,"q":1}]}""", "saveEqProfile: band 1: gain must be -20 to +20 dB")]
     [InlineData("""{"cmd":"saveEqProfile","name":" ","bands":[{"enabled":true,"type":"peak","frequency":1000,"gain":3,"q":1}]}""", "saveEqProfile: need 'name', a profile name has 1 to 80 characters and no control characters")]
     [InlineData("""{"cmd":"renameEqProfile","name":"Voice","newName":"Speech"}""", null)]
     [InlineData("""{"cmd":"renameEqProfile","name":"Voice"}""", "renameEqProfile: need 'newName', a profile name has 1 to 80 characters and no control characters")]

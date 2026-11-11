@@ -3124,6 +3124,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="EqAddBand" xml:space="preserve"><value>Idugang ang band</value></data>
   <data name="EqRemoveBandName" xml:space="preserve"><value>Tangtanga ang EQ band {0}</value></data>
   <data name="EqDeviceBandLimit" xml:space="preserve"><value>Hangtod {1} ka EQ band ang masuportahan sa {0}. Nagdagan kining EQ sa software hangtod mohaum na usab sa unit ang gidaghanon sa mga band.</value></data>
+  <data name="EqDeviceGainLimit" xml:space="preserve"><value>Modawat ang {0} og band gain gikan -{1} hangtod +{1} dB. Nagdagan kining EQ sa software hangtod mohaum na usab sa maong range ang gain sa matag band.</value></data>
   <data name="EqRemoveBand" xml:space="preserve"><value>Tangtanga</value></data>
   <data name="OlderDaemonCannotConnectNote" xml:space="preserve">
     <value>Nagdagan pa ang daemon gikan sa wala pa ang update, ug dili makakonektar niini kining window (v{0}). I-restart ang daemon aron makonektar.</value>

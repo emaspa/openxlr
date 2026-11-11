@@ -77,6 +77,17 @@ public sealed record UnitEqSupport(string Name, string? Firmware, bool Ready, st
     /// <summary>The first firmware the model runs the EQ on, as major.minor.patch.</summary>
     public string MinimumFirmware { get; init; } = WaveFxEq.Format(WaveFxEq.Mk2EqFirmware);
 
+    /// <summary>The widest band gain, in dB either way, the unit's EQ is written.</summary>
+    public double MaxGain { get; init; } = WaveFxEq.DefaultMaxGainDb;
+
+    /// <summary>
+    /// Whether the unit can hold <paramref name="eq"/>: no more bands than it
+    /// has, and every band's gain within <see cref="MaxGain"/>. A gain is held
+    /// to it whatever the band's type, since the unit stores every band's gain.
+    /// </summary>
+    public bool Holds(MicEq eq)
+        => eq.Bands.Count is >= MicEq.MinimumBands and <= WaveFxEq.Bands && eq.Bands.All(b => Math.Abs(b.Gain) <= MaxGain);
+
     /// <summary>
     /// Whether the unit runs the microphone compressor and expander now, and
     /// why not; null on a model without them, whose microphones run them in
