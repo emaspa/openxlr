@@ -82,6 +82,7 @@ public sealed class UnitInputViewModel : ViewModelBase
                 [nameof(MainViewModel.Phantom)] = nameof(Phantom), [nameof(MainViewModel.ClipGuard)] = nameof(ClipGuard),
                 [nameof(MainViewModel.Compressor)] = nameof(Compressor),
                 [nameof(MainViewModel.MicMissing)] = nameof(MicMissing),
+                [nameof(MainViewModel.RawCapture)] = nameof(RawCapture), [nameof(MainViewModel.CapRawCapture)] = nameof(CapRawCapture),
             }
             : new(StringComparer.Ordinal)
             {
@@ -93,6 +94,7 @@ public sealed class UnitInputViewModel : ViewModelBase
                 [nameof(MainViewModel.VoiceTuneStrength2Text)] = nameof(VoiceTuneStrengthText),
                 [nameof(MainViewModel.Phantom2)] = nameof(Phantom), [nameof(MainViewModel.ClipGuard2)] = nameof(ClipGuard),
                 [nameof(MainViewModel.Compressor2)] = nameof(Compressor),
+                [nameof(MainViewModel.RawCapture2)] = nameof(RawCapture), [nameof(MainViewModel.CapRawCapture2)] = nameof(CapRawCapture),
             };
         foreach (string shared in new[] { nameof(MainViewModel.GainMaxDb), nameof(MainViewModel.GainLocked), nameof(MainViewModel.ShowGainLock),
                      nameof(MainViewModel.CapLowCut), nameof(MainViewModel.CapExpander), nameof(MainViewModel.CapVoiceTune),
@@ -199,6 +201,10 @@ public sealed class UnitInputViewModel : ViewModelBase
     public bool Compressor { get => Input == 1 ? _main.Compressor : _main.Compressor2; set { if (Input == 1) _main.Compressor = value; else _main.Compressor2 = value; } }
     /// <summary>The unit reports no microphone plugged into this input: the Wave XLR MK.2's status block, input 1 only.</summary>
     public bool MicMissing => Input == 1 && _main.MicMissing;
+
+    /// <summary>The computer receives this input before the unit's processing.</summary>
+    public bool RawCapture { get => Input == 1 ? _main.RawCapture : _main.RawCapture2; set { if (Input == 1) _main.RawCapture = value; else _main.RawCapture2 = value; } }
+    public bool CapRawCapture => Input == 1 ? _main.CapRawCapture : _main.CapRawCapture2;
     public bool CapLowCut => _main.CapLowCut;
     public bool CapExpander => _main.CapExpander;
     public bool CapVoiceTune => _main.CapVoiceTune;

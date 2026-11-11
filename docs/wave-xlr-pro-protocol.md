@@ -29,8 +29,8 @@ transport and is not maintained.
 
 The mix sections of block 0x0001 (sections 12 and 15 to 19) have their own
 codec, `src/OpenXLR.Core/Devices/ProMixSections.cs`: the five sections'
-levels, membership and ducking fields, the output selectors, byte 94 and
-byte 98, the cell law with its floor and ceiling, and the small low-level
+levels, membership and ducking fields, the output selectors, the capture
+taps at bytes 94 to 97 (sections 17 and 22) and byte 98, the cell law with its floor and ceiling, and the small low-level
 changes the unit drops. Diagnostics show the block decoded with it.
 
 Block 0x0002, the unit's meters (section 21), has its own codec,
@@ -47,7 +47,9 @@ each sweep together with any ducking target waiting to be written, so the
 block is written once for all of them, block 0x0008 first when ducking
 changed, and the commit follows only when a selector or a membership bit
 changed. At steady state the plan matches the last poll and nothing is
-read or written.
+read or written. The one other write of the block is raw capture's, the
+capture taps at bytes 94, 95 and 97 (section 22), one byte at a time under
+the same lock.
 
 ## 0. HARDWARE-CONFIRMED (2026-08-25, live on the device)
 
@@ -1117,8 +1119,9 @@ stayed 1.000 throughout, with room noise as the signal, so the compressor
 acted as its makeup gain only; the clip guard and the gain stage were not
 tested. Bytes 95 to 97 at `00` changed nothing that could be seen: XLR 2
 and USB Aux carried digital silence during the run and Line In's noise
-floor stayed the same, so whether they hold the same choice for the other
-inputs is still open.
+floor stayed the same. A later probe with signal on each input settled
+them (section 22): byte 95 is XLR 2's tap, byte 97 Line In's, and byte 96
+showed no effect on USB Aux.
 
 ### Ducking on the USB Aux port
 
@@ -1378,3 +1381,71 @@ bytes are read for diagnostics only.
 ### Open
 
 - Which input each maximizer, expander and compressor belongs to.
+
+## 22. The capture taps of XLR 2, USB Aux and Line In (desk probe of 2026-11-11)
+
+Firmware 1.0.14, the desk unit. Bytes 95, 96 and 97 of block 0x0001 sit
+after XLR 1's tap at byte 94 (section 17) and read `02` on the desk unit,
+as Wave Link leaves them, as byte 94 does. Each was written alone, the
+rest of the block as read, and its input's USB capture compared with the
+input's levels in block 0x0002 (section 21).
+
+### Byte 95, XLR 2
+
+XLR 2's expander was held at a steady 24 dB of reduction on speech, so the
+processing showed as a level difference:
+
+| Byte 95 | AUX2, XLR 2's capture |
+|---|---|
+| `00` | the microphone before the unit's processing: it tracked the meter of XLR 2 before the processing (level channel 4) |
+| `01` | after the processing, about 30 dB under that meter |
+| `02` | the same as `01` |
+| `03` | the same as `01` |
+
+`02` and `03` read the same with no insert and no ducking on XLR 2. So
+byte 95 is XLR 2's capture tap in the layout of byte 94. It applies live,
+without the commit.
+
+### Byte 96, USB Aux
+
+Music played into the USB Aux port with USB Aux ducked by 40 dB. AUX4 kept
+the music at its full level at `00`, `01`, `02` and `03`: no value changed
+USB Aux's capture. What byte 96 holds is not known, and OpenXLR never
+writes it.
+
+### Byte 97, Line In
+
+A source on the Line In jack with Line In ducked by 40 dB:
+
+| Byte 97 | AUX6 and AUX7, Line In's capture |
+|---|---|
+| `00` | Line In as it arrives |
+| `01` | after the insert return, the same as `00` with no insert |
+| `02` | after the ducker, 40 dB down |
+| `03` | silence |
+
+It applies live; the commit changed nothing.
+
+### Bit 2
+
+A tap value is bits 0 and 1 of its byte. Bit 2 of each of bytes 94 to 97
+is believed to bypass the capture's limiter. It was not tested, so OpenXLR
+writes the two tap bits alone and every other bit as read.
+
+### What OpenXLR does with it
+
+[Raw capture](api.md#raw-capture) sets XLR 1's, XLR 2's or Line In's tap
+to `00` on a unit on firmware 1.0.14 or later, one byte at a time, under
+the same lock as the writes of the mixes so neither loses the other's
+bytes, and without the commit. The mixes take their inputs at their own
+tap fields at `s+15` (section 20), which raw capture never touches, so the
+mixes, the zero-latency path to the jacks and the USB Aux port keep the
+processed microphone. Turning raw capture off puts back the tap the unit
+held before, or `02`. Diagnostics decode the four bytes as `xlr1Capture`,
+`xlr2Capture`, `usbAuxCapture` and `lineInCapture`.
+
+### Open
+
+- Whether the unit's mute, ClipGuard and the capture limiter act before or
+  after the tap.
+- What byte 96 does.

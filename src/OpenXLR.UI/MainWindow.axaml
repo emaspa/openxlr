@@ -470,6 +470,8 @@
                 <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard, Mode=TwoWay}" IsVisible="{Binding CapClipGuard}"/>
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor, Mode=TwoWay}"
                               IsVisible="{Binding CapCompressor}"/>
+                <ToggleButton Name="RawCaptureToggle" Content="{loc:Text Key=RawCapture}" IsChecked="{Binding RawCapture, Mode=TwoWay}"
+                              IsVisible="{Binding CapRawCapture}" ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
               </WrapPanel>
               <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune}">
                 <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
@@ -634,6 +636,8 @@
                 <ToggleButton Content="{loc:Text Key=Phantom}"  IsChecked="{Binding Phantom2, Mode=TwoWay}"/>
                 <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard2, Mode=TwoWay}"/>
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
+                <ToggleButton Name="RawCapture2Toggle" Content="{loc:Text Key=RawCapture}" IsChecked="{Binding RawCapture2, Mode=TwoWay}"
+                              IsVisible="{Binding CapRawCapture2}" ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
               </WrapPanel>
               <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune2}">
                 <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" MinWidth="{DynamicResource UiText.Width90}" VerticalAlignment="Center"/>
@@ -712,7 +716,7 @@
         </Grid>
         <!-- the Wave XLR Pro's analog Line In, an input of its own; its readout shows Line In's
              volume while that fader moves and for a second after -->
-        <Grid Name="LineInRow" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}">
+        <Grid Name="LineInRow" Margin="0,2,0,0" IsVisible="{Binding ShowLineInRow}" RowDefinitions="Auto,Auto">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
@@ -726,6 +730,9 @@
           <TextBlock Grid.Column="2" Name="LineInReadout" Text="{Binding LineInReadout}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right" AutomationProperties.Name="{Binding LineInReadoutName}" ToolTip.Tip="{Binding LineInReadoutName}"/>
           <ToggleButton Grid.Column="4" Name="LineInLock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding LineInLevelLock, Mode=TwoWay}"/>
+          <ToggleButton Grid.Row="1" Grid.Column="1" Name="LineInRawToggle" Content="{loc:Text Key=RawCapture}" Margin="0,4,0,0"
+                        IsChecked="{Binding LineInRawCapture, Mode=TwoWay}" IsVisible="{Binding CapLineInRawCapture}"
+                        HorizontalAlignment="Left" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>
         </Grid>
         <ItemsControl Name="CaptureInputs" ItemsSource="{Binding CaptureInputs}" IsVisible="{Binding HasMixer}">
           <ItemsControl.ItemTemplate>

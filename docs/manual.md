@@ -573,6 +573,54 @@ channel's key is the interface's mute. Stream Deck keys and dials for those
 controls name that channel. The bar puts its mic button on that channel's
 strip. A bound strip keeps its sends and send mutes everywhere.
 
+<a name="raw-capture"></a>
+#### Record the microphone before the interface's processing
+
+On a Wave XLR Pro (firmware 1.0.14 or later) and a Wave XLR MK.2 (firmware
+1.0.15 or later), **Raw Capture** sends an input to the computer before the
+interface's own processing. It sits with the input's switches: next to
+Compressor in the INPUTS card, in the input rack and under **Mic** in a mix
+matrix row. On the Pro, XLR 1 and XLR 2 each have one, and Line In has one
+next to its **Level Lock**. Turn it on when you want OpenXLR's EQ,
+compressor, noise removal and plugins to work on the microphone as the
+preamp gives it, rather than after the interface's low cut, EQ, compressor,
+expander and Voice Tune.
+
+What changes while it is on:
+
+- The interface still runs its processing for its own paths: what you hear
+  on its headphone jacks through the zero-latency path, the mixes it builds
+  in [hardware mixing](#hardware-mixing) and the USB Aux port keep the
+  processed microphone. Only what the computer records changes.
+- The interface's Low Cut and Voice Tune switches, and its Expander and
+  Compressor where it shows them, then act on those paths only. OpenXLR,
+  the virtual microphones and your recordings no longer hear them.
+- The microphone's [EQ](#where-the-eq-runs) and its
+  [compressor and expander](#where-the-compressor-and-expander-run) run on
+  this computer, whatever **Where the EQ runs** and **Where it runs** say,
+  because the interface's would no longer reach the computer. The EQ
+  editor and the compressor window say why. The interface's own EQ,
+  compressor and expander are switched off meanwhile, as they are whenever
+  this computer runs them, so the zero-latency path to the headphone jacks
+  hears the microphone without them. Turn Raw Capture off and they go back
+  to the interface if that is your choice.
+- On XLR 1 the software low cut appears, since the interface's low cut is
+  no longer in front of it.
+- The gain is the preamp's and works as before. Whether the interface's
+  mute and ClipGuard act before the raw signal has not been measured yet, so
+  check the mute in your recording application before you rely on it.
+
+On Line In, Raw Capture sends the jack to the computer as it arrives,
+before the interface's ducking.
+
+OpenXLR keeps the setting per interface and per input and puts it back each
+time the interface connects, so a dual boot into Wave Link, which may set
+the processed signal back, does not undo it. Turning it off puts back what the
+interface held before. Profiles do not save it. The terminal mixer has a
+**Raw capture** row for each input, and the Stream Deck toggle has XLR 1,
+XLR 2 and Line In raw capture targets. The XLR Dock MK.2 and the Wave:3
+MK.2 use the same layout but were not measured, so they do not offer it.
+
 <a name="monitor"></a>
 ### 3.2 Choose what you hear and how loud
 
@@ -1255,7 +1303,8 @@ and the first move brings it into range.
 and other applications from changing the Line In gain. While it is on,
 the unit ignores gain changes made through its ALSA control, and the
 Line In gain in OpenXLR still works. It is separate from Aux In's Level
-Lock, and a profile saves it.
+Lock, and a profile saves it. **Raw Capture**, under it, sends Line In to
+the computer before the unit's ducking ([Raw capture](#raw-capture)).
 
 Like Aux In, Line In starts
 muted in Monitor A, Monitor B and the Aux mix and open in Stream and Chat;
@@ -2193,6 +2242,9 @@ the input's route, and the plugin host is not needed.
   unit's own signal, so every channel and program that takes that unit's
   audio hears it, a capture channel on its node included, as they hear its
   low cut.
+- While [Raw Capture](#raw-capture) is on for the input, the EQ runs on
+  this computer and the unit's own EQ is off, since the unit sends that
+  input to the computer before its EQ.
 - A Mic setup session moves the EQ to this computer while it runs, so
   the take is the raw microphone, the loop follows every edit and Raw
   leaves the EQ out; the unit takes it back when the session ends.
@@ -3361,8 +3413,8 @@ with the meter under it, **FX**, which opens their plugin chain, and over it
 **EQ**, which opens their [EQ editor](#microphone-eq); the gain lock and
 phantom power's settling time still apply. Beside the name,
 **Mic** opens the switches INPUTS shows next to the mute: Low Cut,
-Expander, Voice Tune, Phantom, ClipGuard and Compressor, the ones your
-interface has, with the Voice Tune strength while Voice Tune is on. On an
+Expander, Voice Tune, Phantom, ClipGuard, Compressor and
+[Raw Capture](#raw-capture), the ones your interface has, with the Voice Tune strength while Voice Tune is on. On an
 interface without a hardware low cut or ClipGuard, XLR 1's software low cut
 and ClipGuard are there too. Under them is the microphone's
 [noise removal](#noise-removal), which also gives a capture input with no
@@ -4209,7 +4261,8 @@ its live state, so what a key displays is what the UI shows.
 **Toggle** (a key) switches one thing: a hardware control (mute,
 phantom, low cut, expander, voice tune, ClipGuard, compressor, low
 impedance, the Pro's output selectors, the aux level lock, the Line In
-level lock, the gain lock), [ducking](#ducking) on or off, the software low cut (cycling Off, 80, 120), the software
+level lock, the gain lock, [raw capture](#raw-capture) on XLR 1, XLR 2 or
+Line In), [ducking](#ducking) on or off, the software low cut (cycling Off, 80, 120), the software
 ClipGuard, the Aux mix to the USB Aux port, a mix or send mute,
 the monitor output (switching the monitor mixes to one specific device),
 an output's feed (cycling Monitor A, Monitor B, Monitor A+B and the remaining mixes, lit
@@ -5157,7 +5210,7 @@ settings. See
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference and the added plugin folders |
 | `~/.config/openxlr/active-device.json` | the interface picked last in the header, driven again after a restart |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
-| `~/.config/openxlr/leds.json` | the LED ring set from OpenXLR on a Wave XLR MK.2, written back each time it connects |
+| `~/.config/openxlr/leds.json` | the LED ring set from OpenXLR on a Wave XLR MK.2, written back each time it connects `~/.config/openxlr/rawcapture.json` | the inputs each interface sends to the computer before its own processing ([Raw capture](#raw-capture)) |
 | `~/.config/openxlr/soundboard.json` | the soundboard's clip library and whether it is on, written by the daemon ([api.md](api.md#soundboard)) |
 | `~/.local/share/openxlr/soundboard/` | the soundboard's clips, copied in when imported |
 | `~/.config/openxlr/wave-interfaces.json` | the units driven as additional interfaces, by instance id ([Multiple Wave interfaces](wave-interfaces.md)) |
@@ -5890,7 +5943,7 @@ Nine sections are reachable with `1` to `9`, Tab and Shift+Tab:
 |---|---|
 | 1 Mixer | channel sends, mix masters, stereo meters and level history; channel and user mix creation, renaming, removal and ordering |
 | 2 Matrix | the whole submixer as one grid: every channel's send into every mix, the mix masters and their meters across the top, a meter beside each channel. With height to spare a channel's meter is stereo: its name and its sends sit on a row of their own, the left bar on the row above and the right bar on the row below, so the name is centred between its two bars and each bar is centred on its letter. Where only two rows a channel fit, the name sits beside the left bar. Either way a blank row follows each channel, so its right bar never touches the next channel's left one. A short terminal keeps one row a channel and one summed bar. A microphone input, including a mono capture input, carries one bar rather than a pair of the same reading. A strip bound to another microphone shows its source, or why it is silent, on the row under its name, and a silent one's name is in the warning colour |
-| 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard and the compressor for each of the interface's inputs, headed by the channel that carries it; what feeds XLR 1 and XLR 2; each capture microphone's source, connection and carried unit controls; what runs each microphone's EQ and, on a unit that can run it, the choice between the unit and software; each microphone's noise removal, its engine and strength; each microphone's expander and compressor on this computer; software processing, headphones, direct monitor blend, hardware output routing, [ducking](#terminal-ducking) on any device, USB Aux return and, on a Wave XLR Pro, the Line In gain; each capture input's own gain and its source's mute |
+| 3 Inputs | hardware controls in grouped cards with gain arcs on a wide terminal, or a scrolling list in a small one; gain, mute, low cut, expander, voice tune and its strength, phantom power, ClipGuard, the compressor and, on a unit that has it, [raw capture](#raw-capture) for each of the interface's inputs, headed by the channel that carries it; what feeds XLR 1 and XLR 2; each capture microphone's source, connection and carried unit controls; what runs each microphone's EQ and, on a unit that can run it, the choice between the unit and software; each microphone's noise removal, its engine and strength; each microphone's expander and compressor on this computer; software processing, headphones, direct monitor blend, hardware output routing, [ducking](#terminal-ducking) on any device, USB Aux return and, on a Wave XLR Pro, the Line In gain, lock and raw capture; each capture input's own gain and its source's mute |
 | 4 Outputs | selected monitor sinks and their feeds, shared output volume, the monitoring pause (**Mute monitoring**, microphone sends also pause when enabled in Options), each sink's volume and mute, and the system default sink and source |
 | 5 Apps | every known application and its channel assignment, including the desktop's own routing |
 | 6 Inserts | the chain on each input and mix, its order, bypass and status; add a plugin from the catalogue, narrowed by typing, of those that fit the chain's width; open a plugin's native editor or edit its generated controls when the editor is blocked or refused |

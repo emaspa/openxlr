@@ -571,6 +571,9 @@ public static class ControlNames
     public const string AuxLevelLock = "auxLevelLock";       // bool
     public const string LineInGain = "lineInGain";           // int dB (0..lineInGainMaxDb)
     public const string LineInLevelLock = "lineInLevelLock"; // bool
+    public const string RawCapture = "rawCapture";           // bool, XLR 1 before the unit's processing
+    public const string RawCapture2 = "rawCapture2";         // bool, XLR 2
+    public const string LineInRawCapture = "lineInRawCapture"; // bool, Line In
 }
 
 /// <summary>

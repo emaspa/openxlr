@@ -183,8 +183,16 @@ top.
 - [ ] Hardware mixing, the next steps once the mode has run for a while:
   meters read from the unit's capture pairs, so the computer stops
   building its own copy of the mixes the unit builds; section 72 as a
-  fourth feed; XLR 1's raw capture (block 0x0001 byte 94) for the
-  computer's processing; and the unit's own meters in block 0x0002.
+  fourth feed; and the unit's own meters in block 0x0002.
+- [ ] Raw capture: an input sent to the computer before the unit's
+  processing, so the computer's chain works on the microphone as the preamp
+  gives it while the unit's own paths keep the processed one. Built for the
+  Wave XLR Pro's XLR 1, XLR 2 and Line In (block 0x0001 bytes 94, 95 and
+  97) and the Wave XLR MK.2's input (block 0x0001 byte 4), with the
+  microphone's EQ, compressor and expander moved to the computer while it is
+  on; the registers were measured on the desk on 2026-11-11, the feature is
+  owed a desk check. Byte 96 showed no effect on USB Aux and is left
+  alone.
 - [ ] The Pro's mix maximizer and channel booster, the onboard effects
   with no mapped control. The booster adds up to 12 dB above the normal
   ceiling on any input; the maximizer is per mix. Both need Wave Link

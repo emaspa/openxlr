@@ -52,6 +52,14 @@ namespace OpenXLR.Core.Devices;
 /// Only that model is driven there; the XLR Dock MK.2 and the Wave:3 MK.2
 /// have not been measured and are left alone.
 ///
+/// Block 0x0001 byte 4 bits 0 and 1 pick where the Wave XLR MK.2 takes its
+/// USB capture (<see cref="CaptureTap"/>): 00 the microphone before the
+/// unit's processing, 01 and 02 after it (desk, firmware 1.0.15,
+/// 2026-11-11). OpenXLR writes it for raw capture on that model from 1.0.15
+/// only; the XLR Dock MK.2 and the Wave:3 MK.2 share this class and were not
+/// measured, so they never get it. Bytes 1 to 3 and 5 and the byte's other
+/// bits are carried as read.
+///
 /// The XLR Dock MK.2 (<see cref="XlrDockMk2Device"/>) presents the same USB
 /// descriptor layout (five interfaces, vendor interface 3 whose alternate
 /// setting 0 has no endpoints; we never leave that setting)
@@ -83,6 +91,8 @@ public class WaveXlrMk2Device : IAudioDevice
     // How much of each block ReadState and the setters index (the highest
     // offset used, plus one); a shorter answer is refused rather than decoded.
     private const int CrossfadeUsed = 1;
+    // Block 0x0001 byte 4: the USB capture's tap in bits 0 and 1.
+    private const int CaptureTapOffset = 4;
     private const int SettingsUsed = 11;
     private const int HpUsed = 2;
 
@@ -159,6 +169,10 @@ public class WaveXlrMk2Device : IAudioDevice
     // OpenXLR sets. Nothing but OpenXLR changes it while the unit is driven.
     private byte[]? _led;
 
+    // The first firmware whose capture tap OpenXLR writes; null on a model
+    // where it was not measured, which never gets raw capture.
+    private readonly Version? _rawCaptureFirmware;
+
     // Whether OpenXLR holds the unit's gain lock, set by SetUnitGainLock
     // after each connect; a ClipGuard write keeps byte 2 bit 0x04 to it.
     private bool _gainLockHeld;
@@ -195,13 +209,17 @@ public class WaveXlrMk2Device : IAudioDevice
         ushort? alternateVIndex = null, IUsbTransport? usb = null, Version? statusFirmware = null, Version? ledFirmware = null,
         double eqMaxGain = WaveFxEq.DefaultMaxGainDb)
         : this(productId, model, vIndex, Mk2Capabilities(physicalControls, retainsSettings), WaveFxEq.Mk2EqFirmware, alternateVIndex, usb,
-            limiterModeFirmware: LimiterModeFirmware, statusFirmware: statusFirmware, ledFirmware: ledFirmware, eqMaxGain: eqMaxGain) { }
+            limiterModeFirmware: LimiterModeFirmware, statusFirmware: statusFirmware, ledFirmware: ledFirmware, eqMaxGain: eqMaxGain,
+            rawCaptureFirmware: productId == ProductId ? RawCaptureFirmware : null) { }
 
     /// <summary>The Wave XLR MK.2's and the XLR Dock MK.2's first firmware with the limiter mode and the gain lock in byte 2.</summary>
     public static Version LimiterModeFirmware { get; } = new(1, 0, 15);
 
     /// <summary>The Wave XLR MK.2's first firmware whose meter and status blocks are read: the version they were measured on.</summary>
     public static Version StatusFirmware { get; } = new(1, 0, 15);
+
+    /// <summary>The Wave XLR MK.2's first firmware whose capture tap OpenXLR writes, the version it was measured on.</summary>
+    public static Version RawCaptureFirmware { get; } = new(1, 0, 15);
 
     /// <param name="capabilities">The controls the model has; each one this
     /// class can drive and the model lacks is left out of the state and
@@ -224,15 +242,19 @@ public class WaveXlrMk2Device : IAudioDevice
     /// <param name="eqMaxGain">The widest band gain, in dB either way, the
     /// unit's EQ is written: <see cref="WaveFxEq.MeasuredMaxGainDb"/> on a
     /// model measured to it, <see cref="WaveFxEq.DefaultMaxGainDb"/> otherwise.</param>
+    /// <param name="rawCaptureFirmware">The first firmware on which block
+    /// 0x0001 byte 4 holds the capture tap OpenXLR writes for raw capture;
+    /// null for a model where it was not measured.</param>
     protected WaveXlrMk2Device(ushort productId, string model, ushort vIndex, DeviceCapabilities capabilities, Version? eqFirmware,
         ushort? alternateVIndex = null, IUsbTransport? usb = null, bool crossfadeReversed = false, byte lowCutMask = LowCutMask,
         Version? limiterModeFirmware = null, Version? statusFirmware = null, Version? ledFirmware = null,
-        double eqMaxGain = WaveFxEq.DefaultMaxGainDb)
+        double eqMaxGain = WaveFxEq.DefaultMaxGainDb, Version? rawCaptureFirmware = null)
     {
         _eqMaxGain = eqMaxGain;
         _limiterModeFirmware = limiterModeFirmware;
         _statusFirmware = statusFirmware;
         _ledFirmware = ledFirmware;
+        _rawCaptureFirmware = rawCaptureFirmware;
         _preferredVIndex = _vIndex = vIndex;
         _alternateVIndex = alternateVIndex;
         _usb = usb ?? UsbTransport.Create();
@@ -240,7 +262,7 @@ public class WaveXlrMk2Device : IAudioDevice
         _crossfadeReversed = crossfadeReversed;
         _lowCutMask = lowCutMask;
         Info = UsbTransport.WithLocation(new DeviceInfo("Elgato", model, VendorId, productId));
-        Capabilities = _modelCapabilities = capabilities with { HardwareEq = false, HardwareGainLock = false, LedRing = false };
+        Capabilities = _modelCapabilities = capabilities with { HardwareEq = false, HardwareGainLock = false, LedRing = false, RawCapture = false };
     }
 
     private static DeviceCapabilities Mk2Capabilities(bool physicalControls, bool retainsSettings) => new()
@@ -353,7 +375,8 @@ public class WaveXlrMk2Device : IAudioDevice
         _statusBlocks = version is not null && _statusFirmware is not null && version >= _statusFirmware;
         // The gain lock bit exists only in the limiter-mode layout; below it
         // 0x04 is ClipGuard off and is never written for the lock.
-        Capabilities = _modelCapabilities with { HardwareGainLock = _limiterMode };
+        bool rawCapture = version is not null && _rawCaptureFirmware is not null && version >= _rawCaptureFirmware;
+        Capabilities = _modelCapabilities with { HardwareGainLock = _limiterMode, RawCapture = rawCapture };
         if (_eqFirmware is null) return version;
         byte[]? block = null;
         EqSupport = WaveFxEq.Gate(Info.Model, version, _eqFirmware, () =>
@@ -374,6 +397,7 @@ public class WaveXlrMk2Device : IAudioDevice
             HardwareDynamics = DynamicsSupport?.Ready == true,
             HardwareGainLock = _limiterMode,
             DynamicsMeters = _statusBlocks && DynamicsSupport?.Ready == true,
+            RawCapture = rawCapture,
         };
         return version;
     }
@@ -523,6 +547,8 @@ public class WaveXlrMk2Device : IAudioDevice
             MicConnected = status?.MicConnected,
             HeadphonesConnected = status?.HeadphonesConnected,
             Led = LedLocked(),
+            RawCapture = Capabilities.RawCapture && xf.Length > CaptureTapOffset
+                ? CaptureTap.Field(xf[CaptureTapOffset]) == CaptureTap.Raw : null,
         };
     }
 
@@ -696,6 +722,30 @@ public class WaveXlrMk2Device : IAudioDevice
         }
     }
 
+    /// <summary>
+    /// Set where the unit takes its USB capture, block 0x0001 byte 4 bits 0
+    /// and 1: one read of the block and one write when the tap changes,
+    /// under the lock, no commit; the crossfade and every other byte and bit
+    /// as read. Returns the tap held before.
+    /// </summary>
+    public int SetCaptureTap(RawCaptureInput input, int tap)
+    {
+        if (input != RawCaptureInput.Xlr1 || !Capabilities.RawCapture)
+            throw new InvalidOperationException($"{Info.Model}: this unit has no raw capture OpenXLR can set on that input");
+        lock (_lock)
+        {
+            byte[] b = Read(BlockCrossfade, CrossfadeLen, CaptureTapOffset + 1);
+            int held = CaptureTap.Field(b[CaptureTapOffset]);
+            byte written = CaptureTap.With(b[CaptureTapOffset], tap);
+            if (written != b[CaptureTapOffset])
+            {
+                b[CaptureTapOffset] = written;
+                Write(BlockCrossfade, b);
+            }
+            return held;
+        }
+    }
+
     public bool SetEq(int input, DeviceEq eq)
     {
         if (input != 1 || EqSupport is not { Ready: true } support)
@@ -768,6 +818,9 @@ public class WaveXlrMk2Device : IAudioDevice
             {
                 byte[] read = Read(block, len, used: 0);
                 blocks[name] = Convert.ToHexString(read);
+                if (block == BlockCrossfade && _rawCaptureFirmware is not null && read.Length > CaptureTapOffset)
+                    blocks["usbCapture"] = (CaptureTap.Field(read[CaptureTapOffset]) == CaptureTap.Raw ? "before the unit's processing" : "processed")
+                        + $" (byte {CaptureTapOffset} {read[CaptureTapOffset]:x2})";
                 if (block == BlockSettings && _eqFirmware is not null)
                 {
                     blocks["eq"] = WaveFxEq.Decode(read) is { } eq

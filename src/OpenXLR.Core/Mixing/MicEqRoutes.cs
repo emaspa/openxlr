@@ -134,6 +134,9 @@ public sealed partial class Mixer
     /// <summary>What a unit input that did not keep a written EQ reports; its channel runs the EQ in software.</summary>
     internal const string EqDeviceFailedReason = "failed";
 
+    /// <summary>Why a unit that runs the EQ, compressor and expander leaves them to software on an input it sends raw.</summary>
+    internal const string RawCaptureReason = "rawCapture";
+
     /// <summary>A channel's EQ: what was set or recalled, else the defaults with the EQ off.</summary>
     public MicEq EqFor(string channel) { lock (_gate) return EqLocked(channel); }
 
@@ -210,16 +213,19 @@ public sealed partial class Mixer
     /// <see cref="UnitInputsLocked"/>), that unit runs the EQ and can hold
     /// the channel's (no more bands than it has, no band gain beyond its
     /// <see cref="UnitEqSupport.MaxGain"/>), the channel's choice is the
-    /// unit, no Sound Check session runs on it, and the unit has not failed
-    /// to keep the EQ for that input in this run. <paramref name="eq"/> is
-    /// asked about in place of the channel's, for a table about to replace it.
+    /// unit, no Sound Check session runs on it, the unit does not send that
+    /// input raw (<see cref="UnitEqSupport.RawCaptures"/>, whose capture the
+    /// unit's EQ never reaches), and the unit has not failed to keep the EQ
+    /// for that input in this run. <paramref name="eq"/> is asked about in
+    /// place of the channel's, for a table about to replace it.
     /// </summary>
     private EqUnitInput? EqDeviceTargetLocked(string channel, IReadOnlyDictionary<string, UnitInputStatus> carried, MicEq? eq = null)
     {
         if (_eqPort is null || !IsMicrophoneId(channel) || EqProcessingLocked(channel) != MicEqProcessing.Device) return null;
         if (_soundCheckClaim == channel || _soundCheck is not null && _soundCheckChannel == channel) return null;
         if (!EqCarrierLocked(channel, carried, out UnitInputStatus? unit, out UnitEqSupport? support) || !support.Ready
-            || !support.Holds(eq ?? EqLocked(channel))) return null;
+            || !support.Holds(eq ?? EqLocked(channel))
+            || support.RawCaptures(unit.Input)) return null;
         var target = new EqUnitInput(unit.Unit, unit.Input);
         return _eqDeviceFailed.ContainsKey(target.Key) ? null : target;
     }
@@ -734,6 +740,12 @@ public sealed partial class Mixer
     {
         if (!IsMicrophoneId(channel) || !EqCarrierLocked(channel, carried, out UnitInputStatus? unit, out UnitEqSupport? support)) return null;
         string? failure = _eqDeviceFailed.GetValueOrDefault(new EqUnitInput(unit.Unit, unit.Input).Key);
+        if (support.Ready && failure is null && support.RawCaptures(unit.Input))
+            return new MicEqDevice(unit.Unit, unit.Input, support.Name, support.Firmware, false, RawCaptureReason,
+                $"The {support.Name} sends this input to the computer before its own processing (raw capture), so the EQ runs in software.")
+            {
+                MinimumFirmware = support.MinimumFirmware,
+            };
         return new MicEqDevice(unit.Unit, unit.Input, support.Name, support.Firmware, support.Ready && failure is null,
             failure is null ? support.Reason : EqDeviceFailedReason, failure is null ? support.Note : $"The {support.Name} {failure}, so the EQ runs in software.")
         {

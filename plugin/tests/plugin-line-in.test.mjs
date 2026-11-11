@@ -92,6 +92,16 @@ test("the Line In dial turns the Pro's Line In gain and mutes its channel", asyn
     host.receive({event:"keyDown",context:"line-lock"});
     assert.deepEqual(daemon.messages.at(-1), {cmd:"set",control:"lineInLevelLock",value:false});
 
+    // Line In's raw capture key, on a unit that has raw capture.
+    state.capabilities.rawCapture = true;
+    state.state.lineInRawCapture = false;
+    daemon.receive(state);
+    host.receive({event:"willAppear",context:"line-raw",action:"com.emaspa.openxlr.toggle",payload:{settings:{target:"lineInRawCapture"}}});
+    host.receive({event:"titleParametersDidChange",context:"line-raw",payload:{title:""}});
+    assert.ok(keyImage("line-raw").includes(">Raw</text>"));
+    host.receive({event:"keyDown",context:"line-raw"});
+    assert.deepEqual(daemon.messages.at(-1), {cmd:"set",control:"lineInRawCapture",value:true});
+
     // A unit without the input: the dial says so and sends nothing, and so does the key.
     state.capabilities.lineInput = false;
     daemon.receive(state);

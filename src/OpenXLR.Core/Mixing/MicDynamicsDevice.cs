@@ -6,8 +6,9 @@ namespace OpenXLR.Core.Mixing;
 /// Where the compressor and the expander of XLR 1 and XLR 2 run, by the
 /// rule the EQ follows: on the unit's own DSP when the channel carries a
 /// unit's input, that unit runs them (<see cref="UnitEqSupport.Dynamics"/>),
-/// the channel's choice is <c>device</c>, no Sound Check session runs on it
-/// and the unit has kept what was written to it; otherwise in the software
+/// the channel's choice is <c>device</c>, no Sound Check session runs on it,
+/// the unit does not send that input raw and the unit has kept what was
+/// written to it; otherwise in the software
 /// stage. One choice covers both, since the unit holds them in one struct. A
 /// capture input's always run in software.
 ///
@@ -87,7 +88,8 @@ public sealed partial class Mixer
     {
         if (_eqPort is null || !IsMicrophoneId(channel) || DynamicsProcessingLocked(channel) != UnitDynamics.Device) return null;
         if (_soundCheckClaim == channel || _soundCheck is not null && _soundCheckChannel == channel) return null;
-        if (!EqCarrierLocked(channel, carried, out UnitInputStatus? unit, out UnitEqSupport? support) || support.Dynamics is not { Ready: true })
+        if (!EqCarrierLocked(channel, carried, out UnitInputStatus? unit, out UnitEqSupport? support) || support.Dynamics is not { Ready: true }
+            || support.RawCaptures(unit.Input))
             return null;
         var target = new EqUnitInput(unit.Unit, unit.Input);
         return _dynamicsDeviceFailed.ContainsKey(DynamicsKey(target)) ? null : target;
@@ -230,6 +232,12 @@ public sealed partial class Mixer
         if (!IsMicrophoneId(channel) || !EqCarrierLocked(channel, carried, out UnitInputStatus? unit, out UnitEqSupport? support)
             || support.Dynamics is not { } dynamics) return null;
         string? failure = _dynamicsDeviceFailed.GetValueOrDefault(DynamicsKey(new EqUnitInput(unit.Unit, unit.Input)));
+        if (dynamics.Ready && failure is null && support.RawCaptures(unit.Input))
+            return new MicEqDevice(unit.Unit, unit.Input, support.Name, support.Firmware, false, RawCaptureReason,
+                $"The {support.Name} sends this input to the computer before its own processing (raw capture), so the compressor and expander run in software.")
+            {
+                MinimumFirmware = support.MinimumFirmware,
+            };
         return new MicEqDevice(unit.Unit, unit.Input, support.Name, support.Firmware, dynamics.Ready && failure is null,
             failure is null ? dynamics.Reason : EqDeviceFailedReason,
             failure is null ? dynamics.Note : $"The {support.Name} {failure}, so the compressor and expander run in software.")

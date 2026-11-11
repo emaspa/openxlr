@@ -700,6 +700,7 @@ public sealed partial class DeviceManager : BackgroundService
             ConnectDuckingLocked(dev);
             ConnectUnitGainLockLocked(dev);
             ConnectLedLocked(dev);
+            ConnectRawCaptureLocked(dev);
             if (dev.EqSupport is { Ready: false } eqSupport && eqSupport.Note is { } eqNote)
                 _log.LogInformation("{dev}: {note}", dev.Info.DisplayName, eqNote);
             if (_unansweredId is not null && _unansweredId != dev.Info.InstanceId) ClearUnansweredLocked();
@@ -1157,6 +1158,9 @@ public sealed partial class DeviceManager : BackgroundService
                     case ControlNames.AuxLevelLock: _device.SetAuxLevelLock(value.GetBoolean()); break;
                     case ControlNames.LineInGain: lineInWritten = _device.SetLineInGainDb(value.GetInt32()); break;
                     case ControlNames.LineInLevelLock: _device.SetLineInLevelLock(value.GetBoolean()); break;
+                    case ControlNames.RawCapture or ControlNames.RawCapture2 or ControlNames.LineInRawCapture:
+                        SetRawCaptureLocked(_device, RawCaptureControl(control)!.Value, value.GetBoolean());
+                        break;
                     case "hp2VolumeDb": _device.SetHp2VolumeDb(value.GetDouble()); break;
                     case "gain2":
                         if (GainIsLocked) return "gain is locked";
@@ -1232,6 +1236,8 @@ public sealed partial class DeviceManager : BackgroundService
                 ControlNames.OutLineOut => c.OutputRouting,
             ControlNames.AuxLevelDb or ControlNames.AuxLevelLock => c.AuxInput,
             ControlNames.LineInGain or ControlNames.LineInLevelLock => c.LineInput,
+            ControlNames.RawCapture or ControlNames.RawCapture2 or ControlNames.LineInRawCapture
+                => RawCaptureSupported(c, RawCaptureControl(control)!.Value),
             "gain2" => c.Gain && c.XlrInputs > 1,
             "mute2" => c.Mute && c.XlrInputs > 1,
             "lowCut2" => c.LowCut && c.XlrInputs > 1,
@@ -1531,6 +1537,7 @@ public sealed partial class DeviceManager : BackgroundService
                 MaxGain = support.MaxGain,
                 Dynamics = dev.DynamicsSupport,
                 DynamicsLevels = dev.Capabilities.DynamicsMeters,
+                RawCaptureInputs = RawCaptureMicsLocked(),
             }
             : null;
         // A unit that answered a poll but not the ducking block cannot run it.

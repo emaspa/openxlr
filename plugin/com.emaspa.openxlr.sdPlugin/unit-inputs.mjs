@@ -16,6 +16,7 @@ const UNIT_CONTROLS = {
   voiceTune: [1, "Voice Tune"], voiceTune2: [2, "Voice Tune"],
   clipGuard: [1, "ClipGuard"], clipGuard2: [2, "ClipGuard"],
   compressor: [1, "Comp"], compressor2: [2, "Comp"],
+  rawCapture: [1, "Raw"], rawCapture2: [2, "Raw"],
 };
 const UNIT_DIALS = { gain: 1, gain2: 2 };
 
@@ -205,6 +206,8 @@ export function deviceTargetSupported(capabilities, target) {
   if (!c || typeof c !== "object") return false;
   if (unitInputOf(target) === 2 && (c.xlrInputs ?? 1) < 2) return false;
   if (target === "hp2" && (c.hpOutputs ?? 1) < 2) return false;
+  // Line In sent to the computer as it arrives: a unit with raw capture and the input.
+  if (target === "lineInRawCapture") return c.rawCapture === true && c.lineInput === true;
   const capability = {
     gain: "gain", gain2: "gain", mute: "mute", mute2: "mute",
     phantom: "phantom", phantom2: "phantom", lowCut: "lowCut", lowCut2: "lowCut",
@@ -217,6 +220,7 @@ export function deviceTargetSupported(capabilities, target) {
     outHp1: "outputRouting", outHp2: "outputRouting",
     outLineOut: "outputRouting", auxLevel: "auxInput", auxLevelLock: "auxInput",
     lineIn: "lineInput", lineInLevelLock: "lineInput",
+    rawCapture: "rawCapture", rawCapture2: "rawCapture",
   }[target];
   return capability ? c[capability] === true : target === "gainLocked";
 }

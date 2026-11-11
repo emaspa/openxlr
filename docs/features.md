@@ -32,6 +32,14 @@ Wave XLR Pro:
   [hardware-support.md](hardware-support.md))
 - Line In level lock, which keeps the desktop mixer and other
   applications from changing the Line In gain
+- Raw capture on XLR 1, XLR 2 and Line In (firmware 1.0.14): the unit
+  sends the input to the computer before its own low cut, compressor,
+  expander and Voice Tune (Line In before its ducking), while its own
+  paths and mixes keep the processed signal. The microphone's EQ,
+  compressor and expander then run on this computer. Held per input and
+  written again at each connect
+  ([manual](manual.md#raw-capture), [api.md](api.md#raw-capture)); the
+  register was measured on the desk unit, the feature not yet run there
 - Both headphone outputs: independent volumes, low-impedance mode
 - Mic/PC direct-monitor crossfade (inside the device, no host latency)
 - Physical output routing: Headphones 1, Headphones 2, Line Out and USB
@@ -67,6 +75,8 @@ that carries its microphone while none is) and the levels of the
 compressor and expander it runs, read from its status and meter blocks
 ([layout](hardware-support.md#mk2-meter-status)). OpenXLR reads neither
 block on the XLR Dock MK.2 until their layout is checked there.
+The Wave XLR MK.2 on firmware 1.0.15 also has raw capture, as the Pro's
+inputs do; the XLR Dock MK.2 was not measured and does not offer it.
 
 Wave XLR: gain, mute, headphone volume, low impedance, phantom power.
 The desktop's volume controls follow the interface's gain, mute and

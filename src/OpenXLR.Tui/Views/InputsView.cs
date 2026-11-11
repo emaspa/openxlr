@@ -176,6 +176,10 @@ internal sealed class InputsView : View
             // Holds the gain against the desktop mixer; this row's own writes still apply.
             rows.Add(new ToggleRow("Level lock", state.Flag("lineInLevelLock"),
                 value => Set(link, "lineInLevelLock", value)));
+            // Line In sent to the computer as it arrives, before the unit's ducking.
+            if (state.Can("rawCapture"))
+                rows.Add(new ToggleRow("Raw capture", state.Flag("lineInRawCapture"),
+                    value => Set(link, "lineInRawCapture", value)));
         }
 
         return rows;
@@ -219,6 +223,10 @@ internal sealed class InputsView : View
             value => Write($"clipGuard{suffix}", value)) { Enabled = state.Can("clipGuard"), DisabledText = off });
         rows.Add(new ToggleRow("Compressor", state.Flag($"compressor{suffix}"),
             value => Write($"compressor{suffix}", value)) { Enabled = state.Can("compressor"), DisabledText = off });
+        // The input sent to the computer before the unit's processing; only on a unit that has it.
+        if (state.Can("rawCapture"))
+            rows.Add(new ToggleRow("Raw capture", state.Flag($"rawCapture{suffix}"),
+                value => Write($"rawCapture{suffix}", value)));
     }
 
     /// <summary>

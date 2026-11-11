@@ -127,6 +127,17 @@ public interface IAudioDevice : IDisposable
     /// <exception cref="InvalidOperationException">The unit has no LEDs OpenXLR can set, or a transfer failed.</exception>
     bool SetLed(DeviceLedChange change) => throw new InvalidOperationException("this unit has no LEDs OpenXLR can set");
 
+    /// <summary>
+    /// Set where the unit takes one input's USB capture (<see cref="CaptureTap"/>):
+    /// <see cref="CaptureTap.Raw"/> for the input before the unit's
+    /// processing, 1 to 3 for points after it. One read of the block and one
+    /// write when the tap changes, every other bit and byte as read. Returns
+    /// the tap the unit held before. A unit whose capabilities report
+    /// <see cref="DeviceCapabilities.RawCapture"/> overrides it.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The unit has no capture tap OpenXLR drives for that input, or a transfer failed.</exception>
+    int SetCaptureTap(RawCaptureInput input, int tap) => throw new InvalidOperationException("this unit has no raw capture");
+
     // The microphone EQ on the unit's own DSP. Default no-ops, like the
     // second-input setters; a unit whose capabilities report HardwareEq
     // overrides them.
@@ -343,6 +354,17 @@ public sealed record DeviceCapabilities
     /// version was not read.
     /// </summary>
     public bool LedRing { get; init; }
+
+    /// <summary>
+    /// The unit can send the computer its inputs before its own processing
+    /// (raw capture, <see cref="CaptureTap"/>): each XLR input, and Line In
+    /// on a model with <see cref="LineInput"/>. The Wave XLR Pro from
+    /// firmware 1.0.14 and the Wave XLR MK.2 from firmware 1.0.15, measured
+    /// on the desk on those versions. False on every other model, the XLR
+    /// Dock MK.2 and the Wave:3 MK.2 included, on older firmware and on a
+    /// unit whose version was not read.
+    /// </summary>
+    public bool RawCapture { get; init; }
 
     /// <summary>
     /// The unit ducks its own outputs while the key input is loud and the

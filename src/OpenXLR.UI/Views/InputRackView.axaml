@@ -122,6 +122,8 @@
                     <ToggleButton Name="RackPhantom" Content="{loc:Text Key=Phantom}" IsChecked="{Binding Main.Phantom, Mode=TwoWay}" IsVisible="{Binding Main.CapPhantom}"/>
                     <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding Main.ClipGuard, Mode=TwoWay}" IsVisible="{Binding Main.CapClipGuard}"/>
                     <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Main.Compressor, Mode=TwoWay}" IsVisible="{Binding Main.CapCompressor}"/>
+                    <ToggleButton Content="{loc:Text Key=RawCapture}" IsChecked="{Binding Main.RawCapture, Mode=TwoWay}" IsVisible="{Binding Main.CapRawCapture}"
+                                  ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
                   </WrapPanel>
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" IsVisible="{Binding Main.VoiceTune}">
                     <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
@@ -255,6 +257,8 @@
                     <ToggleButton Content="{loc:Text Key=Phantom}" IsChecked="{Binding Main.Phantom2, Mode=TwoWay}"/>
                     <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding Main.ClipGuard2, Mode=TwoWay}"/>
                     <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Main.Compressor2, Mode=TwoWay}"/>
+                    <ToggleButton Content="{loc:Text Key=RawCapture}" IsChecked="{Binding Main.RawCapture2, Mode=TwoWay}" IsVisible="{Binding Main.CapRawCapture2}"
+                                  ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
                   </WrapPanel>
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" IsVisible="{Binding Main.VoiceTune2}">
                     <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
@@ -407,6 +411,8 @@
               </StackPanel>
               <StackPanel layout:StripPanel.Part="hardware-controls" Classes="dev" IsVisible="{Binding Main.CapLineInput}">
                 <ToggleButton Name="RackLineInLock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding Main.LineInLevelLock, Mode=TwoWay}" HorizontalAlignment="Left"/>
+                <ToggleButton Name="RackLineInRawCapture" Content="{loc:Text Key=RawCapture}" IsChecked="{Binding Main.LineInRawCapture, Mode=TwoWay}"
+                              IsVisible="{Binding Main.CapLineInRawCapture}" HorizontalAlignment="Left" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>
               </StackPanel>
             </layout:StripPanel>
           </DockPanel>
@@ -498,6 +504,8 @@
                     <ToggleButton Content="{loc:Text Key=Phantom}" IsChecked="{Binding Unit.Phantom, Mode=TwoWay}" IsVisible="{Binding Unit.CapPhantom, FallbackValue=False}"/>
                     <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding Unit.ClipGuard, Mode=TwoWay}" IsVisible="{Binding Unit.CapClipGuard, FallbackValue=False}"/>
                     <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Unit.Compressor, Mode=TwoWay}" IsVisible="{Binding Unit.CapCompressor, FallbackValue=False}"/>
+                    <ToggleButton Content="{loc:Text Key=RawCapture}" IsChecked="{Binding Unit.RawCapture, Mode=TwoWay}" IsVisible="{Binding Unit.CapRawCapture, FallbackValue=False}"
+                                  ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
                   </WrapPanel>
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" IsVisible="{Binding Unit.VoiceTune, FallbackValue=False}">
                     <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>

@@ -51,8 +51,9 @@ public static class DeviceStateStore
     /// A snapshot without the daemon's own stamps (gain lock, phantom
     /// settling), which describe the daemon at the time, not the hardware,
     /// without the unit's own gain lock, which follows the daemon's,
-    /// without what is plugged into the unit, which is read, never set, and
-    /// without its LEDs, which the daemon keeps per unit in a file of their own.
+    /// without what is plugged into the unit, which is read, never set,
+    /// without its LEDs, which the daemon keeps per unit in a file of their own,
+    /// and without raw capture, which the daemon holds by its own setting.
     /// </summary>
     public static DeviceState Hardware(DeviceState s) => s with
     {
@@ -61,6 +62,9 @@ public static class DeviceStateStore
         MicConnected = null,
         HeadphonesConnected = null,
         Led = null,
+        RawCapture = null,
+        RawCapture2 = null,
+        LineInRawCapture = null,
         PhantomSettling = false,
         PhantomSettling2 = false,
         PhantomSettleSeconds = 0,
