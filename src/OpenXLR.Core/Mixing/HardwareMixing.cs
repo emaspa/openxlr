@@ -124,6 +124,13 @@ public sealed record HardwareMixingSetup
 
     /// <summary><c>hardwareSections</c> as saved: feed to section start.</summary>
     public IReadOnlyDictionary<string, int> SavedSections { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>
+    /// The return pairs the running plan holds, by unit input: an input that
+    /// still needs one keeps it while it is free of a kept channel pair.
+    /// Never saved, so empty while the mode does not run.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> HeldReturns { get; init; } = new Dictionary<string, int>();
 }
 
 /// <summary>A level the unit cannot play as the faders set it: the cell holds it at the ceiling.</summary>
@@ -172,7 +179,7 @@ public sealed record HardwareMixingPlan
     /// <summary>One sentence for the reason, or null.</summary>
     public string? Note { get; init; }
 
-    /// <summary>Channel id to USB playback pair, for every channel that streams on one.</summary>
+    /// <summary>Channel id to USB playback pair, for every channel that streams on one (see <see cref="Unpaired"/>).</summary>
     public IReadOnlyDictionary<string, int> Pairs { get; init; } = new Dictionary<string, int>();
     /// <summary>
     /// A unit input software processes, to the pair its processed audio plays
@@ -183,6 +190,13 @@ public sealed record HardwareMixingPlan
     public IReadOnlyDictionary<string, int> ReturnPairs { get; init; } = new Dictionary<string, int>();
     /// <summary>The pair soundboard auditions play on, a member of the jacks' sections only; null when none is free.</summary>
     public int? CuePair { get; init; }
+    /// <summary>
+    /// The channels that need a pair and found none, every pair being held
+    /// by another channel or a return pair: the unit's mixes leave them out,
+    /// with a <c>pair:&lt;id&gt;</c> note. Empty over the budget, where the
+    /// mode does not run.
+    /// </summary>
+    public IReadOnlyList<string> Unpaired { get; init; } = [];
     /// <summary>
     /// Feed to section start, for every feed a selected jack plays, and the
     /// Aux mix to section 36 while the USB Aux port plays it.
@@ -212,7 +226,8 @@ public sealed record HardwareMixingPlan
 /// the Aux mix in section 36 while the USB Aux port is on. Every channel the
 /// unit cannot take raw streams on a USB playback pair of its own: pair 0
 /// System, 1 Game, 2 Music, 3 Browser, 4 Voice Chat, 6 SFX, then 7 and 5 for
-/// the channels beyond those. Pair 5 carried the Aux mix's stream before the
+/// the channels beyond those, after the return pairs of processed inputs
+/// (see <see cref="Allocate"/>). Pair 5 carried the Aux mix's stream before the
 /// unit built the Aux mix; in the mode nothing of the computer's plays there.
 /// The unit's own inputs (XLR 1, XLR 2, USB Aux, Line In) are sources of
 /// their own, and Aux In never joins the Aux mix's section, which would send
@@ -266,22 +281,22 @@ public static class HardwareMixingPlanner
     public static HardwareMixingPlan Plan(HardwareMixingSetup setup)
     {
         (string? reason, string? note) = Eligibility(setup);
-        List<ChannelDefinition> needing = [.. setup.Channels.Where(c => !setup.UnitSources.Values.Contains(c.Id))];
-        Dictionary<string, int> pairs = [];
-        if (needing.Count > ChannelPairs.Count)
+        List<string> needing = [.. setup.Channels.Where(c => !setup.UnitSources.Values.Contains(c.Id)).Select(c => c.Id)];
+        bool fits = needing.Count <= ChannelPairs.Count;
+        if (!fits)
         {
             reason ??= "budget";
             note ??= BudgetNote(needing.Count);
         }
-        else pairs = AllocatePairs(needing.Select(c => c.Id), setup.SavedPairs);
-        (Dictionary<string, int> returns, int? cue) = pairs.Count == needing.Count ? Claim(setup, pairs) : ([], null);
+        (Dictionary<string, int> pairs, Dictionary<string, int> returns, int? cue) = fits ? Allocate(setup, needing) : ([], [], null);
+        List<string> unpaired = fits ? [.. needing.Where(c => !pairs.ContainsKey(c))] : [];
 
         Dictionary<string, int> sections = AllocateSections(setup.Jacks.Select(j => j.Feed).Distinct(), setup.SavedSections);
         var jacks = setup.Jacks.ToDictionary(j => j.Jack, j => sections[j.Feed], StringComparer.Ordinal);
         if (AuxMixOf(setup) is { } aux) sections[aux.Id] = AuxSection;
         var clamped = new List<HardwareMixingClamp>();
         var content = new List<HardwareSectionContent>();
-        if (pairs.Count == needing.Count)
+        if (fits)
             foreach ((string feed, int section) in sections.OrderBy(p => p.Value))
                 content.Add(Build(setup, feed, section, pairs, returns, cue, clamped));
 
@@ -293,11 +308,12 @@ public static class HardwareMixingPlanner
             Pairs = pairs,
             ReturnPairs = returns,
             CuePair = cue,
+            Unpaired = unpaired,
             Sections = sections,
             Jacks = jacks,
             Content = content,
             Clamped = clamped,
-            Disabled = Disabled(setup, sections.Keys, pairs, returns, cue),
+            Disabled = Disabled(setup, sections.Keys, pairs, returns, cue, unpaired),
             // A dry input plays raw on the jacks, so it gains what any unit input does.
             EntryOffsetsDb = setup.Jacks.ToDictionary(j => j.Jack,
                 j => EntryOffsetDb(setup, j.Feed, returns.Keys.Where(c => !DryOn(setup, c, j.Feed))), StringComparer.Ordinal),
@@ -327,46 +343,50 @@ public static class HardwareMixingPlanner
         => firmware is not null && Version.TryParse(firmware, out Version? version) && version >= MinimumFirmware;
 
     /// <summary>
-    /// A pair for every channel that needs one, in layout order: the saved
-    /// pair when it is a channel pair and still free, then the channel's
-    /// default, then the first free pair in <see cref="ChannelPairs"/> order.
-    /// The caller has checked the budget.
+    /// The pairs of the channels that need one, the return pairs and the cue
+    /// (plan, section 3.2), in this order. A channel first keeps its saved
+    /// pair while that is a channel pair and still free, and a unit input
+    /// software processes keeps the return pair the running plan holds for
+    /// it. Then a built-in channel takes its default while free, and each
+    /// other processed unit input, in source order, claims the first free
+    /// pair for its processed audio. Any channel still without a pair then
+    /// takes the first free one, in layout order, and the cue takes the
+    /// first pair left, for auditions. A pair a channel holds is never taken from it,
+    /// so an input whose processing starts later finds none and reaches the
+    /// unit's mixes raw, with a note. A return pair is never handed to a
+    /// channel that holds none, so such a channel added while every pair is
+    /// in use gets none and stays out of the unit's mixes, with a note. An
+    /// input every jack hears dry needs its return only for the Aux mix's
+    /// section, so it claims none while the unit builds no Aux mix. The
+    /// caller has checked the budget.
     /// </summary>
-    internal static Dictionary<string, int> AllocatePairs(IEnumerable<string> channels, IReadOnlyDictionary<string, int> saved)
+    internal static (Dictionary<string, int> Pairs, Dictionary<string, int> Returns, int? Cue) Allocate(HardwareMixingSetup setup, IReadOnlyList<string> channels)
     {
-        List<string> order = [.. channels];
         var pairs = new Dictionary<string, int>(StringComparer.Ordinal);
         var taken = new HashSet<int>();
-        foreach (string channel in order)
-            if (saved.TryGetValue(channel, out int pair) && ChannelPairs.Contains(pair) && taken.Add(pair)) pairs[channel] = pair;
-        foreach (string channel in order.Where(c => !pairs.ContainsKey(c)))
-            if (DefaultPairs.TryGetValue(channel, out int pair) && taken.Add(pair)) pairs[channel] = pair;
-        foreach (string channel in order.Where(c => !pairs.ContainsKey(c)))
-        {
-            int free = ChannelPairs.First(p => !taken.Contains(p));
-            taken.Add(free);
-            pairs[channel] = free;
-        }
-        return pairs;
-    }
-
-    /// <summary>
-    /// The pairs no channel takes, claimed on demand in order (plan, section
-    /// 3.2): first each unit input software processes, in source order, for
-    /// its processed audio; then the cue, for auditions. Channels come first
-    /// and keep their pairs, so a channel added later takes a pair from these
-    /// claims, and the claim it takes falls back (the input raw, auditions
-    /// refused) with a note. An input every jack hears dry needs its return
-    /// only for the Aux mix's section, so it claims none while the unit
-    /// builds no Aux mix.
-    /// </summary>
-    internal static (Dictionary<string, int> Returns, int? Cue) Claim(HardwareMixingSetup setup, IReadOnlyDictionary<string, int> pairs)
-    {
-        Queue<int> free = new(FreePairs(pairs.Values));
+        foreach (string channel in channels)
+            if (setup.SavedPairs.TryGetValue(channel, out int pair) && ChannelPairs.Contains(pair) && taken.Add(pair)) pairs[channel] = pair;
         var returns = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach ((int _, string channel) in setup.UnitSources.OrderBy(s => s.Key))
-            if (NeedsReturn(setup, channel) && !returns.ContainsKey(channel) && free.TryDequeue(out int pair)) returns[channel] = pair;
-        return (returns, free.TryDequeue(out int cue) ? cue : null);
+            if (NeedsReturn(setup, channel) && !returns.ContainsKey(channel)
+                && setup.HeldReturns.TryGetValue(channel, out int held) && ChannelPairs.Contains(held) && taken.Add(held))
+                returns[channel] = held;
+        foreach (string channel in channels.Where(c => !pairs.ContainsKey(c)))
+            if (DefaultPairs.TryGetValue(channel, out int pair) && taken.Add(pair)) pairs[channel] = pair;
+        foreach ((int _, string channel) in setup.UnitSources.OrderBy(s => s.Key))
+            if (NeedsReturn(setup, channel) && !returns.ContainsKey(channel) && FreePairs(taken).FirstOrDefault(-1) is int back and >= 0)
+            {
+                taken.Add(back);
+                returns[channel] = back;
+            }
+        foreach (string channel in channels.Where(c => !pairs.ContainsKey(c)))
+            if (FreePairs(taken).FirstOrDefault(-1) is int free and >= 0)
+            {
+                taken.Add(free);
+                pairs[channel] = free;
+            }
+        int? cue = FreePairs(taken).FirstOrDefault(-1) is int left and >= 0 ? left : null;
+        return (pairs, returns, cue);
     }
 
     /// <summary>Whether a unit input's processed audio has a section to play in: it is processed, and heard processed on the jacks or in the Aux mix.</summary>
@@ -615,6 +635,9 @@ public static class HardwareMixingPlanner
         return Math.Max(ProJackLevels.DbOf(240), Math.Round(leaving * 4, MidpointRounding.AwayFromZero) / 4);
     }
 
+    /// <summary>The <c>disabled</c> key of a channel that needs a USB pair and found none, which the unit's mixes leave out.</summary>
+    public static string UnpairedDisabledKey(string channel) => "pair:" + channel;
+
     /// <summary>The <c>disabled</c> key of a mix the unit builds only summed with another, which runs no maximizer.</summary>
     public static string MaximizerDisabledKey(string mix) => "maximizer:" + mix;
 
@@ -634,7 +657,7 @@ public static class HardwareMixingPlanner
 
     /// <summary>The fixed keys of what the mode turns off for this layout, with each sentence.</summary>
     private static Dictionary<string, string> Disabled(HardwareMixingSetup setup, IEnumerable<string> feeds,
-        IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> returns, int? cue)
+        IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> returns, int? cue, IReadOnlyList<string> unpaired)
     {
         var disabled = new SortedDictionary<string, string>(StringComparer.Ordinal);
         HashSet<string> unitMixes = [.. feeds.SelectMany(MonitorFeed.Parts)];
@@ -664,6 +687,8 @@ public static class HardwareMixingPlanner
         foreach (string channel in setup.UnitSources.Values.Where(c => NeedsReturn(setup, c) && !returns.ContainsKey(c)))
             disabled[$"processedMic:{channel}"] =
                 $"The Wave XLR Pro's mixes take {NameOf(channel)} as it comes in, without the processing on this computer: no USB pair is free to play it back.";
+        foreach (string channel in unpaired)
+            disabled[UnpairedDisabledKey(channel)] = $"The mixes the Wave XLR Pro builds leave {NameOf(channel)} out: every USB pair is in use.";
         // Mic setup plays the take back through the channel, so a unit
         // microphone under it needs a pair: its return pair, a free one, or
         // the cue's, which a processed input claims before the cue.

@@ -165,6 +165,7 @@ public sealed partial class Mixer
             AuxPort = _auxPortEnabled,
             SavedPairs = new Dictionary<string, int>(_hardwarePairs, StringComparer.Ordinal),
             SavedSections = new Dictionary<string, int>(_hardwareSections, StringComparer.Ordinal),
+            HeldReturns = _hardwarePlan is { Active: true } running ? running.ReturnPairs : new Dictionary<string, int>(),
             Section0LevelDb = section0LevelDb,
         };
     }
@@ -351,6 +352,10 @@ public sealed partial class Mixer
     private bool KeepHardwareMapsLocked(IReadOnlyDictionary<string, int> pairs, IReadOnlyDictionary<string, int> sections)
     {
         bool changed = false;
+        // A channel no longer in the layout keeps no pair: one made later
+        // under its id would otherwise take a pair a return pair holds.
+        foreach (string gone in _hardwarePairs.Keys.Where(c => !_config.Channels.Any(d => d.Id == c)).ToList())
+            changed |= _hardwarePairs.Remove(gone);
         foreach ((string channel, int pair) in pairs)
             if (!_hardwarePairs.TryGetValue(channel, out int was) || was != pair)
             {

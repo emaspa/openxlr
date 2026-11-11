@@ -25,6 +25,9 @@ public sealed class LayoutRollbackTests
         var levels = Field<Dictionary<string, double>>("_levels");
         foreach (string cell in cells) levels[cell] = .4;
         Field<HashSet<string>>("_muted").Add("game|chat");
+        // The pair hardware mixing kept for the channel leaves the saved file
+        // with it, and comes back when the deletion is not saved.
+        Field<Dictionary<string, int>>("_hardwarePairs")["game"] = 1;
         Set("_built", true);
         try
         {
@@ -39,6 +42,7 @@ public sealed class LayoutRollbackTests
                 Assert.Equal(4, cells.Count);
                 Assert.Equal(.4, levels["game|chat"]);
                 Assert.Contains("game|chat", Field<HashSet<string>>("_muted"));
+                Assert.Equal(1, mixer.ExportSettings().HardwarePairs["game"]);
             }
         }
         finally { Set("_built", false); } // The fixture never created an audio graph.
@@ -46,6 +50,7 @@ public sealed class LayoutRollbackTests
         string? Persist(MixerSettings settings)
         {
             Assert.DoesNotContain("game|chat", settings.Levels.Keys);
+            Assert.Equal(!removeMix, !settings.HardwarePairs.ContainsKey("game"));
             if (throws) throw new IOException("disk full");
             return "disk full";
         }
