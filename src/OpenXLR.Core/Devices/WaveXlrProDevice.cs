@@ -25,6 +25,13 @@ namespace OpenXLR.Core.Devices;
 /// values there on both inputs, so it is driven the same way, behind the
 /// EQ's gate and only when both inputs' fields decode; that its DSP runs
 /// them from these bytes is inferred and not yet heard.
+///
+/// Block 0x0001 bytes 94, 95 and 97 pick where the unit takes the USB
+/// capture of XLR 1, XLR 2 and Line In (<see cref="CaptureTap"/>). OpenXLR
+/// writes them for raw capture from firmware 1.0.14, the version they were
+/// measured on, one byte at a time under the lock <see cref="WriteMix"/>
+/// takes, so neither write loses the other's bytes. The mixes keep their own
+/// taps at s+15, which raw capture never touches.
 /// </summary>
 public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 {
@@ -104,7 +111,8 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 
     // Block 0x0001, the unit's mixes and output selectors, is read and
     // written through ProMixPlan (today's mode) and decoded for
-    // diagnostics by ProMixSections; nothing else here writes it.
+    // diagnostics by ProMixSections; the capture taps at bytes 94, 95 and
+    // 97 are the one other write, SetCaptureTap, under the same lock.
 
     // Flag masks in block 0x0004 offset 1 (all confirmed via the logged
     // capture 2 and, for mute, bidirectionally against ALSA).
@@ -121,6 +129,9 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
 
     // Flag mask in block 0x0005 offset 1.
     private const byte LowZMask = 0x02;      // bit1
+
+    /// <summary>The first firmware whose capture taps OpenXLR writes, the version they were measured on.</summary>
+    public static Version RawCaptureFirmware { get; } = new(1, 0, 14);
 
     public const int GainMaxDb = 80;
     // The Line In takes 0 to 80 dB like the XLR inputs, but it hisses above
@@ -209,7 +220,12 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         // Each input's compressor and expander, in the same struct as its EQ.
         DynamicsSupport = WaveFxDynamics.Gate(Info.Model, EqSupport,
             () => WaveFxDynamics.Decodes(DynamicsOf(block!, 1)) && WaveFxDynamics.Decodes(DynamicsOf(block!, 2)));
-        Capabilities = ModelCapabilities with { HardwareEq = EqSupport.Ready, HardwareDynamics = DynamicsSupport.Ready };
+        Capabilities = ModelCapabilities with
+        {
+            HardwareEq = EqSupport.Ready,
+            HardwareDynamics = DynamicsSupport.Ready,
+            RawCapture = version is not null && version >= RawCaptureFirmware,
+        };
     }
 
     private static DeviceEq? EqOf(byte[] settings, int input)
@@ -316,8 +332,14 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             AuxLevelLock = (b4[AuxLevelLockOffset] & AuxLevelLockMask) != 0,
             LineInGainDb = b4[LineInGainOffset],
             LineInLevelLock = (b4[LineInLevelLockOffset] & LineInLevelLockMask) != 0,
+            RawCapture = RawCaptureOf(b1, RawCaptureInput.Xlr1),
+            RawCapture2 = RawCaptureOf(b1, RawCaptureInput.Xlr2),
+            LineInRawCapture = RawCaptureOf(b1, RawCaptureInput.LineIn),
         };
     }
+
+    private bool? RawCaptureOf(byte[] b1, RawCaptureInput input)
+        => Capabilities.RawCapture ? CaptureTap.Field(b1[ProMixSections.CaptureTapOffsetOf(input)]) == CaptureTap.Raw : null;
 
     // --- setters (read-modify-write a single field) ---
 
@@ -454,6 +476,34 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
             {
                 Change5 = b5 is null || new5.AsSpan().SequenceEqual(b5) ? "" : ProDucking.Diff(b5, new5!),
             };
+        }
+    }
+
+    // --- raw capture (block 0x0001 bytes 94, 95 and 97) ---
+
+    /// <summary>
+    /// Set where the unit takes an input's USB capture: one read of block
+    /// 0x0001 and, when the tap changes, one write of the whole block under
+    /// the lock, without the commit (each tap applies live; the commit
+    /// changed nothing on the desk, 2026-11-11). Bits 2 to 7 of the byte and
+    /// every other byte go back as read. Returns the tap held before.
+    /// </summary>
+    public int SetCaptureTap(RawCaptureInput input, int tap)
+    {
+        if (!Capabilities.RawCapture)
+            throw new InvalidOperationException($"{Info.Model}: raw capture needs firmware {WaveFxEq.Format(RawCaptureFirmware)} or later");
+        int offset = ProMixSections.CaptureTapOffsetOf(input);
+        lock (_lock)
+        {
+            byte[] b1 = Read(BlockCrossfade, CrossfadeLen);
+            int held = CaptureTap.Field(b1[offset]);
+            byte written = CaptureTap.With(b1[offset], tap);
+            if (written != b1[offset])
+            {
+                b1[offset] = written;
+                Write(BlockCrossfade, b1);
+            }
+            return held;
         }
     }
 

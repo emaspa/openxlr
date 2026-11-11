@@ -60,7 +60,7 @@ Block lengths as Wave Link requests them:
 | Block | Bytes | What is known |
 |---|---|---|
 | `0x0000` | 117 | identity. Bytes 5, 6 and 7 are the firmware version as major, minor and patch: `01 00 00` on the dock before its update, `01 00 0f` on the Wave XLR MK.2, both as Wave Link reports them. A hash in ASCII at 12 and 27, the serial at 35 and the build string at 53 |
-| `0x0001` | 6 | crossfade at byte 0 |
+| `0x0001` | 6 | crossfade at byte 0; on the Wave XLR MK.2 on 1.0.15 the USB capture's tap at byte 4 bits 0 and 1 ([below](#the-usb-capture-tap-in-block-0x0001)) |
 | `0x0002` | 21 | the meters, decoded on the Wave XLR MK.2 on firmware 1.0.15 on 2026-11-10 ([layout](hardware-support.md#mk2-meter-status)); not checked on the dock |
 | `0x0004` | 38 | input settings, including the equalizer below |
 | `0x0005` | 2 | headphones |
@@ -397,6 +397,33 @@ the EQ bytes every 5 s: stored EQ, gains zeroed, stored, zeroed, band 4
 at 5 kHz with gain `0x18` and byte 11 `00`, zeroed, the same boost,
 stored. The listener heard no difference. With the switch off, the
 stored +3.25 dB shelf at 227 Hz and -3 dB bell at 860 Hz did nothing.
+
+## The USB capture tap in block 0x0001
+
+Measured on the Wave XLR MK.2 on firmware 1.0.15 on 2026-11-11. Block
+`0x0001` byte 4 reads `02` on the desk unit, as Wave Link leaves it. Its
+bits 0 and 1 pick where the unit takes its USB capture, the signal the
+computer records. With the unit's expander held at a steady 24 dB of
+reduction on speech:
+
+| Byte 4 bits 0 and 1 | USB capture |
+|---|---|
+| `00` | the microphone before the unit's processing, within 1 dB of the input meter |
+| `01` | after the processing, 23 to 24 dB down |
+| `02` | the same as `01` |
+
+The unit's USB meter, block `0x0002` bytes 4 and 5, follows what the
+capture carries. The change applies live, with no commit block (the MK.2
+family has none). Bit 2 is believed to bypass the capture's limiter and was
+not tested; byte 0 is the crossfade, and bytes 1, 2, 3 and 5 hold other
+routing choices that were not tested.
+
+OpenXLR's [raw capture](api.md#raw-capture) writes bits 0 and 1 alone, `00`
+for raw and the value it found, or `02`, to turn it off, every other bit
+and byte as read. It does so only on the Wave XLR MK.2 from firmware
+1.0.15. The XLR Dock MK.2 and the Wave:3 MK.2 share the layout but were not
+measured, so they do not offer it. Diagnostics decode the byte as
+`usbCapture`.
 
 ## What this means for OpenXLR
 

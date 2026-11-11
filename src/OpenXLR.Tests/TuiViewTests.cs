@@ -1724,6 +1724,42 @@ public sealed class TuiViewTests
     }
 
     [Fact]
+    public void AUnitWithRawCaptureHasItsToggleOnEachInputAndLineIn()
+    {
+        DaemonLink link = new();
+        List<string> sent = [];
+        link.Sent += json => sent.Add(json);
+        link.Receive(StateJson.Replace("\"auxInput\": true,", "\"auxInput\": true, \"lineInput\": true, \"rawCapture\": true,", StringComparison.Ordinal)
+            .Replace("\"auxLevelLock\": false,", "\"auxLevelLock\": false, \"lineInGainDb\": 20, \"lineInLevelLock\": false, \"rawCapture\": true, \"lineInRawCapture\": false,", StringComparison.Ordinal));
+        App app = new(link, Theme.Material);
+        app.ShowTab(2);
+        Screen screen = new(150, 42);
+        app.Draw(screen);
+        for (int i = 0; i < 60; i++) app.Handle(new KeyPress(Key.Down));
+        app.Draw(screen);
+        Assert.Contains("Raw capture", Frame(screen), StringComparison.Ordinal);
+        // The last row is Line In's raw capture.
+        app.Handle(new KeyPress(Key.Char, ' '));
+        JsonElement command = Command(sent);
+        Assert.Equal("set", Text(command, "cmd"));
+        Assert.Equal("lineInRawCapture", Text(command, "control"));
+        Assert.True(command.GetProperty("value").GetBoolean());
+        // XLR 1's, the first raw capture row from the top, reads back on; a press turns it off.
+        for (int i = 0; i < 80; i++) app.Handle(new KeyPress(Key.Up));
+        string? control = null;
+        for (int i = 0; i < 40 && control != "rawCapture"; i++)
+        {
+            sent.Clear();
+            app.Handle(new KeyPress(Key.Char, ' '));
+            control = sent.Count > 0 && Command(sent) is { } pressed && pressed.TryGetProperty("control", out JsonElement name) ? name.GetString() : null;
+            app.Handle(new KeyPress(Key.Down));
+        }
+        command = Command(sent);
+        Assert.Equal("rawCapture", Text(command, "control"));
+        Assert.False(command.GetProperty("value").GetBoolean());
+    }
+
+    [Fact]
     public void TheProsLineInHasAGainOfItsOwnAtTheEndOfTheHardwareTab()
     {
         DaemonLink link = new();

@@ -144,6 +144,18 @@ public sealed record DeviceState
     public DeviceLed? Led { get; init; }
 
     /// <summary>
+    /// Raw capture as the unit reads it back, on a unit with
+    /// <see cref="DeviceCapabilities.RawCapture"/>: true while the computer
+    /// receives the input before the unit's processing (its capture tap reads
+    /// 0, <see cref="CaptureTap"/>). XLR 1, XLR 2 and Line In; null on a unit
+    /// or an input without it. The daemon holds what the user chose at every
+    /// connect; left out of saved settings and profiles.
+    /// </summary>
+    public bool? RawCapture { get; init; }
+    public bool? RawCapture2 { get; init; }
+    public bool? LineInRawCapture { get; init; }
+
+    /// <summary>
     /// Daemon-enforced software gain lock (Wave Link's Gain Lock for devices
     /// that keep it app-side). Not a hardware field: the daemon stamps it
     /// onto every snapshot and rejects gain writes while it is set.

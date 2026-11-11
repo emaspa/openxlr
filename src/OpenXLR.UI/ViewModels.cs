@@ -1095,6 +1095,7 @@ public sealed partial class MainViewModel : ViewModelBase
             LedRing.Apply(DeviceConnected && node["capabilities"]?["ledRing"] is JsonValue ledRing && ledRing.TryGetValue(out bool hasLeds) && hasLeds,
                 node["state"]?["led"]);
 
+            ApplyRawCapture(DeviceConnected ? node["capabilities"] : null, node["state"]);
             // Read outside the state block, so a unit that left takes its path with it.
             HpMixMicDirect = node["state"]?["hpMixMicDirect"]?.GetValue<bool>() ?? false;
             HpMixMic2Direct = node["state"]?["hpMixMic2Direct"]?.GetValue<bool>() ?? false;

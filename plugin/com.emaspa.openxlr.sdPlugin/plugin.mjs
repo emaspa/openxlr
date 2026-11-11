@@ -36,6 +36,7 @@ const DEVICE_TOGGLES = {
   clipGuard: "XLR 1\nClipGuard", clipGuard2: "XLR 2\nClipGuard",
   compressor: "XLR 1\nComp", compressor2: "XLR 2\nComp",
   lowImpedance: "Low Z", auxLevelLock: "Aux In\nLock", lineInLevelLock: "Line In\nLock",
+  rawCapture: "XLR 1\nRaw", rawCapture2: "XLR 2\nRaw", lineInRawCapture: "Line In\nRaw",
   outHp1: "HP 1\nOut", outHp2: "HP 2\nOut", outLineOut: "Line\nOut",
   gainLocked: "Gain\nLock",
   softClipGuard: "Clip\nGuard",

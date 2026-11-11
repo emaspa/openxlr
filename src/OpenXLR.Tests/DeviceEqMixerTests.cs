@@ -601,6 +601,48 @@ public sealed class DeviceEqMixerTests
     }
 
     /// <summary>
+    /// Raw capture on the Pro's XLR 1: the computer hears XLR 1 before the
+    /// unit's processing, so its EQ leaves the unit, switched off first, and
+    /// runs in software, and the state says why. XLR 2 keeps the unit. With
+    /// raw capture off the unit takes XLR 1's EQ back.
+    /// </summary>
+    [Fact]
+    public void RawCaptureMovesThatInputsEqToSoftware()
+    {
+        var port = new Port();
+        using Mixer mixer = Pro2(port);
+        mixer.SetEqEnabled("xlr1", true);
+        mixer.SetEqEnabled("xlr2", true);
+        port.Sweep();
+        Assert.True(port.UnitOn(Pro, 1));
+        Assert.True(port.UnitOn(Pro, 2));
+
+        int posts = port.Posts.Count;
+        Assert.True(mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [Pro] = ProReady() with { RawCaptureInputs = 1 } }));
+        Assert.Equal((Pro, 1, DeviceEq.Off), port.Posts.Skip(posts).Single());
+        Assert.False(mixer.EqWantsSoftwareStage("xlr1"), "software waits for the unit to confirm");
+        NeverDoubled(mixer, port, "xlr1", Pro, 1);
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.True(mixer.EqWantsSoftwareStage("xlr1"));
+        Assert.False(mixer.EqRunsOnDevice("xlr1"));
+        Assert.True(mixer.EqRunsOnDevice("xlr2"));
+        Assert.True(port.UnitOn(Pro, 2));
+        MicEqDevice device = Eq(mixer).Device!;
+        Assert.False(device.Ready);
+        Assert.Equal("rawCapture", device.Reason);
+        Assert.Contains("raw capture", device.Note, StringComparison.Ordinal);
+        Assert.Equal("device", Eq(mixer).Processing);
+
+        Assert.True(mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [Pro] = ProReady() }));
+        port.Sweep();
+        Assert.True(mixer.EqRunsOnDevice("xlr1"));
+        Assert.True(port.UnitOn(Pro, 1));
+        NeverDoubled(mixer, port, "xlr1", Pro, 1);
+        Assert.True(Eq(mixer).Device!.Ready);
+    }
+
+    /// <summary>
     /// XLR 2 bound to another microphone: its EQ runs in software on that
     /// source and nothing of it reaches the Pro's input 2, which is held off
     /// once per connection so an EQ Wave Link left on (+12 dB on band 2) does

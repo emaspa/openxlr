@@ -189,6 +189,36 @@ public sealed class DeviceDynamicsMixerTests
         Assert.Equal(-24, other.Held[(W3, 1)].Values!.CompressorThreshold);
     }
 
+    /// <summary>
+    /// Raw capture on the unit's input: the computer hears it before the
+    /// unit's compressor and expander, so they leave the unit, switched off
+    /// first, and run in software, and the state says why.
+    /// </summary>
+    [Fact]
+    public void RawCaptureMovesThemToSoftware()
+    {
+        var port = new Port();
+        using Mixer mixer = Wave3(port);
+        port.Sweep();
+        mixer.SetCompressor("xlr1", new MicCompressorChange(Enabled: true));
+        port.Sweep();
+        Assert.True(mixer.DynamicsRunOnDevice("xlr1"));
+        Assert.True(port.UnitOn(W3, 1));
+
+        mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [W3] = Ready() with { RawCaptureInputs = 1 } });
+        Assert.Equal(DeviceDynamics.Off, port.Posts[^1].Value);
+        Assert.False(mixer.DynamicsWantsSoftwareStage("xlr1"), "software waits for the unit to confirm");
+        NeverDoubled(mixer, port);
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.False(mixer.DynamicsRunOnDevice("xlr1"));
+        Assert.True(mixer.DynamicsWantsSoftwareStage("xlr1"));
+        NeverDoubled(mixer, port);
+        Assert.False(Compressor(mixer).Device!.Ready);
+        Assert.Equal("rawCapture", Compressor(mixer).Device!.Reason);
+        Assert.Equal("device", Compressor(mixer).Processing);
+    }
+
     [Fact]
     public void TheChoiceHandsOverOffBeforeOnBothWays()
     {

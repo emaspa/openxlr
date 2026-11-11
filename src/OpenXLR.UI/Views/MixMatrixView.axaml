@@ -111,6 +111,8 @@
             <ToggleButton Content="{loc:Text Key=Phantom}" IsChecked="{Binding Unit.Phantom, Mode=TwoWay}" IsVisible="{Binding Unit.CapPhantom, FallbackValue=False}"/>
             <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding Unit.ClipGuard, Mode=TwoWay}" IsVisible="{Binding Unit.CapClipGuard, FallbackValue=False}"/>
             <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Unit.Compressor, Mode=TwoWay}" IsVisible="{Binding Unit.CapCompressor, FallbackValue=False}"/>
+            <ToggleButton Content="{loc:Text Key=RawCapture}" IsChecked="{Binding Unit.RawCapture, Mode=TwoWay}" IsVisible="{Binding Unit.CapRawCapture, FallbackValue=False}"
+                          ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
           </WrapPanel>
           <Grid Name="MatrixVoiceTuneStrength" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" IsVisible="{Binding Unit.VoiceTune, FallbackValue=False}">
             <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>

@@ -101,6 +101,17 @@ public sealed record UnitEqSupport(string Name, string? Firmware, bool Ready, st
     /// <see cref="IDeviceEqPort.DynamicsMeters"/> then gives.
     /// </summary>
     public bool DynamicsLevels { get; init; }
+
+    /// <summary>
+    /// The inputs whose capture the unit sends raw, before its processing,
+    /// bit 0 for input 1 and bit 1 for input 2. The computer does not hear
+    /// the unit's EQ, compressor or expander on such an input, so its
+    /// microphone runs them in software.
+    /// </summary>
+    public int RawCaptureInputs { get; init; }
+
+    /// <summary>Whether the unit sends input <paramref name="input"/> (1 or 2) raw.</summary>
+    public bool RawCaptures(int input) => input is >= 1 and <= 31 && (RawCaptureInputs & 1 << input - 1) != 0;
 }
 
 /// <summary>One input of one unit, by the unit's instance id and the input's number (1 or 2).</summary>

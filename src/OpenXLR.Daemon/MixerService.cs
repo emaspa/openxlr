@@ -1026,7 +1026,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
             // update, a binding that moved.
             if (_mixer.SetUnitEqSupport(_eqPort.Units()) | _mixer.SyncDeviceEq()) Changed?.Invoke();
             // Software DSP only for devices without the hardware version.
-            _mixer.SetLowCutApplicable(!(_devices.ActiveCapabilities?.LowCut ?? false));
+            // Raw capture takes XLR 1 before the unit's low cut, so the soft one applies.
+            _mixer.SetLowCutApplicable(!(_devices.ActiveCapabilities?.LowCut ?? false) || _devices.Xlr1RawCapture);
             stop.ThrowIfCancellationRequested();
             _mixer.SetClipGuardApplicable(!(_devices.ActiveCapabilities?.ClipGuard ?? false));
             stop.ThrowIfCancellationRequested();

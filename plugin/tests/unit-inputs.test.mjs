@@ -194,3 +194,20 @@ test("a ducking key is offered without a Pro and a press flips the switch alone"
   for (const state of [undefined, null, {connected:true}, {ducking:null}, {ducking:"on"}])
     assert.equal(duckingToggle(state), null);
 });
+
+test("raw capture keys need a unit with raw capture, and the input", () => {
+  const raw = {...pro, rawCapture:true, lineInput:true};
+  for (const target of ["rawCapture", "rawCapture2", "lineInRawCapture"]) {
+    assert.equal(deviceTargetSupported(raw, target), true, target);
+    assert.equal(deviceTargetSupported({...raw, rawCapture:false}, target), false, target);
+    assert.equal(deviceTargetSupported(pro, target), false, target);
+  }
+  // A one-input unit with raw capture and no Line In: XLR 1 only.
+  const mk2 = {gain:true, mute:true, xlrInputs:1, hpOutputs:1, rawCapture:true};
+  assert.equal(deviceTargetSupported(mk2, "rawCapture"), true);
+  assert.equal(deviceTargetSupported(mk2, "rawCapture2"), false);
+  assert.equal(deviceTargetSupported(mk2, "lineInRawCapture"), false);
+  assert.equal(unitInputOf("rawCapture"), 1);
+  assert.equal(unitInputOf("rawCapture2"), 2);
+  assert.equal(unitInputOf("lineInRawCapture"), null);
+});

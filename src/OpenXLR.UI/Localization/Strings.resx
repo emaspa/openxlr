@@ -1098,6 +1098,15 @@
   <data name="LevelLock" xml:space="preserve">
     <value>Level Lock</value>
   </data>
+  <data name="RawCapture" xml:space="preserve">
+    <value>Raw Capture</value>
+  </data>
+  <data name="RawCaptureTip" xml:space="preserve">
+    <value>Send this microphone to the computer before the unit's low cut, EQ, compressor, expander and Voice Tune. The unit's own paths keep its processing, and OpenXLR runs this microphone's EQ, compressor and expander on the computer.</value>
+  </data>
+  <data name="LineInRawCaptureTip" xml:space="preserve">
+    <value>Send Line In to the computer as it arrives, before the unit's ducking.</value>
+  </data>
   <data name="LineIn" xml:space="preserve">
     <value>Line In</value>
   </data>

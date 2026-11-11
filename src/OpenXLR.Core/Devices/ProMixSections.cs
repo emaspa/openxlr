@@ -34,9 +34,10 @@ namespace OpenXLR.Core.Devices;
 ///
 /// After the sections: bytes 90 to 93 the selectors of Headphones 1,
 /// Headphones 2, the USB Aux port and Line Out (1e to 22 play sections 0 to
-/// 72, 23 nothing); byte 94 XLR 1's capture tap (00 the microphone before
-/// the unit's low cut, compressor and Voice Tune, 01 to 03 after them);
-/// byte 98 section 0's level in quarter-dB attenuation (54, -21 dB, on
+/// 72, 23 nothing); bytes 94, 95 and 97 the USB capture taps of XLR 1, XLR 2
+/// and Line In in bits 0 and 1 (<see cref="CaptureTap"/>: 00 before the
+/// unit's processing), byte 96 one for USB Aux that showed no effect on the
+/// desk (2026-11-11) and is not driven; byte 98 section 0's level in quarter-dB attenuation (54, -21 dB, on
 /// every unit read so far). Every other byte is unknown and carried as
 /// read.
 ///
@@ -88,6 +89,21 @@ public static class ProMixSections
     public const int CaptureTapOffset = 94;
     /// <summary>Byte 94's value that gives XLR 1's capture before the unit's processing.</summary>
     public const byte CaptureTapRaw = 0x00;
+    /// <summary>XLR 2's capture tap (AUX2), as byte 94 is XLR 1's (desk, 2026-11-11).</summary>
+    public const int Xlr2CaptureTapOffset = 95;
+    /// <summary>A tap byte for USB Aux by its place; no value changed USB Aux's capture on the desk (2026-11-11). Never written.</summary>
+    public const int UsbAuxCaptureTapOffset = 96;
+    /// <summary>Line In's capture tap (AUX6 and AUX7): 00 as it arrives, 01 after the insert return, 02 after the ducker, 03 silence (desk, 2026-11-11).</summary>
+    public const int LineInCaptureTapOffset = 97;
+
+    /// <summary>The byte of block 0x0001 that holds an input's capture tap.</summary>
+    public static int CaptureTapOffsetOf(RawCaptureInput input) => input switch
+    {
+        RawCaptureInput.Xlr1 => CaptureTapOffset,
+        RawCaptureInput.Xlr2 => Xlr2CaptureTapOffset,
+        RawCaptureInput.LineIn => LineInCaptureTapOffset,
+        _ => throw new ArgumentOutOfRangeException(nameof(input)),
+    };
 
     public const int Section0LevelOffset = 98;
 
@@ -286,8 +302,8 @@ public static class ProMixSections
     /// <summary>
     /// The block decoded for tester diagnostics: one entry per section
     /// (<c>section0</c> to <c>section72</c>), the outputs' selectors, section
-    /// 0's level and XLR 1's capture tap; or <c>sections</c> alone saying why
-    /// it does not decode.
+    /// 0's level and the capture taps of XLR 1, XLR 2, USB Aux and Line In;
+    /// or <c>sections</c> alone saying why it does not decode.
     /// </summary>
     public static IReadOnlyDictionary<string, string> Describe(ReadOnlySpan<byte> block)
     {
@@ -307,9 +323,25 @@ public static class ProMixSections
             outputs.Add($"{name} {DescribeSelector(block[offset])}");
         lines["outputs"] = string.Join(", ", outputs);
         lines["section0Level"] = $"{Db(Section0LevelDb(block[Section0LevelOffset]))} (byte 98 {block[Section0LevelOffset]:x2})";
-        byte tap = block[CaptureTapOffset];
-        lines["xlr1Capture"] = (tap == CaptureTapRaw ? "before the unit's processing" : "processed") + $" (byte 94 {tap:x2})";
+        lines["xlr1Capture"] = DescribeMicTap(block, CaptureTapOffset);
+        lines["xlr2Capture"] = DescribeMicTap(block, Xlr2CaptureTapOffset);
+        lines["usbAuxCapture"] = $"no effect seen (byte {UsbAuxCaptureTapOffset} {block[UsbAuxCaptureTapOffset]:x2})";
+        byte line = block[LineInCaptureTapOffset];
+        string lineTap = CaptureTap.Field(line) switch
+        {
+            0 => "as it arrives",
+            1 => "after the insert return",
+            2 => "after the ducker",
+            _ => "silent",
+        };
+        lines["lineInCapture"] = $"{lineTap} (byte {LineInCaptureTapOffset} {line:x2})";
         return lines;
+    }
+
+    private static string DescribeMicTap(ReadOnlySpan<byte> block, int offset)
+    {
+        byte tap = block[offset];
+        return (CaptureTap.Field(tap) == CaptureTap.Raw ? "before the unit's processing" : "processed") + $" (byte {offset} {tap:x2})";
     }
 
     private static string DescribeSection(ReadOnlySpan<byte> block, int start)
