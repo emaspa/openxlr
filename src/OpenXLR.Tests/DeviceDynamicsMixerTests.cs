@@ -141,7 +141,7 @@ public sealed class DeviceDynamicsMixerTests
         Assert.Equal("device", state.Processing);
         Assert.True(state.Available, "a unit-run compressor needs no native helper");
         Assert.Null(state.Error);
-        Assert.Equal(new MicEqDevice(W3, 1, "Wave:3 MK.2", "1.0.1", true) { MinimumFirmware = "0.2.3" }, state.Device);
+        Assert.Equal(new MicEqDevice(W3, 1, "Wave:3 MK.2", "1.0.1", true) { MinimumFirmware = "0.2.3", Levels = false }, state.Device);
         Assert.Equal("device", Expander(mixer).Backend);
         // An equal value is not posted again.
         int posts = port.Posts.Count;
@@ -434,6 +434,8 @@ public sealed class DeviceDynamicsMixerTests
         foreach (string json in new[]
         {
             """{"cmd":"setCompressor","channel":"xlr1","enabled":true}""", """{"cmd":"setExpander","channel":"xlr1","enabled":true}""",
+            // A unit that reports their levels sends them without the helper too.
+            """{"cmd":"watchDynamics","channel":"xlr1"}""",
         })
         {
             Assert.Null(Check(json, new Layout(true), host: false));

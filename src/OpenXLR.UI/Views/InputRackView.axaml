@@ -74,6 +74,9 @@
                 <views:BindingChip DataContext="{Binding Channel}" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                            IsVisible="{Binding Channel.HasBindingWarning}"/>
+                <!-- the interface reports no microphone in the jack this strip carries -->
+                <TextBlock Name="RackMicMissing" Text="{loc:Text Key=MicNotPluggedIn}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
+                           TextWrapping="Wrap" IsVisible="{Binding Unit.MicMissing, FallbackValue=False}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterL}" AutomationProperties.Name="{Binding LeftLevelName}"/>
@@ -435,6 +438,9 @@
                 <views:CaptureSourceChip DataContext="{Binding Channel}" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Channel.BindingWarning}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
                            TextWrapping="Wrap" IsVisible="{Binding Channel.HasBindingWarning}"/>
+                <!-- the interface reports no microphone in the jack this strip carries -->
+                <TextBlock Name="RackCaptureMicMissing" Text="{loc:Text Key=MicNotPluggedIn}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
+                           TextWrapping="Wrap" IsVisible="{Binding Unit.MicMissing, FallbackValue=False}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterL}" AutomationProperties.Name="{Binding LeftLevelName}"/>

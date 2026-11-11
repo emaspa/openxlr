@@ -4252,6 +4252,15 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="DynamicsUnitLevels" xml:space="preserve">
     <value>The {0} reports no input level or gain reduction, so Output shows the microphone as it leaves the unit, after its expander and compressor.</value>
   </data>
+  <data name="MicNotPluggedIn" xml:space="preserve">
+    <value>No microphone is plugged into the interface.</value>
+  </data>
+  <data name="CompressorUnitInputPoint" xml:space="preserve">
+    <value>The {0} reports these levels. Input is what its compressor hears, after its expander, and moves more slowly than a peak meter.</value>
+  </data>
+  <data name="ExpanderUnitInputPoint" xml:space="preserve">
+    <value>The {0} reports these levels. Input is what its expander hears.</value>
+  </data>
   <data name="DynamicsDeviceFirmwareOld" xml:space="preserve">
     <value>Runs in software: this {0} has firmware {1}, and the unit runs the compressor and the expander itself from firmware {2}. Elgato's updater is in Wave Link on Windows or macOS.</value>
   </data>

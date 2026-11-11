@@ -334,7 +334,9 @@ every write showed up there and read back from the block. Blocks
 (21), 0x0006 (17) and 0x0016 (51 on firmware 1.0.0, 61 on 1.0.15) exist
 too; those are the lengths Wave Link asks for. Block 0x0000 bytes 5, 6
 and 7 are the firmware version as major, minor and patch (`01 00 0f` is
-1.0.15) on both MK.2 models. The rest of those blocks is not decoded yet.
+1.0.15) on both MK.2 models. Blocks 0x0002 and 0x0006 are decoded on the
+Wave XLR MK.2 ([below](#mk2-meter-status)); the rest of those blocks is
+not decoded yet.
 
 Switching phantom power off makes the dock's firmware set the mute bit
 (settings byte 1 bit 0) by itself and clear it 12.5 s later, seen on
@@ -370,7 +372,55 @@ Link 3.5 leaves that EQ on when it quits, so a unit it has driven can
 reach OpenXLR with it running. On connect OpenXLR writes the microphone's
 own EQ over it, or switches it off on an input whose EQ runs in software.
 The diagnostics archive carries block 0x0000 and the EQ decoded from the
-settings block. Blocks 0x0002 and 0x0006 exist and are not decoded.
+settings block.
+
+<a name="mk2-meter-status"></a>
+### Meters and status on the Wave XLR MK.2
+
+Measured on the desk on 2026-11-10 with a Wave XLR MK.2 on firmware
+1.0.15 and a mono microphone, by reading the two blocks while talking,
+staying silent, plugging the microphone and the headphones in and out,
+and changing the unit's settings. Both blocks are read only.
+
+Block 0x0002, 21 bytes, the meters. A level byte is -4 times the level in
+dBFS, `f0` the floor (silence); a reduction byte is 4 times the reduction
+in dB. With the mono microphone each left and right pair read equal.
+
+| Bytes | What it reads |
+|---|---|
+| 0, 1 | the input, before the unit's processing |
+| 2, 3 | the headphone output: the monitor mix less the headphone attenuation, about 11 dB at the desk's setting |
+| 4, 5 | the USB recording level, what the computer receives |
+| 6, 7 | not identified |
+| 8 to 10 | the expander: reduction, key level, output level. The reduction reached the configured range (24 dB) in silence and read 0 while talking. Its output is the compressor's key |
+| 11 to 13 | the compressor: reduction, key level, output level. The reduction read 0.25 to 0.75 dB only near full scale with the threshold at -12 dB, and the key level moved more slowly than the input peak |
+| 14 | not identified |
+| 15, 16 | after the unit's processing |
+| 17, 18 | after the insert return, equal to the USB level with nothing inserted |
+| 19, 20 | the monitor mix, 6 dB under the input with the crossfade at its centre |
+
+The compressor's make-up gain (6 dB on the desk) showed as the USB level
+6 to 8 dB over the input.
+
+Block 0x0006, 17 bytes, the status.
+
+| Bytes | What it reads |
+|---|---|
+| 0 | bit 0 a microphone is plugged in, bit 1 headphones are plugged in |
+| 1, 2 | stayed 0 at a 0 dBFS input with ClipGuard on; not identified |
+| 10 to 13 | 48000, the sample rate, little endian |
+| 14 | bit 0 set by any write to the unit and cleared about 10.5 s later, while the unit stores its settings |
+| 15, 16 | the microphone detection, little endian: about 55 to 70 with a microphone plugged in, 373 without |
+
+From firmware 1.0.15 the daemon reads block 0x0006 with each poll and
+reports bit 0 and bit 1 as the state's `micConnected` and
+`headphonesConnected` ([API](api.md)). It reads block 0x0002 only
+while a client watches the compressor's and expander's levels, which then
+come from bytes 8 to 13 ([API](api.md#compressor-and-expander)). The
+diagnostics archive carries both blocks, raw and decoded. On older
+firmware OpenXLR reads neither. The XLR Dock MK.2 and the Wave:3 MK.2 answer blocks of the
+same lengths, which have not been checked against these layouts, so
+OpenXLR reads neither block on them.
 
 ## Wave:3 (0fd9:0070)
 

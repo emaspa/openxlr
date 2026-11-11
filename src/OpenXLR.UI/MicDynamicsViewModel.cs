@@ -276,7 +276,7 @@ public sealed class MicDynamicsViewModel : ViewModelBase
 
     private string? _backend, _deviceName, _deviceFirmware, _deviceReason, _deviceNote, _minimumFirmware;
     private string _processing = UnitDynamics.Device;
-    private bool _processingReported, _hasDevice, _deviceReady;
+    private bool _processingReported, _hasDevice, _deviceReady, _deviceLevels;
     private string? _awaitingProcessing;
     private long _awaitingProcessingSince = long.MinValue;
 
@@ -355,8 +355,14 @@ public sealed class MicDynamicsViewModel : ViewModelBase
 
     public bool HasDeviceNote => DeviceNote is not null;
 
-    /// <summary>The input and gain reduction meters show: software runs it. The unit reports neither.</summary>
-    public bool ShowsStageMeters => !OnDevice;
+    /// <summary>
+    /// The unit runs it and reports its levels (the device's <c>levels</c>,
+    /// the Wave XLR MK.2 from firmware 1.0.15): they come as the stage's do.
+    /// </summary>
+    public bool UnitReportsLevels => OnDevice && _deviceLevels;
+
+    /// <summary>The input and gain reduction meters show: software runs it, or a unit that reports them. Other units report neither.</summary>
+    public bool ShowsStageMeters => !OnDevice || _deviceLevels;
 
     private void RaisePlace()
     {
@@ -364,7 +370,7 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         {
             nameof(Backend), nameof(OnDevice), nameof(UnitName), nameof(Processing), nameof(HasProcessingChoice), nameof(ProcessOnDevice),
             nameof(ProcessInSoftware), nameof(CanProcessOnDevice), nameof(ProcessOnDeviceTip), nameof(DeviceNote), nameof(HasDeviceNote),
-            nameof(ShowsStageMeters), nameof(Subtitle), nameof(Note), nameof(FloorDb),
+            nameof(ShowsStageMeters), nameof(UnitReportsLevels), nameof(Subtitle), nameof(Note), nameof(FloorDb),
         })
             Raise(name);
         Threshold.RangeChanged();
@@ -424,7 +430,11 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         {
             if (_enabled && _error is { Length: > 0 } error) return error;
             if (!_available) return Localizer.Text("DynamicsNoHost");
-            if (OnDevice) return Localizer.Format("DynamicsUnitLevels", UnitName);
+            if (OnDevice)
+                return UnitReportsLevels && Source == DynamicsLevelSource.Stage
+                    ? IsCompressor ? Localizer.Format("CompressorUnitInputPoint", UnitName) : Localizer.Format("ExpanderUnitInputPoint", UnitName)
+                    : UnitReportsLevels && Source == DynamicsLevelSource.None ? Localizer.Text("DynamicsNoLevels")
+                    : Localizer.Format("DynamicsUnitLevels", UnitName);
             return Source switch
             {
                 DynamicsLevelSource.Raw => Localizer.Text("DynamicsRawInput"),
@@ -480,8 +490,8 @@ public sealed class MicDynamicsViewModel : ViewModelBase
 
     private double ReductionScale => IsCompressor ? 30 : Math.Max(Advanced[1].Value, 6);
 
-    /// <summary>The input, or a dash while the unit runs the processor, since it reports none.</summary>
-    public string InputText => OnDevice ? Localizer.Text("DynamicsNoReading") : LevelText(_inputDb);
+    /// <summary>The input, or a dash while the unit runs the processor and no level of its own has come.</summary>
+    public string InputText => OnDevice && !Live(_levelsAt) ? Localizer.Text("DynamicsNoReading") : LevelText(_inputDb);
     /// <summary>
     /// The output, or a dash while the levels come from before a stage that
     /// does not run. While the unit runs the processor the output is the
@@ -503,8 +513,9 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     /// <summary>Take this processor's <c>[input, reduction, output]</c> from a meter push.</summary>
     internal void ApplyLevels(JsonArray levels)
     {
-        // The unit runs it: a stage that runs for something else has this processor off and nothing to report.
-        if (Detached || OnDevice || levels.Count < 3) return;
+        // The unit runs it: a stage that runs for something else has this
+        // processor off and nothing to report, unless the unit reports its own.
+        if (Detached || OnDevice && !_deviceLevels || levels.Count < 3) return;
         double Read(int i) => levels[i] is JsonValue v && v.TryGetValue(out double d) && double.IsFinite(d) ? d : double.NaN;
         double input = Read(0), reduction = Read(1), output = Read(2);
         if (double.IsNaN(input) || double.IsNaN(reduction) || double.IsNaN(output)) return;
@@ -528,7 +539,8 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     /// levels win while they come. While the unit runs the processor the
     /// same meter reads the microphone as it leaves the unit, after the
     /// unit's compressor and expander: it is the output, and the history
-    /// draws it; the unit reports no input or gain reduction.
+    /// draws it, until the unit's own levels come, on a unit that reports
+    /// them.
     /// </summary>
     internal void ApplyInputLevel(JsonArray level)
     {
@@ -564,13 +576,15 @@ public sealed class MicDynamicsViewModel : ViewModelBase
 
     /// <summary>
     /// Ask for the levels for another lease, while a window shows them: the
-    /// stage's, and while those do not come, the meter before the chain, which
-    /// runs beside the route and starts no stage.
+    /// stage's, or the unit's when it runs the processor and reports them,
+    /// and while those do not come, the meter before the chain, which runs
+    /// beside the route and starts no stage. A unit that reports no levels
+    /// gets the meter before the chain alone.
     /// </summary>
     internal async Task KeepLevelsAsync()
     {
         if (Detached) return;
-        if (OnDevice)
+        if (OnDevice && !_deviceLevels)
         {
             await Commands.WatchInputMeterAsync(Channel);
             return;
@@ -640,12 +654,14 @@ public sealed class MicDynamicsViewModel : ViewModelBase
         JsonObject? device = s["device"] as JsonObject;
         _hasDevice = device is not null;
         _deviceReady = device?["ready"]?.GetValue<bool>() ?? false;
+        bool hadLevels = _deviceLevels;
+        _deviceLevels = device?["levels"]?.GetValue<bool>() ?? false;
         _deviceName = device?["name"]?.GetValue<string>();
         _deviceFirmware = device?["firmware"]?.GetValue<string>();
         _deviceReason = device?["reason"]?.GetValue<string>();
         _deviceNote = device?["note"]?.GetValue<string>();
         _minimumFirmware = device?["minimumFirmware"]?.GetValue<string>();
-        if (wasOnDevice != OnDevice)
+        if (wasOnDevice != OnDevice || OnDevice && hadLevels != _deviceLevels)
         {
             _levelsAt = _rawAt = long.MinValue;
             _inputDb = _outputDb = -120;

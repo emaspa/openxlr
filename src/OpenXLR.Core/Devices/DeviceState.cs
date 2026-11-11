@@ -122,6 +122,20 @@ public sealed record DeviceState
     public bool? UnitGainLock { get; init; }
 
     /// <summary>
+    /// Whether a microphone is plugged into the unit, block 0x0006 byte 0
+    /// bit 0, read with each poll on the Wave XLR MK.2 from firmware 1.0.15.
+    /// Read only. Null on every other unit and when the block was not read,
+    /// and left out of saved settings and profiles.
+    /// </summary>
+    public bool? MicConnected { get; init; }
+
+    /// <summary>
+    /// Whether headphones are plugged into the unit, block 0x0006 byte 0
+    /// bit 1, read with <see cref="MicConnected"/> and under the same rule.
+    /// </summary>
+    public bool? HeadphonesConnected { get; init; }
+
+    /// <summary>
     /// Daemon-enforced software gain lock (Wave Link's Gain Lock for devices
     /// that keep it app-side). Not a hardware field: the daemon stamps it
     /// onto every snapshot and rejects gain writes while it is set.

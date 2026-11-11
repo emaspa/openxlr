@@ -81,6 +81,7 @@ public sealed class UnitInputViewModel : ViewModelBase
                 [nameof(MainViewModel.VoiceTuneStrengthText)] = nameof(VoiceTuneStrengthText),
                 [nameof(MainViewModel.Phantom)] = nameof(Phantom), [nameof(MainViewModel.ClipGuard)] = nameof(ClipGuard),
                 [nameof(MainViewModel.Compressor)] = nameof(Compressor),
+                [nameof(MainViewModel.MicMissing)] = nameof(MicMissing),
             }
             : new(StringComparer.Ordinal)
             {
@@ -196,6 +197,8 @@ public sealed class UnitInputViewModel : ViewModelBase
     public bool Phantom { get => Input == 1 ? _main.Phantom : _main.Phantom2; set { if (Input == 1) _main.Phantom = value; else _main.Phantom2 = value; } }
     public bool ClipGuard { get => Input == 1 ? _main.ClipGuard : _main.ClipGuard2; set { if (Input == 1) _main.ClipGuard = value; else _main.ClipGuard2 = value; } }
     public bool Compressor { get => Input == 1 ? _main.Compressor : _main.Compressor2; set { if (Input == 1) _main.Compressor = value; else _main.Compressor2 = value; } }
+    /// <summary>The unit reports no microphone plugged into this input: the Wave XLR MK.2's status block, input 1 only.</summary>
+    public bool MicMissing => Input == 1 && _main.MicMissing;
     public bool CapLowCut => _main.CapLowCut;
     public bool CapExpander => _main.CapExpander;
     public bool CapVoiceTune => _main.CapVoiceTune;

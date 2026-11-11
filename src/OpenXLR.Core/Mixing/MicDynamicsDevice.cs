@@ -235,6 +235,7 @@ public sealed partial class Mixer
             failure is null ? dynamics.Note : $"The {support.Name} {failure}, so the compressor and expander run in software.")
         {
             MinimumFirmware = support.MinimumFirmware,
+            Levels = support.DynamicsLevels,
         };
     }
 

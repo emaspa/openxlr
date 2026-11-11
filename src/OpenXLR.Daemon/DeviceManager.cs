@@ -1408,8 +1408,12 @@ public sealed partial class DeviceManager : BackgroundService
     }
 
     private DeviceState SavedStateLocked(IAudioDevice device, DeviceState state)
-        => EffectiveCapabilitiesLocked(device).OutputRouting && HardwareMixingEntry?.Invoke() is { } entry
+    {
+        // What is plugged into the unit is read, never written back.
+        state = state with { MicConnected = null, HeadphonesConnected = null };
+        return EffectiveCapabilitiesLocked(device).OutputRouting && HardwareMixingEntry?.Invoke() is { } entry
             ? HardwareMixingPlanner.ToSavedJackLevels(state, entry) : state;
+    }
 
     /// <summary>Section 0's level as the Pro's last poll read it in byte 98, or null without one.</summary>
     public double? ProSection0LevelDb
@@ -1471,6 +1475,7 @@ public sealed partial class DeviceManager : BackgroundService
                 Inputs = dev.Capabilities.XlrInputs,
                 MinimumFirmware = support.MinimumFirmware ?? WaveFxEq.Format(WaveFxEq.Mk2EqFirmware),
                 Dynamics = dev.DynamicsSupport,
+                DynamicsLevels = dev.Capabilities.DynamicsMeters,
             }
             : null;
         // A unit that answered a poll but not the ducking block cannot run it.
@@ -1550,6 +1555,13 @@ public sealed partial class DeviceManager : BackgroundService
     private long? _unitMetersAskedAt;
     private ProMeterReading? _unitMeters;
     private long _unitMetersAt;
+    // The Wave XLR MK.2's meters (its own block 0x0002) for the levels of the
+    // compressor and expander it runs: read only while the mixer asked within
+    // UnitMetersHold, which it does while a client watches them. Guarded by
+    // _duckGate, as the others are.
+    private long? _dynamicsMetersAskedAt;
+    private Mk2MeterReading? _dynamicsMeters;
+    private long _dynamicsMetersAt;
     // The last poll read the unit's meters for someone, so the device loop
     // reads them once more between polls.
     private volatile bool _unitMetersWatched;
@@ -1704,13 +1716,37 @@ public sealed partial class DeviceManager : BackgroundService
     }
 
     /// <summary>
+    /// The driven unit's meters as the poll last read them for the levels of
+    /// the compressor and expander it runs on <paramref name="input"/>. Each
+    /// ask keeps the poll reading them for <see cref="UnitMetersHold"/>; null
+    /// on a unit that does not report them
+    /// (<see cref="DeviceCapabilities.DynamicsMeters"/>), for an input it
+    /// does not have, before the first read, after a read that failed, and
+    /// once the last read is older than the hold. Never waits for the device
+    /// lock.
+    /// </summary>
+    internal Mk2MeterReading? UnitDynamicsMeters(int input)
+    {
+        if (input != 1 || _published.Eq is not { DynamicsLevels: true }) return null;
+        long now = NowMs;
+        lock (_duckGate)
+        {
+            _dynamicsMetersAskedAt = now;
+            return _dynamicsMeters is { } meters && now - _dynamicsMetersAt < (long)UnitMetersHold.TotalMilliseconds ? meters : null;
+        }
+    }
+
+    /// <summary>
     /// After the ducking readback: at most one read of the unit's meters,
     /// for whoever wants it. The ducking reduction wants it while the unit
     /// holds an enabled target, verified and not moved since, and the
     /// reduction was asked for within the hold. The mix meters want it while
-    /// the mixer holds hardware mixing and asked within the hold. Anything
-    /// else reads nothing and forgets the last reading; a read that fails
-    /// leaves no reading, so the mixer meters its own copy instead.
+    /// the mixer holds hardware mixing and asked within the hold. On a Wave
+    /// XLR MK.2 the levels of its compressor and expander want its own meter
+    /// block while the mixer asked within the hold. Anything else reads
+    /// nothing and forgets the last reading; a read that fails leaves no
+    /// reading, so the mixer meters its own copy of a mix instead and sends
+    /// no compressor or expander levels.
     /// </summary>
     private void ReadUnitMetersLocked(IAudioDevice dev)
     {
@@ -1718,7 +1754,7 @@ public sealed partial class DeviceManager : BackgroundService
         long hold = (long)UnitMetersHold.TotalMilliseconds;
         bool inMode = HardwareMixingEntry?.Invoke() is not null;
         IReadOnlyList<int> entries = [];
-        bool forMixes;
+        bool forMixes, forDynamics;
         lock (_duckGate)
         {
             if (dev.Capabilities.Ducking)
@@ -1728,11 +1764,23 @@ public sealed partial class DeviceManager : BackgroundService
                 entries = asked && held && _duckVerified is { } verified ? ProMeters.DuckedEntries(verified) : [];
             }
             forMixes = inMode && _unitMetersAskedAt is { } mixesAt && now - mixesAt < hold;
+            forDynamics = dev.Capabilities.DynamicsMeters && _dynamicsMetersAskedAt is { } dynamicsAt && now - dynamicsAt < hold;
             if (entries.Count == 0) _duckReduction = null;
             if (!forMixes) _unitMeters = null;
+            if (!forDynamics) _dynamicsMeters = null;
         }
-        _unitMetersWatched = entries.Count > 0 || forMixes;
-        if (!_unitMetersWatched) return;
+        _unitMetersWatched = entries.Count > 0 || forMixes || forDynamics;
+        if (forDynamics)
+        {
+            // The Wave XLR MK.2's own block; no model reports both kinds.
+            Mk2MeterReading? levels = dev.ReadInputMeters();
+            lock (_duckGate)
+            {
+                _dynamicsMeters = levels;
+                _dynamicsMetersAt = now;
+            }
+        }
+        if (entries.Count == 0 && !forMixes) return;
         ProMeterReading? meters = dev.ReadMeters();
         lock (_duckGate)
         {

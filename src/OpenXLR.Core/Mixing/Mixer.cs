@@ -100,7 +100,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         UnitDuckMeter? unit = _unitDuckMeter;
         var unitMixes = UnitMixMeterNow();
         if (_duckMeterHosts.IsEmpty && unit is null && unitMixes is null && _inputMeterHosts.IsEmpty && _dynamicsMeterHosts.IsEmpty
-            && _soundCheckProbe is null && _player is null)
+            && _dynamicsMeterUnits.IsEmpty && _soundCheckProbe is null && _player is null)
             return levels;
         var meters = new Dictionary<string, double[]>(levels);
         AddUnitMixLevels(meters, unitMixes);

@@ -61,10 +61,10 @@ Block lengths as Wave Link requests them:
 |---|---|---|
 | `0x0000` | 117 | identity. Bytes 5, 6 and 7 are the firmware version as major, minor and patch: `01 00 00` on the dock before its update, `01 00 0f` on the Wave XLR MK.2, both as Wave Link reports them. A hash in ASCII at 12 and 27, the serial at 35 and the build string at 53 |
 | `0x0001` | 6 | crossfade at byte 0 |
-| `0x0002` | 21 | not decoded; changes between reads when Wave Link is closed, perhaps meters |
+| `0x0002` | 21 | the meters, decoded on the Wave XLR MK.2 on firmware 1.0.15 on 2026-11-10 ([layout](hardware-support.md#mk2-meter-status)); not checked on the dock |
 | `0x0004` | 38 | input settings, including the equalizer below |
 | `0x0005` | 2 | headphones |
-| `0x0006` | 17 | not decoded. Byte 15 changes between reads with nothing touched. Bytes 10 to 13 read `80 bb 00 00` (48000, perhaps the sample rate). On the updated dock byte 14 read `05`, `04` and `00` while the firmware held the input muted after phantom power was switched off |
+| `0x0006` | 17 | the status, decoded on the Wave XLR MK.2 on firmware 1.0.15 on 2026-11-10 ([layout](hardware-support.md#mk2-meter-status)): byte 0 the microphone and headphones plugged in, bytes 15 and 16 the microphone detection, which is why byte 15 changes between reads with nothing touched. Bytes 10 to 13 read `80 bb 00 00` (48000, perhaps the sample rate). On the updated dock byte 14 read `05`, `04` and `00` while the firmware held the input muted after phantom power was switched off |
 | `0x0016` | 51 on the dock's firmware 1.0.0, 61 on 1.0.15 (both devices) | not decoded |
 
 The firmware answers whatever length is asked for, so these are the

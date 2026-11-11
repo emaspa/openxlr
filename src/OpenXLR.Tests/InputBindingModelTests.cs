@@ -69,6 +69,36 @@ public sealed class InputBindingModelTests
             + (unitInput is null ? "" : ",\"unitInput\":" + unitInput) + "}";
 
     [Fact]
+    public async Task TheStripCarryingTheInterfacesMicrophoneSaysWhenNoneIsPluggedIn()
+    {
+        await using var client = new DaemonClient("ws://127.0.0.1:1/ws");
+        var model = new MainViewModel(client);
+        using var rack = new InputRackViewModel(model);
+        InputStripViewModel RackStrip(string id) => rack.Strips.Single(s => s.Channel.Id == id);
+        string State(string status) => ProState($"{Xlr("xlr1", 0, Input(1))},{Xlr("xlr2", 1, Input(2))}")
+            .Replace("\"capabilities\":", "\"state\":{" + status + "},\"capabilities\":");
+
+        // A unit that reports nothing says nothing.
+        Apply(model, State("\"gainDb\":30"));
+        Assert.Null(model.MicConnected);
+        Assert.False(RackStrip("xlr1").Unit!.MicMissing);
+
+        Apply(model, State("\"gainDb\":30,\"micConnected\":false,\"headphonesConnected\":true"));
+        Assert.True(model.MicMissing);
+        Assert.True(RackStrip("xlr1").Unit!.MicMissing);
+        // Input 2 is not what the status block reports on.
+        Assert.False(RackStrip("xlr2").Unit!.MicMissing);
+
+        Apply(model, State("\"gainDb\":30,\"micConnected\":true"));
+        Assert.False(RackStrip("xlr1").Unit!.MicMissing);
+
+        // A unit that leaves takes it with it.
+        Apply(model, State("\"micConnected\":false"));
+        Apply(model, ProState(Xlr("xlr1", 0, null), connected: false));
+        Assert.False(model.MicMissing);
+    }
+
+    [Fact]
     public async Task TheInterfaceControlsFollowTheChannelThatCarriesItsMicrophone()
     {
         await using var client = new DaemonClient("ws://127.0.0.1:1/ws");
