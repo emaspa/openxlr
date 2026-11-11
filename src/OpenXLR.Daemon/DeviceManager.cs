@@ -631,8 +631,11 @@ public sealed partial class DeviceManager : BackgroundService
             if (_unansweredId is { } silent && !all.Any(d => d.Info.InstanceId == silent)) ClearUnansweredLocked();
             // The unit went away under its transport without a drop: clients
             // stop seeing it as driven now, not when the next state is read.
-            if (_device is { Connected: false } && _published.Message.Connected)
+            if (_device is { Connected: false } gone && _published.Message.Connected)
             {
+                // No failed transfer says this anywhere else.
+                _log.LogWarning("{dev} closed without a failed USB transfer (its USB helper exited); its state is gone until it reconnects",
+                    gone.Info.DisplayName);
                 RaiseFromLocked();
                 ForgetEq();
                 ForgetDynamics();

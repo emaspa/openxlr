@@ -283,6 +283,50 @@ public sealed class WaveInterfaceTests : IDisposable
         finally { await interfaces.StopAsync(CancellationToken.None); primary.SuspendSession(); }
     }
 
+    /// <summary>
+    /// An enabled unit on the bus whose entry shows no state is said once
+    /// per gap, with what its manager shows, and once more when its state is
+    /// back; a unit that leaves the USB scan is said once.
+    /// </summary>
+    [Fact]
+    public async Task AnEnabledUnitWithoutStateIsSaidOncePerGap()
+    {
+        using var a = new FakeDevice("unitA"); using var b = new FakeDevice("unitB");
+        using var primary = Manager(() => [a, b]); primary.SweepOnce();
+        var log = new DeviceEqWriterTests.Lines();
+        bool scanned = true;
+        using var interfaces = new WaveInterfaces(primary, log, Configuration, () => scanned ? [a.Fork(), b.Fork()] : [a.Fork()])
+        {
+            StateGapWarning = TimeSpan.Zero,
+        };
+        int Said(string part) { lock (log.Written) return log.Written.Count(l => l.Contains(part, StringComparison.Ordinal)); }
+        b.Refuse = true;
+        await interfaces.StartAsync(CancellationToken.None);
+        try
+        {
+            Wait(() => interfaces.Snapshot().Count == 2);
+            Assert.Null(interfaces.SetEnabled(b.Info.InstanceId, true));
+            Wait(() => Said("has shown no state") == 1);
+            Assert.Equal(1, Said("has shown no state for 0 s: its manager has no connection to it."));
+            // The scans that follow, and the reconnects, add nothing.
+            Thread.Sleep(TimeSpan.FromSeconds(2.5));
+            Assert.Equal(1, Said("has shown no state"));
+            Assert.Null(interfaces.Snapshot().Single(s => s.Id == b.Info.InstanceId).State);
+
+            // The manager's open retries back off, 2 s then 4 s.
+            b.Refuse = false;
+            Assert.True(SpinWait.SpinUntil(() => Said("shows its state again") == 1, TimeSpan.FromSeconds(15)));
+            Assert.NotNull(interfaces.Snapshot().Single(s => s.Id == b.Info.InstanceId).State);
+
+            scanned = false;
+            Wait(() => Said("is not on the USB scan any more") == 1);
+            Thread.Sleep(TimeSpan.FromSeconds(1.5));
+            Assert.Equal(1, Said("is not on the USB scan any more"));
+            Assert.Equal(1, Said("has shown no state"));
+        }
+        finally { await interfaces.StopAsync(CancellationToken.None); primary.SuspendSession(); }
+    }
+
     [Fact]
     public async Task TwoProsWithoutTellingSerialsCannotBeMadeAdditional()
     {
@@ -572,13 +616,15 @@ public sealed class WaveInterfaceTests : IDisposable
         internal sealed class Hardware
         {
             public int Gain = 30;
+            public volatile bool Refuse;
             public volatile ManualResetEventSlim? ReadBlock;
             public readonly ManualResetEventSlim ReadEntered = new();
         }
         private readonly Hardware _hardware = shared ?? new();
         public FakeDevice Fork() => new(serial, _hardware, Capabilities.RetainsSettings, port, outputRouting, model, productId);
         public int Gain { get => _hardware.Gain; set => _hardware.Gain = value; }
-        public void Connect() => Connected = true;
+        public void Connect() => Connected = _hardware.Refuse ? throw new InvalidOperationException("the unit refused the open") : true;
+        public bool Refuse { get => _hardware.Refuse; set => _hardware.Refuse = value; }
         public void Disconnect() => Connected = false;
         public void Dispose() => Connected = false;
         public void Unplug() => Connected = false;
