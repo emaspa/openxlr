@@ -368,6 +368,13 @@ physical gain dial.
   not a change and goes through: a dock that forgets its settings would
   otherwise come up at whatever gain its firmware chooses, which is the
   one thing the lock is there to prevent.
+- LED ring on the Wave XLR MK.2 from firmware 1.0.15: the ring's and the
+  level meter's brightness and the ring's colour in the gain, headphone
+  and mix modes, from the **LEDs** button in the HEADPHONES card or
+  [`setLed`](api.md#led-ring). Each change is written to the unit at once;
+  the daemon keeps what was set per unit in `leds.json` and writes it back
+  at every connect. Measured on the desk on 2026-11-11; the XLR Dock MK.2
+  and the Wave:3 MK.2 are not driven.
 
 The software low cut and limiter appear when XLR 1 is bound to another
 source or the backend does not expose the corresponding hardware control.

@@ -49,6 +49,9 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>Hardware mixing on the Wave XLR Pro: the Options choice, the SUBMIXER badge and what the mode turns off.</summary>
     public HardwareMixingViewModel HardwareMixing { get; }
 
+    /// <summary>The LED ring of a unit that has one OpenXLR sets: the LEDs window edits it.</summary>
+    public LedRingViewModel LedRing { get; }
+
     private readonly DaemonClient _client;
     private bool _applying;
 
@@ -62,6 +65,7 @@ public sealed partial class MainViewModel : ViewModelBase
         Soundboard = new SoundboardViewModel(client);
         VoiceChanger = new VoiceChangerViewModel(client);
         HardwareMixing = new HardwareMixingViewModel(client);
+        LedRing = new LedRingViewModel(client);
         LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
@@ -82,6 +86,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 Soundboard.Reset();
                 VoiceChanger.Reset();
                 HardwareMixing.Reset();
+                LedRing.Reset();
                 ApplyHardwareMixingNotes();
                 _client.EqProfiles.Reset();
                 Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
@@ -1086,6 +1091,9 @@ public sealed partial class MainViewModel : ViewModelBase
                 if (!SliderSync.RecentlyTouched("line")) LineInGainDb = s["lineInGainDb"]?.GetValue<int>() ?? 0;
                 LineInLevelLock = s["lineInLevelLock"]?.GetValue<bool>() ?? false;
             }
+
+            LedRing.Apply(DeviceConnected && node["capabilities"]?["ledRing"] is JsonValue ledRing && ledRing.TryGetValue(out bool hasLeds) && hasLeds,
+                node["state"]?["led"]);
 
             // Read outside the state block, so a unit that left takes its path with it.
             HpMixMicDirect = node["state"]?["hpMixMicDirect"]?.GetValue<bool>() ?? false;

@@ -569,6 +569,9 @@ public sealed class WebSocketHub
                 lock (_installGate) error = HandleRecallOnConnect(cmd);
                 if (error is null) Broadcast(Snapshot());
                 break;
+            case "setLed":
+                error = CommandValidation.CheckLed(cmd) ?? _devices.ApplyLed(CommandValidation.LedChange(cmd));   // broadcasts on success
+                break;
             case "resetDevice":
                 error = _devices.ResetToDefaults();   // the state change broadcasts itself
                 if (error is null) _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());

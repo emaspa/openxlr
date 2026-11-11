@@ -910,6 +910,9 @@
         <UniformGrid Columns="7">
           <ToggleButton Content="{loc:Text Key=LowImp}" IsChecked="{Binding LowImpedance, Mode=TwoWay}" Margin="0,0,6,0"
                         IsVisible="{Binding CapLowImpedance}"/>
+          <!-- the unit's LED ring, on a unit that has one OpenXLR sets -->
+          <Button Name="LedRingButton" Content="{loc:Text Key=LedRingButton}" Click="OnLedRing" Margin="0,0,6,0"
+                  IsVisible="{Binding LedRing.Available}" ToolTip.Tip="{loc:Text Key=LedRingButtonTip}"/>
         </UniformGrid>
       </StackPanel>
       </Expander>

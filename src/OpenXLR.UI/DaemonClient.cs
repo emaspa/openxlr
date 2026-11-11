@@ -16,7 +16,7 @@ namespace OpenXLR.UI;
 /// <see cref="StateReceived"/> for every pushed state. State is handed over as a
 /// JsonNode so the UI can bind to it without duplicating the daemon's records.
 /// </summary>
-public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileCommands, INoiseCommands, IVoiceCommands, IDynamicsCommands, IDuckingCommands, ISoundboardCommands
+public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileCommands, INoiseCommands, IVoiceCommands, IDynamicsCommands, IDuckingCommands, ISoundboardCommands, ILedCommands
 {
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -156,6 +156,14 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     /// companion: the tab id and the origin the requester saw.
     /// </summary>
     internal event Action<int, string>? BrowserTabActivationReceived;
+
+    /// <summary>
+    /// Set one of the unit's LEDs (<c>ringBrightness</c>, <c>meterBrightness</c>,
+    /// <c>gainColour</c>, <c>headphoneColour</c>, <c>mixColour</c>), or with
+    /// <c>reset</c> and no value write its factory LEDs. Null once the unit has it.
+    /// </summary>
+    public Task<string?> SetLedAsync(string control, object? value)
+        => EditLayoutAsync(new() { ["cmd"] = "setLed", ["control"] = control, ["value"] = value! });
 
     /// <summary>Force the graph's block size in frames, or null for automatic.</summary>
     public Task<string?> SetBlockSizeAsync(int? frames)

@@ -417,6 +417,9 @@ public partial class MainWindow : Window
     private void OnDucking(object? sender, RoutedEventArgs e)
         => DuckingWindow.Open(this, _vm.Ducking);
 
+    private void OnLedRing(object? sender, RoutedEventArgs e)
+        => new LedRingWindow(_vm.LedRing).ShowDialog(this);
+
     /// <summary>The SUBMIXER header's Soundboard button, which stays in this window while the mixer is popped out.</summary>
     private void OnSoundboard(object? sender, RoutedEventArgs e)
         => OpenSoundboard();

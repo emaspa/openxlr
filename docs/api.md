@@ -162,7 +162,7 @@ The state message in full. At the top level: `daemonVersion`, `daemonBuildId`, `
 `mute`, `lowCut`, `expander`, `voiceTune`, `hpVolume`, `lowImpedance`,
 `crossfade`, `phantom`, `clipGuard`, `compressor`, `outputRouting`,
 `auxInput`, `lineInput` (the analog Line In with a gain of its own, separate from the USB Aux input: true on the Wave XLR Pro only), `lineInGainMaxDb` (the highest Line In gain in dB that `lineInGain` takes, from 0: 40 on the Wave XLR Pro, whose unit takes 80 but hisses above about 20; 0 on a model without `lineInput`), `xlrInputs`, `xlrJacks` (false on the Wave:3, Wave:3 MK.2 and Wave:1, whose one input is the microphone's own capsule rather than an XLR jack), `hpOutputs`, `physicalControls`, `retainsSettings`, `hardwareEq` (the unit's DSP runs the [microphone EQ](#microphone-eq) and the driver can write it: true on the Wave XLR MK.2 and the XLR Dock MK.2 from firmware 1.0.15, on the Wave:3 MK.2 from its firmware 0.2.3 and on the Wave XLR Pro from firmware 1.0.14, false on every other model and on older firmware), `hardwareDynamics` (the unit's DSP runs the microphone's [compressor and expander](#where-the-compressor-and-expander-run) and the driver can write their settings: true where `hardwareEq` is true and the unit's compressor and expander fields hold values it takes), `dynamicsMeters` (the unit reports the levels of the compressor and expander it runs, which then reach `exp:<id>` and `comp:<id>`: true on the Wave XLR MK.2 from firmware 1.0.15 where `hardwareDynamics` is true, false on every other model; the XLR Dock MK.2 and the Wave:3 MK.2 have the same meter block, not yet checked), `hardwareGainLock` (the unit has a gain lock of its own, which the daemon holds with the gain lock: true on the Wave XLR MK.2 and the XLR Dock MK.2 from firmware 1.0.15, false on every other model, on older firmware and on a unit whose version was not read), `ducking` (the unit can run [ducking](#ducking) on its own processor: true on the Wave XLR Pro only), `hardwareMixing` (the unit can build the mixes its outputs play, see [hardware mixing](#hardware-mixing): true on the Wave XLR Pro only),
-`builtInDefaults`, `captureRecovery` (the daemon brings the unit's microphone back by a USB reset when its capture stalls under its own playback, and takes `recoverCapture`, which first links the capture again: true on the Wave:3 MK.2 only), and `gainMaxDb`, the highest gain in dB that `gain` and
+`builtInDefaults`, `ledRing` (the unit's LED ring can be set with [`setLed`](#led-ring): true on the Wave XLR MK.2 from firmware 1.0.15 once its LED block has answered in full at connect, false on every other model, the XLR Dock MK.2 and the Wave:3 MK.2 among them, on older firmware and on a unit whose version was not read), `captureRecovery` (the daemon brings the unit's microphone back by a USB reset when its capture stalls under its own playback, and takes `recoverCapture`, which first links the capture again: true on the Wave:3 MK.2 only), and `gainMaxDb`, the highest gain in dB that `gain` and
 `gain2` take, from 0: 80 on the Wave XLR Pro and the MK.2 family, 75 on the
 Wave XLR and the first XLR Dock, 40 on the Wave:3, Wave:3 MK.2 and Wave:1; a higher value is held
 to it), `state` (the hardware settings: `gainDb`, `mute`,
@@ -175,7 +175,7 @@ written above it; false on every other model), `lowImpedance`,
 `outLineOut`, `hpMixMonitorReturn` (the Wave XLR Pro's Monitor return in the mix its headphone jacks and Line Out play, true only at 0 dB with the Line In jack's own path and every other USB playback pair, the Aux mix's stream among them, out of that mix, which is how the daemon sets it while a jack is a monitor output), `hpMixMicDirect` (XLR 1 in that mix: the Pro's zero-latency microphone path), `hpMixMicLevelDb` (that path's level in dB, -60 to +12 in half-dB steps; 0 on every other model), `hpMixMic2Direct` and `hpMixMic2LevelDb` (the same for XLR 2), `auxReturnEnabled`,
 `auxLevelDb`, `auxLevelLock`, `lineInGainDb` (the Line In's gain in dB as the unit reads it back, 0 to `lineInGainMaxDb` once OpenXLR has written it and up to 80 on a unit set higher elsewhere, on a model with `lineInput`; absent on every other model), `lineInLevelLock` (the Line In's level lock, on a model with `lineInput`: while true the unit ignores Line In gain writes through its ALSA control, so the desktop mixer and other applications cannot move the gain, while `lineInGain` still applies; absent on every other model), `unitGainLock` (the unit's own gain lock as the unit reads it back, block 0x0004 byte 2 bit 0x04, on a model with `hardwareGainLock`: while true the unit ignores gain written through its ALSA control, so the desktop mixer and WirePlumber's restore cannot move the gain, while `gain` still applies; the daemon sets it while `gainLocked` is true and clears it while it is false, at every connect too; absent on every other model and left out of saved settings and profiles), `micConnected` and `headphonesConnected` (read only: whether a microphone is plugged into the unit's XLR jack and headphones into its headphone jack, block 0x0006 byte 0 bits 0 and 1, read with each poll on the Wave XLR MK.2 from firmware 1.0.15; absent on every other model, on older firmware and after a read of the block failed, and left out of saved settings and profiles), plus the daemon-stamped `gainLocked`,
 `phantomSettling`, `phantomSettling2`, `phantomSettleSeconds` and
-`phantomSettleSeconds2`), `ducking` (present whenever the daemon runs, see [ducking](#ducking)),
+`phantomSettleSeconds2`, and `led`, the unit's LEDs as it reads them back on a model with `ledRing`, see [LED ring](#led-ring); absent on every other model and left out of saved settings and profiles), `ducking` (present whenever the daemon runs, see [ducking](#ducking)),
 `mixer`, `mixerWaiting`, `devices`, `profiles`, `activeProfile`, `recallOnConnect`,
 `eqProfiles` and `eqProfileProblem` (see [EQ profiles](#eq-profiles)) and
 `detected` (`usbId`, `name`, `active` for every attached interface; `usbId`
@@ -377,6 +377,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setRecallOnConnect` | `name` | the profile recalled whenever the active device connects fresh (daemon start, replug, switch to it); empty clears it. With none chosen, a device whose capabilities say `retainsSettings: false` gets the last settings the daemon saw on it instead. Refused while no interface is connected |
 | `setDucking` | `value` | change the [ducking](#ducking) setup: an object with any of `enabled`, `keys` (or `key`, one key, as older clients send it), `channels`, `mixes`, `sensitivity`, `amount`, `speed`; the fields it leaves out keep their values and an unknown one is refused. Saved in `mixer.json` before it applies. Needs the software mixer, on any device or none |
 | `setDuckingProcessing` | `value` | where [ducking](#ducking) should run: `device` (the default) on the unit when the setup fits it, or `software` on this computer. On the Wave XLR Pro `device` runs ducking on the unit when the setup fits it, and in software otherwise, with the reason in `ducking.device.reason` (see [where ducking runs](#ducking)). Saved in `mixer.json`, never in a profile |
+| `setLed` | `control`, `value` | set the unit's LED ring on a unit with `ledRing`: `ringBrightness` or `meterBrightness` with a whole percentage from 0 to 100, `gainColour`, `headphoneColour` or `mixColour` with a colour as `#rrggbb`, or `reset` with no value for the factory LEDs. The daemon keeps what was set per unit and writes it back at every connect; see [LED ring](#led-ring) |
 | `resetDevice` | none | write the recorded defaults back to a device using connect-time restoration and forget its last settings (an error until the daemon has seen the device connect after a power cycle once); on the Wave XLR Pro, which keeps its own settings, write OpenXLR's baseline instead: gain 30 dB on both inputs, every processing stage and phantom off, headphones and aux level at half, routing, the microphone's level in the jacks' mix and the Line In gain and level lock untouched, refused while the gain lock is on. The capabilities say `builtInDefaults` when a model has a baseline |
 | `recoverCapture` | none | bring back the driven unit's microphone. First every link OpenXLR made out of the unit's capture is removed and made again, which leaves the mixes on the unit's own output playing; after 2 seconds the daemon asks the kernel whether the capture runs, and stops there when it does. Only a capture still stopped or missing goes on to the reset: every mix comes off the unit's own output, the unit is reset on USB, and the mixes go back once the reconnected unit's capture runs, or after 30 seconds without it. Only on a unit whose capabilities say `captureRecovery`; an error otherwise, while a recovery is under way, or when the reset fails, in which case the mixes go straight back. The daemon resets the unit by itself, without the relink, when the kernel keeps the capture stopped for 3 seconds while PipeWire runs it and a mix plays into the unit, at most once every 2 minutes and 3 times in 30 minutes |
 | `setAudioClock` | `value` | make one ALSA device the audio clock by its node name, or with `null` or no `value` go back to Automatic. The node must be one of `mixer.clockChoice.options` or the one already chosen; a name other than `alsa_input.` or `alsa_output.` followed by letters, digits, `_`, `-` and `.` is refused. Writes `~/.config/wireplumber/wireplumber.conf.d/57-openxlr-clock.conf`, or for Automatic deletes it, and restarts nothing; the rule applies when WirePlumber next starts. A file of that name OpenXLR did not write is neither replaced nor deleted. Refused in the Flatpak. See [audio clock](#audio-clock) |
@@ -1246,6 +1247,55 @@ before a changed state is broadcast. These updates are serialized outside
 the USB poll loops, so a read stalled on one interface does not block a
 command or state notification from another interface.
 
+### LED ring
+
+On a unit whose capabilities report `ledRing` (the Wave XLR MK.2 from
+firmware 1.0.15), the state carries `led`:
+
+```json
+"led": {
+  "ringBrightness": 100,
+  "meterBrightness": 100,
+  "gainColour": "#ffffff",
+  "headphoneColour": "#ffffff",
+  "mixColour": "#ffffff"
+}
+```
+
+`ringBrightness` is the brightness of the ring's steady display and
+`meterBrightness` that of the moving microphone level meter on the ring,
+each 0 to 100 %. `gainColour`, `headphoneColour` and `mixColour` are the
+ring's colour while the dial sets the gain, the headphone level and the
+mix, as `#rrggbb` in lower case. The values are what the unit reads back. The
+daemon reads the LED block once at connect and again with each write.
+
+`setLed` sets one of them:
+
+```json
+{"cmd":"setLed","control":"ringBrightness","value":40}
+{"cmd":"setLed","control":"mixColour","value":"#00ff00"}
+{"cmd":"setLed","control":"reset"}
+```
+
+| `control` | `value` |
+|---|---|
+| `ringBrightness`, `meterBrightness` | a whole number from 0 to 100. The unit takes a byte from 0x08 to 0xff: 100 is 0xff, and 3 and below write 0x08, the dimmest level checked on the unit, so they read back as 3 |
+| `gainColour`, `headphoneColour`, `mixColour` | a colour as `#rrggbb`, either case. `#ffffff` lights the unit's white LED alone, as the unit ships; any other colour lights its red, green and blue LEDs at the colour's own values with the white LED off. A slot set elsewhere with the white LED and a colour together reads back as their sum |
+| `reset` | none. Writes the factory LEDs, 100 % for both brightnesses and `#ffffff` in every mode, and forgets what OpenXLR kept for the unit |
+
+Each write is one read of the unit's LED block and one write of the whole
+block, with every byte other than the field set written back as read; a
+value the unit already holds is not written. On a unit without `ledRing`
+the daemon answers `setLed: the active device has no LEDs OpenXLR can set`.
+The command acts on the primary interface.
+
+The daemon keeps the fields set through `setLed` in
+`~/.config/openxlr/leds.json`, per unit by its USB id, and writes them back
+each time the unit connects, so a unit changed elsewhere meanwhile comes
+back as OpenXLR left it. A field never set from OpenXLR is left as the unit
+holds it, and after `reset` nothing is written back. Profiles and saved
+settings do not carry the LEDs.
+
 ### Card profile
 
 `cardProfile` describes the PipeWire card of the driven unit, at the top of
@@ -1576,6 +1626,7 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   with after a power cycle, what `resetDevice` writes back
 - `active-device.json`: `{device}`, the instance id of the unit `setActiveDevice` chose last (a model id `vvvv:pppp` for a unit without a USB location), driven again as the primary after a restart. Written by the daemon.
 - `gainlock.json`: which devices have the gain lock set
+- `leds.json`: the LEDs set with `setLed`, per unit, written back at every connect ([LED ring](#led-ring))
 - `soundboard.json`: the [soundboard](#soundboard) library, `{enabled,
   clips}`, each clip `{id, name, file, gain, mode, loop, icon, colour,
   seconds, page, starter}`, `retired`, the ids of deleted clips, which a new clip

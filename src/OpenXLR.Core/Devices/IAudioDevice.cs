@@ -117,6 +117,16 @@ public interface IAudioDevice : IDisposable
     /// <exception cref="InvalidOperationException">The unit has no gain lock of its own, or a transfer failed.</exception>
     bool SetUnitGainLock(bool on) => throw new InvalidOperationException("this unit has no gain lock of its own");
 
+    /// <summary>
+    /// Write the unit's LEDs: the fields <paramref name="change"/> sets, in
+    /// one read of the LED block and one write of the whole block, every
+    /// other byte as read. False when the unit already held them and nothing
+    /// was written. A unit whose capabilities report
+    /// <see cref="DeviceCapabilities.LedRing"/> overrides it.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The unit has no LEDs OpenXLR can set, or a transfer failed.</exception>
+    bool SetLed(DeviceLedChange change) => throw new InvalidOperationException("this unit has no LEDs OpenXLR can set");
+
     // The microphone EQ on the unit's own DSP. Default no-ops, like the
     // second-input setters; a unit whose capabilities report HardwareEq
     // overrides them.
@@ -322,6 +332,17 @@ public sealed record DeviceCapabilities
     /// same bit is ClipGuard, and on a unit whose version was not read.
     /// </summary>
     public bool HardwareGainLock { get; init; }
+
+    /// <summary>
+    /// The unit's LED ring can be set: the ring's and the level meter's
+    /// brightness and the ring's colour in each of the dial's three modes
+    /// (<see cref="WaveFxLed"/>). The Wave XLR MK.2 from firmware 1.0.15,
+    /// measured on the desk on 2026-11-11, once its LED block has answered
+    /// in full at connect. False on every other model, the XLR Dock MK.2 and
+    /// the Wave:3 MK.2 among them, on older firmware and on a unit whose
+    /// version was not read.
+    /// </summary>
+    public bool LedRing { get; init; }
 
     /// <summary>
     /// The unit ducks its own outputs while the key input is loud and the
