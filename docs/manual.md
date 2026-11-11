@@ -4231,7 +4231,7 @@ profiles work as before. What changes on the mixes the unit builds:
 
 | What | While the unit builds the jacks' mixes |
 |---|---|
-| How many channels | Eight fit, hidden ones included, each on its own USB pair. XLR 1, XLR 2, Line In and Aux In are the unit's own inputs and need none. A bigger layout is refused, and so is adding a ninth channel. The pairs your channels leave free go to processed microphones first, then to auditions. |
+| How many channels | Eight fit, hidden ones included, each on its own USB pair. XLR 1, XLR 2, Line In and Aux In are the unit's own inputs and need none. A bigger layout is refused, and so is adding a ninth channel. The pairs your channels leave free go to processed microphones first, then to auditions. A channel you add while every pair is in use, as with seven channels and a processed XLR 1, gets no pair. The jacks and the USB Aux port leave it out until a pair is free, and the processed microphone keeps its pair. Stream and Chat still get the channel. |
 | Headphones when it starts | Turned down 21 dB, or 29 dB while a jack's mix holds Line In, Aux In or a microphone that reaches the unit raw, so nothing gets louder. |
 | Output volume of a jack | Turns that jack's headphone volume, or Line Out's level, down. It never goes above where it was. |
 | Balance | Applications sit 7.9 dB under the microphones at equal faders, as they do under Wave Link. |

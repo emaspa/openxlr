@@ -3288,7 +3288,8 @@ from `disabled`. Nothing of it has been heard on a unit yet.
 
 **Pairs.** A channel the unit cannot take raw streams on a pair: System on
 pair 0, Game on 1, Music on 2, Browser on 3, Voice Chat on 4 and SFX on 6.
-Any other channel takes the first free pair of 7, 5, 0, 1, 2, 3, 4 and 6.
+Any other channel takes the first pair of 7, 5, 0, 1, 2, 3, 4 and 6 that
+no channel and no return pair (below) holds.
 Pair 5 carries the Aux mix's stream to the USB Aux port outside the mode;
 in it the unit builds the Aux mix itself, so pair 5 is a channel pair like
 the others. XLR 1, XLR 2, Aux
@@ -3296,7 +3297,7 @@ In and Line In are the unit's own inputs and need no pair while they carry
 the unit's input. A strip bound to another source takes a pair, and the
 capture input kept for the unit's microphone takes the unit's input
 instead. A channel keeps its pair in `hardwarePairs` across restarts and
-layout edits. Eight channels fit, hidden ones included. A layout with
+layout edits, and deleting the channel drops it. Eight channels fit, hidden ones included. A layout with
 more is refused, and `note` says how many need a pair: "Hardware mixing on
 the Wave XLR Pro streams at most 8 channels; this layout has 9 that need a
 USB pair."
@@ -3309,10 +3310,19 @@ XLR 2, Aux In, Line In: its channel's audio plays back to the unit on that
 pair, a return pair, and the unit's mixes take the input from there,
 processed, at its sends, instead of the raw input. Then the cue pair, which
 plays soundboard auditions in the jacks' sections only, at the volume of
-the jack's mixes, and never in the Aux mix. Channels come first and keep
-their pairs, so a channel added later takes a pair from a claim; the cue
-gives way first, then the last processed input. An input with no pair left
-reaches the unit's mixes raw, with its `processedMic:<id>` note. A switch
+the jack's mixes, and never in the Aux mix. The order is: each channel's
+kept pair and each return pair the running mode holds, the built-in
+channels' own pairs, the other return pairs, the other channels in layout
+order, then the cue. A pair is never taken from a
+channel or an input that holds it, so a return pair is never handed to a
+channel. A channel added while every pair is in use, as with seven
+channels and a processed XLR 1, gets no pair. It carries no
+`hardwarePair`, the jacks' mixes and the Aux mix leave it out, and
+`disabled` carries its `pair:<id>` note. The computer's mixes keep it. It takes a
+pair once one is free. An input whose processing starts while every pair
+is in use reaches the unit's mixes raw, with its `processedMic:<id>`
+note. A channel added while a pair is free takes it and the cue gives
+way. A switch
 between the raw input and its return pair is one block write that clears
 the one and opens the other, with the pair linked before, so the voice is
 never heard twice. Neither claim is kept in `hardwarePairs`. On a layout
@@ -3452,8 +3462,9 @@ a microphone with no pair for its take, with the `soundCheck:<id>` or
 cue pair, `setInserts` with a chain for a mix a jack plays with its
 `inserts:mix:<id>` sentence, and `setEq`, `setEqEnabled`, `setEqBand` and
 `loadEqProfile` on a mix the unit builds with its `eq:mix:<id>` sentence. `createChannel`, `createCaptureChannel` and a `setInputBinding`
-that would need a pair when none is left are refused with the budget
-sentence. `setMixing` with `hardware` is refused with that sentence while
+that would put more than eight channels on pairs are refused with the
+budget sentence; one that fits while every pair is in use is made, and
+the channel gets no pair (see **Processed inputs and the cue**). `setMixing` with `hardware` is refused with that sentence while
 the layout has more channels than pairs. Ducking on a mix the unit builds,
 the Aux mix included while the port is on, runs on the unit per channel
 (see [where ducking runs](#where-ducking-runs)); on mixes the computer
@@ -3475,7 +3486,9 @@ which runs no maximizer; while the unit builds a mix, `ducking:key` (the unit ke
 ducking of its mixes only from its own inputs and the channels on its
 pairs, so a capture microphone cannot key it); `latencyCompensation`;
 `processedMic:<id>` for a unit input with software processing and no
-return pair, which the unit's mixes take as it comes in;
+return pair, which the unit's mixes take as it comes in; `pair:<id>` for
+a channel that needs a USB pair and found none, which the unit's mixes
+leave out;
 `soundCheck:<id>` for XLR 1 or XLR 2 when no pair is left for its take,
 and `soundCheck` when that holds for both; `audition` while there is no
 cue pair. Mixes the computer builds (Stream, Chat, and any mix only other
@@ -3496,7 +3509,7 @@ unit holds.
 also carries `pairs`, `returnPairs` (each processed unit input to its
 return pair), `cuePair` (or null), `sections`, `jacks`, `clamped` and
 `disabled`, each channel on a pair or a return pair carries
-`hardwarePair`, and each mix a jack plays carries `hardwareSection`. `capabilities.hardwareMixing` is true on the
+`hardwarePair` (a channel left without a pair carries none), and each mix a jack plays carries `hardwareSection`. `capabilities.hardwareMixing` is true on the
 Wave XLR Pro.
 
 **Dry run.** `{"cmd":"setMixing","value":"hardware","check":true}` is

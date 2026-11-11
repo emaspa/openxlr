@@ -193,6 +193,9 @@ public sealed partial class Mixer
             _voice.Remove(id, out MicVoice? previousVoice);
             _compressor.Remove(id, out MicCompressor? previousCompressor);
             _expander.Remove(id, out MicExpander? previousExpander);
+            // And the pair hardware mixing kept for it, so a channel made
+            // later under the same id holds no pair it never had.
+            bool hadPair = _hardwarePairs.Remove(id, out int previousPair);
             CellSnapshot cells = TakeChannelCellsLocked(id, previous.Mixes);
             _config = next;
             foreach (string identity in movedOverrides) Matcher.SetOverride(identity, fallback.Id);
@@ -208,6 +211,7 @@ public sealed partial class Mixer
                 if (previousVoice is not null) _voice[id] = previousVoice;
                 if (previousCompressor is not null) _compressor[id] = previousCompressor;
                 if (previousExpander is not null) _expander[id] = previousExpander;
+                if (hadPair) _hardwarePairs[id] = previousPair;
                 cells.Restore(this);
                 foreach (string identity in movedOverrides) Matcher.SetOverride(identity, id);
                 foreach ((string identity, StreamAssignment app) in movedApps) _apps[identity] = app;

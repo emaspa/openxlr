@@ -391,7 +391,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// What hardware mixing turns off while it runs, as the command's error:
     /// a Sound Check session and Hear myself, an audition, an insert chain or
     /// an EQ change on a mix the unit builds, and a channel or binding that
-    /// needs a USB pair when none is left. Null otherwise.
+    /// would need a USB pair past the budget. Null otherwise.
     /// </summary>
     private string? RefusedInHardwareMixing(Command cmd)
     {
@@ -399,8 +399,12 @@ public sealed partial class MixerService : IHostedService, IDisposable
         string? Disabled(string key) => plan.Disabled.TryGetValue(key, out string? sentence) ? $"{cmd.Cmd}: {sentence}" : null;
         // A session on a channel that has no pair for its take, or on any while none has.
         string? SoundCheck() => Disabled($"soundCheck:{cmd.Channel}") ?? Disabled("soundCheck");
-        string? Budget() => plan.Pairs.Count < HardwareMixingPlanner.ChannelPairs.Count ? null
-            : $"{cmd.Cmd}: {HardwareMixingPlanner.BudgetNote(plan.Pairs.Count + 1)}";
+        // Over the budget the mode would stop. A channel the budget still
+        // takes but no pair is left for runs out of the unit's mixes, with
+        // its note: return pairs stay with their inputs.
+        int needing = plan.Pairs.Count + plan.Unpaired.Count;
+        string? Budget() => needing < HardwareMixingPlanner.ChannelPairs.Count ? null
+            : $"{cmd.Cmd}: {HardwareMixingPlanner.BudgetNote(needing + 1)}";
         return cmd.Cmd switch
         {
             "soundCheck" when cmd.Action != "stop" && _mixer.SoundCheckChannel != cmd.Channel => SoundCheck(),
@@ -413,7 +417,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             "setEq" or "setEqEnabled" or "setEqBand" or "loadEqProfile" when cmd.Mix is { } mix => Disabled(Mixer.MixEqDisabledKey(mix)),
             "createChannel" or "createCaptureChannel" => Budget(),
             // A strip bound to another source streams on a pair of its own.
-            "setInputBinding" when cmd.Source is not null && cmd.Channel is { } strip && !plan.Pairs.ContainsKey(strip) => Budget(),
+            "setInputBinding" when cmd.Source is not null && cmd.Channel is { } strip && !plan.Pairs.ContainsKey(strip) && !plan.Unpaired.Contains(strip) => Budget(),
             _ => null,
         };
     }
