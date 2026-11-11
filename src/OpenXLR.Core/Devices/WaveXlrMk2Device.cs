@@ -37,6 +37,15 @@ namespace OpenXLR.Core.Devices;
 /// MK.2; the Wave XLR MK.2 and the XLR Dock MK.2 hold the same fields with
 /// the same factory values, and are driven the same way unchecked by ear.
 ///
+/// On the Wave XLR MK.2 from firmware 1.0.15 the poll also reads the status
+/// block 0x0006 (<see cref="Mk2Status"/>) for whether a microphone and
+/// headphones are plugged in, and the device manager reads the meter block
+/// 0x0002 (<see cref="Mk2Meters"/>) for the compressor's and expander's
+/// levels while a client watches them. Both layouts were measured on the
+/// desk on 2026-11-10. The XLR Dock MK.2 and the Wave:3 MK.2 answer blocks
+/// of the same lengths, which have not been checked on them, so neither
+/// block is read there.
+///
 /// The XLR Dock MK.2 (<see cref="XlrDockMk2Device"/>) presents the same USB
 /// descriptor layout (five interfaces, vendor interface 3 whose alternate
 /// setting 0 has no endpoints; we never leave that setting)
@@ -126,6 +135,13 @@ public class WaveXlrMk2Device : IAudioDevice
     // Whether this unit's firmware is the limiter-mode layout, decided at connect.
     private bool _limiterMode;
 
+    // The first firmware whose meter and status blocks are read; null on a
+    // model whose blocks have not been checked.
+    private readonly Version? _statusFirmware;
+
+    // Whether this unit's meter and status blocks are read, decided at connect.
+    private bool _statusBlocks;
+
     // Whether OpenXLR holds the unit's gain lock, set by SetUnitGainLock
     // after each connect; a ClipGuard write keeps byte 2 bit 0x04 to it.
     private bool _gainLockHeld;
@@ -143,20 +159,27 @@ public class WaveXlrMk2Device : IAudioDevice
     // and ReadDynamics decode without a transfer.
     private byte[]? _settings;
 
-    public WaveXlrMk2Device() : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203) { }
+    public WaveXlrMk2Device() : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, statusFirmware: StatusFirmware) { }
 
-    internal WaveXlrMk2Device(IUsbTransport usb) : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, usb: usb) { }
+    internal WaveXlrMk2Device(IUsbTransport usb)
+        : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, usb: usb, statusFirmware: StatusFirmware) { }
 
     /// <param name="model">Must match the device's iProduct string minus the
     /// vendor, since the daemon derives the PipeWire node-name hint from it.</param>
     /// <param name="vIndex">wIndex of the vendor transfers, see <see cref="_vIndex"/>.</param>
+    /// <param name="statusFirmware">The first firmware on which the unit's
+    /// meter and status blocks (0x0002 and 0x0006) are read; null on a model
+    /// whose blocks have not been checked, which reads neither.</param>
     protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true,
-        ushort? alternateVIndex = null, IUsbTransport? usb = null)
+        ushort? alternateVIndex = null, IUsbTransport? usb = null, Version? statusFirmware = null)
         : this(productId, model, vIndex, Mk2Capabilities(physicalControls, retainsSettings), WaveFxEq.Mk2EqFirmware, alternateVIndex, usb,
-            limiterModeFirmware: LimiterModeFirmware) { }
+            limiterModeFirmware: LimiterModeFirmware, statusFirmware: statusFirmware) { }
 
     /// <summary>The Wave XLR MK.2's and the XLR Dock MK.2's first firmware with the limiter mode and the gain lock in byte 2.</summary>
     public static Version LimiterModeFirmware { get; } = new(1, 0, 15);
+
+    /// <summary>The Wave XLR MK.2's first firmware whose meter and status blocks are read: the version they were measured on.</summary>
+    public static Version StatusFirmware { get; } = new(1, 0, 15);
 
     /// <param name="capabilities">The controls the model has; each one this
     /// class can drive and the model lacks is left out of the state and
@@ -176,9 +199,10 @@ public class WaveXlrMk2Device : IAudioDevice
     /// 0x04 as ClipGuard on every firmware.</param>
     protected WaveXlrMk2Device(ushort productId, string model, ushort vIndex, DeviceCapabilities capabilities, Version? eqFirmware,
         ushort? alternateVIndex = null, IUsbTransport? usb = null, bool crossfadeReversed = false, byte lowCutMask = LowCutMask,
-        Version? limiterModeFirmware = null)
+        Version? limiterModeFirmware = null, Version? statusFirmware = null)
     {
         _limiterModeFirmware = limiterModeFirmware;
+        _statusFirmware = statusFirmware;
         _preferredVIndex = _vIndex = vIndex;
         _alternateVIndex = alternateVIndex;
         _usb = usb ?? UsbTransport.Create();
@@ -243,6 +267,7 @@ public class WaveXlrMk2Device : IAudioDevice
         ConnectionNote = null;
         Firmware = null;
         _limiterMode = false;
+        _statusBlocks = false;
         _gainLockHeld = false;
         EqSupport = null;
         DynamicsSupport = null;
@@ -293,6 +318,7 @@ public class WaveXlrMk2Device : IAudioDevice
         Firmware = version is null ? null : WaveFxEq.Format(version);
         // An unread version keeps the older meaning, as the EQ stays in software.
         _limiterMode = version is not null && _limiterModeFirmware is not null && version >= _limiterModeFirmware;
+        _statusBlocks = version is not null && _statusFirmware is not null && version >= _statusFirmware;
         // The gain lock bit exists only in the limiter-mode layout; below it
         // 0x04 is ClipGuard off and is never written for the lock.
         Capabilities = _modelCapabilities with { HardwareGainLock = _limiterMode };
@@ -315,6 +341,7 @@ public class WaveXlrMk2Device : IAudioDevice
             HardwareEq = EqSupport.Ready,
             HardwareDynamics = DynamicsSupport?.Ready == true,
             HardwareGainLock = _limiterMode,
+            DynamicsMeters = _statusBlocks && DynamicsSupport?.Ready == true,
         };
     }
 
@@ -426,6 +453,7 @@ public class WaveXlrMk2Device : IAudioDevice
         lock (_lock) _settings = s;
         byte[] hp = Read(BlockHp, HpLen, HpUsed);
         byte[] xf = Read(BlockCrossfade, CrossfadeLen, CrossfadeUsed);
+        Mk2StatusReading? status = ReadStatus();
         // A control the model lacks reads as off: on the Wave:3 MK.2 the
         // flag byte carries bits whose meaning is not known there.
         DeviceCapabilities c = _modelCapabilities;
@@ -444,7 +472,35 @@ public class WaveXlrMk2Device : IAudioDevice
             HpVolumeDb = -hp[0] / 4.0,
             LowImpedance = c.LowImpedance && (hp[1] & LowZMask) != 0,
             Crossfade = CrossfadeByte(xf[0]),
+            MicConnected = status?.MicConnected,
+            HeadphonesConnected = status?.HeadphonesConnected,
         };
+    }
+
+    /// <summary>
+    /// The status block, on a unit whose blocks are read; null on any other
+    /// and when the read fails or answers short, so the poll still reports
+    /// every control. A transfer that hangs still throws.
+    /// </summary>
+    private Mk2StatusReading? ReadStatus()
+    {
+        if (!_statusBlocks) return null;
+        try { return Mk2Status.Decode(Read(Mk2Status.Block, Mk2Status.Length, used: 0)); }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    /// <summary>
+    /// Block 0x0002, the unit's meters, read once and decoded, on a unit with
+    /// <see cref="DeviceCapabilities.DynamicsMeters"/>. Nothing polls it
+    /// here: the device manager reads it only while a client watches the
+    /// compressor's and expander's levels. A failed read gives null; a hung
+    /// one throws.
+    /// </summary>
+    public Mk2MeterReading? ReadInputMeters()
+    {
+        if (!Capabilities.DynamicsMeters) return null;
+        try { return Mk2Meters.Decode(Read(Mk2Meters.Block, Mk2Meters.Length, used: 0)); }
+        catch (InvalidOperationException) { return null; }
     }
 
     /// <summary>Refuse a control the model does not advertise before anything is read or written.</summary>
@@ -640,6 +696,20 @@ public class WaveXlrMk2Device : IAudioDevice
             }
             catch (Exception ex) { blocks[name] = $"error: {ex.Message}"; }
         }
+        if (_statusBlocks)
+            foreach ((string name, ushort block, int len, Func<byte[], IReadOnlyDictionary<string, string>> describe) in
+                     new (string, ushort, int, Func<byte[], IReadOnlyDictionary<string, string>>)[]
+                     { ("meterBlock", Mk2Meters.Block, Mk2Meters.Length, b => Mk2Meters.Describe(b)),
+                       ("statusBlock", Mk2Status.Block, Mk2Status.Length, b => Mk2Status.Describe(b)) })
+            {
+                try
+                {
+                    byte[] read = Read(block, len, used: 0);
+                    blocks[name] = Convert.ToHexString(read);
+                    foreach ((string key, string value) in describe(read)) blocks[key] = value;
+                }
+                catch (Exception ex) { blocks[name] = $"error: {ex.Message}"; }
+            }
         blocks["firmware"] = Firmware ?? "not read";
         blocks["eqSupport"] = _eqFirmware is null ? "in software: the model has no hardware EQ"
             : EqSupport is { } support ? support.Ready ? "on the unit" : $"in software: {support.Reason}" : "not decided";

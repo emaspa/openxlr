@@ -512,6 +512,14 @@ public sealed partial class MainViewModel : ViewModelBase
     private int _phantomSettleSeconds2;
     public int PhantomSettleSeconds2 { get => _phantomSettleSeconds2; set { if (Set(ref _phantomSettleSeconds2, value)) Raise(nameof(Mute2Label)); } }
 
+    // Whether the unit reports a microphone plugged in: the Wave XLR MK.2's
+    // status block from firmware 1.0.15; null on every other unit.
+    private bool? _micConnected;
+    public bool? MicConnected { get => _micConnected; set { if (Set(ref _micConnected, value)) Raise(nameof(MicMissing)); } }
+
+    /// <summary>The unit reports that no microphone is plugged in; false where it reports nothing.</summary>
+    public bool MicMissing => _micConnected == false;
+
     // The mute button counts the hold down while the firmware settles 48V.
     public string MuteLabel => PhantomSettling ? $"48V {PhantomSettleSeconds}s" : Localizer.Text("Mute");
     public string Mute2Label => PhantomSettling2 ? $"48V {PhantomSettleSeconds2}s" : Localizer.Text("Mute");
@@ -1038,6 +1046,8 @@ public sealed partial class MainViewModel : ViewModelBase
                 _capCaptureRecovery = caps["captureRecovery"]?.GetValue<bool>() ?? false;
             }
 
+            // Read outside the state block, so a unit that left takes it with it.
+            MicConnected = node["state"]?["micConnected"]?.GetValue<bool>();
             if (node["state"] is JsonNode s)
             {
                 if (!SliderSync.RecentlyTouched("gain")) GainDb = s["gainDb"]?.GetValue<int>() ?? 0;

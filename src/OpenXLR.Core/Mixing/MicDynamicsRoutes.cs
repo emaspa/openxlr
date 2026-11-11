@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using OpenXLR.Core.Devices;
 
 namespace OpenXLR.Core.Mixing;
 
@@ -18,7 +19,8 @@ namespace OpenXLR.Core.Mixing;
 /// running stage live, or to the unit. A client that shows their levels
 /// asks for them with <see cref="WatchDynamics"/> and keeps asking; while it
 /// does and the stage runs, the levels go out with the other meters as
-/// <c>exp:</c> and <c>comp:</c> and the channel.
+/// <c>exp:</c> and <c>comp:</c> and the channel. While a Wave XLR MK.2 runs
+/// them they come from the unit's own meters instead, read only while asked.
 /// </summary>
 public sealed partial class Mixer
 {
@@ -44,6 +46,9 @@ public sealed partial class Mixer
     // stages' helpers for the meter push, which reads them without the lock.
     private readonly Dictionary<string, long> _dynamicsWatch = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, NativePluginHost> _dynamicsMeterHosts = new(StringComparer.Ordinal);
+    // The watched channels whose compressor and expander a unit runs and
+    // reports the levels of, with that unit's input, for the same push.
+    private readonly ConcurrentDictionary<string, EqUnitInput> _dynamicsMeterUnits = new(StringComparer.Ordinal);
 
     /// <summary>A channel's compressor: what was set or recalled, else off.</summary>
     public MicCompressor CompressorFor(string channel) { lock (_gate) return CompressorLocked(channel); }
@@ -214,8 +219,9 @@ public sealed partial class Mixer
     /// Send this microphone's compressor and expander levels for another
     /// <see cref="DynamicsMeterLease"/>. They go out with the other meters as
     /// <c>exp:</c> and <c>comp:</c> and the channel while the microphone's
-    /// stage runs, which needs something in it on; nothing about the route
-    /// changes. Never saved.
+    /// stage runs, which needs something in it on, or while its unit runs
+    /// them and reports their levels; nothing about the route changes. Never
+    /// saved.
     /// </summary>
     public void WatchDynamics(string channel)
     {
@@ -238,6 +244,8 @@ public sealed partial class Mixer
     private void FollowDynamicsMetersLocked(string channel)
     {
         bool watched = _dynamicsWatch.ContainsKey(channel);
+        if (watched && UnitReportsDynamicsLocked(channel) is { } unit) _dynamicsMeterUnits[channel] = unit;
+        else _dynamicsMeterUnits.TryRemove(channel, out _);
         if (!_eqStages.TryGetValue(channel, out SoftwareEqBackend? stage) || !stage.IsAlive)
         {
             _dynamicsMeterHosts.TryRemove(channel, out _);
@@ -255,13 +263,23 @@ public sealed partial class Mixer
         else _dynamicsMeterHosts.TryRemove(channel, out _);
     }
 
-    /// <summary>The sweep's part: end leases that ran out, and follow a stage that was replaced.</summary>
+    /// <summary>
+    /// The unit input that runs a channel's compressor and expander now, when
+    /// that unit reports their levels (<see cref="UnitEqSupport.DynamicsLevels"/>);
+    /// null otherwise.
+    /// </summary>
+    private EqUnitInput? UnitReportsDynamicsLocked(string channel)
+        => _dynamicsDevices.TryGetValue(channel, out DeviceDynamicsBackend? backend)
+           && _unitEq.TryGetValue(backend.Target.Unit, out UnitEqSupport? support) && support.DynamicsLevels
+            ? backend.Target : null;
+
+    /// <summary>The sweep's part: end leases that ran out, and follow a stage that was replaced or a move to or from the unit.</summary>
     private void EnsureDynamicsMetersLocked()
     {
         long now = Stopwatch.GetTimestamp();
         foreach ((string channel, long until) in _dynamicsWatch.ToList())
             if (now >= until || !CarriesMicrophoneStageLocked(channel)) _dynamicsWatch.Remove(channel);
-        foreach (string channel in _dynamicsWatch.Keys.Union(_dynamicsMeterHosts.Keys).ToList())
+        foreach (string channel in _dynamicsWatch.Keys.Union(_dynamicsMeterHosts.Keys).Union(_dynamicsMeterUnits.Keys).ToList())
             FollowDynamicsMetersLocked(channel);
     }
 
@@ -270,13 +288,23 @@ public sealed partial class Mixer
     /// channel, each <c>[input, reduction, output]</c> in dB: the highest
     /// input and output peak in dBFS, -120 for silence, and the most gain
     /// reduction, 0 or more, since the stage's last report. Absent while the
-    /// stage does not run or its helper has no compressor.
+    /// stage does not run or its helper has no compressor. While a unit runs
+    /// them and reports their levels they are the unit's
+    /// (<see cref="UnitDynamicsLevels"/>), and absent for a frame its meters
+    /// are not there for; the stage, which then runs neither, is not asked.
     /// </summary>
     private void AddDynamicsLevels(Dictionary<string, double[]> meters)
     {
+        if (!_dynamicsMeterUnits.IsEmpty && Volatile.Read(ref _eqPort) is { } port)
+            foreach ((string channel, EqUnitInput unit) in _dynamicsMeterUnits)
+                if (port.DynamicsMeters(unit.Unit, unit.Input) is { } reading)
+                {
+                    meters[$"exp:{channel}"] = UnitDynamicsLevels(reading.Expander);
+                    meters[$"comp:{channel}"] = UnitDynamicsLevels(reading.Compressor);
+                }
         foreach ((string channel, NativePluginHost host) in _dynamicsMeterHosts)
         {
-            if (!host.IsHealthy) continue;
+            if (!host.IsHealthy || _dynamicsMeterUnits.ContainsKey(channel)) continue;
             IReadOnlyDictionary<string, double> values = host.Meters;
             if (!values.ContainsKey(SoftwareEqBackend.CompressorReductionMeter)) continue;
             meters[$"exp:{channel}"] = DynamicsLevels(values, SoftwareEqBackend.ExpanderInputMeter,
@@ -285,6 +313,14 @@ public sealed partial class Mixer
                 SoftwareEqBackend.CompressorReductionMeter, SoftwareEqBackend.CompressorOutputMeter);
         }
     }
+
+    /// <summary>
+    /// One of the unit's processors as <c>[input, reduction, output]</c>: its
+    /// key level as the input, since that is what it measures, its reduction
+    /// and its output, each level -120 at the unit's floor.
+    /// </summary>
+    internal static double[] UnitDynamicsLevels(Mk2DynamicsMeter meter)
+        => [Level(meter.KeyDb ?? -120), Math.Round(Math.Clamp(meter.ReductionDb, 0, 120), 2), Level(meter.OutputDb ?? -120)];
 
     internal static double[] DynamicsLevels(IReadOnlyDictionary<string, double> values, string input, string reduction, string output)
         => [Level(values.GetValueOrDefault(input, -120)), Math.Round(Math.Clamp(values.GetValueOrDefault(reduction), 0, 120), 1),

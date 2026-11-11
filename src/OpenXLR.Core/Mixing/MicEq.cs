@@ -307,4 +307,12 @@ public static class MicEqProcessing
 /// <see cref="MinimumFirmware"/> is the first version the unit runs it on.
 /// </summary>
 public sealed record MicEqDevice(string Unit, int Input, string Name, string? Firmware, bool Ready,
-    string? Reason = null, string? Note = null, string MinimumFirmware = "1.0.15");
+    string? Reason = null, string? Note = null, string MinimumFirmware = "1.0.15")
+{
+    /// <summary>
+    /// On the compressor's and expander's <c>device</c> only: whether the
+    /// unit reports their levels while it runs them, so <c>watchDynamics</c>
+    /// brings <c>exp:</c> and <c>comp:</c> from the unit. Null on the EQ's.
+    /// </summary>
+    public bool? Levels { get; init; }
+}

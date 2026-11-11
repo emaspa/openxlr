@@ -60,7 +60,13 @@ Wave XLR Pro:
 
 Wave XLR MK.2 and XLR Dock MK.2: gain, mute, phantom power, low cut,
 expander, voice tune with strength, ClipGuard, compressor, headphone
-volume, low impedance, crossfade.
+volume, low impedance, crossfade. From firmware 1.0.15 the Wave XLR MK.2
+also reports whether a microphone and headphones are plugged in (the
+state's `micConnected` and `headphonesConnected`, and a line on the strip
+that carries its microphone while none is) and the levels of the
+compressor and expander it runs, read from its status and meter blocks
+([layout](hardware-support.md#mk2-meter-status)). OpenXLR reads neither
+block on the XLR Dock MK.2 until their layout is checked there.
 
 Wave XLR: gain, mute, headphone volume, low impedance, phantom power.
 The desktop's volume controls follow the interface's gain, mute and
@@ -348,7 +354,9 @@ physical gain dial.
   **In software**, one choice for both
   ([`setDynamicsProcessing`](api.md#where-the-compressor-and-expander-run)).
   On the unit the window shows the output only, since the unit reports no
-  input or gain reduction. The unit's own Compressor and Expander switches
+  input or gain reduction, except on a Wave XLR MK.2 from firmware 1.0.15,
+  whose own meters fill the input, gain reduction and output meters while
+  the window is open. The unit's own Compressor and Expander switches
   become the microphone's, so the two never stack, and a microphone with
   no setting of its own takes what the unit holds. Byte layout checked on
   the Wave:3 MK.2; the other units hold the same fields and are not yet

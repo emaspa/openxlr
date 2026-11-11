@@ -52,6 +52,14 @@ public interface IDeviceEqPort
 
     /// <summary>The compressor and expander the input held at the last read, raw; null when not known.</summary>
     DeviceDynamics? HeldDynamics(string unit, int input) => null;
+
+    /// <summary>
+    /// The unit's own meters, for the levels of the compressor and expander
+    /// it runs on this input. Asking keeps them read for a second; null
+    /// while none is read yet, after a read that failed, on a unit that does
+    /// not report them, or when this unit is not driven. Never waits for USB.
+    /// </summary>
+    Mk2MeterReading? DynamicsMeters(string unit, int input) => null;
 }
 
 /// <summary>
@@ -75,6 +83,13 @@ public sealed record UnitEqSupport(string Name, string? Firmware, bool Ready, st
     /// software.
     /// </summary>
     public DeviceEqSupport? Dynamics { get; init; }
+
+    /// <summary>
+    /// Whether the unit reports the levels of the compressor and expander it
+    /// runs (<see cref="DeviceCapabilities.DynamicsMeters"/>), which
+    /// <see cref="IDeviceEqPort.DynamicsMeters"/> then gives.
+    /// </summary>
+    public bool DynamicsLevels { get; init; }
 }
 
 /// <summary>One input of one unit, by the unit's instance id and the input's number (1 or 2).</summary>

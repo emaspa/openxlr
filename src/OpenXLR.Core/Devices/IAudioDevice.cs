@@ -164,6 +164,14 @@ public interface IAudioDevice : IDisposable
     ProMeterReading? ReadMeters() => null;
 
     /// <summary>
+    /// Wave XLR MK.2: one read of the unit's meters (<see cref="Mk2Meters"/>),
+    /// decoded; null on a unit without
+    /// <see cref="DeviceCapabilities.DynamicsMeters"/> or when the read
+    /// fails. A transfer that hangs still throws.
+    /// </summary>
+    Mk2MeterReading? ReadInputMeters() => null;
+
+    /// <summary>
     /// Wave XLR Pro: bring block 0x0001 to a plan, the one writer of that
     /// block: the output selectors, the headphone mix's Monitor return and
     /// microphone paths, the USB Aux port's cells and the ducking fields, in
@@ -293,6 +301,15 @@ public sealed record DeviceCapabilities
     /// the Wave XLR Pro hold the same fields and are driven the same way.
     /// </summary>
     public bool HardwareDynamics { get; init; }
+
+    /// <summary>
+    /// The unit reports the levels of the compressor and expander it runs
+    /// (<see cref="Mk2Meters"/>): the Wave XLR MK.2 from firmware 1.0.15
+    /// while <see cref="HardwareDynamics"/> is true, measured on the desk.
+    /// False on every other model; the XLR Dock MK.2 and the Wave:3 MK.2
+    /// have the same block, whose layout has not been checked on them.
+    /// </summary>
+    public bool DynamicsMeters { get; init; }
 
     /// <summary>
     /// The unit has a gain lock of its own and the daemon holds it with

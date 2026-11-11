@@ -410,6 +410,11 @@ them. Plugin parameter controls keep the steps supplied by their plugin.
    level) reaches the same virtual microphone. What you hear yourself
    comes from the Monitor mix, which is separate.
 
+A Wave XLR MK.2 on firmware 1.0.15 or later tells OpenXLR whether a
+microphone is plugged into its XLR jack. While none is, the strip that
+carries its microphone says **No microphone is plugged into the
+interface.** under its source. The other models do not report it.
+
 Options has a tip for step 2: enforcing `OpenXLR Chat` as the system
 default input ([section 3.7](#default-devices)) makes every voice app pick it up without
 configuration.
@@ -1821,9 +1826,16 @@ expander together.
   A value set in software outside these, or between their steps, is held
   to the nearest one the unit takes while the unit runs it, and the window
   shows that value; your own comes back when you choose **In software**.
-- The unit reports no input level and no gain reduction, so on the unit
-  the window shows only **Output**: the microphone as it leaves the unit,
-  after its expander and compressor. The graph draws that level.
+- The Wave:3 MK.2, the XLR Dock MK.2 and the Wave XLR Pro report no
+  input level and no gain reduction, so on those units the window shows
+  only **Output**: the microphone as it leaves the unit, after its
+  expander and compressor. The graph draws that level.
+- A Wave XLR MK.2 on firmware 1.0.15 or later reports both, so its window
+  shows all three meters while it runs them. **Input** is what each
+  processor hears. The expander hears the microphone and the compressor
+  hears it after the expander. The compressor's **Input** moves more
+  slowly than a peak meter, since the compressor smooths what it hears.
+  OpenXLR reads the unit's meters only while the window is open.
 - **In software** runs both on this computer, with every setting in the
   table further up, and switches the unit's own off; the unit keeps its
   settings. While the unit cannot take them (older firmware, settings it

@@ -239,7 +239,7 @@ public sealed class DynamicsViewModelTests
 
     /// <summary>A processor's state with where it runs: the backend, the choice and the unit the channel carries.</summary>
     private static JsonNode OnUnit(JsonNode processor, string? backend, string processing = "device", bool ready = true,
-        string? reason = null, string name = "Wave:3 MK.2")
+        string? reason = null, string name = "Wave:3 MK.2", bool? levels = null)
     {
         JsonNode copy = JsonNode.Parse(processor.ToJsonString())!;
         copy["backend"] = backend;
@@ -249,8 +249,54 @@ public sealed class DynamicsViewModelTests
             ["unit"] = "0fd9:00ca@1", ["input"] = 1, ["name"] = name, ["firmware"] = ready ? "1.0.1" : "0.2.2", ["ready"] = ready,
             ["reason"] = reason, ["note"] = null, ["minimumFirmware"] = "0.2.3",
         };
+        if (levels is { } reports) copy["device"]!["levels"] = reports;
         return copy;
     }
+
+    [Fact]
+    public void AUnitThatReportsItsLevelsFillsTheMetersAsTheStageDoes() => TestUi.Run(() =>
+    {
+        var time = new ManualTime();
+        var sent = new Recorder();
+        var pair = new ChannelDynamicsViewModel(sent, "xlr1", "XLR 1", time);
+        MicDynamicsViewModel compressor = pair.Compressor, expander = pair.Expander;
+        pair.Apply(OnUnit(Compressor(enabled: true, threshold: -12), "device", name: "Wave XLR MK.2", levels: true),
+            OnUnit(Expander(enabled: true), "device", name: "Wave XLR MK.2", levels: true));
+        Assert.True(compressor.OnDevice);
+        Assert.True(compressor.UnitReportsLevels);
+        Assert.True(compressor.ShowsStageMeters);
+        Assert.Equal(Localizer.Text("DynamicsNoLevels"), compressor.Status);
+
+        // It watches the levels, and the meter before the chain while none came.
+        _ = compressor.KeepLevelsAsync();
+        Assert.Equal((1, 1), (sent.Watches, sent.InputWatches));
+        compressor.ApplyInputLevel(new JsonArray(0.4, 0.5, 0));
+        Assert.Equal(Localizer.Text("DynamicsNoReading"), compressor.InputText);
+        Assert.Equal(-30, compressor.OutputDb);
+
+        // The unit's levels win, input and reduction included.
+        compressor.ApplyLevels(new JsonArray(-12.0, 0.5, -14.5));
+        Assert.True(compressor.HasLevels);
+        Assert.Equal(DynamicsLevelSource.Stage, compressor.Source);
+        Assert.Equal((-12, 0.5, -14.5), (compressor.InputDb, compressor.ReductionDb, compressor.OutputDb));
+        Assert.Equal(Localizer.Format("DynamicsDecibels", "-12"), compressor.InputText);
+        Assert.Equal(Localizer.Format("CompressorUnitInputPoint", "Wave XLR MK.2"), compressor.Status);
+        expander.ApplyLevels(new JsonArray(-120.0, 24.0, -120.0));
+        Assert.Equal(24, expander.ReductionDb);
+        Assert.Equal(Localizer.Format("ExpanderUnitInputPoint", "Wave XLR MK.2"), expander.Status);
+        _ = compressor.KeepLevelsAsync();
+        Assert.Equal((2, 1), (sent.Watches, sent.InputWatches));
+
+        // A unit that stops reporting them goes back to the output alone.
+        pair.Apply(OnUnit(Compressor(enabled: true, threshold: -12), "device", name: "Wave XLR MK.2", levels: false),
+            OnUnit(Expander(enabled: true), "device", name: "Wave XLR MK.2", levels: false));
+        Assert.False(compressor.UnitReportsLevels);
+        Assert.False(compressor.ShowsStageMeters);
+        Assert.False(compressor.HasLevels);
+        compressor.ApplyLevels(new JsonArray(-12.0, 0.5, -14.5));
+        Assert.False(compressor.HasLevels);
+        Assert.Equal(Localizer.Format("DynamicsUnitLevels", "Wave XLR MK.2"), compressor.Status);
+    });
 
     [Fact]
     public void OnTheUnitTheControlsKeepToItsLimitsAndTheSwitchSendsTheChoice() => TestUi.Run(() =>

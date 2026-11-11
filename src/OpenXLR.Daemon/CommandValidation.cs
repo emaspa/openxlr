@@ -138,7 +138,9 @@ public static class CommandValidation
             case "watchDynamics":
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.IsMicrophoneChannel(cmd.Channel))
                     return "watchDynamics: need a microphone channel";
-                return !(nativeHostInstalled ?? PluginCatalog.HostInstalled) ? Mixer.DynamicsNeedsHost : null;
+                // A unit that runs them reports their levels without the host.
+                return !(nativeHostInstalled ?? PluginCatalog.HostInstalled) && !layout.DynamicsRunOnDevice(cmd.Channel)
+                    ? Mixer.DynamicsNeedsHost : null;
             case "getNativeEditorRules":
                 return null;
             case "setNativeEditorRule":

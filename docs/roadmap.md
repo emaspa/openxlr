@@ -189,8 +189,12 @@ top.
   with no mapped control. The booster adds up to 12 dB above the normal
   ceiling on any input; the maximizer is per mix. Both need Wave Link
   captures ([capture guide](hardware-effects-capture.md)).
-- [ ] XLR Dock MK.2: blocks 0x0002, 0x0006 and 0x0016, which exist and
-  are not decoded, and block 0x0000 beyond its firmware version bytes.
+- [ ] XLR Dock MK.2: blocks 0x0002, 0x0006 and 0x0016, and block 0x0000
+  beyond its firmware version bytes. The Wave XLR MK.2 now reads its
+  meter block 0x0002 and status block 0x0006 from firmware 1.0.15
+  ([layout](hardware-support.md#mk2-meter-status)). The dock and the
+  Wave:3 MK.2 answer blocks of the same lengths; OpenXLR reads neither
+  block on them until a desk check shows the same layout there.
   OpenXLR drives bytes 3 to 17 of the settings block as the compressor
   and expander settings, at the Wave:3 MK.2's layout; a check on the dock
   is still owed.
