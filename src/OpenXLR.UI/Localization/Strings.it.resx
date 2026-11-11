@@ -3203,6 +3203,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="EqAddBand" xml:space="preserve"><value>Aggiungi banda</value></data>
   <data name="EqRemoveBandName" xml:space="preserve"><value>Rimuovi la banda {0} dell'EQ</value></data>
   <data name="EqDeviceBandLimit" xml:space="preserve"><value>{0} supporta fino a {1} bande di EQ. Questo EQ funziona via software finché il numero di bande non rientra di nuovo nell'unità.</value></data>
+  <data name="EqDeviceGainLimit" xml:space="preserve"><value>{0} accetta guadagni di banda da -{1} a +{1} dB. Questo EQ funziona via software finché il guadagno di ogni banda non rientra di nuovo in questo intervallo.</value></data>
   <data name="EqRemoveBand" xml:space="preserve"><value>Rimuovi</value></data>
   <data name="MicSetupStepLevel" xml:space="preserve">
     <value>Livello</value>

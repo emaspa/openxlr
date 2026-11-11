@@ -18,7 +18,7 @@ namespace OpenXLR.UI;
 
 /// <summary>
 /// The response graph's geometry: frequency on a log axis from 20 Hz to
-/// 20 kHz, gain from -12 to +12 dB, and the curve sampled from
+/// 20 kHz, gain from -20 to +20 dB, and the curve sampled from
 /// <see cref="EqResponse"/>, so what is drawn is what the daemon runs.
 /// </summary>
 public static class EqCurve
@@ -29,7 +29,10 @@ public static class EqCurve
     public const double MinFrequency = 20, MaxFrequency = 20000;
 
     /// <summary>The gain axis runs from minus this to plus this, the range of a band's gain.</summary>
-    public const double GainRange = 12;
+    public const double GainRange = MicEq.MaxGain;
+
+    /// <summary>The gain axis has a line every this many dB and a label on every other line.</summary>
+    public const double GainGridStep = 5;
 
     /// <summary>The frequencies the axis is labelled at, which are also where the six regions meet.</summary>
     public static readonly double[] Edges = [20, 80, 300, 1400, 5000, 12000, 20000];
@@ -322,15 +325,16 @@ public sealed class EqGraph : Panel
             context.DrawRectangle(Live(i % 2 == 0 ? "Ox.Eq.ZoneA" : "Ox.Eq.ZoneB"), null, new Rect(left, plot.Top, right - left, plot.Height));
         }
 
-        // The grid: every 6 dB across, the region edges down, the 0 dB line marked.
+        // The grid: every 5 dB across, labelled every 10, the region edges down, the 0 dB line marked.
         var grid = new Pen(Live("Ox.Eq.Grid"), 1);
         var zero = new Pen(Live("Ox.Eq.GridLabel"), 1);
         var typeface = new Typeface(TextElement.GetFontFamily(this));
         IBrush label = Live("Ox.Eq.GridLabel");
-        for (double db = -EqCurve.GainRange; db <= EqCurve.GainRange; db += 6)
+        for (double db = -EqCurve.GainRange; db <= EqCurve.GainRange; db += EqCurve.GainGridStep)
         {
             double y = Math.Round(EqCurve.Y(db, plot)) + 0.5;
             context.DrawLine(db == 0 ? zero : grid, new Point(plot.Left, y), new Point(plot.Right, y));
+            if (db % (2 * EqCurve.GainGridStep) != 0) continue;
             var text = Text(db > 0 ? $"+{db:0}" : $"{db:0}", typeface, label);
             context.DrawText(text, new Point(plot.Left - 6 - text.Width, y - text.Height / 2));
         }

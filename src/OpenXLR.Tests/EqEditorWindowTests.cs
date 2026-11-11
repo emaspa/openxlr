@@ -85,7 +85,7 @@ public sealed class EqEditorWindowTests
                     : """{"id":"xlr2","name":"XLR 2","hardware":true,"present":true,"levels":{"monitor":1},"binding":{"kind":"source","source":"longmic","pair":0,"monoChannel":0},"bindingConnected":true}""");
                 string limits = """
                     ,"eqLimits":{"bands":4,"types":["lowCut","lowShelf","peak","notch","highShelf","highCut"],
-                      "frequency":{"min":20,"max":20000,"step":1},"gain":{"min":-12,"max":12,"step":0.25},
+                      "frequency":{"min":20,"max":20000,"step":1},"gain":{"min":-20,"max":20,"step":0.25},
                       "q":{"min":0.1,"max":10,"log10Step":0.016}}
                     """;
                 JsonNode state = JsonNode.Parse(ProState(channels, mixerExtra: WithEq ? limits : "", withMix: true))!;
@@ -1240,7 +1240,10 @@ public sealed class EqEditorWindowTests
         Assert.Equal(Math.Round((decimal)eq.Bands[1].Q, 2), qField.Value);
         // A gain typed past the range is held to it.
         BandField<NumericUpDown>(editor, 2, "EqBandGain").Value = 30m;
-        AssertBand((await Sent(daemon, 1))[0], 2, "gain", 12);
+        AssertBand((await Sent(daemon, 1))[0], 2, "gain", 20);
+        // Back within the 12 dB the fake dock is written, so it can take the EQ later.
+        BandField<NumericUpDown>(editor, 2, "EqBandGain").Value = 6m;
+        AssertBand((await Sent(daemon, 1))[0], 2, "gain", 6);
 
         ToggleButton on = editor.FindControl<ToggleButton>("EqSwitch")!, compare = editor.FindControl<ToggleButton>("EqCompare")!;
         Assert.False(compare.IsEnabled);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 // Shared with the window, which draws and edits the EQ with the same model
 // and snapping the daemon uses.
@@ -26,7 +27,7 @@ public sealed record EqBand
     public string Type { get; init; } = MicEq.Peak;
     /// <summary>Hz, 20 to 20000, on whole hertz.</summary>
     public double Frequency { get; init; } = 1000;
-    /// <summary>dB, -12 to +12, in quarter decibels.</summary>
+    /// <summary>dB, -20 to +20, in quarter decibels.</summary>
     public double Gain { get; init; }
     /// <summary>Linear Q, 0.1 to 10, on the log10 grid of <see cref="MicEq.QLog10Step"/>.</summary>
     public double Q { get; init; } = MicEq.DefaultQ;
@@ -50,7 +51,7 @@ public sealed record MicEq
     public const int BandCount = 4;
     public const int MinimumBands = 1, MaximumBands = 16;
     public const double MinFrequency = 20, MaxFrequency = 20000, FrequencyStep = 1;
-    public const double MinGain = -12, MaxGain = 12, GainStep = 0.25;
+    public const double MinGain = -20, MaxGain = 20, GainStep = 0.25;
     public const double MinQ = 0.1, MaxQ = 10, QLog10Step = 0.016;
 
     /// <summary>Wave Link's Q of 0.707 on the grid: 10^(-1 + 53 x 0.016) = 10^-0.152.</summary>
@@ -315,4 +316,12 @@ public sealed record MicEqDevice(string Unit, int Input, string Name, string? Fi
     /// brings <c>exp:</c> and <c>comp:</c> from the unit. Null on the EQ's.
     /// </summary>
     public bool? Levels { get; init; }
+
+    /// <summary>
+    /// The EQ's alone: the widest band gain, in dB either way, the unit is
+    /// written. A band beyond it runs the microphone's EQ in software. Left
+    /// out of the compressor's and expander's <c>device</c>.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? MaxGain { get; init; }
 }

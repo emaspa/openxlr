@@ -130,11 +130,13 @@ public sealed class EqEditorModelTests
             for (int i = 0; i < curve.Length; i++)
                 Assert.Equal(EqCurve.Y(DaemonResponse.MagnitudeDb(c, 48000, EqCurve.FrequencyOf(i, 64)), Plot), curve[i].Y, 1e-6);
         }
-        // The axis: 20 Hz at the left edge, 20 kHz at the right, 1 kHz two thirds in; +12 dB at the top.
+        // The axis: 20 Hz at the left edge, 20 kHz at the right, 1 kHz two thirds in; +20 dB at the top, the band gain's range.
         Assert.Equal(Plot.Left, EqCurve.X(20, Plot), 1e-9);
         Assert.Equal(Plot.Right, EqCurve.X(20000, Plot), 1e-9);
         Assert.Equal(Plot.Left + Plot.Width * 2 / 3, EqCurve.X(2000, Plot), 1e-9);
-        Assert.Equal(Plot.Top, EqCurve.Y(12, Plot), 1e-9);
+        Assert.Equal(Plot.Top, EqCurve.Y(20, Plot), 1e-9);
+        Assert.Equal(Plot.Bottom, EqCurve.Y(-20, Plot), 1e-9);
+        Assert.Equal(MicEq.MaxGain, EqCurve.GainRange);
         Assert.Equal(Plot.Center.Y, EqCurve.Y(0, Plot), 1e-9);
         Assert.Equal(["20", "80", "300", "1.4k", "5k", "12k", "20k"], EqCurve.Edges.Select(EqCurve.Label));
         // A gainless band's handle sits on the 0 dB line, whatever gain it keeps.
@@ -147,7 +149,7 @@ public sealed class EqEditorModelTests
     {
         var (eq, sent) = Model();
         EqBandViewModel band = eq.Bands[1];
-        // Two thirds across is 2 kHz; a quarter down is +6 dB.
+        // Two thirds across is 2 kHz; a quarter down is +10 dB.
         band.BeginDrag();
         Assert.Same(band, eq.SelectedBand);
         Point at = new(Plot.Left + Plot.Width * 2 / 3 + 0.3, Plot.Top + Plot.Height / 4 + 0.4);
@@ -157,15 +159,15 @@ public sealed class EqEditorModelTests
         double hz = Math.Round(EqCurve.FrequencyAt(at.X, Plot));
         Assert.InRange(hz, 2001, 2012);
         Assert.Equal(hz, change.Frequency);
-        Assert.Equal(6, change.Gain);
+        Assert.Equal(10, change.Gain);
         Assert.Null(change.Q);
         Assert.Equal(hz, band.Frequency);
-        Assert.Equal(6, band.Gain);
+        Assert.Equal(10, band.Gain);
         // Past the graph: held to the ranges, never refused by the daemon.
         band.DragTo(EqCurve.FrequencyAt(Plot.Right + 50, Plot), EqCurve.GainAt(Plot.Bottom + 80, Plot));
         (_, change) = sent.Band();
         Assert.Equal(20000, change.Frequency);
-        Assert.Equal(-12, change.Gain);
+        Assert.Equal(-20, change.Gain);
         // Only what moved goes out.
         band.DragTo(20000.2, -11.6);
         (_, change) = sent.Band();
@@ -330,7 +332,7 @@ public sealed class EqEditorModelTests
         eq.Bands[1].FrequencyValue = 999.6m;
         Assert.Equal(1000, sent.Band().Change.Frequency);
         eq.Bands[1].GainValue = -40m;
-        Assert.Equal(-12, sent.Band().Change.Gain);
+        Assert.Equal(-20, sent.Band().Change.Gain);
     }
 
     /// <summary>A sender on a clock the test moves, recording each command with the clock's time.</summary>
@@ -784,6 +786,42 @@ public sealed class EqEditorModelTests
         Assert.Equal(("setEqProcessing", "xlr1", (object)"software"), choice);
         Assert.Equal("software", eq.Processing);
         Assert.True(eq.ProcessInSoftware);
+    }
+
+    [Fact]
+    public void ABandGainBeyondTheUnitsRangeLightsTheSoftwareSideAndSaysWhy()
+    {
+        var (eq, sent) = Model();
+        static JsonNode Loud(double gain, double? maxGain)
+        {
+            JsonNode state = OnUnit(true, "software", "device", "1.0.15", ready: true);
+            state["bands"]![1]!["gain"] = gain;
+            if (maxGain is { } widest) state["device"]!["maxGain"] = widest;
+            return state;
+        }
+
+        // A daemon that does not report the unit's range: 12 dB, as every unit was written before.
+        eq.Apply(Loud(15, null), null);
+        string limit = Localizer.Format("EqDeviceGainLimit", "Wave XLR Dock MK.2", 12.0);
+        Assert.False(eq.ProcessOnDevice);
+        Assert.True(eq.ProcessInSoftware);
+        Assert.False(eq.CanProcessOnDevice);
+        Assert.Equal(limit, eq.ProcessOnDeviceTip);
+        Assert.Equal(limit, eq.EditorNote);
+        eq.ChooseProcessing("device");
+        Assert.Empty(sent.Sent);
+
+        // The same band on a unit written 20 dB fits.
+        eq.Apply(Loud(15, 20), null);
+        Assert.True(eq.CanProcessOnDevice);
+        Assert.Null(eq.EditorNote);
+
+        // Cuts count the same way, and the edge of the range fits.
+        eq.Apply(Loud(-12.25, 12), null);
+        Assert.False(eq.CanProcessOnDevice);
+        eq.Apply(Loud(-12, 12), null);
+        Assert.True(eq.CanProcessOnDevice);
+        Assert.True(eq.ProcessOnDevice);
     }
 
     [Fact]

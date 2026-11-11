@@ -117,7 +117,29 @@ public sealed class ProHardwareEqTests
         Assert.Null(pro.ReadEq(3));
         Assert.Throws<InvalidOperationException>(() => pro.SetEq(3, DeviceEq.Off));
         Assert.Throws<InvalidOperationException>(() => pro.SetEq(0, DeviceEq.Off));
+        // Measured to 12 dB only: a band beyond it is never written.
+        Assert.Equal(12, pro.EqSupport!.MaxGain);
+        Assert.Throws<ArgumentException>(() => pro.SetEq(2, new DeviceEq(true, [.. SavedBands.Select(b => b with { Gain = -49 })])));
         Assert.Empty(unit.SettingsWrites);
+    }
+
+    [Fact]
+    public void AProWhoseBandsHoldMoreThanTwelveDecibelsStillRunsTheEq()
+    {
+        var unit = new Unit();
+        // XLR 1's band 1 at +15 dB (byte 19) and XLR 2's at -20 dB (38 + 19):
+        // values another program may leave, read but never written by OpenXLR.
+        unit.Blocks[0x0004][19] = 0x3c;
+        unit.Blocks[0x0004][57] = 0xb0;
+        using WaveXlrProDevice pro = Connected(unit);
+        Assert.True(pro.Capabilities.HardwareEq);
+        Assert.True(pro.EqSupport!.Ready);
+        Assert.Null(pro.ConnectionNote);
+        Assert.Equal(60, pro.ReadEq(1)!.Bands![0].Gain);
+        Assert.Equal(-80, pro.ReadEq(2)!.Bands![0].Gain);
+        // The switch alone keeps the stored bands.
+        Assert.True(pro.SetEq(1, DeviceEq.Off with { Enabled = true }));
+        Assert.Equal(60, pro.ReadEq(1)!.Bands![0].Gain);
     }
 
     /// <summary>

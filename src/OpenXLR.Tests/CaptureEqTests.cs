@@ -52,7 +52,7 @@ public sealed class CaptureEqTests
     [InlineData("""{"cmd":"setEqBand","channel":"guest","band":2,"gain":6}""", null)]
     [InlineData("""{"cmd":"setEq","channel":"guest","eq":{"enabled":true,"bands":BANDS}}""", null)]
     [InlineData("""{"cmd":"setEqBand","channel":"guest","band":17,"gain":6}""", "setEqBand: need 'band' from 1 to 16")]
-    [InlineData("""{"cmd":"setEqBand","channel":"guest","band":2,"gain":13}""", "setEqBand: gain must be -12 to +12 dB")]
+    [InlineData("""{"cmd":"setEqBand","channel":"guest","band":2,"gain":21}""", "setEqBand: gain must be -20 to +20 dB")]
     [InlineData("""{"cmd":"setEqEnabled","channel":"missing","value":true}""", "setEqEnabled: 'missing' is not a microphone or capture input")]
     [InlineData("""{"cmd":"setEqEnabled","channel":"system","value":true}""", "setEqEnabled: 'system' is not a microphone or capture input")]
     [InlineData("""{"cmd":"setEq","channel":"camera","eq":{"enabled":true,"bands":BANDS}}""", null)]

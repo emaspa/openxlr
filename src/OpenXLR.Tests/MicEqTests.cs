@@ -61,7 +61,7 @@ public sealed class MicEqTests
         // under an Italian, Spanish or German locale must not say "0,1".
         using var culture = new CultureScope("it-IT");
         Assert.Equal("q must be 0.1 to 10", MicEq.Check(new EqBand { Type = "peak", Frequency = 1000, Gain = 0, Q = 0.09 }));
-        Assert.Equal("gain must be -12 to +12 dB", MicEq.Check(new EqBand { Type = "peak", Frequency = 1000, Gain = 12.5, Q = 1 }));
+        Assert.Equal("gain must be -20 to +20 dB", MicEq.Check(new EqBand { Type = "peak", Frequency = 1000, Gain = 20.5, Q = 1 }));
         Assert.Equal("frequency must be 20 to 20000 Hz", MicEq.Check(new EqBand { Type = "peak", Frequency = 10, Gain = 0, Q = 1 }));
     }
     [Theory]
@@ -69,14 +69,17 @@ public sealed class MicEqTests
     [InlineData("peak", 19.9, 0, 1, "frequency must be 20 to 20000 Hz")]
     [InlineData("peak", 20001, 0, 1, "frequency")]
     [InlineData("peak", double.NaN, 0, 1, "frequency")]
-    [InlineData("peak", 1000, 12.1, 1, "gain must be -12 to +12 dB")]
-    [InlineData("peak", 1000, -12.5, 1, "gain")]
+    [InlineData("peak", 1000, 20.1, 1, "gain must be -20 to +20 dB")]
+    [InlineData("peak", 1000, -20.5, 1, "gain")]
     [InlineData("peak", 1000, double.PositiveInfinity, 1, "gain")]
     [InlineData("peak", 1000, 0, 0.09, "q must be 0.1 to 10")]
     [InlineData("peak", 1000, 0, 10.5, "q")]
     [InlineData("peak", 1000, 0, 0, "q")]
     [InlineData("highCut", 20000, 12, 10, null)]
     [InlineData("lowCut", 20, -12, 0.1, null)]
+    [InlineData("peak", 703, 20, 0.6, null)]
+    [InlineData("lowShelf", 80, -20, 1, null)]
+    [InlineData("highShelf", 8000, 15.25, 1, null)]
     public void ABandOutsideTheRangesIsRefusedNotClamped(string type, double frequency, double gain, double q, string? error)
     {
         string? problem = MicEq.Check(new EqBand { Type = type, Frequency = frequency, Gain = gain, Q = q });
@@ -120,7 +123,7 @@ public sealed class MicEqTests
             ($$"""{"enabled":true,"bands":{{Bands("""{"enabled":true,"type":"peak","frequency":310,"q":1}""")}}}""", "band 2: need 'enabled', 'type', 'frequency', 'gain' and 'q'"),
             ($$"""{"enabled":true,"bands":{{Bands("""{"enabled":true,"type":"peak","frequency":"310","gain":0,"q":1}""")}}}""", "band 2: need"),
             ($$"""{"enabled":true,"bands":{{Bands("""{"enabled":true,"type":"bandPass","frequency":310,"gain":0,"q":1}""")}}}""", "band 2: type must be one of"),
-            ($$"""{"enabled":true,"bands":{{Bands("""{"enabled":true,"type":"peak","frequency":310,"gain":13,"q":1}""")}}}""", "band 2: gain must be"),
+            ($$"""{"enabled":true,"bands":{{Bands("""{"enabled":true,"type":"peak","frequency":310,"gain":21,"q":1}""")}}}""", "band 2: gain must be"),
             ("null", "need 'eq'"),
         })
         {
@@ -160,7 +163,7 @@ public sealed class MicEqTests
     [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":1,"type":"bandPass"}""", "type must be one of lowCut, lowShelf, peak, notch, highShelf, highCut")]
     [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":1,"frequency":19}""", "frequency must be 20 to 20000 Hz")]
     [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":1,"frequency":20000.5}""", "frequency")]
-    [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":1,"gain":-12.25}""", "gain must be -12 to +12 dB")]
+    [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":1,"gain":-20.25}""", "gain must be -20 to +20 dB")]
     [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":1,"q":0.05}""", "q must be 0.1 to 10")]
     [InlineData("""{"cmd":"setEqBand","channel":"xlr1","band":1,"q":11}""", "q must be")]
     [InlineData("""{"cmd":"setEq","channel":"xlr1"}""", "setEq: need 'eq' with 'enabled' and 'bands'")]
@@ -201,7 +204,7 @@ public sealed class MicEqTests
         mixer.SetEqBand("xlr1", 2, new(Type: "notch"));
         mixer.SetEqBand("xlr1", 2, new(Type: "peak"));
         Assert.Equal(9.25, mixer.EqFor("xlr1").Bands[1].Gain);
-        Assert.Throws<ArgumentException>(() => mixer.SetEqBand("xlr1", 2, new(Gain: 13)));
+        Assert.Throws<ArgumentException>(() => mixer.SetEqBand("xlr1", 2, new(Gain: 20.25)));
         Assert.Throws<ArgumentException>(() => mixer.SetEqBand("xlr1", 5, new(Gain: 1)));
         Assert.Throws<ArgumentException>(() => mixer.SetEqBand("xlr1", 1, new()));
         Assert.Throws<ArgumentException>(() => mixer.SetEqEnabled("aux", true));

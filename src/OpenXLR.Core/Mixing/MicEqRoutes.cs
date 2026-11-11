@@ -151,10 +151,9 @@ public sealed partial class Mixer
     /// <summary>Whether a channel's EQ runs on its unit now.</summary>
     public bool EqRunsOnDevice(string channel) { lock (_gate) return _eqDevices.ContainsKey(channel); }
 
-    public bool CanRunEqOnDevice(string channel, int bands)
+    public bool CanRunEqOnDevice(string channel, MicEq eq)
     {
-        lock (_gate) return bands is >= MicEq.MinimumBands and <= WaveFxEq.Bands
-            && EqDeviceTargetLocked(channel, UnitInputsLocked(), bands) is not null;
+        lock (_gate) return EqDeviceTargetLocked(channel, UnitInputsLocked(), eq) is not null;
     }
 
     /// <summary>
@@ -208,16 +207,19 @@ public sealed partial class Mixer
     /// <summary>
     /// The unit input that runs a channel's EQ, or null for software: the
     /// channel carries a unit's input (the carrier rule of
-    /// <see cref="UnitInputsLocked"/>), that unit runs the EQ, the channel's
-    /// choice is the unit, no Sound Check session runs on it, and the unit
-    /// has not failed to keep the EQ for that input in this run.
+    /// <see cref="UnitInputsLocked"/>), that unit runs the EQ and can hold
+    /// the channel's (no more bands than it has, no band gain beyond its
+    /// <see cref="UnitEqSupport.MaxGain"/>), the channel's choice is the
+    /// unit, no Sound Check session runs on it, and the unit has not failed
+    /// to keep the EQ for that input in this run. <paramref name="eq"/> is
+    /// asked about in place of the channel's, for a table about to replace it.
     /// </summary>
-    private EqUnitInput? EqDeviceTargetLocked(string channel, IReadOnlyDictionary<string, UnitInputStatus> carried, int? bands = null)
+    private EqUnitInput? EqDeviceTargetLocked(string channel, IReadOnlyDictionary<string, UnitInputStatus> carried, MicEq? eq = null)
     {
         if (_eqPort is null || !IsMicrophoneId(channel) || EqProcessingLocked(channel) != MicEqProcessing.Device) return null;
-        if ((bands ?? EqLocked(channel).Bands.Count) > WaveFxEq.Bands) return null;
         if (_soundCheckClaim == channel || _soundCheck is not null && _soundCheckChannel == channel) return null;
-        if (!EqCarrierLocked(channel, carried, out UnitInputStatus? unit, out UnitEqSupport? support) || !support.Ready) return null;
+        if (!EqCarrierLocked(channel, carried, out UnitInputStatus? unit, out UnitEqSupport? support) || !support.Ready
+            || !support.Holds(eq ?? EqLocked(channel))) return null;
         var target = new EqUnitInput(unit.Unit, unit.Input);
         return _eqDeviceFailed.ContainsKey(target.Key) ? null : target;
     }
@@ -736,6 +738,7 @@ public sealed partial class Mixer
             failure is null ? support.Reason : EqDeviceFailedReason, failure is null ? support.Note : $"The {support.Name} {failure}, so the EQ runs in software.")
         {
             MinimumFirmware = support.MinimumFirmware,
+            MaxGain = support.MaxGain,
         };
     }
 

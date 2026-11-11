@@ -224,7 +224,7 @@ physical gain dial.
 - Microphone EQ: one to sixteen bands on XLR 1, XLR 2 and every capture
   input with Wave Link's band types (high pass, low shelf, bell, notch,
   high shelf, low pass), ranges
-  and steps (20 Hz to 20 kHz in hertz, -12 to +12 dB in quarter decibels,
+  and steps (20 Hz to 20 kHz in hertz, -20 to +20 dB in quarter decibels,
   Q 0.1 to 10 on Wave Link's log grid) and defaults, off until switched
   on. The curves are the Audio EQ Cookbook's, which Wave Link's are; a test
   holds the daemon's maths and the running filters to the same table. It

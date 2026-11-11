@@ -3648,6 +3648,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
   <data name="EqAddBand" xml:space="preserve"><value>Add band</value></data>
   <data name="EqRemoveBandName" xml:space="preserve"><value>Remove EQ band {0}</value></data>
   <data name="EqDeviceBandLimit" xml:space="preserve"><value>{0} supports up to {1} EQ bands. This EQ runs in software until its band count fits the unit again.</value></data>
+  <data name="EqDeviceGainLimit" xml:space="preserve"><value>{0} takes band gains from -{1} to +{1} dB. This EQ runs in software until every band's gain fits that range again.</value></data>
   <data name="EqRemoveBand" xml:space="preserve"><value>Remove</value></data>
   <data name="NoiseRemoval" xml:space="preserve">
     <value>Noise removal</value>

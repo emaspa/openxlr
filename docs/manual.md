@@ -1928,8 +1928,8 @@ Wave matrix it sits over **FX** in the row head. **EQ** turns green while
 the EQ runs and red when it cannot run. Each microphone has one editor;
 clicking **EQ** again brings it to the front.
 
-- The graph runs from 20 Hz to 20 kHz across and from -12 to +12 dB up the
-  side. The six regions of a voice are shaded in turn and named along the
+- The graph runs from 20 Hz to 20 kHz across and from -20 to +20 dB up the
+  side, with a line every 5 dB. The six regions of a voice are shaded in turn and named along the
   top; point at a name to see what lives there. Each band draws its own
   curve thin in its colour, and the sum of the active bands is the thick line.
   While the EQ is off the sum is grey, and the bands still move, so you can
@@ -2173,6 +2173,17 @@ the input's route, and the plugin host is not needed.
   version or the unit's EQ settings cannot be read, or when the unit did
   not keep an EQ written to it; switch the EQ off and on, or choose **In
   software** and then **On the unit**, to try the unit again.
+- A band's gain goes from -20 to +20 dB. The Wave XLR MK.2 takes the whole
+  range on the unit. The Wave XLR Pro, the XLR Dock MK.2 and the Wave:3
+  MK.2 were measured only up to 12 dB either way, so OpenXLR never writes
+  them more. Set any band of the microphone's EQ past what its unit takes,
+  cut or boost, and the whole EQ runs on this computer, as it does with
+  more than four bands. The note under the switch says so and your choice
+  stays **On the unit**. Bring every band back within range and the EQ
+  returns to the unit. A high pass, low pass or notch band counts too,
+  because the unit stores its gain for when the type changes back. A unit
+  where Wave Link left a band past 12 dB still runs the EQ. OpenXLR reads
+  any value from -20 to +20 dB and writes its own over it.
 - Only the microphone the unit carries is equalised there: XLR 1 or XLR 2
   on the unit's own input, an additional interface's input, or a strip
   bound to the unit's own capture node. A microphone bound to any other

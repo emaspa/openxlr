@@ -538,7 +538,7 @@ four biquads in cascade with the coefficients of the Audio EQ Cookbook, mono,
 with the same ports, pipe and supervision as an insert and no algorithmic
 latency. Its controls are `enabled` and, for N from 1 to 4, `bandN_enabled`,
 `bandN_type` (0 low cut, 1 low shelf, 2 bell, 3 notch, 4 high shelf, 5 high
-cut), `bandN_frequency` (20 to 20000 Hz), `bandN_gain` (-12 to 12 dB) and
+cut), `bandN_frequency` (20 to 20000 Hz), `bandN_gain` (-20 to 20 dB) and
 `bandN_qlog10` (-1 to 1, log10 of Q). The daemon starts it with every value
 on the command line and changes them with `set` lines.
 `openxlr-lv2-host eq-bands COUNT NODE 1 RATE` runs the same stage with 1 to

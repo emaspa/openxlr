@@ -129,8 +129,8 @@ public sealed class TuiEqBandTests
     [InlineData("NaN")]
     [InlineData("Infinity")]
     [InlineData("1e999")]
-    [InlineData("-13")]
-    [InlineData("12.1")]
+    [InlineData("-21")]
+    [InlineData("20.1")]
     [InlineData("1,5")]
     [InlineData("oops")]
     public void InvalidExactValuesSendNothing(string text)

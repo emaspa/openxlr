@@ -37,7 +37,7 @@ public interface ILayoutInfo
     /// <summary>Whether a microphone's EQ runs on its unit now, so switching it on needs no native helper.</summary>
     bool EqRunsOnDevice(string id) => false;
     /// <summary>Whether the unit can take an incoming table, before that table replaces the current one.</summary>
-    bool CanRunEqOnDevice(string id, int bands) => bands is >= MicEq.MinimumBands and <= MicEq.BandCount && EqRunsOnDevice(id);
+    bool CanRunEqOnDevice(string id, MicEq eq) => eq.Bands.Count is >= MicEq.MinimumBands and <= MicEq.BandCount && EqRunsOnDevice(id);
     /// <summary>Whether a microphone's compressor and expander run on its unit now, so switching either on needs no native helper.</summary>
     bool DynamicsRunOnDevice(string id) => false;
     /// <summary>An insert chain key: an XLR or capture input id, or "mix:&lt;id&gt;".</summary>

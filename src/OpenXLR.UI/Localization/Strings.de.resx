@@ -3228,6 +3228,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="EqAddBand" xml:space="preserve"><value>Band hinzufügen</value></data>
   <data name="EqRemoveBandName" xml:space="preserve"><value>EQ-Band {0} entfernen</value></data>
   <data name="EqDeviceBandLimit" xml:space="preserve"><value>{0} unterstützt bis zu {1} EQ-Bänder. Dieser EQ läuft in Software, bis die Bandzahl wieder auf das Gerät passt.</value></data>
+  <data name="EqDeviceGainLimit" xml:space="preserve"><value>{0} nimmt Bandverstärkungen von -{1} bis +{1} dB an. Dieser EQ läuft in Software, bis die Verstärkung jedes Bandes wieder in diesen Bereich passt.</value></data>
   <data name="EqRemoveBand" xml:space="preserve"><value>Entfernen</value></data>
   <data name="NoiseRemoval" xml:space="preserve">
     <value>Rauschentfernung</value>

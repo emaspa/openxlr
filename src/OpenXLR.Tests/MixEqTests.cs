@@ -49,7 +49,7 @@ public sealed class MixEqTests
     [InlineData("""{"cmd":"setEqEnabled","channel":"xlr1","mix":"stream","value":true}""", "setEqEnabled: give 'channel' or 'mix', not both")]
     [InlineData("""{"cmd":"setEqEnabled","mix":"stream","value":1}""", "setEqEnabled: value must be a boolean")]
     [InlineData("""{"cmd":"setEqBand","mix":"stream","band":0,"gain":3}""", "setEqBand: need 'band' from 1 to 16")]
-    [InlineData("""{"cmd":"setEqBand","mix":"stream","band":1,"gain":13}""", "setEqBand: gain must be -12 to +12 dB")]
+    [InlineData("""{"cmd":"setEqBand","mix":"stream","band":1,"gain":21}""", "setEqBand: gain must be -20 to +20 dB")]
     [InlineData("""{"cmd":"setEq","mix":"stream","eq":{"enabled":true,"bands":[]}}""", "setEq: need 1 to 16 bands")]
     [InlineData("""{"cmd":"setEqProcessing","mix":"stream","value":"software"}""", "setEqProcessing: takes a microphone 'channel'; a mix's EQ always runs on this computer")]
     [InlineData("""{"cmd":"loadEqProfile","mix":"nope","profile":"builtin:clear"}""", "loadEqProfile: 'nope' is not a mix")]

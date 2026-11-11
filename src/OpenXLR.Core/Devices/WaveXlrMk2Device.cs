@@ -126,6 +126,8 @@ public class WaveXlrMk2Device : IAudioDevice
     // not run it at all. Such a model never asks the gate, so it carries no
     // EQ reason and no updater advice.
     private readonly Version? _eqFirmware;
+    // The widest band gain in dB the unit's EQ is written, either way.
+    private readonly double _eqMaxGain;
 
     // Whether the model's crossfade byte is the mirror of OpenXLR's crossfade.
     private readonly bool _crossfadeReversed;
@@ -174,10 +176,11 @@ public class WaveXlrMk2Device : IAudioDevice
     // and ReadDynamics decode without a transfer.
     private byte[]? _settings;
 
-    public WaveXlrMk2Device() : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, statusFirmware: StatusFirmware, ledFirmware: WaveFxLed.Mk2Firmware) { }
+    public WaveXlrMk2Device() : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203,
+        statusFirmware: StatusFirmware, ledFirmware: WaveFxLed.Mk2Firmware, eqMaxGain: WaveFxEq.MeasuredMaxGainDb) { }
 
-    internal WaveXlrMk2Device(IUsbTransport usb)
-        : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, usb: usb, statusFirmware: StatusFirmware, ledFirmware: WaveFxLed.Mk2Firmware) { }
+    internal WaveXlrMk2Device(IUsbTransport usb) : this(ProductId, "Wave XLR MK.2", physicalControls: true, vIndex: 0x0203, usb: usb,
+        statusFirmware: StatusFirmware, ledFirmware: WaveFxLed.Mk2Firmware, eqMaxGain: WaveFxEq.MeasuredMaxGainDb) { }
 
     /// <param name="model">Must match the device's iProduct string minus the
     /// vendor, since the daemon derives the PipeWire node-name hint from it.</param>
@@ -187,10 +190,12 @@ public class WaveXlrMk2Device : IAudioDevice
     /// whose blocks have not been checked, which reads neither.</param>
     /// <param name="ledFirmware">The first firmware on which the model's LED
     /// block is driven; null to leave the block alone.</param>
+    /// <param name="eqMaxGain">See the full constructor.</param>
     protected WaveXlrMk2Device(ushort productId, string model, bool physicalControls, ushort vIndex, bool retainsSettings = true,
-        ushort? alternateVIndex = null, IUsbTransport? usb = null, Version? statusFirmware = null, Version? ledFirmware = null)
+        ushort? alternateVIndex = null, IUsbTransport? usb = null, Version? statusFirmware = null, Version? ledFirmware = null,
+        double eqMaxGain = WaveFxEq.DefaultMaxGainDb)
         : this(productId, model, vIndex, Mk2Capabilities(physicalControls, retainsSettings), WaveFxEq.Mk2EqFirmware, alternateVIndex, usb,
-            limiterModeFirmware: LimiterModeFirmware, statusFirmware: statusFirmware, ledFirmware: ledFirmware) { }
+            limiterModeFirmware: LimiterModeFirmware, statusFirmware: statusFirmware, ledFirmware: ledFirmware, eqMaxGain: eqMaxGain) { }
 
     /// <summary>The Wave XLR MK.2's and the XLR Dock MK.2's first firmware with the limiter mode and the gain lock in byte 2.</summary>
     public static Version LimiterModeFirmware { get; } = new(1, 0, 15);
@@ -216,10 +221,15 @@ public class WaveXlrMk2Device : IAudioDevice
     /// 0x04 as ClipGuard on every firmware.</param>
     /// <param name="ledFirmware">The first firmware on which the model's LED
     /// block 0x0016 is driven (<see cref="WaveFxLed"/>); null to leave it alone.</param>
+    /// <param name="eqMaxGain">The widest band gain, in dB either way, the
+    /// unit's EQ is written: <see cref="WaveFxEq.MeasuredMaxGainDb"/> on a
+    /// model measured to it, <see cref="WaveFxEq.DefaultMaxGainDb"/> otherwise.</param>
     protected WaveXlrMk2Device(ushort productId, string model, ushort vIndex, DeviceCapabilities capabilities, Version? eqFirmware,
         ushort? alternateVIndex = null, IUsbTransport? usb = null, bool crossfadeReversed = false, byte lowCutMask = LowCutMask,
-        Version? limiterModeFirmware = null, Version? statusFirmware = null, Version? ledFirmware = null)
+        Version? limiterModeFirmware = null, Version? statusFirmware = null, Version? ledFirmware = null,
+        double eqMaxGain = WaveFxEq.DefaultMaxGainDb)
     {
+        _eqMaxGain = eqMaxGain;
         _limiterModeFirmware = limiterModeFirmware;
         _statusFirmware = statusFirmware;
         _ledFirmware = ledFirmware;
@@ -350,7 +360,7 @@ public class WaveXlrMk2Device : IAudioDevice
         {
             block = Read(BlockSettings, SettingsLen, used: 0);
             return block.Length >= WaveFxEq.StructLength && WaveFxEq.Decodes(WaveFxEq.Decode(block));
-        });
+        }) with { MaxGain = _eqMaxGain };
         if (EqSupport.Ready) _settings = block;
         else if (EqSupport.Reason == DeviceEqSupport.UnsupportedBlock)
             ConnectionNote = ConnectionNote is null ? WaveFxEq.UnsupportedBlockNote : $"{ConnectionNote} Also, {WaveFxEq.UnsupportedBlockNote}";
@@ -688,8 +698,10 @@ public class WaveXlrMk2Device : IAudioDevice
 
     public bool SetEq(int input, DeviceEq eq)
     {
-        if (input != 1 || EqSupport?.Ready != true)
+        if (input != 1 || EqSupport is not { Ready: true } support)
             throw new InvalidOperationException($"{Info.Model}: this unit does not run the EQ on input {input}");
+        if (!WaveFxEq.FitsGain(eq, support.MaxGain))
+            throw new ArgumentException($"{Info.Model}: a band gain is beyond the {support.MaxGain} dB this unit is written", nameof(eq));
         lock (_lock)
         {
             byte[] b = Read(BlockSettings, SettingsLen, WaveFxEq.StructLength);
