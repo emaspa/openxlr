@@ -46,7 +46,7 @@ public sealed partial class DeviceManager
     /// <summary>What a unit that did not keep a written compressor and expander reports, after the unit's name.</summary>
     internal const string DynamicsNotKept = "did not keep the compressor and expander written to it";
 
-    /// <summary>Whether the mixer drives the unit's compressor and expander: something was posted in this connection.</summary>
+    /// <summary>Whether the mixer drives the unit's compressor and expander: something was posted in this connection and not forgotten since.</summary>
     private bool DynamicsOwned
     {
         get { lock (_dynamicsGate) return _dynamicsSlots.Count > 0; }
@@ -83,6 +83,18 @@ public sealed partial class DeviceManager
             wake = NowMs - _dynamicsLastWrite >= (long)EqWriteSpacing.TotalMilliseconds;
         }
         if (wake) Wake();
+    }
+
+    /// <summary>
+    /// No microphone holds this input any more (<see cref="IDeviceEqPort.ForgetDynamics"/>):
+    /// its post is dropped, so nothing is written back, and the next sweep
+    /// offers the unit's own switches again once no input is held.
+    /// </summary>
+    internal void ForgetDynamics(int input)
+    {
+        bool forgot;
+        lock (_dynamicsGate) forgot = _dynamicsSlots.Remove(input);
+        if (forgot) Wake();
     }
 
     /// <summary>Where the last compressor and expander post to one input stands.</summary>

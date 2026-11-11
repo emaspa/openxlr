@@ -128,6 +128,14 @@ unit is unplugged, with unambiguous source names as a fallback for older
 entries. Other units' channels stay. An unplugged unit that remains enabled
 keeps its channels, silent until it returns.
 
+The daemon journal records when an enabled unit stops showing its state
+while it is still attached. It says so once when an enabled unit leaves the
+USB scan, and once when one on the bus shows no state for 5 s, with the
+reason: no manager drives it, its manager has no connection to it, or it is
+connected but nothing has been read from it yet. A second line follows when
+the state is back. The journal also says when a unit's USB helper exits
+without a failed transfer.
+
 ## Adding its microphone
 
 Under each driven unit, choose its capture source, its microphone, 1 or 2 on

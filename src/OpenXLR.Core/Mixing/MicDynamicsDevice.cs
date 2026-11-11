@@ -18,7 +18,10 @@ namespace OpenXLR.Core.Mixing;
 /// moving to the unit, the stage's compressor and expander are switched off
 /// before the unit is told. While software runs them, or they are off, the
 /// unit holds both switches off, so a compressor left on by another program
-/// cannot stack on OpenXLR's.
+/// cannot stack on OpenXLR's. A unit the microphone left that no microphone
+/// holds now, an additional interface after the primary moved off it, keeps
+/// nothing of the mixer's once the hand-over ends: its own compressor and
+/// expander switches are offered again.
 ///
 /// A microphone that has no compressor or expander setting of its own when
 /// its unit first takes them adopts what the unit holds, so a unit whose
@@ -169,6 +172,11 @@ public sealed partial class Mixer
                 && (leaving.Backend.Status is { IsOff: true } or { Phase: DeviceEqPhase.Failed } || now >= leaving.Deadline))
             {
                 _dynamicsReleasing.Remove(id);
+                // A unit the microphone left that no microphone holds now, an
+                // additional interface after the primary moved off it, keeps
+                // nothing of the mixer's: its own switches are its again.
+                if (!DynamicsHeldLocked(leaving.Backend.Target, carried))
+                    port.ForgetDynamics(leaving.Backend.Target.Unit, leaving.Backend.Target.Input);
                 ApplySoftwareEqLocked(id);
                 changed = true;
             }
@@ -183,6 +191,17 @@ public sealed partial class Mixer
         HoldUncarriedDynamicsOffLocked(port, carried);
         return changed;
     }
+
+    /// <summary>
+    /// Whether the mixer still holds a unit input's compressor and expander:
+    /// a microphone runs them there or carries the input, or the input is the
+    /// primary unit's, whose switches are held off while no microphone
+    /// carries it (<see cref="HoldUncarriedDynamicsOffLocked"/>).
+    /// </summary>
+    private bool DynamicsHeldLocked(EqUnitInput target, IReadOnlyDictionary<string, UnitInputStatus> carried)
+        => target.Unit == _drivenUnit
+           || _dynamicsDevices.Values.Any(b => b.Target == target)
+           || carried.Any(c => IsMicrophoneId(c.Key) && c.Value.Unit == target.Unit && c.Value.Input == target.Input);
 
     /// <summary>
     /// A microphone with no compressor and no expander setting of its own

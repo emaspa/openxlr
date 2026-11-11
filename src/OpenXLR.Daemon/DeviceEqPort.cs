@@ -38,6 +38,8 @@ internal sealed class DeviceEqPort : IDeviceEqPort
 
     public DeviceDynamics? HeldDynamics(string unit, int input) => For(unit)?.HeldDynamics(input);
 
+    public void ForgetDynamics(string unit, int input) => For(unit)?.ForgetDynamics(input);
+
     public Mk2MeterReading? DynamicsMeters(string unit, int input) => For(unit)?.UnitDynamicsMeters(input);
 
     /// <summary>Every driven unit whose model has a hardware EQ, by instance id, for the mixer.</summary>

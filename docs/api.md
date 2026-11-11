@@ -2912,7 +2912,13 @@ The unit's two switches are the same bits the unit's own `compressor` and
 expander, those controls are left out of the unit's `capabilities` and
 `set` refuses them, so the microphone's setting is the only one. When
 software runs them, or they are off, the unit's switches are held off, so
-they never stack. A microphone with no compressor and no expander setting
+they never stack. When the microphone leaves a unit that no microphone
+carries any more, such as an additional interface after `setActiveDevice`
+moved the primary off it, the daemon writes both switches off. Once the
+unit reads them back off, the mixer lets go of it. Its `compressor` and
+`expander` controls are back in its `capabilities`, which `waveInterfaces[]`
+reports for an additional interface, `set` takes them again, and nothing is
+written back over them. A microphone with no compressor and no expander setting
 of its own when its unit first runs them takes the unit's switches and
 settings (each held to the software's ranges, the knee and the hold at
 their defaults), so a compressor switched on with the unit's own switch

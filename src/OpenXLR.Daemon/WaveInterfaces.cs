@@ -99,6 +99,48 @@ public sealed class WaveInterfaces : BackgroundService
         finally { session.Dispose(); }
     }
 
+    // Enabled, attached units that show no state: since when, and whether it was said.
+    private readonly Dictionary<string, (long Since, bool Said)> _stateGaps = new(StringComparer.Ordinal);
+
+    /// <summary>How long an enabled, attached unit shows no state before the journal says so. Tests shorten it.</summary>
+    internal TimeSpan StateGapWarning { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Once a second, from the scan: an enabled unit on the bus whose entry
+    /// has shown no state for <see cref="StateGapWarning"/> is said once at
+    /// warning, with what its manager shows, and once more when its state is
+    /// back. A unit that is not attached is listed as such and not said here.
+    /// </summary>
+    private void NoteStateGaps(IReadOnlyList<IAudioDevice> devices, HashSet<string> enabled, string? primary)
+    {
+        long now = Environment.TickCount64;
+        HashSet<string> watched = new(StringComparer.Ordinal);
+        foreach (IAudioDevice device in devices)
+        {
+            string id = device.Info.InstanceId;
+            if (id == primary || !enabled.Contains(id)) continue;
+            watched.Add(id);
+            DeviceManager? session = _sessions.GetValueOrDefault(id);
+            StateMessage? message = session?.Snapshot();
+            string? gap = session is null ? "no manager drives it"
+                : message is not { Connected: true } ? "its manager has no connection to it"
+                : message.State is null ? "it is connected, but no state has been read from it"
+                : null;
+            if (gap is null)
+            {
+                if (_stateGaps.Remove(id, out var ended) && ended.Said)
+                    _deviceLog.LogInformation("{dev} ({id}) shows its state again after {s} s", device.Info.DisplayName, id, (now - ended.Since) / 1000);
+                continue;
+            }
+            if (!_stateGaps.TryGetValue(id, out var open)) _stateGaps[id] = open = (now, false);
+            if (open.Said || now - open.Since < (long)StateGapWarning.TotalMilliseconds) continue;
+            _stateGaps[id] = open with { Said = true };
+            _deviceLog.LogWarning("{dev} ({id}) is enabled as an additional interface and attached, but has shown no state for {s} s: {gap}. {warning}",
+                device.Info.DisplayName, id, (now - open.Since) / 1000, gap, session?.Warning ?? "No warning is set.");
+        }
+        foreach (string id in _stateGaps.Keys.Where(id => !watched.Contains(id)).ToList()) _stateGaps.Remove(id);
+    }
+
     public IReadOnlyList<WaveInterfaceState> Snapshot()
     {
         var available = Volatile.Read(ref _available);
@@ -276,10 +318,20 @@ public sealed class WaveInterfaces : BackgroundService
                 lock (_preferencesGate) enabled = [.. _enabled];
                 string? reserved = Volatile.Read(ref _reserved) ?? _primary.ActiveInfo?.InstanceId;
                 foreach (var pair in _sessions.ToArray())
-                    if (pair.Key == reserved || !enabled.Contains(pair.Key) || !devices.Any(d => d.Info.InstanceId == pair.Key))
-                    {
-                        if (_sessions.TryRemove(pair.Key, out var old)) { old.SuspendSession(); await StopSessionAsync(old); }
-                    }
+                {
+                    bool scanned = devices.Any(d => d.Info.InstanceId == pair.Key);
+                    if (pair.Key != reserved && enabled.Contains(pair.Key) && scanned) continue;
+                    if (!_sessions.TryRemove(pair.Key, out var old)) continue;
+                    // A unit disabled was the user's doing; the other two
+                    // stop the unit's state without a failed read, so they
+                    // are said.
+                    if (pair.Key == reserved)
+                        _deviceLog.LogInformation("{id} is the primary interface now; its additional interface stops", pair.Key);
+                    else if (enabled.Contains(pair.Key))
+                        _deviceLog.LogWarning("{id} is not on the USB scan any more; it is not driven as an additional interface until it is back", pair.Key);
+                    old.SuspendSession();
+                    await StopSessionAsync(old);
+                }
                 foreach (var device in devices.Where(d => d.Info.InstanceId != reserved && enabled.Contains(d.Info.InstanceId)))
                 {
                     string id = device.Info.InstanceId;
@@ -313,6 +365,7 @@ public sealed class WaveInterfaces : BackgroundService
                     }
                     if (added) { await starting!; changed = true; } else session.Dispose();
                 }
+                NoteStateGaps(devices, enabled, reserved);
                 if (changed) Changed?.Invoke();
                 await Task.Delay(TimeSpan.FromSeconds(1), stop);
             }
