@@ -26,12 +26,18 @@ is measured over one that is described.
   software. The microphone compressor and expander run on the unit too,
   wherever the EQ does: the byte layout is verified on the Wave:3 MK.2,
   and the Pro, the XLR Dock MK.2 and the Wave XLR MK.2 are driven at the
-  same fields but not yet checked. The Pro runs ducking itself for a setup
-  keyed by XLR 1 on its headphone jacks and its USB Aux port, accepted by
-  ear with the presets; custom ducking values are not yet heard on it. In
-  an experimental hardware mixing mode the Pro also builds the mixes its
-  jacks and USB Aux port play, one USB pair per channel, heard on one unit
-  with Headphones 1 and the USB Aux port. On the maintainer's
+  same fields but not yet checked. The Pro runs ducking itself on its
+  headphone jacks and its USB Aux port for a setup keyed by its own
+  inputs, accepted by ear keyed by XLR 1 with the presets; custom ducking
+  values are not yet heard on it. In an experimental hardware mixing mode
+  the Pro also builds the mixes its jacks and USB Aux port play, one USB
+  pair per channel, heard on one unit with Headphones 1 and the USB Aux
+  port. A mix the unit builds alone has the unit's maximizer and reads
+  the unit's own meter. Raw capture sends an input to the computer before
+  the unit's processing, on the Pro from firmware 1.0.14 and on the Wave
+  XLR MK.2 from 1.0.15. From that firmware OpenXLR also drives the Wave
+  XLR MK.2's LED ring and its own gain lock, and reads its compressor and
+  expander meters. On the maintainer's
   Wave:3 every
   control writes and reads back, and the gain, mute, monitor balance and
   desktop volume controls are verified; a Wave:1 owner confirmed gain,
@@ -54,9 +60,11 @@ is measured over one that is described.
   it. Each microphone with the EQ also has noise removal, a compressor,
   an expander and a voice changer. Built-in and saved EQ profiles load
   from the UI, a Deck key or the API. Exclusive channel groups,
-  ducking on every device with presets or custom values, profiles with
-  one recalled on connect, and browser tabs routed to channels through the Chromium
-  companion. A soundboard plays clips into SFX, with pages, audition,
+  ducking on every device with one to eight keys and presets or custom
+  values, a playback volume for each application, a lock on an output's
+  volume, profiles with one recalled on connect, and browser tabs routed
+  to channels through the Chromium companion, each with a volume of its
+  own. A soundboard plays clips into SFX, with pages, audition,
   export and import, starter sounds, and keys on the Deck and the desktop.
 - [x] Plugins. LV2, CLAP and VST3 inserts on every input and mix, with
   generated controls and the plugin's own editor; Windows plugins through
@@ -68,7 +76,7 @@ is measured over one that is described.
   over a bundle that hangs. The companion's host reports the system
   disk's identity, so a Windows plugin that ties its licence to that disk
   can activate.
-- [x] Clients. The UI, with seventeen built-in skins, skins that rearrange
+- [x] Clients. The UI, with twenty built-in skins, skins that rearrange
   it, Broadcast and Wave among them with the mixer drawn as a matrix,
   system, light and dark modes, a compact and a large density, five text
   sizes, the Flow
@@ -178,12 +186,21 @@ top.
   unit on 2026-11-04, with headphones on Headphones 1 and a second
   computer on the USB Aux port: the faders' balance, mutes, the output
   volume, ducking, a processed microphone on its return pair, auditions,
-  a replug, a restart and leaving the mode. Keys other than XLR 1 still
-  wait on a capture that shows their encoding.
-- [ ] Hardware mixing, the next steps once the mode has run for a while:
-  meters read from the unit's capture pairs, so the computer stops
-  building its own copy of the mixes the unit builds; section 72 as a
-  fourth feed; and the unit's own meters in block 0x0002.
+  a replug, a restart and leaving the mode. Captures of 2026-11-10 showed
+  how the unit encodes its keys
+  ([section 20](wave-xlr-pro-protocol.md#20-ducking-keys-and-the-input-taps-2026-11-10)),
+  so a setup takes any of the unit's inputs, or a channel on a USB pair,
+  as a key; the unit took XLR 1 and XLR 2 together on the desk, and a
+  channel on a pair as a key is not yet run on one.
+- [x] The unit's own meters in hardware mixing: a mix the unit builds
+  alone reads its section's level from block 0x0002, and the Ducking
+  window shows the unit's reduction. The block's scale and the meters'
+  rise and fall were measured on the desk on 2026-11-10
+  ([section 21](wave-xlr-pro-protocol.md#21-the-meters-in-block-0x0002)).
+  The computer still builds its own copy of those mixes, which other
+  outputs, software ducking and leaving the mode need.
+- [ ] Hardware mixing, the next step once the mode has run for a while:
+  section 72 as a fourth feed.
 - [x] Raw capture: an input sent to the computer before the unit's
   processing, so the computer's chain works on the microphone as the preamp
   gives it while the unit's own paths keep the processed one. Built for the
