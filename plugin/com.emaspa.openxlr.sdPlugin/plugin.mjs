@@ -3,11 +3,13 @@
 // daemon. The daemon owns all state and broadcasts every change, so keys
 // and dials stay in sync with the UI (and with the hardware) for free.
 
+import fs from "node:fs";
 import process from "node:process";
 import {ControlSocket} from "./control-socket.mjs";
 import { KeyCommands } from "./key-commands.mjs";
 import { channelName, mixName, mixShortName, defaultMonitorMix, monitorFeed, layoutChoices, controllableOutputs, outputKey, targetAppearance, openGroupMember } from "./layout-choices.mjs";
 import { SkinPalette } from "./skin-palette.mjs";
+import { segmented, segmentText, segmentWidth, fittedSize } from "./segment-text.mjs";
 import { captureGainOf, captureMuteOf, channelUnitControl, channelUnitTarget, deviceTargetSupported, duckingEnabled, duckingKeyOn, duckingKeyToggle, duckingToggle, withDucking, unitDialLabel, unitKeyLabel, unitMeterKey } from "./unit-inputs.mjs";
 import { isEqTarget, eqTarget, eqStep, eqCommand, eqLabel, eqDial } from "./microphone-eq.mjs";
 import { isVoiceTarget, voiceTarget, voiceMode, voicePress, voiceRelease, voiceLabel } from "./voice-changer.mjs";
@@ -329,6 +331,7 @@ host.onmessage = (e) => {
       releaseHeldClip(m.context);
       keyCommands.clear(m.context);
       clearEqTurns(m.context);
+      dialLook.delete(m.context);   // it appears in the manifest's layout
       instances.set(m.context, {
         action: m.action,
         device: m.device,
@@ -346,6 +349,7 @@ host.onmessage = (e) => {
       instances.delete(m.context);
       emptyTitle.delete(m.context);
       lastMeter.delete(m.context);
+      dialLook.delete(m.context);
       marquee.delete(m.context);
       break;
     case "deviceDidDisconnect":
@@ -1337,6 +1341,8 @@ function sevenSegText(text, x, y, h, color) {
 }
 
 function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null, appearance = {}, progress = null) {
+  if (segmented(skinPalette.colours["Ox.Text.Ghost"]))
+    return vfdKeySvg(on, muteLike, known, glyphName, badge, label, offColor, appearance, progress);
   // The skin colours the owned faceplate, cap and glyph. An insert's bypass
   // uses the alert colour, and a mute keeps its visible slash and status lamp.
   // A channel's or mix's own icon and colour from the layout editor replace
@@ -1395,9 +1401,17 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null, a
     `<rect x="22" y="124" width="100" height="6" rx="3" fill="${skinPalette.colours["Ox.Meter.Track"]}"/>` +
     (progress > 0 ? `<rect x="22" y="124" width="${Math.round(Math.min(1, progress) * 100)}" height="6" rx="3" fill="${skinPalette.colours["Ox.Meter.Fill"]}"/>` : "");
 
+  const ghost = skinPalette.colours["Ox.Text.Ghost"];
   const labelSvg = lines.map((line, i) => {
     const size = line.length > 11 ? 19 : line.length > 8 ? 22 : 26;
     const y = lines.length === 1 ? (progress === null ? 126 : 114) : 106 + i * 24;
+    // A segment skin letters the label as the UI does, over its unlit cells,
+    // a little smaller so the wider cells fit across the key.
+    if (segmented(ghost)) {
+      const fitted = fittedSize(line, size * 0.8, 120);
+      return segmentText(line, 72, y - 2, fitted,
+        { fill: tint ?? skinPalette.colours["Ox.Text.Primary"], ghost, glow: "soft" });
+    }
     return `<text x="72" y="${y}" text-anchor="middle" fill="${tint ?? skinPalette.colours["Ox.Text.Primary"]}" ` +
       `stroke="#000" stroke-width="4" paint-order="stroke" stroke-linejoin="round" ` +
       `font-family="Inter, Noto Sans, DejaVu Sans, sans-serif" font-size="${size}" font-weight="700">` +
@@ -1421,6 +1435,111 @@ function keySvg(on, muteLike, known, glyphName, badge, label, offColor = null, a
       <rect x="6" y="6" width="132" height="132" rx="14" fill="url(#side)"/>
       <rect x="9" y="9" width="126" height="126" rx="12" fill="none" stroke="${tint ?? skinPalette.colours["Ox.Text.Muted"]}" stroke-width="4"/>
       ${face}${slash}${lampDot}${labelSvg}${bar}
+    </svg>`).toString("base64");
+}
+
+// A colour scaled toward black, for the glass under a display's lettering.
+function darken(hex, amount) {
+  const rgb = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  return "#" + rgb.map(v => Math.round(v * amount).toString(16).padStart(2, "0")).join("");
+}
+
+// The defs every display key shares: the halo lit lettering wears, the
+// light it spills into the glass, and the glass's fine mesh and sheen, as on
+// the VFD Clock keys and the InfoPanel VFD profiles.
+function vfdDefs(lit) {
+  return `
+        <filter id="halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.5"/></filter>
+        <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5"/></filter>
+        <radialGradient id="spill" cx="72" cy="84" r="80" gradientUnits="userSpaceOnUse">
+          <stop stop-color="${lit}" stop-opacity="0.10"/><stop offset="1" stop-color="${lit}" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="72" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#ffdcbe" stop-opacity="0.06"/><stop offset="1" stop-color="#ffdcbe" stop-opacity="0"/>
+        </linearGradient>
+        <pattern id="mesh" width="1.5" height="1.5" patternUnits="userSpaceOnUse">
+          <rect width="1.5" height="0.5" fill="#000" opacity="0.27"/><rect width="0.5" height="1.5" fill="#000" opacity="0.18"/>
+        </pattern>`;
+}
+
+// Something lit on the display: a soft halo of its own colour under it.
+const glowing = (inner, colour) =>
+  `<g filter="url(#halo)" opacity="0.8" color="${colour}" fill="${colour}">${inner}</g><g color="${colour}" fill="${colour}">${inner}</g>`;
+
+// A key as a vacuum fluorescent display: near-black glass with a thin frame,
+// the target's glyph lit while it is on and unlit while it is off, its label
+// in the skin's segment face over unlit cells, a lamp segment in the corner,
+// and the glass's mesh over everything. A mute is lit in the alert colour
+// with its slash, an insert's bypass too, as on the faceplate keys.
+function vfdKeySvg(on, muteLike, known, glyphName, badge, label, offColor, appearance, progress) {
+  const c = skinPalette.colours;
+  const ghost = c["Ox.Text.Ghost"];
+  const lit = c["Ox.Text.Primary"];
+  const accent = !known ? null : on ? (muteLike ? c["Ox.Led.Alert"] : c["Ox.Led.On"]) : offColor;
+  const tint = known ? appearance.colour ?? null : null;
+  // Off, the glyph is drawn in the unlit cells' colour, a little brighter so its shape still reads.
+  const unlit = c["Ox.Text.Muted"];
+  const lines = label ? label.split("\n").slice(0, 2) : [];
+  const capY = lines.length ? 52 : 66;
+
+  let face = "";
+  const ink = accent ?? (known ? tint ?? unlit : ghost);
+  if (appearance.icon) {
+    const text = `<text x="72" y="${capY + 15}" text-anchor="middle" font-family="sans-serif" font-size="48">${escXml(appearance.icon)}</text>`;
+    face = accent ? glowing(text, ink) : `<g fill="${ink}">${text}</g>`;
+  } else if (appearance.path || glyphName) {
+    const shape = appearance.path
+      ? `<g transform="translate(72 ${capY}) scale(2.3) translate(-12 -12)"><path d="${appearance.path}" fill="currentColor"/></g>`
+      : `<g transform="translate(72 ${capY}) scale(0.72) translate(-72 -72)">${GLYPHS[glyphName]}</g>`;
+    face = accent ? glowing(shape, ink) : `<g color="${ink}" fill="${ink}">${shape}</g>`;
+  } else if (badge) {
+    const colour = accent ?? (known ? unlit : ghost);
+    face = (accent ? `<g filter="url(#halo)" opacity="0.8">${sevenSegText(badge, 72, capY - 22, 44, colour)}</g>` : "") +
+      sevenSegText(badge, 72, capY - 22, 44, colour);
+  } else {
+    // A key with nothing to draw is one lamp segment, lit while on.
+    const bar = `<rect x="44" y="${capY - 6}" width="56" height="12" rx="2"/>`;
+    face = accent ? glowing(bar, accent) : `<g fill="${known ? unlit : ghost}">${bar}</g>`;
+  }
+
+  const slash = muteLike && on
+    ? glowing(`<line x1="${72 - 30}" y1="${capY + 30}" x2="${72 + 30}" y2="${capY - 30}" stroke="currentColor" stroke-width="7" stroke-linecap="square"/>`, c["Ox.Led.Alert"])
+    : "";
+
+  // The corner lamp is a small segment of the display.
+  const lampBar = `<rect x="110" y="18" width="16" height="6" rx="1"/>`;
+  const lamp = glyphName ? (accent ? glowing(lampBar, accent) : `<g fill="${ghost}">${lampBar}</g>`) : "";
+
+  // A playing clip's progress, a ladder of cells along the bottom.
+  let bar = "";
+  if (progress !== null) {
+    const cells = 20, w = 4, gap = 1, x0 = 72 - (cells * (w + gap) - gap) / 2;
+    const on = Math.round(Math.min(1, Math.max(0, progress)) * cells);
+    let litCells = "", dark = "";
+    for (let i = 0; i < cells; i++) {
+      const cell = `<rect x="${x0 + i * (w + gap)}" y="124" width="${w}" height="6"/>`;
+      if (i < on) litCells += cell; else dark += cell;
+    }
+    bar = `<g fill="${ghost}">${dark}</g>` + (litCells ? glowing(litCells, c["Ox.Meter.Fill"]) : "");
+  }
+
+  const labelSvg = lines.map((line, i) => {
+    const size = line.length > 11 ? 19 : line.length > 8 ? 22 : 26;
+    const y = lines.length === 1 ? (progress === null ? 126 : 114) : 106 + i * 24;
+    return segmentText(line, 72, y - 2, fittedSize(line, size * 0.8, 120),
+      { fill: known ? tint ?? lit : unlit, ghost, glow: known ? "soft" : null });
+  }).join("");
+
+  const glass = darken(ghost, 0.25);
+  return "data:image/svg+xml;base64," + Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="288" height="288" viewBox="0 0 144 144">
+      <defs>${vfdDefs(lit)}</defs>
+      <rect width="144" height="144" fill="${glass}"/>
+      <rect width="144" height="144" fill="url(#spill)"/>
+      <rect x="5" y="5" width="134" height="134" rx="16" fill="none" stroke="${tint ?? darken(lit, 0.3)}" stroke-width="2"/>
+      ${face}${slash}${lamp}${labelSvg}${bar}
+      <rect width="144" height="144" fill="url(#mesh)"/>
+      <rect width="144" height="144" fill="url(#sheen)"/>
     </svg>`).toString("base64");
 }
 
@@ -1489,6 +1608,7 @@ function meterKeyFor(t) {
 // switches colour from one tick to the next.
 const METER_W = 130, METER_BLEND = 0.04;
 function meterSvg(level) {
+  if (segmented(skinPalette.colours["Ox.Text.Ghost"])) return vfdMeterSvg(level);
   const w = Math.round(Math.max(0, Math.min(1, level)) * METER_W);
   const c = skinPalette.colours;
   const warn = Math.max(0, Math.min(1, c["Ox.Meter.WarningLevel"]));
@@ -1503,6 +1623,27 @@ function meterSvg(level) {
       <rect width="${METER_W}" height="6" rx="3" fill="${c["Ox.Meter.Track"]}"/>
       ${w > 0 ? `<rect width="${w}" height="6" rx="3" fill="url(#level)"/>` : ""}
     </svg>`).toString("base64");
+}
+
+// The width of a display strip's meter and value, layouts/dial-display.json.
+const DISPLAY_W = 168;
+
+// A segment skin's dial meter: cells of three pixels, each in its zone's
+// colour when lit and in the unlit cells' colour when not, as in the UI.
+function vfdMeterSvg(level) {
+  const c = skinPalette.colours;
+  const warn = c["Ox.Meter.WarningLevel"], hot = Math.max(warn, c["Ox.Meter.HotLevel"]);
+  const w = 3, gap = 2, cells = Math.floor((DISPLAY_W + gap) / (w + gap));
+  const x0 = Math.floor((DISPLAY_W - (cells * (w + gap) - gap)) / 2);
+  const on = Math.ceil(Math.max(0, Math.min(1, level)) * cells - 1e-9);
+  let out = "";
+  for (let i = 0; i < cells; i++) {
+    const at = (i + 1) / cells;
+    const fill = i >= on ? c["Ox.Text.Ghost"] : at > hot ? c["Ox.Meter.Hot"] : at > warn ? c["Ox.Meter.Warning"] : c["Ox.Meter.Fill"];
+    out += `<rect x="${x0 + i * (w + gap)}" y="0" width="${w}" height="6" fill="${fill}"/>`;
+  }
+  return "data:image/svg+xml;base64," + Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${DISPLAY_W}" height="6" viewBox="0 0 ${DISPLAY_W} 6">${out}</svg>`).toString("base64");
 }
 
 // Meters tick at 15 Hz; only redraw a dial's bar when its value moved
@@ -1552,7 +1693,31 @@ const TITLE_W = 154, TITLE_H = 24, CHAR_W = 8.1, GAP_PX = 20, STEP_PX = 7;
 const escXml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const textW = (t) => Math.round(t.length * CHAR_W);
 
+// A segment skin's dial titles: its face at a size that fills the strip's height.
+const SEGMENT_TITLE = 13;
+const segmentTitles = () => segmented(skinPalette.colours["Ox.Text.Ghost"]);
+const titleW = (t) => segmentTitles() ? Math.round(segmentWidth(t, SEGMENT_TITLE)) : textW(t);
+
+function segmentTitleSvg(pinText, scroll, offsetPx) {
+  const ghost = skinPalette.colours["Ox.Text.Ghost"];
+  const fill = skinPalette.colours["Ox.Text.Primary"];
+  const line = (text, x) => segmentText(text, x, 18, SEGMENT_TITLE, { fill, ghost, anchor: "start" });
+  const pinW = titleW(pinText);
+  const scrollW = titleW(scroll);
+  const avail = TITLE_W - pinW;
+  let body;
+  if (scrollW <= avail) body = line(scroll, pinW);
+  else {
+    const o = offsetPx % (scrollW + GAP_PX);
+    body = `<svg x="${pinW}" y="0" width="${avail}" height="${TITLE_H}">${line(scroll, -o)}${line(scroll, -o + scrollW + GAP_PX)}</svg>`;
+  }
+  return "data:image/svg+xml;base64," + Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${TITLE_W}" height="${TITLE_H}" viewBox="0 0 ${TITLE_W} ${TITLE_H}">${pinText ? line(pinText, 0) : ""}${body}</svg>`
+  ).toString("base64");
+}
+
 function titleSvg(pinText, scroll, offsetPx) {
+  if (segmentTitles()) return segmentTitleSvg(pinText, scroll, offsetPx);
   const attrs = `y="17" font-family="sans-serif" font-size="14.5" font-weight="700" fill="${skinPalette.colours["Ox.Text.Primary"]}"`;
   const pinW = textW(pinText);
   const scrollW = textW(scroll);
@@ -1576,13 +1741,14 @@ function titleSvg(pinText, scroll, offsetPx) {
 
 const marquee = new Map();   // context -> {pin, scroll, offset, hold, total}
 function marqueeTitle(context, pin, scroll) {
-  let pinText = pin === "" ? "" : `${pin} · `;
+  // A segment face has no middle dot; a dash stands between the two names there.
+  let pinText = pin === "" ? "" : segmentTitles() ? `${pin} - ` : `${pin} · `;
   // with no room left beside the pin, scroll the whole thing instead
-  if (pinText !== "" && TITLE_W - textW(pinText) < 40) { scroll = pinText + scroll; pinText = ""; }
-  if (textW(scroll) <= TITLE_W - textW(pinText)) { marquee.delete(context); return titleSvg(pinText, scroll, 0); }
+  if (pinText !== "" && TITLE_W - titleW(pinText) < 40) { scroll = pinText + scroll; pinText = ""; }
+  if (titleW(scroll) <= TITLE_W - titleW(pinText)) { marquee.delete(context); return titleSvg(pinText, scroll, 0); }
   let m = marquee.get(context);
   if (!m || m.pinText !== pinText || m.scroll !== scroll)
-    { m = { pinText, scroll, offset: 0, hold: 3, total: textW(scroll) + GAP_PX }; marquee.set(context, m); }
+    { m = { pinText, scroll, offset: 0, hold: 3, total: titleW(scroll) + GAP_PX }; marquee.set(context, m); }
   return titleSvg(pinText, m.scroll, m.offset);
 }
 setInterval(() => {
@@ -1636,7 +1802,7 @@ function refresh(context) {
   } else if (inst.action === "com.emaspa.openxlr.dial") {
     const d = dialValue(t, inst);
     const isDb = t === "gain" || t === "gain2" || t?.startsWith("chgain:");
-    send({ event: "setFeedback", context, payload: d
+    const payload = d
       ? { title: marqueeTitle(context, d.pin ?? "", d.scroll ?? d.label),
           value: isDb && !d.muted ? d.text.replace(" dB", "") : d.text,
           unit: { enabled: isDb && !d.muted },
@@ -1645,8 +1811,80 @@ function refresh(context) {
           muteOverlay: { enabled: d.muted } }
       : { title: marqueeTitle(context, "", "OpenXLR"), value: daemonUp ? "set up" : daemonNotice ?? "offline",
           unit: { enabled: false }, icon: dialIcon(null),
-          needle: needleSvg(0), muteOverlay: { enabled: false } } });
+          needle: needleSvg(0), muteOverlay: { enabled: false } };
+    send({ event: "setFeedback", context, payload: dialStyle(context, payload, d) });
   }
+}
+
+// The strip's own images for a dial, as the layout file names them, sent
+// back when a skin stops drawing the strip as a display.
+const stripImage = (file) => "data:image/svg+xml;base64," +
+  fs.readFileSync(new URL(`./imgs/${file}`, import.meta.url)).toString("base64");
+const STRIP = { backgroundDial: stripImage("dialBackground.svg"), dial: stripImage("dial.svg") };
+const dialLook = new Map();   // context -> the colours its strip was last drawn as a display in, or false
+
+// A segment skin draws a dial's strip as a display: the glass of its keys, a
+// ladder of cells lit up to the value in place of the knob and needle, and
+// the value in the segment face over unlit cells in place of the strip's own
+// text. Other skins keep the layout's knob, needle and text.
+function dialStyle(context, payload, d) {
+  const c = skinPalette.colours;
+  const display = segmented(c["Ox.Text.Ghost"]);
+  // What the strip's glass is drawn from, so a move between two display
+  // skins repaints it; false for the layout's own strip. A dial appears in
+  // the manifest's layout, the knob's.
+  const look = display ? `${c["Ox.Text.Ghost"]} ${c["Ox.Text.Primary"]}` : false;
+  const before = dialLook.get(context) ?? false;
+  const changed = before !== look;
+  dialLook.set(context, look);
+  // A display has no knob or text beside its meter, so its meter and value
+  // take the strip's whole width: a layout of its own.
+  if ((before !== false) !== display) {
+    send({ event: "setFeedbackLayout", context, payload: { layout: display ? "layouts/dial-display.json" : "layouts/dial.json" } });
+    lastMeter.delete(context);
+  }
+  if (!display) return changed ? { ...payload, ...STRIP } : payload;
+  const reading = payload.value + (payload.unit?.enabled ? " dB" : "");
+  return { ...payload, value: "", unit: { enabled: false }, needle: EMPTY_NEEDLE,
+    dial: vfdDialSvg(d ? d.pct / (d.maxPct || 100) : 0, reading, !!d && !d.muted),
+    ...(changed ? { backgroundDial: vfdStripSvg() } : {}) };
+}
+
+const EMPTY_NEEDLE = "data:image/svg+xml;base64," +
+  Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="168" height="52"/>').toString("base64");
+
+function vfdStripSvg() {
+  const c = skinPalette.colours;
+  const lit = c["Ox.Text.Primary"];
+  return "data:image/svg+xml;base64," + Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="92" viewBox="0 0 192 92">
+      <defs>${vfdDefs(lit)}</defs>
+      <rect width="192" height="92" rx="12" fill="${darken(c["Ox.Text.Ghost"], 0.25)}"/>
+      <rect width="192" height="92" rx="12" fill="url(#spill)"/>
+      <rect x="1" y="1" width="190" height="90" rx="11" fill="none" stroke="${darken(lit, 0.3)}" stroke-width="2"/>
+      <rect width="192" height="92" rx="12" fill="url(#mesh)"/>
+    </svg>`).toString("base64");
+}
+
+// The value as a display shows it: its reading in the segment face, and
+// under it a ladder of cells lit up to where the dial stands.
+function vfdDialSvg(fraction, reading, active) {
+  const c = skinPalette.colours;
+  const ghost = c["Ox.Text.Ghost"], lit = active ? c["Ox.Text.Primary"] : c["Ox.Text.Muted"];
+  const size = fittedSize(reading, 22, DISPLAY_W - 4);
+  const text = segmentText(reading, DISPLAY_W - 2, 28, size, { fill: lit, ghost, anchor: "end", glow: active ? "soft" : null });
+  const w = 3, gap = 2, cells = Math.floor((DISPLAY_W + gap) / (w + gap));
+  const x0 = Math.floor((DISPLAY_W - (cells * (w + gap) - gap)) / 2);
+  const on = Math.round(Math.max(0, Math.min(1, fraction)) * cells);
+  let litCells = "", dark = "";
+  for (let i = 0; i < cells; i++) {
+    const cell = `<rect x="${x0 + i * (w + gap)}" y="38" width="${w}" height="8"/>`;
+    if (i < on) litCells += cell; else dark += cell;
+  }
+  return "data:image/svg+xml;base64," + Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${DISPLAY_W}" height="52" viewBox="0 0 ${DISPLAY_W} 52">
+      <defs>${vfdDefs(lit)}</defs>${text}<g fill="${ghost}">${dark}</g>${litCells ? glowing(litCells, lit) : ""}
+    </svg>`).toString("base64");
 }
 
 function refreshAll() { for (const context of instances.keys()) refresh(context); }

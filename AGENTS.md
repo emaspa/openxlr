@@ -42,6 +42,7 @@ python3 tools/test-installation-receipt.py
 python3 packaging/yabridge/test-receipt.py
 python3 tools/deck-skins.py --check  # regenerate with no flag after changing embedded skins or colour defaults
 python3 tools/deck-icons.py --check  # regenerate with no flag after changing LayoutIcons.cs
+python3 tools/deck-segments.py --check  # regenerate with no flag after changing the OpenXLR Segment 14 font
 node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
 node --test plugin/tests/*.test.mjs
 node --test browser/tests/*.test.mjs

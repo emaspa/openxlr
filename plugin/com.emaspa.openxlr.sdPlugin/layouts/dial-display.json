@@ -1,0 +1,19 @@
+{
+  "id": "com.emaspa.openxlr.dial-display-layout",
+  "items": [
+    { "key": "backgroundDial", "type": "pixmap", "rect": [4, 4, 192, 92], "zOrder": 1,
+      "value": "./imgs/dialBackground.svg" },
+    { "key": "icon", "type": "pixmap", "rect": [16, 12, 24, 24], "zOrder": 10 },
+    { "key": "title", "type": "pixmap", "rect": [42, 12, 154, 24], "zOrder": 10 },
+    { "key": "dial", "type": "pixmap", "rect": [16, 44, 168, 52], "zOrder": 20 },
+    { "key": "needle", "type": "pixmap", "rect": [16, 44, 168, 52], "zOrder": 21 },
+    { "key": "value", "type": "text", "rect": [76, 46, 108, 24],
+      "font": { "size": 22, "weight": 700 }, "alignment": "right", "zOrder": 110, "enabled": false },
+    { "key": "unit", "type": "text", "rect": [140, 70, 44, 16],
+      "font": { "size": 13, "weight": 700 }, "alignment": "right", "zOrder": 30,
+      "enabled": false, "value": "dB" },
+    { "key": "meter", "type": "pixmap", "rect": [16, 37, 168, 6], "zOrder": 25 },
+    { "key": "muteOverlay", "type": "pixmap", "rect": [4, 4, 192, 92], "zOrder": 100,
+      "value": "./imgs/dialMuted.svg", "enabled": false }
+  ]
+}
