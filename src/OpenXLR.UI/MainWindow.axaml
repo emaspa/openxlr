@@ -454,7 +454,7 @@
                         AutomationProperties.Name="{Binding UnitInput1.GainName}"/>
                 <TextBlock Grid.Column="2" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center"
                            HorizontalAlignment="Right"/>
-                <ToggleButton Grid.Column="3" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
+                <ToggleButton Grid.Column="3" Content="{loc:Text Key=Lock}" Classes="lock" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
                               Margin="6,0,0,0" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowGainLock}"
                               IsChecked="{Binding GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
                               ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
@@ -712,7 +712,7 @@
                   Value="{Binding AuxLevelDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
           <TextBlock Grid.Column="2" Name="AuxInReadout" Text="{Binding AuxReadout}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right" AutomationProperties.Name="{Binding AuxReadoutName}" ToolTip.Tip="{Binding AuxReadoutName}"/>
-          <ToggleButton Grid.Column="4" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding AuxLevelLock, Mode=TwoWay}"/>
+          <ToggleButton Grid.Column="4" Classes="lock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding AuxLevelLock, Mode=TwoWay}"/>
         </Grid>
         <!-- the Wave XLR Pro's analog Line In, an input of its own; its readout shows Line In's
              volume while that fader moves and for a second after -->
@@ -729,7 +729,7 @@
                   Value="{Binding LineInGainSliderDb, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
           <TextBlock Grid.Column="2" Name="LineInReadout" Text="{Binding LineInReadout}" Classes="val" VerticalAlignment="Center"
                      HorizontalAlignment="Right" AutomationProperties.Name="{Binding LineInReadoutName}" ToolTip.Tip="{Binding LineInReadoutName}"/>
-          <ToggleButton Grid.Column="4" Name="LineInLock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding LineInLevelLock, Mode=TwoWay}"/>
+          <ToggleButton Grid.Column="4" Name="LineInLock" Classes="lock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding LineInLevelLock, Mode=TwoWay}"/>
           <ToggleButton Grid.Row="1" Grid.Column="1" Name="LineInRawToggle" Content="{loc:Text Key=RawCapture}" Margin="0,4,0,0"
                         IsChecked="{Binding LineInRawCapture, Mode=TwoWay}" IsVisible="{Binding CapLineInRawCapture}"
                         HorizontalAlignment="Left" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>

@@ -50,9 +50,13 @@ internal static class SkinOptionalStyles
         Face<Button>("fx", "fxOff", ":pointerover"), Face<Button>("fx", "fxOff", ":pressed"),
         Face<ToggleButton>("bypass", ":checked", ":pointerover"), Face<ToggleButton>("bypass", ":checked", ":pressed"),
     ];
-    private static readonly Func<Selector?, Selector>[] LitRest = [Face<Button>("fx", "fxOn")];
+    private static readonly Func<Selector?, Selector>[] LitRest =
+        [Face<Button>("fx", "fxOn"), Face<ToggleButton>("lock", ":checked")];
     private static readonly Func<Selector?, Selector>[] LitActive =
-        [Face<Button>("fx", "fxOn", ":pointerover"), Face<Button>("fx", "fxOn", ":pressed")];
+    [
+        Face<Button>("fx", "fxOn", ":pointerover"), Face<Button>("fx", "fxOn", ":pressed"),
+        Face<ToggleButton>("lock", ":checked", ":pointerover"), Face<ToggleButton>("lock", ":checked", ":pressed"),
+    ];
     private static readonly Func<Selector?, Selector>[] Muted =
     [
         Face<ToggleButton>("mute", ":checked"), Face<ToggleButton>("mute", ":checked", ":pointerover"),

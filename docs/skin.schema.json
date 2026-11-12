@@ -278,7 +278,7 @@
         },
         "Ox.Led.On": {
           "$ref": "#/$defs/flatColour",
-          "description": "a connected device, a plugin that is processing, the button of a chain with one, a microphone's **EQ** button while its EQ runs, a matrix row's **Mic** button while one of its switches is on"
+          "description": "a connected device, a plugin that is processing, the button of a chain with one, a microphone's **EQ** button while its EQ runs, a matrix row's **Mic** button while one of its switches is on, a **Lock** key while its lock is on"
         },
         "Ox.Led.Off": {
           "$ref": "#/$defs/flatColour",
@@ -546,7 +546,7 @@
         },
         "Ox.Lit.Background": {
           "$ref": "#/$defs/brush",
-          "description": "the face of a key lettered in `Ox.Led.On`: a plugin chain's button while a plugin processes, and a microphone's **EQ**, noise removal or dynamics button while it is on"
+          "description": "the face of a key lettered in `Ox.Led.On`: a plugin chain's button while a plugin processes, and a microphone's **EQ**, noise removal or dynamics button while it is on, and a **Lock** key while its lock is on"
         },
         "Ox.Lit.BackgroundPointerOver": {
           "$ref": "#/$defs/brush",

@@ -302,6 +302,25 @@
             <Setter Property="Foreground" Value="{DynamicResource Ox.Led.Alert}"/>
         </Style>
 
+        <!-- A lock key, for an input's gain or a capture input's level: the
+             plain button face, lettered in the lamp green of a processing
+             chain while the lock is on, the way the EQ key shows its EQ is on. -->
+        <Style Selector="ToggleButton.lock:checked">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Led.On}"/>
+        </Style>
+        <Style Selector="ToggleButton.lock:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Led.On}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+        </Style>
+        <Style Selector="ToggleButton.lock:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.BackgroundPointerOver}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrushPointerOver}"/>
+        </Style>
+        <Style Selector="ToggleButton.lock:checked:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.BackgroundPointerOver}"/>
+        </Style>
+
         <!-- The small keys beside an input's binding chip: EQ, noise removal
              and dynamics. They draw no ring unless the skin gives chips one. -->
         <Style Selector="Button.chip">
