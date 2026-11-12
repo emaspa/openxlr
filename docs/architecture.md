@@ -99,11 +99,14 @@ modules or custom drivers:
   and mix meters still read the same mix. The stage has no algorithmic
   latency. Each bus reserves headroom for one stream per channel and
   two nodes before it is created.
-- The duck key is the key channel's `monitor_FL`, after input EQ, inserts
-  and Sound Check, before channel volume and sends. The key's own cells
-  cannot be targets. `key_open` follows whether any key send is audible
-  after channel volume, send mutes, exclusive groups, mix controls and
-  hardware-path silencing. Controls go live over the helper's command
+- A stage has eight key inputs, `key_0` to `key_7`, one for each of the
+  setup's one to eight keys in their order. Each is its key channel's
+  `monitor_FL`, after input EQ, inserts and Sound Check, before channel
+  volume and sends, and the stage follows the loudest open key. A key's
+  own cells cannot be targets. `key_open` is a mask with one bit per key,
+  set while a send of that key is audible after channel volume, send
+  mutes, exclusive groups, mix controls and hardware-path silencing.
+  Controls go live over the helper's command
   pipe. Turning the plan off lets the gain recover at its release rate
   and keeps existing stages until a rebuild. An off plan starts none.
 - A duck bus's output stays disconnected until all its legs have their
