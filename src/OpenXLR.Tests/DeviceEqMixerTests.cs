@@ -30,6 +30,7 @@ public sealed class DeviceEqMixerTests
         public readonly Dictionary<(string, int), DeviceEq> Held = [];
         public readonly List<(string Unit, int Input, DeviceEq Eq)> Posts = [];
         public readonly HashSet<string> Gone = [];
+        public readonly List<(string Unit, int Input)> Forgotten = [];
         public bool AutoSweep;
 
         public void Post(string unit, int input, DeviceEq eq, string owner)
@@ -65,6 +66,16 @@ public sealed class DeviceEqMixerTests
                     _status[key] = new(DeviceEqPhase.Verified, eq);
                 }
                 _pending.Clear();
+            }
+        }
+
+        public void ForgetEq(string unit, int input)
+        {
+            lock (this)
+            {
+                Forgotten.Add((unit, input));
+                _pending.Remove((unit, input));
+                _status.Remove((unit, input));
             }
         }
 
@@ -710,6 +721,55 @@ public sealed class DeviceEqMixerTests
         int posts = port.Posts.Count;
         moved.SyncDeviceEq();
         Assert.Equal(posts, port.Posts.Count);
+    }
+
+    /// <summary>
+    /// The primary moves from a Wave XLR MK.2 to a Wave XLR Pro and the MK.2
+    /// stays driven as an additional interface: its EQ is written off, and
+    /// once it confirms that, the mixer forgets the input, so nothing is
+    /// written back over an EQ set there later. Software chosen on the
+    /// primary keeps its input held off instead.
+    /// </summary>
+    [Fact]
+    public void AUnitNoMicrophoneHoldsAfterTheHandOverIsForgotten()
+    {
+        var port = new Port();
+        using var mixer = new Mixer { Time = new ManualTime() };
+        var both = new Dictionary<string, UnitEqSupport> { [Mk2] = Ready("Wave XLR MK.2"), [Pro] = ProReady() };
+        mixer.SetDrivenUnit(Mk2);
+        mixer.SetDeviceEqPort(port);
+        mixer.SetUnitEqSupport(both);
+        mixer.SetEqEnabled("xlr1", true);
+        port.Sweep();
+        mixer.SetEqProcessing("xlr1", "software");
+        mixer.SyncDeviceEq();
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.True(mixer.EqWantsSoftwareStage("xlr1"));
+        Assert.False(port.UnitOn(Mk2, 1));
+        Assert.Empty(port.Forgotten);
+        mixer.SetEqProcessing("xlr1", "device");
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.True(mixer.EqRunsOnDevice("xlr1"));
+        Assert.True(port.UnitOn(Mk2, 1));
+
+        mixer.SetDrivenUnit(Pro);
+        mixer.SyncDeviceEq();
+        Assert.Contains((Mk2, 1, DeviceEq.Off), port.Posts);
+        Assert.Empty(port.Forgotten);   // not before the unit confirms
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.Equal([(Mk2, 1)], port.Forgotten);
+        Assert.False(port.UnitOn(Mk2, 1));
+        Assert.True(mixer.EqRunsOnDevice("xlr1"));
+        Assert.Equal("Wave XLR Pro", Eq(mixer).Device!.Name);
+        // Nothing more is posted to it.
+        int posts = port.Posts.Count(p => p.Unit == Mk2);
+        port.Sweep();
+        mixer.SyncDeviceEq();
+        Assert.Equal(posts, port.Posts.Count(p => p.Unit == Mk2));
+        Assert.Single(port.Forgotten);
     }
 
     private sealed class Layout(bool onDevice) : ILayoutInfo

@@ -2202,6 +2202,15 @@ public sealed partial class DeviceManager : BackgroundService
         catch (SemaphoreFullException) { }
     }
 
+    /// <summary>
+    /// No microphone holds this input's EQ any more (<see cref="IDeviceEqPort.ForgetEq"/>):
+    /// its post is dropped, so a change made elsewhere is not written back over.
+    /// </summary>
+    internal void ForgetEq(int input)
+    {
+        lock (_eqGate) _eqSlots.Remove(input);
+    }
+
     private void ForgetEq()
     {
         bool had;

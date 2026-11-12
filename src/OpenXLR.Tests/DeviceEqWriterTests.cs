@@ -321,6 +321,34 @@ public sealed class DeviceEqWriterTests
         return 0;
     });
 
+    /// <summary>
+    /// The hand-over leaves an input switched off, then the mixer forgets it
+    /// because no microphone holds the unit any more: an EQ another program
+    /// sets there afterwards stays, with nothing written back and nothing
+    /// logged, and the input reports no post.
+    /// </summary>
+    [Fact]
+    public void AForgottenInputKeepsAnEqSetElsewhere() => WithConfigDir(() =>
+    {
+        var time = new ManualTime();
+        var unit = new EqUnit { Clock = time, Held = Eq(true, 6) };
+        var log = new Lines();
+        using DeviceManager manager = Manager(unit, time, log);
+        manager.PostEq(1, DeviceEq.Off, "XLR 1");
+        SweepFor(manager, time, 200);
+        Assert.Single(unit.Writes);
+        Assert.False(unit.Held.Enabled);
+        Assert.True(manager.EqStatus(1).IsOff);
+        manager.ForgetEq(1);
+        Assert.Equal(DeviceEqStatus.None, manager.EqStatus(1));
+        lock (unit) unit.Held = Eq(true, -20);
+        SweepFor(manager, time, (int)DeviceManager.EqRewriteSpacing.TotalMilliseconds * 3);
+        Assert.Single(unit.Writes);
+        Assert.Equal(Eq(true, -20), unit.Held);
+        Assert.DoesNotContain(log.Written, l => l.Contains("Another program changed the EQ"));
+        return 0;
+    });
+
     [Fact]
     public void APostTheUnitAlreadyHoldsWritesNothingAndIsVerified() => WithConfigDir(() =>
     {

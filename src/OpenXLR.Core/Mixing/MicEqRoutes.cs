@@ -13,7 +13,9 @@ namespace OpenXLR.Core.Mixing;
 /// always runs in software, whatever source feeds it. A unit-run EQ starts no
 /// stage: its values go to the device side through <see cref="IDeviceEqPort"/>.
 /// Moving between the two switches the leaving one off first, so a voice is
-/// never equalised twice.
+/// never equalised twice. A unit the microphone left that no microphone
+/// holds now, an additional interface after the primary moved off it, keeps
+/// nothing of the mixer's once its EQ reads back off.
 ///
 /// The software stage sits at the head of the
 /// input's route, between the source (or Sound Check's loop) and the software
@@ -244,6 +246,17 @@ public sealed partial class Mixer
         return carried.TryGetValue(channel, out unit) && _unitEq.TryGetValue(unit.Unit, out support) && unit.Input <= support.Inputs;
     }
 
+    /// <summary>
+    /// Whether the mixer still holds a unit input's EQ: a microphone runs it
+    /// there or carries the input, or the input is the primary unit's, whose
+    /// EQ is held off while no microphone carries it
+    /// (<see cref="HoldUncarriedInputsOffLocked"/>).
+    /// </summary>
+    private bool EqHeldLocked(EqUnitInput target, IReadOnlyDictionary<string, UnitInputStatus> carried)
+        => target.Unit == _drivenUnit
+           || _eqDevices.Values.Any(b => b.Target == target)
+           || carried.Any(c => IsMicrophoneId(c.Key) && c.Value.Unit == target.Unit && c.Value.Input == target.Input);
+
     /// <summary>What <c>setEqProcessing</c> on a capture input is refused with.</summary>
     public static string EqSoftwareOnly(string channel)
         => $"setEqProcessing: '{channel}' is a capture input, whose EQ always runs on this computer";
@@ -322,6 +335,11 @@ public sealed partial class Mixer
                 && (leaving.Backend.Status is { IsOff: true } or { Phase: DeviceEqPhase.Failed } || now >= leaving.Deadline))
             {
                 _eqReleasing.Remove(id);
+                // A unit the microphone left that no microphone holds now, an
+                // additional interface after the primary moved off it, keeps
+                // nothing of the mixer's: an EQ set there later stays.
+                if (!EqHeldLocked(leaving.Backend.Target, carried))
+                    port.ForgetEq(leaving.Backend.Target.Unit, leaving.Backend.Target.Input);
                 ApplySoftwareEqLocked(id);
                 changed = true;
             }

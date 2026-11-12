@@ -42,6 +42,12 @@ public interface IDeviceEqPort
     DeviceEqStatus Status(string unit, int input);
 
     /// <summary>
+    /// No microphone holds this input's EQ any more: what was posted to it is
+    /// forgotten, and nothing is written back over a change made elsewhere.
+    /// </summary>
+    void ForgetEq(string unit, int input) { }
+
+    /// <summary>
     /// The compressor and expander this input should hold, as <see cref="Post"/>
     /// for the EQ; a value with no settings names the two switches alone.
     /// </summary>

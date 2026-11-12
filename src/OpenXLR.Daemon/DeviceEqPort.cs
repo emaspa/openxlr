@@ -32,6 +32,8 @@ internal sealed class DeviceEqPort : IDeviceEqPort
 
     public DeviceEqStatus Status(string unit, int input) => For(unit)?.EqStatus(input) ?? DeviceEqStatus.None;
 
+    public void ForgetEq(string unit, int input) => For(unit)?.ForgetEq(input);
+
     public void PostDynamics(string unit, int input, DeviceDynamics dynamics, string owner) => For(unit)?.PostDynamics(input, dynamics, owner);
 
     public DeviceDynamicsStatus DynamicsStatus(string unit, int input) => For(unit)?.DynamicsStatus(input) ?? DeviceDynamicsStatus.None;
