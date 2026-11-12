@@ -3364,7 +3364,7 @@ the old controls cannot affect a plugin that now uses the same slot id.
 <a name="skins"></a>
 ### 3.10 Change how the UI looks
 
-Options, APPEARANCE picks a skin. OpenXLR ships twenty, all built into
+Options, APPEARANCE picks a skin. OpenXLR ships twenty-two, all built into
 the application, so a package brings them with it:
 
 - **Material**, the classic appearance, in a dark palette, which is what
@@ -3383,6 +3383,10 @@ the application, so a package brings them with it:
 - **Broadcast**, the default, a dark neutral palette that also rearranges
   the UI, described below. Choosing it opens the UI at 1224 by 1141, or as
   large as a smaller screen allows;
+- **Broadcast Amber** and **Broadcast Blue**, Broadcast with orange or
+  blue meters, lamps, checked keys and links. Everything said about
+  Broadcast below holds for them too, and each keeps its own Arrange
+  moves;
 - **Compact Desk**, a denser dark matrix with bounded headphones and
   application tiles wrapping across the page, described below;
 - **Nyan Pink**, dark plum cards, candy pink faders and cyan details,
@@ -3390,7 +3394,7 @@ the application, so a package brings them with it:
 - **Wave**, dark charcoal cards, grey faders and green meters, arranged
   the way Broadcast is: everything said about Broadcast below holds for
   Wave too, in its own colours, with a wider name column and the cards a
-  little closer together. Your Arrange moves are kept for each of the two
+  little closer together. Your Arrange moves are kept for each skin
   separately. Choosing it changes appearance and arrangement, not routing
   or audio levels;
 - **Hi-Fi**, a 1980s separates stack: brushed black faceplates, blue
@@ -6254,7 +6258,7 @@ Material held dark, and
 the same way, and `--version` prints the version. Deck, Nyan Pink, the
 three Hi-Fi skins and the Omarchy skins get console fader caps, bracketed keys
 and lamps; Wave and
-Broadcast get the console cap with plain keys; Material is plain
+the three Broadcast skins get the console cap with plain keys; Material is plain
 throughout.
 The terminal reads these choices from `controls` and derives its surfaces
 and selection from the skin's colours, including light skins. A meter is

@@ -8,6 +8,22 @@ var palettes = {
     "warningLevel": 0.7,
     "hotLevel": 0.9
   },
+  "broadcast-amber": {
+    "fill": "#ff9f3f",
+    "warning": "#facc15",
+    "hot": "#ef4444",
+    "track": "#141414",
+    "warningLevel": 0.7,
+    "hotLevel": 0.9
+  },
+  "broadcast-blue": {
+    "fill": "#3fe6ff",
+    "warning": "#facc15",
+    "hot": "#ef4444",
+    "track": "#141414",
+    "warningLevel": 0.7,
+    "hotLevel": 0.9
+  },
   "catppuccin": {
     "fill": "#a6e3a1",
     "warning": "#f9e2af",

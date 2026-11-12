@@ -562,6 +562,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   the UI at 1224 by 1141. It is the complete example
   of a layout skin, and a copy to start from is in `docs/examples/skins`.
   See [Broadcast](manual.md#broadcast)
+- Broadcast Amber and Broadcast Blue: Broadcast with orange or blue
+  meters, lamps, checked keys and links. See [Skins](skins.md)
 - Compact Desk: a dark matrix skin with a bounded headphone column, a
   monitor toolbar that grows with the window, wider names and faders, and
   application tiles wrapping across the page with readable names. Restart, version and About
@@ -1336,11 +1338,11 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   a bezel, a flat or a bevelled mute cap. A meter is coloured by position on
   its scale, so a skin can give it a hi-fi green, amber and red ladder
   without the bar ever repainting itself end to end. What a skin leaves out
-  keeps the shipped default. Twenty appearances ship, all compiled into
+  keeps the shipped default. Twenty-two appearances ship, all compiled into
   the application: Material, the classic look, Deck, built from the
   OpenDeck plugin's key and dial art, one for each of the eleven
-  Omarchy palettes, two of them light, Nyan Pink, Broadcast, Compact Desk,
-  Wave, Hi-Fi, Hi-Fi Amber and Hi-Fi Classic. The last six also arrange the UI. Broadcast is the default: a new
+  Omarchy palettes, two of them light, Nyan Pink, Broadcast, Broadcast Amber,
+  Broadcast Blue, Compact Desk, Wave, Hi-Fi, Hi-Fi Amber and Hi-Fi Classic. The last eight also arrange the UI. Broadcast is the default: a new
   install, or one that never picked a skin, starts on it, and a skin the
   user picked, Material included, is kept. The picker is in Options, the
   choice lives in `ui.json` alone, and switching

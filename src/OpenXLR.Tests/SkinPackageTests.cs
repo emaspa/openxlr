@@ -3,6 +3,7 @@ using Avalonia.Media;
 using Avalonia.Controls;
 using Avalonia.Media.Immutable;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using OpenXLR.UI;
 using OpenXLR.UI.Skinning;
 
@@ -100,7 +101,7 @@ public sealed class SkinPackageTests : IDisposable
         // Every appearance the application carries is compiled in, so a
         // package has them all without installing a single file.
         Assert.Equal(
-            ["broadcast", "catppuccin", "catppuccin-latte", "compact-desk", "everforest", "gruvbox", "hifi", "hifi-amber", "hifi-classic", "kanagawa", "matte-black",
+            ["broadcast", "broadcast-amber", "broadcast-blue", "catppuccin", "catppuccin-latte", "compact-desk", "everforest", "gruvbox", "hifi", "hifi-amber", "hifi-classic", "kanagawa", "matte-black",
                 "nord", "nyan-pink", "opendeck", "osaka-jade", "ristretto", "rose-pine", "tokyo-night", "wave"],
             built.Select(e => e.Id).Order(StringComparer.Ordinal));
         foreach (SkinEntry entry in built)
@@ -157,8 +158,8 @@ public sealed class SkinPackageTests : IDisposable
     }
 
     /// <summary>
-    /// Broadcast is the reference layout skin an author copies, and Wave
-    /// wears the same arrangement in its own palette: the whole layout is
+    /// Broadcast is the reference layout skin an author copies, and Broadcast
+    /// Amber, Broadcast Blue and Wave wear the same arrangement in their own palettes: the whole layout is
     /// taken, with INPUTS hidden, the mix matrix, MONITOR's toolbar,
     /// HEADPHONES beside it, the applications in columns, every header
     /// action in the row and nothing folded. The meter colours are flat, so
@@ -166,6 +167,8 @@ public sealed class SkinPackageTests : IDisposable
     /// </summary>
     [Theory]
     [InlineData("broadcast", "Broadcast")]
+    [InlineData("broadcast-amber", "Broadcast Amber")]
+    [InlineData("broadcast-blue", "Broadcast Blue")]
     [InlineData("wave", "Wave")]
     public void TheMatrixSkinsCarryTheWholeLayout(string id, string name)
     {
@@ -223,6 +226,42 @@ public sealed class SkinPackageTests : IDisposable
             .Select(z => ((SkinSolid)skin.Package.Tokens[z]).Color).Distinct().Count());
         Assert.True(((SkinNumber)skin.Package.Tokens["Ox.Meter.WarningLevel"]).Value
             < ((SkinNumber)skin.Package.Tokens["Ox.Meter.HotLevel"]).Value);
+    }
+
+    /// <summary>
+    /// Broadcast Amber and Broadcast Blue are Broadcast with its accents in
+    /// orange or in blue: the same layout, controls and size, and every value
+    /// that is not a colour the same.
+    /// </summary>
+    [Theory]
+    [InlineData("broadcast-amber", new[] { "Ox.Eq.Band1" })]
+    [InlineData("broadcast-blue", new[] { "Ox.Flow.Output", "Ox.Eq.Band1" })]
+    public void TheBroadcastColoursAreBroadcast(string id, string[] kept)
+    {
+        static JsonObject Read(string id)
+        {
+            using Stream stream = typeof(SkinCatalog).Assembly.GetManifestResourceStream($"OpenXLR.UI.Assets.Skins.{id}.skin.json")!;
+            return (JsonObject)JsonNode.Parse(stream)!;
+        }
+        JsonObject broadcast = Read("broadcast");
+        JsonObject amber = Read(id);
+        foreach (string part in new[] { "schema", "author", "window", "controls", "layout" })
+            Assert.True(JsonNode.DeepEquals(broadcast[part], amber[part]), part);
+
+        JsonObject before = broadcast["tokens"]!.AsObject();
+        JsonObject after = amber["tokens"]!.AsObject();
+        Assert.Equal(before.Select(t => t.Key), after.Select(t => t.Key));
+        string[] changed = [.. before.Where(t => !JsonNode.DeepEquals(t.Value, after[t.Key])).Select(t => t.Key)];
+        foreach (string key in changed)
+            Assert.Matches("^#([0-9a-f]{2})?[0-9a-f]{6}$", after[key]!.GetValue<string>());
+        Assert.Contains("Ox.Accent", changed);
+        Assert.Contains("Ox.Meter.Fill", changed);
+        Assert.Contains("Ox.Led.On", changed);
+        // No green or blue accent of Broadcast's is left behind but the
+        // ones that keep the EQ bands and Flow's node kinds apart.
+        string[] accents = ["#4ade80", "#3b82f6", "#60a5fa", "#93c5fd", "#1e3a5f"];
+        Assert.Equal(kept, after.Where(t => t.Value is JsonValue v && v.TryGetValue(out string? text)
+            && accents.Contains(text)).Select(t => t.Key));
     }
 
     /// <summary>
@@ -711,7 +750,7 @@ public sealed class SkinPackageTests : IDisposable
             Assert.Equal(entry.Package.Id switch
             {
                 "hifi" or "hifi-amber" or "hifi-classic" => new SkinWindowSize(1668, 1174),
-                "broadcast" => new SkinWindowSize(1224, 1141),
+                "broadcast" or "broadcast-amber" or "broadcast-blue" => new SkinWindowSize(1224, 1141),
                 _ => (SkinWindowSize?)null,
             }, entry.Package.WindowSize);
         Assert.Null(SkinPackage.Default.WindowSize);

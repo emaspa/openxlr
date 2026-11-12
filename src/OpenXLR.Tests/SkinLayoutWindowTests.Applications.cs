@@ -37,7 +37,7 @@ internal static partial class SkinLayoutWindowTests
 
     private static void CheckApplicationColumns()
     {
-        foreach ((string id, int perColumn) in new[] { ("broadcast", 4), ("wave", 4), ("hifi", 6), ("hifi-amber", 6), ("hifi-classic", 6) })
+        foreach ((string id, int perColumn) in new[] { ("broadcast", 4), ("broadcast-amber", 4), ("broadcast-blue", 4), ("wave", 4), ("hifi", 6), ("hifi-amber", 6), ("hifi-classic", 6) })
         {
             JsonNode skin;
             using (Stream stream = typeof(SkinCatalog).Assembly.GetManifestResourceStream($"OpenXLR.UI.Assets.Skins.{id}.skin.json")!)
