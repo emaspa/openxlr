@@ -1988,6 +1988,10 @@ public sealed partial class SkinWindowTests
             Assert.Empty(SkinService.Apply(SkinCatalog.Find("nord")!));
             Assert.Equal(1200d, main.Width);
 
+            // Broadcast, the skin a fresh install starts with, has a size of its own.
+            Assert.Empty(SkinService.Apply(SkinCatalog.Find(SkinPackage.StartingId)!));
+            Assert.Equal((1224d, 1141d), (main.Width, main.Height));
+
             // A screen smaller than the skin's size gets the UI as large as it allows.
             MainWindow.WorkingAreaProbe = _ => new Rect(0, 0, 1280, 720);
             Assert.Empty(SkinService.Apply(SkinCatalog.Find("hifi")!));

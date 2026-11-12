@@ -3379,7 +3379,8 @@ the application, so a package brings them with it:
   Kanagawa, Matte Black, Nord, Osaka Jade, Ristretto, Rose Pine and Tokyo
   Night. Catppuccin Latte and Rose Pine are light;
 - **Broadcast**, the default, a dark neutral palette that also rearranges
-  the UI, described below;
+  the UI, described below. Choosing it opens the UI at 1224 by 1141, or as
+  large as a smaller screen allows;
 - **Compact Desk**, a denser dark matrix with bounded headphones and
   application tiles wrapping across the page, described below;
 - **Nyan Pink**, dark plum cards, candy pink faders and cyan details,

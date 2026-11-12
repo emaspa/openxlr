@@ -5,6 +5,12 @@
   "name": "Broadcast",
   "description": "Every channel's send into every mix in one matrix, a row per channel and a column per mix, with the monitor output at the top right, on a dark neutral palette",
   "author": "OpenXLR",
+  "window": {
+    "size": {
+      "width": 1224,
+      "height": 1141
+    }
+  },
   "controls": {
     "button": "flat",
     "fader": "console",
