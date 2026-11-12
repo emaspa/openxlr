@@ -24,11 +24,11 @@ effects and EQ, the headphone outputs and, on the Wave XLR Pro, output
 routing, a second-computer mix on the USB Aux port, ducking on the
 unit's own processor and, as an experiment, mixes built in the unit.
 
-![OpenXLR mixer](docs/screenshot-mixer-0210.png)
+![OpenXLR mixer](docs/screenshot-mixer-0700.png)
 
 ![OpenXLR terminal mixer](docs/screenshot-tui-0200.png)
 
-The UI from 0.2.1 and the terminal mixer from 0.2.0, both in the Broadcast
+The UI from 0.7.0 and the terminal mixer from 0.2.0, both in the Broadcast
 skin. This README and the linked guides describe current `main`; for a
 released build, read the docs at its release tag. Not affiliated with or
 endorsed by Elgato. The device protocols come from Wave Link USB captures,
