@@ -1468,9 +1468,11 @@ pointer is over its tile it glides once to its end and stays there, and
 glides back when the pointer leaves. Nothing moves at rest, and the tooltip
 shows the whole name. The glide does not yet follow a desktop setting to
 reduce motion, since the UI toolkit does not report one. The picker is as wide as the longest channel it
-lists. Columns that do not fit the section's width start a new row of
-columns below, whole, so nothing scrolls sideways; a window narrower than
-two columns shows them one under the other. The default template's chips
+lists. When the columns do not fit the section's width side by side, the
+names narrow, down to 64 pixels, so that as many columns as that makes room
+for stand beside each other. Columns that still do not fit start a new row
+of columns below, whole, so nothing scrolls sideways; a window narrower than
+two narrowed columns shows them one under the other. The default template's chips
 keep the width of their own name and channel, or share a row's spare
 width up to the same limit when the skin sets it.
 

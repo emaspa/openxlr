@@ -37,14 +37,14 @@ internal static partial class SkinLayoutWindowTests
 
     private static void CheckApplicationColumns()
     {
-        foreach (string id in new[] { "broadcast", "wave" })
+        foreach ((string id, int perColumn) in new[] { ("broadcast", 4), ("wave", 4), ("hifi", 6), ("hifi-amber", 6), ("hifi-classic", 6) })
         {
             JsonNode skin;
             using (Stream stream = typeof(SkinCatalog).Assembly.GetManifestResourceStream($"OpenXLR.UI.Assets.Skins.{id}.skin.json")!)
                 skin = JsonNode.Parse(stream)!;
             JsonNode applications = skin["layout"]!["regions"]!["applications"]!;
             Assert.Equal(SkinLayoutTemplates.ApplicationColumns, applications["template"]!.GetValue<string>());
-            Assert.Equal(4, applications["perColumn"]!.GetValue<int>());
+            Assert.Equal(perColumn, applications["perColumn"]!.GetValue<int>());
         }
 
         var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
@@ -94,6 +94,19 @@ internal static partial class SkinLayoutWindowTests
             CheckColumnsAt(window, model, "broadcast with a long name at 1600");
             CheckLongName(window, model);
             model.ActiveApps.Remove(model.ActiveApps.Single(a => a.Label == LongAppName));
+
+            // Hi-Fi at its own window size: eight applications stand in two
+            // columns side by side, their names narrowed to make the room,
+            // rather than one column over another.
+            Wear("hifi");
+            ShowApps(model, all, 8);
+            Layout(window, 1668, 1174);
+            CheckColumnsAt(window, model, "hifi, 8 applications at 1668", 6);
+            Border[] hifi = ApplicationTiles(window);
+            var hifiPanel = (TileColumnsPanel)window.FindControl<ItemsControl>("ApplicationRows")!.ItemsPanelRoot!;
+            Assert.Equal(2, hifi.Select(t => Math.Round(t.TranslatePoint(default, hifiPanel)!.Value.X)).Distinct().Count());
+            Assert.All(hifi, t => Assert.True(t.TranslatePoint(default, hifiPanel)!.Value.Y < 6 * t.Bounds.Height, "a tile went below"));
+            Capture(window, "skin-hifi-applications-8-1668");
 
             // Classic chips wrap while keeping their different natural widths.
             Wear(SkinPackage.DefaultId);
@@ -176,10 +189,9 @@ internal static partial class SkinLayoutWindowTests
         foreach (AppStreamViewModel app in all.Take(count)) model.ActiveApps.Add(app);
     }
 
-    /// <summary>Tiles flow down columns of up to four, then across or into the next band.</summary>
-    private static void CheckColumnsAt(MainWindow window, MainViewModel model, string where)
+    /// <summary>Tiles flow down columns of up to the skin's length, then across or into the next band.</summary>
+    private static void CheckColumnsAt(MainWindow window, MainViewModel model, string where, int maximumPerColumn = 4)
     {
-        const int maximumPerColumn = 4;
         var rows = window.FindControl<ItemsControl>("ApplicationRows")!;
         TileColumnsPanel panel = Assert.IsType<TileColumnsPanel>(rows.ItemsPanelRoot);
         Assert.Equal(maximumPerColumn, panel.PerColumn);
@@ -257,8 +269,9 @@ internal static partial class SkinLayoutWindowTests
             string tile = $"{((AppStreamViewModel)tiles[i].DataContext!).Label} {where}";
             ScrollingName name = tiles[i].GetVisualDescendants().OfType<ScrollingName>().Single();
             ComboBox picker = tiles[i].GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "ApplicationChannel");
-            if (maximum > 0) Assert.True(name.Bounds.Width >= nameWidth - 0.5, tile);
-            else Assert.Equal(nameWidth, name.Bounds.Width, 0.5);
+            // A name narrows below the skin's width only to put another column beside its own.
+            Assert.True(name.Bounds.Width >= Math.Min(nameWidth, TileColumnsPanel.NameFloor) - 0.5, $"{tile}: name {name.Bounds.Width:0.#} wide");
+            if (maximum <= 0) Assert.True(name.Bounds.Width <= nameWidth + 0.5, $"{tile}: name {name.Bounds.Width:0.#} wide");
             AssertInside(name, tiles[i]);
             AssertInside(picker, tiles[i]);
             var volume = tiles[i].GetVisualDescendants().OfType<Button>().Single(b => b.Name == "PlaybackVolume");
