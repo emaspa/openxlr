@@ -100,7 +100,7 @@ read or written as one unit; individual controls are byte fields at fixed offset
 | 0x0001 | 108 B | R/W | 9832 | 146 | main config/state (toggles + a large tail array) |
 | 0x0002 | 150 B | R only | 9872 | 0 | **telemetry / meters** (polled, never written; layout in section 21) |
 | 0x0003 | 12 B  | W     | 0    | 57  | write-only commit block (constant `04 00…` in this capture; role established in section 6) |
-| 0x0004 | 80 B  | R/W   | 9828 | 168 | config: a 0–100 fader + a packed-flags byte + an enum |
+| 0x0004 | 80 B  | R/W   | 9828 | 168 | config: a 0 to 100 fader + a packed-flags byte + an enum |
 | 0x0005 | 8 B   | R/W   | 9790 | 131 | **two independent one-byte level faders** |
 | 0x0006 | 29 B  | R only| 9837 | 0   | status/telemetry |
 | 0x0008 | 96 B  | R only| 9805 | 0   | ducking settings, written by Wave Link 3.5 (section 11) |
@@ -112,17 +112,17 @@ reads to stay live (matches upstream OpenWave's keepalive concern), to be confir
 ## 3. Decoded value encodings (directly observed)
 
 ### Block 0x0005 (8 B) two level faders. Framing `[L0] 00 [L2] 00  50 00 00 00`
-- **offset 0**: one-byte level, swept full range **0x00–0xf0** (0–240), t=361–379 s.
-- **offset 2**: one-byte level, swept full range **0x03–0xf0**, t=388–405 s.
+- **offset 0**: one-byte level, swept full range **0x00 to 0xf0** (0 to 240), t=361 to 379 s.
+- **offset 2**: one-byte level, swept full range **0x03 to 0xf0**, t=388 to 405 s.
 - offset 4 constant **0x50** (80), a third level parked at default. Section 19 measured it: Line Out's level, dB = -byte/4.
 - These two are the analog level controls dragged end-to-end during capture, i.e. **headphone
   volume and monitor/direct-monitor blend** (which is which not yet distinguished; see §4).
 
 ### Block 0x0004 (80 B) mixed config
-- **offset 10**: one-byte fader swept **0x00–0x64 (0–100, a percentage)**, t=506–517 s. A distinct
-  level control from the 0x0005 pair, on a 0–100 scale (candidate: mic-output or a mix %).
-- **offset 0**: **MIC GAIN in dB** (0x00–0x50 = 0–80 dB); gradual, dial-driven. See §4.
-- **offset 1**: a **packed-flags byte**, individual bits flip independently across t=197–533 s
+- **offset 10**: one-byte fader swept **0x00 to 0x64 (0 to 100, a percentage)**, t=506 to 517 s. A distinct
+  level control from the 0x0005 pair, on a 0 to 100 scale (candidate: mic-output or a mix %).
+- **offset 0**: **MIC GAIN in dB** (0x00 to 0x50 = 0 to 80 dB); gradual, dial-driven. See §4.
+- **offset 1**: a **packed-flags byte**, individual bits flip independently across t=197 to 533 s
   (values ba/bb/b8/a9/f8/d8/58/d0). Several booleans live here (phantom / low-cut / ClipGuard /
   mute / impedance / polarity, bit-level decode in §4).
 - **offset 2**: a small **enum**, values 0x00 / 0x01 / 0x05 (3 states), candidate low-cut *type*
@@ -131,7 +131,7 @@ reads to stay live (matches upstream OpenWave's keepalive concern), to be confir
 ### Block 0x0001 (108 B) main config plus a tail array
 - Low-cardinality byte fields (candidate toggles/small enums) at offsets **12, 13, 24, 30, 39,
   48, 90, 91**. Flip events clustered at t≈76 s (initial multi-field apply), 386 s, 445 s, and
-  606–640 s.
+  606 to 640 s.
 - offset 98… onward: a long monotonic-ish array (a curve/table or a meter mirror), not a control.
 
 ## 4. Control map (aligned to the captured action order, which followed the plan ~99%)
@@ -144,8 +144,8 @@ but the exact field/bit split needs one confirming toggle, **LOW** = region know
 ### Mic gain in block 0x0004 offset 0, value = gain in dB (HIGH)
 Gain moves gradually only (both the Wave Link UI and the Stream Deck dials drive it as a dial, per
 the user), which is exactly the signature of block 0x0004 **offset 0**: it climbs 0x01 to 0x3c during
-2:41–3:08, later falls to 0x00, ends 0x33. `0x3c = 60` maps 1:1 to the plan's "gain to 60 dB", so
-**the byte is gain in dB** (range 0x00–0x50 = 0–80, matching the ALSA control's 0–80 dB span).
+2:41 to 3:08, later falls to 0x00, ends 0x33. `0x3c = 60` maps 1:1 to the plan's "gain to 60 dB", so
+**the byte is gain in dB** (range 0x00 to 0x50 = 0 to 80, matching the ALSA control's 0 to 80 dB span).
 Proof it is a control and not a write-counter: when off1/off2/off10 changed, off0 stayed stable in
 65 of 66 writes (a counter would increment every write); off0 moved alone in 100 writes.
 Convenience: the SAME gain is also the standard **UAC2 ALSA capture-volume control** (`amixer -c
@@ -154,36 +154,36 @@ an alternative, not required, for gain.
 
 ### Block 0x0004 offset 1, packed byte of 8 booleans (bit-level decoded)
 Baseline `0xba = 1011_1010`. Flips observed, in order:
-- **bit 0**, toggled on/off/on/off at 3:17–3:24: **MIC MUTE** (the "do it twice" step). HIGH.
+- **bit 0**, toggled on/off/on/off at 3:17 to 3:24: **MIC MUTE** (the "do it twice" step). HIGH.
 - **bit 1**, single flip at 3:50: a mic toggle, **phantom power or low-cut** (first single mic
   toggle after mute). MED.
 - **bit 4**, flips at 4:01 & 4:11 (paired with bit 0): **ClipGuard or the other of phantom/
   low-cut**. MED.
 - **bit 6**, flip at 8:24 (start of the output/monitor cluster): **headphone impedance**. MED.
 - **bit 5**, flip at 8:42: **polarity or mic-output mute**. LOW.
-- **bit 7**, on/off at 8:48–8:49; **bit 3**, on/off at 8:50–8:52: the remaining output toggles
+- **bit 7**, on/off at 8:48 to 8:49; **bit 3**, on/off at 8:50 to 8:52: the remaining output toggles
   (mic-output mute / polarity). LOW.
 
-Early bits (0,1,4) are the **mic** toggles (plan steps 5–13); late bits (3,5,6,7) are the
+Early bits (0,1,4) are the **mic** toggles (plan steps 5 to 13); late bits (3,5,6,7) are the
 **output/monitor** toggles (plan steps 18/21/22). The mic-vs-output split is solid; which bit is
 exactly which within each group is the only soft part.
 
 ### Block 0x0004 offset 2, 3-state enum, values 00 / 01 / 05: **LOW-CUT TYPE / mode** (MED).
-Cycled 01, 05, 01 at 4:11–4:18 (during the mic-toggle window), consistent with low-cut type.
+Cycled 01, 05, 01 at 4:11 to 4:18 (during the mic-toggle window), consistent with low-cut type.
 
 ### Block 0x0005, the two swept faders (framing `[o0] 00 [o2] 00  50 00 00 00`)
-- **offset 0**: swept full-range first, 6:00–6:19: **HEADPHONE VOLUME** (plan steps 15–17, done
+- **offset 0**: swept full-range first, 6:00 to 6:19: **HEADPHONE VOLUME** (plan steps 15 to 17, done
   before monitor blend). MED-HIGH.
-- **offset 2**: swept full-range second, 6:27–6:45: **MONITOR / DIRECT-MONITOR BLEND** (plan step
+- **offset 2**: swept full-range second, 6:27 to 6:45: **MONITOR / DIRECT-MONITOR BLEND** (plan step
   19). MED-HIGH.
 - offset 4 constant **0x50**, a third level parked at default; Line Out's level (section 19).
-  Range for both faders 0x00–0xf0.
+  Range for both faders 0x00 to 0xf0.
 
-### Block 0x0004 offset 10, one-byte fader, range **0x00–0x64 (0–100 %)**, swept 8:25–8:36:
+### Block 0x0004 offset 10, one-byte fader, range **0x00 to 0x64 (0 to 100 %)**, swept 8:25 to 8:36:
 **MIC OUTPUT VOLUME** (plan step 20, in the output cluster). MED.
 
 ### Block 0x0001 (108 B), mic channel config + the unremembered extras
-Multi-field writes at 1:16 (session start) and 10:06–10:40 (session end), touching offsets
+Multi-field writes at 1:16 (session start) and 10:06 to 10:40 (session end), touching offsets
 12/13/24/30/39/48 and single-sets at 90 and 91 (6:26, 7:25). This block holds the remaining mic
 DSP state and is where the "extra mic stuff" landed. Individual labels here are **LOW** confidence
 without a targeted pass, but nothing in daily use is blocked: the day-to-day controls (mute,
@@ -1488,8 +1488,8 @@ on that pair read on the section's capture pair:
 - Whether amount 0 with the bypass clear is dry, or still holds peaks at
   the ceiling.
 - Byte 99 as section 0's mute.
-- The maximizers of sections 0, 36, 54 and 72, measured only through the
-  pattern of section 18's.
+- The maximizers of sections 0, 54 and 72, measured only through the
+  pattern of section 18's. Section 36's ran as OpenXLR drives it (above).
 
 ## 23. The capture taps of XLR 2, USB Aux and Line In (desk probe of 2026-11-11)
 

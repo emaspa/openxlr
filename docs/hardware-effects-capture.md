@@ -9,7 +9,7 @@ or change a device. Software LV2, CLAP and VST3 inserts are a separate path.
 
 | Device | USB product id | Unmapped effects to capture |
 |---|---|---|
-| Wave XLR Pro | `00b4` | A ducking key other than XLR Mic 1, mix maximizer, channel booster. For the EQ only a change of band type, band enable or Q in Wave Link; its layout, switch and band gain and frequency are mapped on firmware 1.0.14, see [hardware support](hardware-support.md#wave-xlr-pro-0fd900b4) |
+| Wave XLR Pro | `00b4` | The channel booster. For ducking only USB Aux or Line In as a lowered channel, which no capture shows yet; the keys and the mix maximizer are mapped. For the EQ only a change of band type, band enable or Q in Wave Link; its layout, switch and band gain and frequency are mapped on firmware 1.0.14, see [hardware support](hardware-support.md#wave-xlr-pro-0fd900b4) |
 | Wave XLR MK.2 | `00b6` | For the EQ only a change of band type or band enable in Wave Link; the rest of its layout and its master enable are mapped on firmware 1.0.15, see the [findings](mk2-eq-findings.md) |
 | Wave:3 MK.2 | `00ca` | A capture of the expander and ClipGuard switches in Wave Link, to confirm the XLR MK.2 offsets they are driven at; the low cut, compressor, voice tune and EQ are measured, see [hardware support](hardware-support.md#wave3-mk2-0fd900ca) |
 | XLR Dock MK.2 | `00c7` | As for the Wave XLR MK.2: on firmware 1.0.15 the dock takes the same EQ layout. On firmware 1.0.0 Wave Link runs the EQ on the computer. See the [findings](mk2-eq-findings.md) |
@@ -28,7 +28,7 @@ with a similar name. Record which input, channel or mix you are editing.
 
 Use Windows, Wave Link and Wireshark with USBPcap as described in the
 [USB capture guide](usb-capture.md#what-you-need). Keep listening levels
-low when changing EQ gain, a maximizer or a booster. Do not change phantom
+low when changing EQ gain or a booster. Do not change phantom
 power, microphone gain or output routing during an effect capture.
 
 1. Note the exact device model, USB product id, firmware and Wave Link
@@ -53,9 +53,9 @@ width or Q separately, using only controls the device actually exposes.
 Keep the other bands unchanged. Include negative, zero and positive gain
 values. Give the band index and the frequency and width units.
 
-For the Pro's ducking and maximizer, repeat the enable sequence on a second
-mix with the first mix left unchanged. Capture each available parameter
-separately and name the mix. For the booster, use a second input channel
+For the Pro's ducking with USB Aux or Line In lowered, change only that
+channel's ducking and name the key and the mix; repeat it on a second mix
+with the first left unchanged. For the booster, use a second input channel
 to establish its scope. Do not assume that an effect's master enable and
 its per-mix or per-channel enable are the same field.
 

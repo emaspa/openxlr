@@ -6,7 +6,7 @@ appearance values and, if it wants, where the header and the
 UI's sections go ([Layout](#layout)); it carries no markup, no script and
 no code, and it cannot reach a file outside its own folder.
 
-OpenXLR ships seventeen appearances, all compiled into the application, so
+OpenXLR ships twenty appearances, all compiled into the application, so
 every package has them and there is nothing to install:
 
 - **Material**, the classic appearance, in a dark and a light palette (see
