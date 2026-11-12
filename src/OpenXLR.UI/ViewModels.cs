@@ -2110,8 +2110,8 @@ public sealed class MixViewModel : ViewModelBase, IHasId
 
     public const int MaximizerMaximum = 100;
 
-    /// <summary>The amount as the button and the flyout say it: Off at 0.</summary>
-    public string MaximizerText => _maximizer == 0 ? Localizer.Text("MaximizerOff") : _maximizer.ToString(System.Globalization.CultureInfo.CurrentCulture);
+    /// <summary>The amount as the button and the flyout say it, a percentage: Off at 0.</summary>
+    public string MaximizerText => _maximizer == 0 ? Localizer.Text("MaximizerOff") : $"{_maximizer}%";
 
     public bool MaximizerOn => _maximizer > 0;
 
