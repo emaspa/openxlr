@@ -2219,6 +2219,11 @@ the input's route, and the plugin host is not needed.
   when it can take it again. The mixer saves the choice per microphone; profiles do not carry it, and a
   recall never changes it. The terminal mixer's Inputs tab shows the same
   choice.
+- When the microphone leaves a unit, for example when you make another
+  interface the primary and the one it ran on stays an additional
+  interface, OpenXLR switches that unit's EQ off. Once the unit confirms
+  it, OpenXLR leaves the unit's EQ alone, so an EQ another program sets
+  there later stays.
 - On older firmware the EQ runs on this computer until the unit is
   updated. A note under the switch names
   the unit's firmware and the version it needs: 1.0.15 on the Wave XLR

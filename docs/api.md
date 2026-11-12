@@ -2419,6 +2419,11 @@ binding off the unit does the same, so an EQ Wave Link left on cannot stay
 on the unit's own paths. Nothing is written when the daemon stops, when the unit is unplugged, to an
 additional interface's input that no microphone carries, or in
 hardware-control mode: the unit keeps the EQ it last held.
+When the microphone leaves a unit that no microphone carries any more, such
+as an additional interface after `setActiveDevice` moved the primary off
+it, OpenXLR switches that unit's EQ off. Once the unit reads it back off,
+the mixer lets go of the input, and an EQ another program sets there later
+is not written back.
 Another channel taking the same unit's audio, a capture channel on its node,
 hears the unit's EQ, as it hears the unit's low cut.
 
