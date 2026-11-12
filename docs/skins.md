@@ -30,8 +30,8 @@ every package has them and there is nothing to install:
   column. HEADPHONES and MONITOR's toolbar share the row above it, INPUTS
   is hidden because the matrix's row heads carry the input gain, mute,
   microphone switches and plugins, and APPLICATIONS is under the matrix in columns of four, on a dark neutral
-  palette. It is the reference for writing a layout skin; see
-  [Layout](#layout).
+  palette. It opens the UI at 1224 by 1141. It is the reference for
+  writing a layout skin; see [Layout](#layout).
 - **Compact Desk**, a dark matrix layout with a 600 pixel headphone column
   and a monitor toolbar that takes the remaining width. Wider name columns
   and faders expand to use the desk's space, muted faders stay readable,

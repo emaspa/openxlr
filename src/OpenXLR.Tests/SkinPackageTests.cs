@@ -705,10 +705,15 @@ public sealed class SkinPackageTests : IDisposable
                 Assert.Single(result.Errors));
         }
 
-        // The Hi-Fi skins are drawn for one size; every other shipped
-        // appearance leaves the UI's size alone.
+        // The Hi-Fi skins are drawn for one size and Broadcast opens at its
+        // own; every other shipped appearance leaves the UI's size alone.
         foreach (SkinEntry entry in SkinCatalog.BuiltIn())
-            Assert.Equal(entry.Package.Id is "hifi" or "hifi-amber" or "hifi-classic" ? new SkinWindowSize(1668, 1174) : null, entry.Package.WindowSize);
+            Assert.Equal(entry.Package.Id switch
+            {
+                "hifi" or "hifi-amber" or "hifi-classic" => new SkinWindowSize(1668, 1174),
+                "broadcast" => new SkinWindowSize(1224, 1141),
+                _ => (SkinWindowSize?)null,
+            }, entry.Package.WindowSize);
         Assert.Null(SkinPackage.Default.WindowSize);
     }
 
