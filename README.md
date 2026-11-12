@@ -45,10 +45,10 @@ These Elgato devices also get their hardware controls over USB:
 
 | Device | USB id | Status |
 |---|---|---|
-| Wave XLR Pro | 0fd9:00b4 | controls and the EQ on the unit verified on hardware; ducking on the unit accepted by ear on the headphone jacks and the USB Aux port; hardware mixing (experimental) heard on one unit |
+| Wave XLR Pro | 0fd9:00b4 | controls and the EQ on the unit verified on hardware; raw capture verified on XLR 1; ducking on the unit accepted by ear on the headphone jacks and the USB Aux port; hardware mixing (experimental) heard on one unit, its maximizer per mix measured there |
 | XLR Dock (Stream Deck+ module) | 0fd9:00a6 | gain, mute, headphone volume, 48V phantom power, low impedance; verified |
 | Wave XLR | 0fd9:007d | gain, mute, headphone volume, low impedance and phantom power verified by community testers |
-| Wave XLR MK.2 | 0fd9:00b6 | gain, mute, phantom power, low impedance, DSP, ClipGuard, compressor, headphone volume, crossfade, verified by a community tester; the EQ on the unit from firmware 1.0.15, verified |
+| Wave XLR MK.2 | 0fd9:00b6 | gain, mute, phantom power, low impedance, DSP, ClipGuard, compressor, headphone volume, crossfade, verified by a community tester; the EQ on the unit from firmware 1.0.15, verified; raw capture, the LED ring and the unit's own meters from the same firmware, measured on hardware |
 | XLR Dock MK.2 (Stream Deck+ module) | 0fd9:00c7 | the Wave XLR MK.2's controls, verified |
 | Wave:3 | 0fd9:0070 | gain, mute, ClipGuard, headphone volume and the monitor balance, each written and read back on the maintainer's unit; gain, mute, the monitor balance and the desktop volume controls verified there |
 | Wave:3 MK.2 | 0fd9:00ca | gain, mute, headphone volume, crossfade, the EQ on the unit, low cut, compressor and voice tune verified on the maintainer's unit; the compressor and expander settings on the unit written and read back there; ClipGuard mapped from the Wave XLR MK.2 |
@@ -64,20 +64,24 @@ untested device, open an issue with a diagnostics archive
 - **Hardware control** of the devices above, down to the Pro's per-input
   effects, both headphone outputs and the routing of HP1, HP2, Line Out
   and USB Aux. Low cut and ClipGuard run in software where the hardware
-  has none.
+  has none. Raw capture on the Pro and the Wave XLR MK.2 sends an input
+  to the computer before the unit's processing
+  ([manual](docs/manual.md#raw-capture)), and the Wave XLR MK.2's LED
+  ring takes a brightness and a colour for each of the dial's modes.
 - **Hardware mixing** on the Wave XLR Pro (experimental): each channel
   streams to the unit on a USB pair of its own and the unit builds the
   mixes its jacks and USB Aux port play, so the microphones reach the
-  headphones with no delay and ducking runs per channel in the unit
+  headphones with no delay and ducking runs per channel in the unit. Each
+  mix the unit builds alone has the unit's maximizer
   ([manual](docs/manual.md#hardware-mixing)).
 - **Submixer** built from PipeWire nodes, no kernel modules: channels for
   the XLR inputs, Aux In, application groups and any other capture
   source, monitor mixes on any outputs, virtual microphones other apps
   record from. You change all of it while audio plays.
-- **Ducking**: a key microphone lowers chosen channels in chosen mixes
-  while you speak, in software everywhere and on the Pro's own processor
-  when the setup fits, with presets or your own sensitivity, amount and
-  speed.
+- **Ducking**: one to eight keys, each a microphone or a channel such as
+  Voice Chat, lower chosen channels in chosen mixes while the loudest key
+  is loud, in software everywhere and on the Pro's own processor when the
+  setup fits, with presets or your own sensitivity, amount and speed.
 - **Microphone processing**: an EQ of up to sixteen bands with Wave
   Link's band types (up to four on the unit where it has an EQ), EQ
   profiles saved by name and loaded from the UI or a Deck key, a
@@ -101,15 +105,16 @@ untested device, open an issue with a diagnostics archive
   [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767),
   can activate.
 - **Application routing** by name rules, Electron and Wine/Proton apps
-  included; an optional Chromium companion routes single browser tabs
-  ([browser routing](docs/browser-routing.md)).
+  included, with a playback volume for each application; an optional
+  Chromium companion routes single browser tabs, each with a volume of
+  its own ([browser routing](docs/browser-routing.md)).
 - **Profiles**: named scenes of hardware settings and the whole submix,
   recalled from the UI, the API, a Stream Deck key or on connect.
 - **Daemon and APIs**: the daemon owns the device and the graph and keeps
   running with the UI closed; WebSocket and HTTP APIs on a private Unix
   socket authenticated by peer credentials.
 - **Terminal mixer** `openxlr-tui` ([manual](docs/manual.md#terminal)),
-  an **Omarchy bar** plugin ([omarchy.md](docs/omarchy.md)), seventeen
+  an **Omarchy bar** plugin ([omarchy.md](docs/omarchy.md)), twenty
   **skins** as data ([skins.md](docs/skins.md)) and seven **languages**
   ([localization](docs/localization.md)).
 
@@ -222,12 +227,12 @@ AI-assisted development.
 
 - Another brand's microphone or interface gets the mixer, not its
   hardware controls.
-- On the Pro, the unit's ducking runs only on the headphone jacks and the
-  USB Aux port, and only keyed by XLR 1; other setups duck in software.
-  Hardware mixing has room for eight channels beside the unit's own
-  inputs, builds only the mixes the unit plays, and takes no plugin on
-  those mixes. The mix maximizer and the channel booster are not
-  available yet.
+- On the Pro, the unit's ducking runs only on the headphone jacks, Line
+  Out and the USB Aux port, and only with the unit's own inputs as keys,
+  or in hardware mixing a channel on a USB pair; other setups duck in
+  software. Hardware mixing has room for eight channels beside the unit's
+  own inputs, builds only the mixes the unit plays, and takes no plugin on
+  those mixes. The channel booster is not available yet.
 - Routing the focused application needs a compositor the UI can ask which
   window has focus: KWin, Hyprland, Sway, Niri, X11 through `xprop`, or
   GNOME Shell with the optional OpenXLR Focus extension
