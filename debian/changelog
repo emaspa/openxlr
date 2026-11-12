@@ -1,3 +1,18 @@
+openxlr (0.7.0) resolute; urgency=medium
+
+  * Mixer: playback volume for each application, remembered per program
+  * Browser: playback volume for routed tabs, per tab or per website
+  * Ducking: one to eight keys, and the Wave XLR Pro's own inputs as targets
+  * Mixer: a maximizer per mix and section levels on the Wave XLR Pro in hardware mixing
+  * Devices: raw capture before the unit's processing on the Wave XLR Pro and the Wave XLR MK.2
+  * Devices: Wave XLR MK.2 LED ring, meters and status, ClipGuard and gain lock on firmware 1.0.15
+  * Mixer: EQ band gains from -20 to +20 dB
+  * Mixer: return pairs stay with their inputs in hardware mixing
+  * Mixer: lock the active PipeWire output volume
+  * UI: Higher voice EQ preset, Mic setup gain lock, green lock keys
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Thu, 12 Nov 2026 09:34:47 +0000
+
 openxlr (0.6.5) resolute; urgency=medium
 
   * UI: Hi-Fi Classic, Hi-Fi with a green display whose meters turn yellow and then red
