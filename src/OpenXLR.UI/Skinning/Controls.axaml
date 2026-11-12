@@ -219,6 +219,7 @@
     <Setter Property="Presentation" Value="Segmented"/>
     <Setter Property="Segments" Value="{DynamicResource Ox.Meter.Segments}"/>
     <Setter Property="SegmentGap" Value="{DynamicResource Ox.Meter.SegmentGap}"/>
+    <Setter Property="SegmentWidth" Value="{DynamicResource Ox.Meter.SegmentWidth}"/>
   </ControlTheme>
 
   <!-- ==== indicator lamps ==== -->

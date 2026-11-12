@@ -13,7 +13,7 @@
   <!-- A wide window keeps the setup at a readable width, centred. -->
   <DockPanel Margin="16" MaxWidth="900">
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,8">
-      <TextBlock Text="{loc:Text Key=Ducking}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+      <skin:LitText Text="{loc:Text Key=Ducking}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       <!-- the unit's own processor runs it -->
       <Border Grid.Column="1" Name="DuckingHardwareBadge" IsVisible="{Binding OnDevice}" VerticalAlignment="Center"
               Background="{DynamicResource Ox.Badge.Background}" CornerRadius="{DynamicResource Ox.Eq.CornerRadius}" Padding="8,2"
@@ -43,7 +43,7 @@
         <TextBlock Text="{loc:Text Key=DuckingReduction}" Classes="h" VerticalAlignment="Center"/>
         <skin:LevelMeter Grid.Column="1" Name="DuckingReductionMeter" Level="{Binding ReductionLevel}" VerticalAlignment="Center"
                          WarningLevel="1" HotLevel="1" AutomationProperties.Name="{loc:Text Key=DuckingReduction}"/>
-        <TextBlock Grid.Column="2" Name="DuckingReductionValue" Text="{Binding ReductionText}" Classes="val" VerticalAlignment="Center"/>
+        <skin:LitText Grid.Column="2" Name="DuckingReductionValue" Text="{Binding ReductionText}" Classes="val" VerticalAlignment="Center"/>
       </Grid>
       <!-- what runs ducking, or why nothing does -->
       <TextBlock Name="DuckingStatus" Text="{Binding Status}" Classes="hint" Classes.warn="{Binding Warns}" TextWrapping="Wrap"/>

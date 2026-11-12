@@ -160,6 +160,30 @@ var palettes = {
     "warningLevel": 0.7,
     "hotLevel": 0.9
   },
+  "vfd-amber": {
+    "fill": "#ff9634",
+    "warning": "#ff3b2f",
+    "hot": "#ff3b2f",
+    "track": "#281308",
+    "warningLevel": 0.7,
+    "hotLevel": 0.7
+  },
+  "vfd-blue": {
+    "fill": "#3fe6ff",
+    "warning": "#ff3b2f",
+    "hot": "#ff3b2f",
+    "track": "#0b2328",
+    "warningLevel": 0.7,
+    "hotLevel": 0.7
+  },
+  "vfd-classic": {
+    "fill": "#4ade80",
+    "warning": "#facc15",
+    "hot": "#ef4444",
+    "track": "#0c2616",
+    "warningLevel": 0.7,
+    "hotLevel": 0.9
+  },
   "wave": {
     "fill": "#41d793",
     "warning": "#ffd166",

@@ -30,9 +30,9 @@
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Send.Muted}"
                            HorizontalAlignment="Center" IsVisible="{Binding ShowsIcon}"
                            AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                <TextBlock Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" IsVisible="{Binding ShowsName}"
-                           ToolTip.Tip="{Binding Channel.Name}"/>
+                <skin:LitText Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" IsVisible="{Binding ShowsName}"
+                              ToolTip.Tip="{Binding Channel.Name}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1"
                           ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -47,7 +47,7 @@
                         Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value">
-                <TextBlock Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
+                <skin:LitText Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
               </Panel>
               <Panel layout:StripPanel.Part="mute">
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
@@ -73,9 +73,9 @@
                            Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Send.Muted}" Margin="0,0,4,0"
                            VerticalAlignment="Center" IsVisible="{Binding ShowsIcon}"
                            AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                <TextBlock Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}"
-                           ToolTip.Tip="{Binding Channel.Name}"/>
+                <skin:LitText Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}"
+                              ToolTip.Tip="{Binding Channel.Name}"/>
               </DockPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1"
                           VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
@@ -90,7 +90,7 @@
                         Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value" VerticalAlignment="Center" MinWidth="28">
-                <TextBlock Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Right"/>
+                <skin:LitText Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Right"/>
               </Panel>
               <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
@@ -120,15 +120,15 @@
                     </MultiBinding>
                   </vm:LayoutIconBlock.IsVisible>
                 </vm:LayoutIconBlock>
-                <TextBlock Grid.Column="1" Text="{Binding Mix.Name}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Mix.Name}">
-                  <TextBlock.IsVisible>
+                <skin:LitText Grid.Column="1" Text="{Binding Mix.Name}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Mix.Name}">
+                  <skin:LitText.IsVisible>
                     <MultiBinding Converter="{x:Static BoolConverters.Or}">
                       <Binding Path="Spec.WantsName"/>
                       <Binding Path="!Mix.Appearance.HasIcon"/>
                     </MultiBinding>
-                  </TextBlock.IsVisible>
-                </TextBlock>
+                  </skin:LitText.IsVisible>
+                </skin:LitText>
               </Grid>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Mix.MeterL}" AutomationProperties.Name="{loc:Text Key=LeftLevel}"/>
@@ -141,7 +141,7 @@
                         AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MixFaderName}}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value">
-                <TextBlock Text="{Binding Mix.VolumeText}" Classes="val" HorizontalAlignment="Right"/>
+                <skin:LitText Text="{Binding Mix.VolumeText}" Classes="val" HorizontalAlignment="Right"/>
               </Panel>
               <Grid layout:StripPanel.Part="mute" ColumnDefinitions="*,Auto,Auto">
                 <ToggleButton Content="{loc:Text Key=Mute}" Classes="mute" IsChecked="{Binding Mix.Muted, Mode=TwoWay}"
@@ -178,9 +178,9 @@
                       <Slider Name="MixMaximizerAmount" Minimum="0" Maximum="100" SmallChange="1" LargeChange="10"
                               TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Mix.Maximizer, Mode=TwoWay}"
                               AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}"/>
-                      <TextBlock Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
+                      <skin:LitText Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
+                    <skin:LitText Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
                     <TextBlock Text="{loc:Text Key=MaximizerTip}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"/>
                   </StackPanel>
                 </Flyout>
@@ -267,15 +267,15 @@
                     </MultiBinding>
                   </vm:LayoutIconBlock.IsVisible>
                 </vm:LayoutIconBlock>
-                <TextBlock Text="{Binding Mix.Name}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" ToolTip.Tip="{Binding Mix.Name}">
-                  <TextBlock.IsVisible>
+                <skin:LitText Text="{Binding Mix.Name}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" ToolTip.Tip="{Binding Mix.Name}">
+                  <skin:LitText.IsVisible>
                     <MultiBinding Converter="{x:Static BoolConverters.Or}">
                       <Binding Path="Spec.WantsName"/>
                       <Binding Path="!Mix.Appearance.HasIcon"/>
                     </MultiBinding>
-                  </TextBlock.IsVisible>
-                </TextBlock>
+                  </skin:LitText.IsVisible>
+                </skin:LitText>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Mix.MeterL}" AutomationProperties.Name="{loc:Text Key=LeftLevel}"/>
@@ -288,7 +288,7 @@
                         AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MixFaderName}}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value">
-                <TextBlock Text="{Binding Mix.VolumeText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
+                <skin:LitText Text="{Binding Mix.VolumeText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
               </Panel>
               <Panel layout:StripPanel.Part="mute">
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Mix.Muted, Mode=TwoWay}"
@@ -330,9 +330,9 @@
                         <Slider Minimum="0" Maximum="100" SmallChange="1" LargeChange="10"
                                 TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Mix.Maximizer, Mode=TwoWay}"
                                 AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}"/>
-                        <TextBlock Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
+                        <skin:LitText Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
                       </Grid>
-                      <TextBlock Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
+                      <skin:LitText Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
                       <TextBlock Text="{loc:Text Key=MaximizerTip}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"/>
                     </StackPanel>
                   </Flyout>

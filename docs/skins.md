@@ -6,7 +6,7 @@ appearance values and, if it wants, where the header and the
 UI's sections go ([Layout](#layout)); it carries no markup, no script and
 no code, and it cannot reach a file outside its own folder.
 
-OpenXLR ships twenty-two appearances, all compiled into the application, so
+OpenXLR ships twenty-five appearances, all compiled into the application, so
 every package has them and there is nothing to install:
 
 - **Material**, the classic appearance, in a dark and a light palette (see
@@ -69,6 +69,16 @@ every package has them and there is nothing to install:
 - **Hi-Fi Amber**, Hi-Fi with an amber display in place of the blue one.
 - **Hi-Fi Classic**, Hi-Fi with a classic green display. Its meters turn
   yellow and then red near the top, like an LED ladder.
+- **VFD Amber**, the whole UI as a vacuum fluorescent display behind
+  smoked glass, in Broadcast's arrangement and size. Every piece of
+  lettering, keys and lists included, is in a segment face over its unlit
+  cells, with a halo on names, readouts and the title. Meters are ladders
+  of fixed-width cells that turn red at the top, fader knobs are solid lit
+  chips, and the version number is part of the title. It letters in
+  OpenXLR Segment 7 and 14, which the UI carries itself, and on Stream Deck
+  keys it draws the keys and dial strips as the same display.
+- **VFD Blue** and **VFD Classic**, VFD Amber in cyan-blue and in the
+  classic green phosphor.
 
 Pick one in Options under APPEARANCE. A new install starts on Broadcast,
 and so does an install whose user never picked a skin, so upgrading from a
@@ -172,11 +182,17 @@ palettes travel with the plugin; regenerate `skin-palettes.json` with
 `python3 tools/deck-skins.py` after changing embedded skins or colour defaults.
 CI checks the generated table and tests its defaults against `SkinTokens`.
 
+A skin that sets `Ox.Text.Ghost` letters the keys' labels and the dials'
+titles in OpenXLR Segment 14 over the unlit cells, as the UI does. OpenDeck
+renders the key images without the UI's bundled fonts, so the glyphs travel
+with the plugin as outlines in `segment-font.json`; regenerate it with
+`python3 tools/deck-segments.py` after changing the font.
+
 The UI publishes its realised palette to the private
 `~/.config/openxlr/deck-palette.json` when it applies a skin. This also carries
 the effective light or dark colours without a second desktop-theme connection
 in the plugin. The file is an atomic, schema-1 object containing `skin`, the UI process `pid` and
-`tokens`, with only the twelve colour and meter values the keys need. It does
+`tokens`, with only the thirteen colour and meter values the keys need. It does
 not change `ui.json` or audio profiles. A write failure appears in the skin's
 errors and leaves the plugin's file-based fallback available.
 
@@ -483,8 +499,16 @@ a URL in it is refused. Name a family the machine is likely to have, or
 one your skin's readme tells the user to install; an unknown family falls
 back to the system default without an error. The UI carries Fira Sans
 Condensed (Regular, SemiBold and Bold, under the SIL Open Font License)
-for the Hi-Fi skins, so a skin may name it on any machine; the name
-reaches that copy even where the font is installed.
+for the Hi-Fi skins, and OpenXLR Segment 7 and OpenXLR Segment 14 (under
+the same licence) for the VFD skins, so a skin may name them on any
+machine; the name reaches that copy even where the font is installed. The
+two segment faces are DSEG7 and DSEG14 Classic Italic with a space one cell
+wide, a point with a width of its own and an ellipsis added, renamed as the
+licence requires of a changed copy. Every character that fills a cell has
+the same width, so `Ox.Text.Ghost` and `Ox.Value.Ghost` can lay the unlit
+cells exactly under the lettering. `tools/segment-fonts.py` makes the two
+faces from the DSEG files, and `tools/deck-segments.py` then exports the
+outlines the Stream Deck keys use.
 
 **A weight** is `"Thin"`, `"ExtraLight"`, `"Light"`, `"Normal"`,
 `"Medium"`, `"SemiBold"`, `"Bold"`, `"ExtraBold"`, `"Black"` and the other
@@ -535,6 +559,8 @@ without a row here fails the build.
 
 | Token | Kind | Default | Range | What it paints |
 |---|---|---|---|---|
+| `Ox.Text.Ghost` | brush | #00000000 |  | the unlit cells behind all lettering, for a segment face such as OpenXLR Segment 14: each cell the face draws as a whole is drawn first with every segment in this colour, as a vacuum fluorescent display shows them. Transparent, the default, draws none. On Stream Deck keys a colour here also letters the keys in segments and draws them as a display |
+| `Ox.Text.LineSpacing` | number | 0 | 0 to 16 | extra room between the lines of text that wraps, in pixels, for a face whose lettering fills its whole height |
 | `Ox.Text.Primary` | brush | #e6e9f0 |  | names and readouts |
 | `Ox.Text.Secondary` | brush | #8b93a7 |  | labels and section headings |
 | `Ox.Text.Muted` | brush | #6b7285 |  | explanatory lines |
@@ -566,16 +592,22 @@ remaining fader width to the nearest display pixel.
 | `Ox.Label.FontSize` | number | 12 | 8 to 24 | section headings and labels |
 | `Ox.Label.FontWeight` | weight | SemiBold |  | those same headings and labels |
 | `Ox.Title.FontSize` | number | 20 | 10 to 40 | the UI's own title line |
+| `Ox.Title.VersionFontSize` | number | framework | 8 to 40 | the version number's size where the header stands it beside the title (`"version": "title"`); unset, it keeps the header's small size |
 | `Ox.Title.FontWeight` | weight | Bold |  | that title line |
 | `Ox.Title.Foreground` | brush | framework |  | that title line's lettering, and the version number's when the header stands it by the title; unset, it keeps `Ox.Text.Primary` |
 | `Ox.Title.Glow` | number | 0 | 0 to 1 | a halo round that title, and that version number, in their own colour, as a backlit legend has; 0 for none |
+| `Ox.Title.FontFamily` | family | framework |  | the title line's face, and the version number's beside it; unset, it keeps `Ox.Font.Family` |
 | `Ox.Strip.FontWeight` | weight | SemiBold |  | the name over a channel strip or a mix |
 | `Ox.Strip.Foreground` | brush | framework |  | the name and icon over a channel strip or a mix, and an application's name under **Applications** and in its **Manage** window; unset, they keep `Ox.Text.Primary`. A colour the layout gives a channel still wins |
 | `Ox.Strip.IconMuted` | brush | framework |  | a mixer strip's icon while its send is muted, and a master's while its mix is; its name keeps its colour. Unset, the icon does not change |
 | `Ox.Strip.Glow` | number | 0 | 0 to 1 | a halo round that name and icon in their own colour, as a backlit legend has, and round a muted icon in its; 0 for none. A channel the layout colours has none |
+| `Ox.Strip.FontFamily` | family | framework |  | the face of a channel's or mix's name over its strip or row, and of an application's name; unset, it keeps `Ox.Font.Family` |
 | `Ox.Value.FontFamily` | family | monospace |  | the numeric readouts |
 | `Ox.Value.Foreground` | brush | framework |  | the numeric readouts' lettering, such as a fader's level or a gain; unset, they keep `Ox.Text.Primary` |
+| `Ox.Value.Glow` | number | 0 | 0 to 1 | a halo round the numeric readouts in their own colour, as a display's lit segments have; 0 for none |
+| `Ox.Value.Ghost` | brush | framework |  | the unlit cells behind the numeric readouts, for a segment face: each cell the face draws as a whole is drawn first with every segment in this colour; unset, `Ox.Text.Ghost` covers them |
 | `Ox.Font.Family` | family | framework |  | the font the buttons, labels and dropdowns use |
+| `Ox.Font.Scale` | number | 1 | 0.5 to 1.5 | multiplies every font size the skin and the text size option give, so a wide face such as a segment display's can fit; widths and spacing stay as they are |
 
 ### Indicators
 
@@ -606,7 +638,8 @@ The rest of an indicator's appearance is shape and size:
 | `Ox.Meter.Height` | number | 4 | 2 to 24 | how tall a meter is |
 | `Ox.Meter.VerticalWidth` | number | 4 | 2 to 24 | how thick an upright meter is, where a strip template stands its meter up; it is as long as what it stands beside |
 | `Ox.Meter.Segments` | number | 16 | 2 to 64 | how many cells, `meter: segmented` only |
-| `Ox.Meter.SegmentGap` | number | 2 | 0 to 8 | the gap between cells in pixels, `meter: segmented` only. Every cell is the same whole number of pixels; the pixels left over widen some gaps by one |
+| `Ox.Meter.SegmentGap` | number | 2 | 0 to 8 | the gap between cells in pixels, `meter: segmented` only. Every cell is the same whole number of pixels; without `Ox.Meter.SegmentWidth` the pixels left over widen some gaps by one |
+| `Ox.Meter.SegmentWidth` | number | 0 | 0 to 16 | each cell's width in pixels, `meter: segmented` only, or 0 to share the length between `Ox.Meter.Segments` cells. With a width the meter holds as many cells as fit, every gap is the same, and the few pixels left over go to the two ends |
 | `Ox.Meter.Glow` | number | 0 | 0 to 1 | a halo in each lit cell's colour, or round the lit bar, bleeding into the gaps as a display tube does; 0 for none |
 
 Cells are laid out on whole pixels, and a ladder too narrow to draw is
@@ -904,6 +937,7 @@ past the skin's maximum to fill the available width.
 | `Ox.Matrix.CellWidth` | number | 168 | 120 to 400 | the width of a cell, of a column head and of a row head's source controls |
 | `Ox.Matrix.CellMaxWidth` | number | 0 | 0 to 1000 | the width up to which matrix cells and source controls grow together; 0 keeps the base cell width |
 | `Ox.Matrix.RowHeight` | number | 40 | 28 to 120 | the height of a row: its head and every cell in it; a row whose head stacks a gain over the channel volume, or the **EQ** button over the chain's, is as tall as the two need, never less |
+| `Ox.Matrix.PhantomLamp` | number | 1 | 0 to 1 | whether a row's microphone switches button (**Mic**) shows the phantom power lamp: 1 shows it, 0 hides it. Phantom power is still shown in the button's switches and in Mic setup |
 | `Ox.Matrix.MutedBackground` | brush | #40a03434 | | the background of a cell whose send is muted, when the matrix tints muted cells. Translucent by default, so the cell's own surface shows through as a red tint |
 | `Ox.Matrix.MutedForeground` | brush | #f6dede | | the lettering of a muted send's mute in a tinted cell |
 | `Ox.Matrix.MutedOpacity` | number | 0.5 | 0.1 to 1 | how far a muted send's fader and level fade when the matrix dims muted cells; the mute keeps its own colour |

@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:skin="using:OpenXLR.UI.Skinning"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="using:OpenXLR.UI.Localization"
              xmlns:vm="using:OpenXLR.UI"
@@ -15,7 +16,7 @@
       <Grid ColumnDefinitions="*,64" IsVisible="{Binding HasGain}">
         <Slider Name="WaveUnitGain" vm:FaderInput.Step="1" IsEnabled="{Binding CanAdjustGain}" Minimum="0" Maximum="{Binding GainMaxDb}"
                 Value="{Binding GainDb, Mode=TwoWay}" AutomationProperties.Name="{Binding GainName}"/>
-        <TextBlock Classes="val" Grid.Column="1" Text="{Binding GainText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        <skin:LitText Classes="val" Grid.Column="1" Text="{Binding GainText}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
       </Grid>
     </Panel>
     <WrapPanel Name="SwitchesPart" ItemSpacing="6" LineSpacing="4">

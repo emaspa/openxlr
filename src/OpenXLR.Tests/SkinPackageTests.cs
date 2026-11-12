@@ -102,7 +102,7 @@ public sealed class SkinPackageTests : IDisposable
         // package has them all without installing a single file.
         Assert.Equal(
             ["broadcast", "broadcast-amber", "broadcast-blue", "catppuccin", "catppuccin-latte", "compact-desk", "everforest", "gruvbox", "hifi", "hifi-amber", "hifi-classic", "kanagawa", "matte-black",
-                "nord", "nyan-pink", "opendeck", "osaka-jade", "ristretto", "rose-pine", "tokyo-night", "wave"],
+                "nord", "nyan-pink", "opendeck", "osaka-jade", "ristretto", "rose-pine", "tokyo-night", "vfd-amber", "vfd-blue", "vfd-classic", "wave"],
             built.Select(e => e.Id).Order(StringComparer.Ordinal));
         foreach (SkinEntry entry in built)
         {
@@ -744,13 +744,14 @@ public sealed class SkinPackageTests : IDisposable
                 Assert.Single(result.Errors));
         }
 
-        // The Hi-Fi skins are drawn for one size and Broadcast opens at its
-        // own; every other shipped appearance leaves the UI's size alone.
+        // The Hi-Fi skins are drawn for one size, and Broadcast and the VFD
+        // skins built on its layout open at its own; every other shipped
+        // appearance leaves the UI's size alone.
         foreach (SkinEntry entry in SkinCatalog.BuiltIn())
             Assert.Equal(entry.Package.Id switch
             {
                 "hifi" or "hifi-amber" or "hifi-classic" => new SkinWindowSize(1668, 1174),
-                "broadcast" or "broadcast-amber" or "broadcast-blue" => new SkinWindowSize(1224, 1141),
+                "broadcast" or "broadcast-amber" or "broadcast-blue" or "vfd-amber" or "vfd-blue" or "vfd-classic" => new SkinWindowSize(1224, 1141),
                 _ => (SkinWindowSize?)null,
             }, entry.Package.WindowSize);
         Assert.Null(SkinPackage.Default.WindowSize);

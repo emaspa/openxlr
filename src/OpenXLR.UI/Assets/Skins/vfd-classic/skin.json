@@ -1,0 +1,357 @@
+{
+  "$schema": "https://raw.githubusercontent.com/emaspa/openxlr/main/docs/skin.schema.json",
+  "schema": 1,
+  "id": "vfd-classic",
+  "name": "VFD Classic",
+  "description": "A vacuum fluorescent display behind smoked glass: the classic green phosphor, readouts over their unlit segments, glowing bargraph meters that turn red at the top, printed legends and the fine grid of the tube.",
+  "author": "OpenXLR",
+  "controls": {
+    "button": "cap",
+    "fader": "console",
+    "meter": "segmented",
+    "led": "lens",
+    "mute": "cap",
+    "check": "key",
+    "chip": "badge"
+  },
+  "tokens": {
+    "Ox.Window.Background": {
+      "type": "image",
+      "source": "glass.png",
+      "stretch": "none",
+      "color": "#040b06"
+    },
+    "Ox.Card.Background": "#2e000000",
+    "Ox.Card.BorderBrush": "#123e22",
+    "Ox.Card.BorderThickness": 1,
+    "Ox.Card.CornerRadius": 12,
+    "Ox.Tile.Background": "#38000000",
+    "Ox.Tile.BorderBrush": "#0c2916",
+    "Ox.Tile.BorderThickness": 1,
+    "Ox.Tile.CornerRadius": 8,
+    "Ox.Dialog.Background": {
+      "type": "image",
+      "source": "glass.png",
+      "stretch": "none",
+      "color": "#040b06"
+    },
+    "Ox.Badge.Background": "#07140b",
+    "Ox.Divider": "#0e311b",
+    "Ox.Danger.Background": "#24100a",
+    "Ox.Danger.BorderBrush": "#742018",
+    "Ox.Danger.Foreground": "#ff3b2f",
+    "Ox.Text.Primary": "#4ade80",
+    "Ox.Value.Foreground": "#4ade80",
+    "Ox.Text.Secondary": "#3ca060",
+    "Ox.Text.Muted": "#2e7a49",
+    "Ox.Text.Detail": "#46ce78",
+    "Ox.Text.Warning": "#c96c47",
+    "Ox.Text.Alert": "#ff3b2f",
+    "Ox.Text.Info": "#7de7a4",
+    "Ox.Link.Foreground": "#7de7a4",
+    "Ox.Link.ForegroundPointerOver": "#b7f2cc",
+    "Ox.Font.Family": "OpenXLR Segment 14, Fira Sans Condensed",
+    "Ox.Font.Scale": 0.75,
+    "Ox.Text.LineSpacing": 5,
+    "Ox.Text.Ghost": "#0c2616",
+    "Ox.Label.FontSize": 11,
+    "Ox.Label.FontWeight": "Normal",
+    "Ox.Title.FontSize": 18,
+    "Ox.Title.FontWeight": "Normal",
+    "Ox.Title.FontFamily": "OpenXLR Segment 14, Fira Sans Condensed",
+    "Ox.Title.VersionFontSize": 18,
+    "Ox.Title.Foreground": "#7de7a4",
+    "Ox.Title.Glow": 0.9,
+    "Ox.Strip.FontWeight": "Normal",
+    "Ox.Strip.FontFamily": "OpenXLR Segment 14, Fira Sans Condensed",
+    "Ox.Strip.Foreground": "#4ade80",
+    "Ox.Strip.IconMuted": "#ff3b2f",
+    "Ox.Strip.Glow": 0.75,
+    "Ox.Value.FontFamily": "OpenXLR Segment 7, OpenXLR Segment 14, Fira Sans Condensed",
+    "Ox.Value.Glow": 0.8,
+    "Ox.Value.Ghost": "#0c2616",
+    "Ox.Led.On": "#4ade80",
+    "Ox.Led.Off": "#11351e",
+    "Ox.Led.Alert": "#ff3b2f",
+    "Ox.Led.Size": 13,
+    "Ox.Led.CoreScale": 0.55,
+    "Ox.Led.Bezel": "#030905",
+    "Ox.Led.BezelThickness": 0,
+    "Ox.Led.Glow": 0.9,
+    "Ox.Meter.Fill": "#4ade80",
+    "Ox.Meter.Warning": "#facc15",
+    "Ox.Meter.Hot": "#ef4444",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9,
+    "Ox.Meter.Track": "#0c2616",
+    "Ox.Meter.CornerRadius": 0,
+    "Ox.Meter.Height": 5,
+    "Ox.Meter.VerticalWidth": 10,
+    "Ox.Meter.Segments": 32,
+    "Ox.Meter.Glow": 0.6,
+    "Ox.Meter.SegmentGap": 2,
+    "Ox.Meter.SegmentWidth": 3,
+    "Ox.Mute.Background": "#051009",
+    "Ox.Mute.Foreground": "#41b66b",
+    "Ox.Mute.BackgroundPointerOver": "#08180e",
+    "Ox.Mute.BackgroundChecked": "#24100a",
+    "Ox.Mute.ForegroundChecked": "#ff3b2f",
+    "Ox.Mute.BorderBrush": "#123e22",
+    "Ox.Mute.BorderBrushChecked": "#ff3b2f",
+    "Ox.Mute.BorderThickness": 1,
+    "Ox.Fader.Track": "#0c2616",
+    "Ox.Fader.Fill": "#38a961",
+    "Ox.Fader.TrackHeight": 4,
+    "Ox.Fader.TrackCornerRadius": 0,
+    "Ox.Fader.Thumb.Background": "#4ade80",
+    "Ox.Fader.Thumb.BorderBrush": "#00000000",
+    "Ox.Fader.Thumb.BorderThickness": 0,
+    "Ox.Fader.Thumb.Width": 8,
+    "Ox.Fader.Thumb.Height": 12,
+    "Ox.Fader.Thumb.CornerRadius": 0,
+    "Ox.Fader.Thumb.Grip": "#00000000",
+    "Ox.Fader.Thumb.GripLength": 0,
+    "Ox.Control.Background": "#051009",
+    "Ox.Control.BackgroundPointerOver": "#08180e",
+    "Ox.Control.BackgroundPressed": "#0e2b19",
+    "Ox.Control.BackgroundChecked": "#0c2314",
+    "Ox.Control.BackgroundDisabled": "#030905",
+    "Ox.Control.Foreground": "#41b66b",
+    "Ox.Control.ForegroundChecked": "#7de7a4",
+    "Ox.Control.ForegroundDisabled": "#25643c",
+    "Ox.Control.BorderBrush": "#123e22",
+    "Ox.Control.BorderBrushPointerOver": "#2b864c",
+    "Ox.Control.BorderBrushDisabled": "#091e11",
+    "Ox.Control.BorderThickness": 1,
+    "Ox.Control.CornerRadius": 4,
+    "Ox.Control.DisabledOpacity": 0.55,
+    "Ox.Ghost.Background": "#00000000",
+    "Ox.Cap.Bevel": {
+      "type": "linear",
+      "from": [
+        0,
+        0
+      ],
+      "to": [
+        0,
+        1
+      ],
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#14c8ffd7"
+        },
+        {
+          "offset": 0.45,
+          "color": "#00c8ffd7"
+        },
+        {
+          "offset": 1,
+          "color": "#00000000"
+        }
+      ]
+    },
+    "Ox.Toggle.Foreground": "#41b66b",
+    "Ox.Toggle.ForegroundChecked": "#7de7a4",
+    "Ox.Toggle.ForegroundDisabled": "#25643c",
+    "Ox.Toggle.BorderBrushChecked": "#4ade80",
+    "Ox.Bypass.Foreground": "#7de7a4",
+    "Ox.Bypass.ForegroundBypassed": "#ff3b2f",
+    "Ox.Lit.Background": "#0c2314",
+    "Ox.Lit.BackgroundPointerOver": "#0e2b19",
+    "Ox.Lit.BorderBrush": "#4ade80",
+    "Ox.Chip.BorderThickness": 1,
+    "Ox.Alert.Background": "#24100a",
+    "Ox.Alert.BackgroundPointerOver": "#30120d",
+    "Ox.Alert.BorderBrush": "#742018",
+    "Ox.Check.Foreground": "#4ade80",
+    "Ox.Input.Background": "#020503",
+    "Ox.Input.Foreground": "#7de7a4",
+    "Ox.Input.BorderBrush": "#123e22",
+    "Ox.Flyout.Background": "#050f09",
+    "Ox.Tooltip.Background": "#050f09",
+    "Ox.Tooltip.Foreground": "#7de7a4",
+    "Ox.Tooltip.BorderBrush": "#123e22",
+    "Ox.Accent": "#4ade80",
+    "Ox.Tab.Indicator": "#4ade80",
+    "Ox.AppIcon.Background": "#07160c",
+    "Ox.AppIcon.Foreground": "#4ade80",
+    "Ox.AppIcon.CornerRadius": 4,
+    "Ox.Matrix.NameWidth": 176,
+    "Ox.Matrix.PhantomLamp": 0,
+    "Ox.Matrix.CellWidth": 150,
+    "Ox.Matrix.CellMaxWidth": 400,
+    "Ox.Matrix.RowHeight": 48,
+    "Ox.Matrix.MutedOpacity": 0.3,
+    "Ox.Matrix.MutedBackground": "#30ff3b2f",
+    "Ox.Matrix.MutedForeground": "#ff3b2f",
+    "Ox.Flow.Background": {
+      "type": "image",
+      "source": "glass.png",
+      "stretch": "none",
+      "color": "#040b06"
+    },
+    "Ox.Flow.Card": "#06120a",
+    "Ox.Flow.CardSelected": "#091c10",
+    "Ox.Flow.Text": "#4ade80",
+    "Ox.Flow.TextDim": "#3ca060",
+    "Ox.Flow.Input": "#4ade80",
+    "Ox.Flow.Channel": "#7de7a4",
+    "Ox.Flow.Output": "#ff3b2f",
+    "Ox.Flow.Muted": "#154226",
+    "Ox.Flow.NodeHoverBackground": "#08180e",
+    "Ox.Flow.NodeHoverBorderBrush": "#2b864c",
+    "Ox.Eq.Background": "#020604",
+    "Ox.Eq.Grid": "#0c2616",
+    "Ox.Eq.GridLabel": "#3ca060",
+    "Ox.Eq.ZoneA": "#00000000",
+    "Ox.Eq.ZoneB": "#0a4ade80",
+    "Ox.Eq.ZoneLabel": "#2e7a49",
+    "Ox.Eq.Curve": "#7de7a4",
+    "Ox.Eq.CurveFill": "#304ade80",
+    "Ox.Eq.Band1": "#4ade80",
+    "Ox.Eq.Band2": "#ff3b2f",
+    "Ox.Eq.Band3": "#a4e27c",
+    "Ox.Eq.Band4": "#a48c58",
+    "Ox.Eq.HandleOff": "#1f5d36",
+    "Ox.Eq.HandleRing": "#dbf8e6",
+    "Ox.Eq.CornerRadius": 6,
+    "Ox.Dynamics.Level": "#4ade80",
+    "Ox.Dynamics.LevelFill": "#804ade80",
+    "Ox.Dynamics.Threshold": "#ff3b2f",
+    "Ox.Dynamics.Reduction": "#b77c4f",
+    "Ox.Soundboard.PadCornerRadius": 6,
+    "Ox.Soundboard.Playing": "#4ade80",
+    "Ox.Soundboard.Progress": "#4ade80",
+    "Ox.Swatch.CornerRadius": 4
+  },
+  "window": {
+    "size": {
+      "width": 1224,
+      "height": 1141
+    }
+  },
+  "layout": {
+    "version": 1,
+    "main": {
+      "kind": "stack",
+      "id": "desk",
+      "orientation": "vertical",
+      "spacing": 12,
+      "children": [
+        {
+          "kind": "grid",
+          "id": "mixes",
+          "spacing": 12,
+          "columns": [
+            {
+              "star": 1
+            },
+            {
+              "size": 360
+            }
+          ],
+          "rows": [
+            "auto",
+            "auto"
+          ],
+          "children": [
+            {
+              "kind": "region",
+              "region": "headphones",
+              "row": 0,
+              "column": 0
+            },
+            {
+              "kind": "region",
+              "region": "monitor",
+              "row": 0,
+              "column": 1
+            },
+            {
+              "kind": "region",
+              "region": "submixer",
+              "row": 1,
+              "column": 0,
+              "columnSpan": 2
+            }
+          ]
+        },
+        {
+          "kind": "region",
+          "region": "inputs"
+        },
+        {
+          "kind": "region",
+          "region": "applications"
+        }
+      ]
+    },
+    "regions": {
+      "header": {
+        "actions": [
+          "profiles",
+          "flow",
+          "arrange",
+          "restart-daemon",
+          "about"
+        ],
+        "version": "title"
+      },
+      "monitor": {
+        "template": "output-toolbar"
+      },
+      "submixer": {
+        "template": "mix-matrix",
+        "matrix": {
+          "rowHead": {
+            "parts": [
+              "identity",
+              "binding",
+              "mute",
+              "gain",
+              "meter",
+              "processing",
+              "effects"
+            ],
+            "label": {
+              "style": "icon-and-text"
+            }
+          },
+          "columnHead": {
+            "parts": [
+              "identity",
+              "outputs",
+              "mute",
+              "master",
+              "effects"
+            ],
+            "label": {
+              "style": "icon-and-text"
+            }
+          },
+          "cell": {
+            "parts": [
+              "mute",
+              "fader",
+              "value"
+            ],
+            "muted": "dim",
+            "valuePlacement": "over-fader"
+          },
+          "meter": "under-fader"
+        },
+        "popOut": {
+          "default": "docked"
+        }
+      },
+      "inputs": {
+        "visibility": "hidden"
+      },
+      "applications": {
+        "template": "application-columns",
+        "perColumn": 4
+      }
+    }
+  }
+}

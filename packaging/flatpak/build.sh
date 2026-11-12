@@ -49,3 +49,4 @@ install -Dm644 native/vst3/LICENSE /app/share/licenses/openxlr/vst3/LICENSE
 # The starter sounds' sources and authors; the clips are installed beside the daemon.
 install -Dm644 packaging/starter-sounds/CREDITS /app/share/licenses/openxlr/starter-sounds/CREDITS
 install -Dm644 src/OpenXLR.UI/Assets/Fonts/OFL.txt /app/share/licenses/openxlr/fira-sans/OFL.txt
+install -Dm644 src/OpenXLR.UI/Assets/Fonts/DSEG-OFL.txt /app/share/licenses/openxlr/dseg/OFL.txt

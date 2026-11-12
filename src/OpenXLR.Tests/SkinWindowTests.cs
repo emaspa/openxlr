@@ -55,6 +55,7 @@ public sealed partial class SkinWindowTests
             AMeterIsColouredByPositionAndNotByItsReading();
             AContinuousBarIsWholeWhereItsZonesMeet();
             AnUprightMeterFillsFromTheBottomOnTheSameScale();
+            AFixedCellWidthKeepsEveryGapTheSame();
             ButtonsCarryTheirStateInTheirLettering(main);
             EveryRectangularControlWearsTheSameFace(main, options);
             EveryKeyIsDrawnLikeTheMuteKey();
@@ -62,6 +63,7 @@ public sealed partial class SkinWindowTests
             ThePluginBypassKeyIsLegibleInBothAppearances();
             LampKeysAndCheckKeysWearTheSkinsFaces();
             TheHiFiSkinsLetterInTheirBundledTypeface();
+            TheVfdSkinsLetterInTheirBundledSegmentFace();
             ASkinOpensTheUIAtItsOwnSize(main);
             TheOptionsTabsWearTheSkin(options);
             TheWindowActuallyRepaintsWhenTheSkinChanges(main);
@@ -696,6 +698,52 @@ public sealed partial class SkinWindowTests
             Environment.SetEnvironmentVariable("XDG_DATA_DIRS", oldDirs);
             if (Directory.Exists(data)) Directory.Delete(data, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// A meter with a fixed cell width holds as many cells as fit, all one
+    /// width, with every gap the skin's gap: the pixels left over go to the
+    /// ends, never into a gap, where a wider one reads as a dead cell.
+    /// </summary>
+    private static void AFixedCellWidthKeepsEveryGapTheSame()
+    {
+        var meter = new LevelMeter
+        {
+            Presentation = MeterPresentation.Segmented, Segments = 32, SegmentGap = 2, SegmentWidth = 3, Level = 1,
+            Width = 105, Height = 6, CornerRadius = new CornerRadius(0),
+            Track = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x10)),
+            Fill = new SolidColorBrush(Color.FromRgb(0x3e, 0xcf, 0x7a)),
+            Warning = new SolidColorBrush(Color.FromRgb(0x3e, 0xcf, 0x7a)),
+            Hot = new SolidColorBrush(Color.FromRgb(0x3e, 0xcf, 0x7a)),
+        };
+        var host = new Border { Background = new SolidColorBrush(Color.FromRgb(0, 0, 0)), Child = meter };
+        var probe = new Window { Content = host, Width = 105, Height = 6, WindowDecorations = WindowDecorations.None };
+        probe.Show();
+        Layout(probe, 105, 6);
+        try
+        {
+            var size = new PixelSize((int)host.Bounds.Width, (int)host.Bounds.Height);
+            byte[] pixels = Read(host, size);
+            int row = size.Height / 2;
+            var runs = new List<(int Start, int End)>();
+            bool inRun = false;
+            for (int x = 0; x < size.Width; x++)
+            {
+                int i = (row * size.Width + x) * 4;
+                bool lit = pixels[i + 1] > 0x60;
+                if (lit && !inRun) { runs.Add((x, x)); inRun = true; }
+                else if (lit) runs[^1] = (runs[^1].Start, x);
+                else inRun = false;
+            }
+            // 105 pixels hold 21 cells of 3 with 20 gaps of 2, one pixel over.
+            Assert.Equal(21, runs.Count);
+            Assert.All(runs, r => Assert.Equal(3, r.End - r.Start + 1));
+            int[] gaps = [.. runs.Zip(runs.Skip(1), (a, b) => b.Start - a.End - 1)];
+            Assert.True(gaps.All(g => g == 2), $"gaps came out uneven: {string.Join(",", gaps)}");
+            Assert.InRange(runs[0].Start, 0, 1);
+            Assert.InRange(size.Width - 1 - runs[^1].End, 0, 1);
+        }
+        finally { probe.Close(); }
     }
 
     /// <summary>
@@ -1948,6 +1996,38 @@ public sealed partial class SkinWindowTests
             Assert.Equal(BundledFonts.CollectionKey, family.Key?.Source.OriginalString);
             Assert.StartsWith("Fira Sans Condensed", face!.FamilyName, StringComparison.Ordinal);
             Assert.Equal(FontWeight.SemiBold, face.Weight);
+        }
+        SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
+    }
+
+    /// <summary>
+    /// The VFD skins letter in OpenXLR Segment 14, which the UI carries
+    /// itself, with a space as wide as a cell so words stay apart, a point
+    /// narrower than a cell and an ellipsis of its own for cut lettering.
+    /// </summary>
+    private static void TheVfdSkinsLetterInTheirBundledSegmentFace()
+    {
+        foreach (string id in new[] { "vfd-amber", "vfd-blue", "vfd-classic" })
+        {
+            SkinEntry skin = SkinCatalog.Find(id)!;
+            Assert.Empty(skin.Errors);
+            Assert.Empty(SkinService.Apply(skin));
+            var family = (FontFamily)Application.Current!.FindResource("Ox.Font.Family")!;
+            Assert.True(FontManager.Current.TryGetGlyphTypeface(new Typeface(family), out GlyphTypeface? face),
+                $"{id}: no typeface for {family}");
+            // No machine has the face installed, so a face of that name is the bundled copy.
+            Assert.StartsWith("OpenXLR Segment 14", face!.FamilyName, StringComparison.Ordinal);
+            ushort Advance(char c)
+            {
+                Assert.True(face.CharacterToGlyphMap.TryGetGlyph(c, out ushort glyph) && glyph != 0, $"{id}: no glyph for '{c}'");
+                Assert.True(face.TryGetHorizontalGlyphAdvance(glyph, out ushort advance));
+                return advance;
+            }
+            ushort cell = Advance('~');
+            Assert.Equal(cell, Advance('8'));
+            Assert.Equal(cell, Advance(' '));
+            Assert.Equal(cell, Advance('\u2026'));
+            Assert.InRange(Advance('.'), 1, cell - 1);
         }
         SkinService.Apply(new SkinEntry(SkinPackage.Default, []));
     }

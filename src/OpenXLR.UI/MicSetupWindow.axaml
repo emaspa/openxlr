@@ -15,7 +15,7 @@
        sizes itself to the step shown, up to the screen's height; see the
        code behind. -->
   <DockPanel Margin="16">
-    <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=MicSetup}" Classes="title" Margin="0,0,0,8"/>
+    <skin:LitText DockPanel.Dock="Top" Text="{loc:Text Key=MicSetup}" Classes="title" Margin="0,0,0,8"/>
 
     <!-- the steps, free to jump between: the lit one is shown -->
     <ItemsControl DockPanel.Dock="Top" Name="MicSetupSteps" ItemsSource="{Binding Steps}" Margin="0,0,0,12">
@@ -105,7 +105,7 @@
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                 <TextBlock Text="{loc:Text Key=MicSetupBeforeEffects}" Classes="h" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" Name="MicSetupPeakValue" Text="{Binding PeakText}" Classes="val" VerticalAlignment="Center"/>
+                <skin:LitText Grid.Column="1" Name="MicSetupPeakValue" Text="{Binding PeakText}" Classes="val" VerticalAlignment="Center"/>
               </Grid>
               <!-- the meter, with the band speech should peak in drawn under it: -18 to -6 dBFS on a -60 to 0 scale -->
               <Grid RowDefinitions="Auto,Auto">

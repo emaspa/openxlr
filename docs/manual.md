@@ -3364,7 +3364,7 @@ the old controls cannot affect a plugin that now uses the same slot id.
 <a name="skins"></a>
 ### 3.10 Change how the UI looks
 
-Options, APPEARANCE picks a skin. OpenXLR ships twenty-two, all built into
+Options, APPEARANCE picks a skin. OpenXLR ships twenty-five, all built into
 the application, so a package brings them with it:
 
 - **Material**, the classic appearance, in a dark palette, which is what
@@ -3405,7 +3405,14 @@ the application, so a package brings them with it:
   large as a smaller screen allows; resize it as you like after that;
 - **Hi-Fi Amber**, the same with an amber display;
 - **Hi-Fi Classic**, the same with a green display whose meters turn
-  yellow and then red near the top.
+  yellow and then red near the top;
+- **VFD Amber**, **VFD Blue** and **VFD Classic**, the whole UI as a
+  vacuum fluorescent display in amber, cyan-blue or green: every label,
+  key and readout in segment lettering over its unlit cells, meters as
+  ladders of cells and fader knobs as lit chips, in Broadcast's
+  arrangement and size. Everything said about Broadcast below holds for
+  them too. The OpenDeck plugin draws its keys and dial strips as the same
+  display while one of them is chosen.
 
 A new install opens on Broadcast. An install that never picked a skin
 opens on Broadcast too, so after upgrading from a version that started on

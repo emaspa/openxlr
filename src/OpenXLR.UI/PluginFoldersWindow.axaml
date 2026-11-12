@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
@@ -9,7 +10,7 @@
   <Grid Margin="18" RowDefinitions="*,12,Auto">
     <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="8" Margin="0,0,12,0">
-        <TextBlock Text="{loc:Text Key=PluginFolders}" Classes="title"/>
+        <skin:LitText Text="{loc:Text Key=PluginFolders}" Classes="title"/>
         <TextBlock Text="{loc:Text Key=LV2CLAPAndVST3PluginsAreFound}"
                    Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding SearchPathWarning}" Classes="warn" TextWrapping="Wrap"
@@ -34,7 +35,7 @@
         </WrapPanel>
         <TextBlock Text="{loc:Text Key=ARescanReadsEveryFormatAgainAnd}"
                    Classes="hint" TextWrapping="Wrap"/>
-        <TextBlock Text="{loc:Text Key=WindowsVST3AndCLAPPlugins}" Classes="title" Margin="0,12,0,0"/>
+        <skin:LitText Text="{loc:Text Key=WindowsVST3AndCLAPPlugins}" Classes="title" Margin="0,12,0,0"/>
         <TextBlock Text="{Binding WindowsPlugins}" Classes="hint" TextWrapping="Wrap"/>
         <TextBlock Text="{loc:Text Key=ChooseAFolderThenSelectAnIndividualPlugin}"
                    FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>

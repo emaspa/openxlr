@@ -158,13 +158,24 @@ public static class SkinTokens
         Weight("Ox.Title.FontWeight", FontWeight.Bold),
         Brush("Ox.Title.Foreground", null),
         Number("Ox.Title.Glow", 0, 0, 1),
+        Family("Ox.Title.FontFamily", null),
+        // The version number's size where the header stands it beside the title;
+        // unset, it keeps the small size of the header's other lettering.
+        Number("Ox.Title.VersionFontSize", null, 8, 40),
         Weight("Ox.Strip.FontWeight", FontWeight.SemiBold),
         Brush("Ox.Strip.Foreground", null),
         Brush("Ox.Strip.IconMuted", null),
         Number("Ox.Strip.Glow", 0, 0, 1),
+        Family("Ox.Strip.FontFamily", null),
         Family("Ox.Value.FontFamily", "monospace"),
         Brush("Ox.Value.Foreground", null),
+        Number("Ox.Value.Glow", 0, 0, 1),
+        Brush("Ox.Value.Ghost", null),
+        Brush("Ox.Text.Ghost", "#00000000"),
+        // Extra room between the lines of wrapped text, in pixels.
+        Number("Ox.Text.LineSpacing", 0, 0, 16),
         Family("Ox.Font.Family", null, new SkinBridge("ContentControlThemeFontFamily")),
+        Number("Ox.Font.Scale", 1, 0.5, 1.5),
 
         // Indicators. These reach the views through value converters as well as
         // through resources, so they are held as one live brush each and must
@@ -192,6 +203,9 @@ public static class SkinTokens
         // Read by the segmented meter only; the continuous one ignores them.
         Number("Ox.Meter.Segments", 16, 2, 64),
         Number("Ox.Meter.SegmentGap", 2, 0, 8),
+        // A fixed cell width instead of a fixed count: the meter holds as many
+        // cells as fit, every gap the same. 0 shares the length between Segments.
+        Number("Ox.Meter.SegmentWidth", 0, 0, 16),
         Number("Ox.Meter.Glow", 0, 0, 1),
         // Read by the lamp indicator only. The defaults draw no ring and no
         // halo, which is the flat dot the window has always shown.
@@ -456,6 +470,8 @@ public static class SkinTokens
         Number("Ox.Matrix.CellWidth", 168, 120, 400),
         Number("Ox.Matrix.CellMaxWidth", 0, 0, 1000),
         Number("Ox.Matrix.RowHeight", 40, 28, 120),
+        // 0 hides the phantom power lamp on a row's microphone switches button.
+        Number("Ox.Matrix.PhantomLamp", 1, 0, 1),
         // A muted send's cell: its background, and the lettering of its mute.
         // The background is translucent by default, so the cell's own surface
         // shows through as a red tint.

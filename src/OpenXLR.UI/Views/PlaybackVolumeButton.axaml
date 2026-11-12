@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:skin="using:OpenXLR.UI.Skinning"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="using:OpenXLR.UI.Localization"
              xmlns:vm="using:OpenXLR.UI"
@@ -27,8 +28,8 @@
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <Slider Name="PlaybackLevel" Minimum="0" Maximum="1" vm:FaderInput.Step="0.01"
                     Value="{Binding Level, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=PlaybackVolume}"/>
-            <TextBlock Grid.Column="1" Text="{Binding Level, StringFormat={}{0:0%}}" Classes="val"
-                       VerticalAlignment="Center"/>
+            <skin:LitText Grid.Column="1" Text="{Binding Level, StringFormat={}{0:0%}}" Classes="val"
+                          VerticalAlignment="Center"/>
           </Grid>
           <CheckBox IsVisible="{Binding Website}" IsEnabled="{Binding HasLevel}" IsChecked="{Binding Remember, Mode=TwoWay}">
             <TextBlock Text="{loc:Text Key=RememberTabPlaybackVolume}" TextWrapping="Wrap"/>

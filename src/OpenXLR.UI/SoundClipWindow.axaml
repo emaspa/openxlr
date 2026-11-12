@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
@@ -17,7 +18,7 @@
     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
       <Slider Name="SoundClipGain" vm:FaderInput.Step="1" Minimum="0" Maximum="100" Value="{Binding GainPercent, Mode=TwoWay}"
               AutomationProperties.Name="{loc:Text Key=SoundClipGain}" ToolTip.Tip="{loc:Text Key=SoundClipGainHint}"/>
-      <TextBlock Grid.Column="1" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
+      <skin:LitText Grid.Column="1" Text="{Binding GainText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
     </Grid>
 
     <TextBlock Text="{loc:Text Key=SoundClipMode}" Classes="h"/>

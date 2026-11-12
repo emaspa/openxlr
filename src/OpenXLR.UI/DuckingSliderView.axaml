@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:skin="using:OpenXLR.UI.Skinning"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:OpenXLR.UI"
              x:Class="OpenXLR.UI.DuckingSliderView" x:DataType="vm:DuckingSliderViewModel">
@@ -47,8 +48,8 @@
     <Slider Grid.Column="1" Name="DuckingSlider" Minimum="{Binding MinimumPosition}" Maximum="{Binding MaximumPosition}"
             Value="{Binding Position, Mode=TwoWay}" VerticalAlignment="Center"
             AutomationProperties.Name="{Binding Name}" ToolTip.Tip="{Binding Tip}"/>
-    <TextBlock Grid.Column="2" Name="DuckingSliderValue" Text="{Binding Text}" Classes="val" VerticalAlignment="Center"
-               MinWidth="72" TextAlignment="Right"/>
+    <skin:LitText Grid.Column="2" Name="DuckingSliderValue" Text="{Binding Text}" Classes="val" VerticalAlignment="Center"
+                  MinWidth="72" TextAlignment="Right"/>
     <vm:DuckingMarks Grid.Row="1" Grid.Column="1" Name="DuckingSliderMarks" Marks="{Binding Marks}"
                      TickBrush="{DynamicResource Ox.Text.Muted}"/>
   </Grid>

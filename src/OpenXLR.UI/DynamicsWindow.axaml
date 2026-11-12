@@ -44,7 +44,7 @@
               StrokeJoin="Round" IsVisible="{Binding !IsCompressor}"/>
       </Panel>
       <StackPanel Grid.Column="1" VerticalAlignment="Center">
-        <TextBlock Name="DynamicsName" Text="{Binding Name}" Classes="title" TextTrimming="CharacterEllipsis"/>
+        <skin:LitText Name="DynamicsName" Text="{Binding Name}" Classes="title" TextTrimming="CharacterEllipsis"/>
         <TextBlock Name="DynamicsSubtitle" Text="{Binding Subtitle}" Classes="hint" TextTrimming="CharacterEllipsis"/>
       </StackPanel>
       <ToggleButton Grid.Column="2" Name="DynamicsSettings" IsChecked="{Binding ShowsAdvanced, Mode=TwoWay}" VerticalAlignment="Center"
@@ -100,7 +100,7 @@
             <Slider Grid.Column="1" Name="DynamicsParameter" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
                     SmallChange="{Binding Step}" LargeChange="{Binding Step}" vm:FaderInput.Step="{Binding Step}"
                     Value="{Binding Value, Mode=TwoWay}" AutomationProperties.Name="{Binding Label}" ToolTip.Tip="{Binding Tip}"/>
-            <TextBlock Grid.Column="2" Name="DynamicsParameterText" Text="{Binding Text}" Classes="val" VerticalAlignment="Center" TextAlignment="Right"/>
+            <skin:LitText Grid.Column="2" Name="DynamicsParameterText" Text="{Binding Text}" Classes="val" VerticalAlignment="Center" TextAlignment="Right"/>
           </Grid>
         </DataTemplate>
       </ItemsControl.ItemTemplate>
@@ -109,12 +109,12 @@
     <!-- The meters and the graph, each with its value above and its name below -->
     <Grid Name="DynamicsBody" ColumnDefinitions="Auto,*,Auto,Auto,Auto" RowDefinitions="Auto,*,Auto" ColumnSpacing="16" Margin="0,14,0,0">
       <!-- the input and the gain reduction exist only in software: the unit reports neither -->
-      <TextBlock Name="DynamicsInputText" Text="{Binding InputText}" Classes="val dynamicsValue" IsVisible="{Binding ShowsStageMeters}"/>
+      <skin:LitText Name="DynamicsInputText" Text="{Binding InputText}" Classes="val dynamicsValue" IsVisible="{Binding ShowsStageMeters}"/>
       <skin:LevelMeter Grid.Row="1" Name="DynamicsInputMeter" Classes="dynamics" Level="{Binding InputLevel}"
                        AutomationProperties.Name="{Binding InputName}" IsVisible="{Binding ShowsStageMeters}"/>
       <TextBlock Grid.Row="2" Text="{loc:Text Key=DynamicsInput}" Classes="body dynamicsLabel" IsVisible="{Binding ShowsStageMeters}"/>
 
-      <TextBlock Grid.Column="1" Name="DynamicsThresholdText" Text="{Binding Threshold.Text}" Classes="val dynamicsValue" HorizontalAlignment="Right"/>
+      <skin:LitText Grid.Column="1" Name="DynamicsThresholdText" Text="{Binding Threshold.Text}" Classes="val dynamicsValue" HorizontalAlignment="Right"/>
       <vm:DynamicsGraph Grid.Row="1" Grid.Column="1" Name="DynamicsGraph" MinWidth="200" MinHeight="140"
                         History="{Binding History}" Threshold="{Binding Threshold.Value, Mode=TwoWay}"
                         Floor="{Binding Threshold.Minimum}" MaximumThreshold="{Binding Threshold.Maximum}"
@@ -124,7 +124,7 @@
                         AutomationProperties.Name="{loc:Text Key=DynamicsThreshold}" ToolTip.Tip="{Binding Threshold.Tip}"/>
       <TextBlock Grid.Row="2" Grid.Column="1" Text="{loc:Text Key=DynamicsThreshold}" Classes="body dynamicsLabel" HorizontalAlignment="Right"/>
 
-      <TextBlock Grid.Column="2" Name="DynamicsReductionText" Text="{Binding ReductionText}" Classes="val dynamicsValue" IsVisible="{Binding ShowsStageMeters}"/>
+      <skin:LitText Grid.Column="2" Name="DynamicsReductionText" Text="{Binding ReductionText}" Classes="val dynamicsValue" IsVisible="{Binding ShowsStageMeters}"/>
       <!-- gain reduction fills from the top, the way it takes level away -->
       <skin:LevelMeter Grid.Row="1" Grid.Column="2" Name="DynamicsReductionMeter" Classes="dynamics" Level="{Binding ReductionLevel}"
                        RenderTransform="scale(1,-1)" Fill="{DynamicResource Ox.Dynamics.Reduction}"
@@ -132,8 +132,8 @@
                        AutomationProperties.Name="{Binding ReductionName}" IsVisible="{Binding ShowsStageMeters}"/>
       <TextBlock Grid.Row="2" Grid.Column="2" Text="{loc:Text Key=DynamicsReduction}" Classes="body dynamicsLabel" IsVisible="{Binding ShowsStageMeters}"/>
 
-      <TextBlock Grid.Column="3" Name="DynamicsMakeupText" Text="{Binding Makeup.Text, FallbackValue=''}" Classes="val dynamicsValue"
-                 IsVisible="{Binding HasMakeup}"/>
+      <skin:LitText Grid.Column="3" Name="DynamicsMakeupText" Text="{Binding Makeup.Text, FallbackValue=''}" Classes="val dynamicsValue"
+                    IsVisible="{Binding HasMakeup}"/>
       <!-- as tall as its row: the mixer's fixed upright fader length would run past the value and the name -->
       <Slider Grid.Row="1" Grid.Column="3" Name="DynamicsMakeup" Orientation="Vertical" HorizontalAlignment="Center" IsVisible="{Binding HasMakeup}"
               Height="NaN" VerticalAlignment="Stretch"
@@ -143,7 +143,7 @@
               AutomationProperties.Name="{loc:Text Key=DynamicsMakeup}" ToolTip.Tip="{Binding Makeup.Tip, FallbackValue=''}"/>
       <TextBlock Grid.Row="2" Grid.Column="3" Name="DynamicsMakeupLabel" Text="{loc:Text Key=DynamicsMakeup}" Classes="body dynamicsLabel" IsVisible="{Binding HasMakeup}"/>
 
-      <TextBlock Grid.Column="4" Name="DynamicsOutputText" Text="{Binding OutputText}" Classes="val dynamicsValue"/>
+      <skin:LitText Grid.Column="4" Name="DynamicsOutputText" Text="{Binding OutputText}" Classes="val dynamicsValue"/>
       <skin:LevelMeter Grid.Row="1" Grid.Column="4" Name="DynamicsOutputMeter" Classes="dynamics" Level="{Binding OutputLevel}"
                        AutomationProperties.Name="{Binding OutputName}"/>
       <TextBlock Grid.Row="2" Grid.Column="4" Text="{loc:Text Key=DynamicsOutput}" Classes="body dynamicsLabel"/>

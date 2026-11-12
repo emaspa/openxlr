@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="OpenXLR.UI.WelcomeGuideWindow"
@@ -13,7 +14,7 @@
     <ScrollViewer Grid.Row="1" Name="GuideScroll" HorizontalScrollBarVisibility="Disabled">
       <Border Classes="card" Padding="16">
         <StackPanel Spacing="12">
-          <TextBlock Name="GuideHeading" Classes="title" TextWrapping="Wrap"/>
+          <skin:LitText Name="GuideHeading" Classes="title" TextWrapping="Wrap"/>
           <TextBlock Name="GuideBody" Classes="body" TextWrapping="Wrap"/>
           <WrapPanel ItemSpacing="8" LineSpacing="6">
             <Button Name="GuideAction" Click="OnAction" Padding="12,6">
