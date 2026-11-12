@@ -88,7 +88,7 @@
                           Value="{Binding Main.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Main.GainLocked}"
                           AutomationProperties.Name="{Binding Main.UnitInput1.GainName}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Main.GainText}" Classes="val" VerticalAlignment="Center"/>
-                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
+                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="lock" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding Main.ShowGainLock}"
                                 IsChecked="{Binding Main.GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
                                 ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
@@ -362,7 +362,7 @@
                 </Grid>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="hardware-controls" Classes="dev" IsVisible="{Binding Main.CapAuxInput}">
-                <ToggleButton Content="{loc:Text Key=LevelLock}" IsChecked="{Binding Main.AuxLevelLock, Mode=TwoWay}" HorizontalAlignment="Left"/>
+                <ToggleButton Classes="lock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding Main.AuxLevelLock, Mode=TwoWay}" HorizontalAlignment="Left"/>
               </StackPanel>
             </layout:StripPanel>
           </DockPanel>
@@ -410,7 +410,7 @@
                 </Grid>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="hardware-controls" Classes="dev" IsVisible="{Binding Main.CapLineInput}">
-                <ToggleButton Name="RackLineInLock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding Main.LineInLevelLock, Mode=TwoWay}" HorizontalAlignment="Left"/>
+                <ToggleButton Name="RackLineInLock" Classes="lock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding Main.LineInLevelLock, Mode=TwoWay}" HorizontalAlignment="Left"/>
                 <ToggleButton Name="RackLineInRawCapture" Content="{loc:Text Key=RawCapture}" IsChecked="{Binding Main.LineInRawCapture, Mode=TwoWay}"
                               IsVisible="{Binding Main.CapLineInRawCapture}" HorizontalAlignment="Left" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>
               </StackPanel>
@@ -459,7 +459,7 @@
                           Value="{Binding Unit.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
                           AutomationProperties.Name="{Binding Unit.GainName}"/>
                   <TextBlock Grid.Column="1" Text="{Binding Unit.GainText}" Classes="val" VerticalAlignment="Center"/>
-                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="mute" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
+                  <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="lock" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding Unit.ShowGainLock, FallbackValue=False}"
                                 IsChecked="{Binding Main.GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
                                 ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>

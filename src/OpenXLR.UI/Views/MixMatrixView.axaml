@@ -481,7 +481,7 @@
                               Value="{Binding Main.AuxLevelDb, Mode=TwoWay}"
                               AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
                     </layout:MeterFader>
-                    <ToggleButton Grid.Column="1" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.AuxLevelLock, Mode=TwoWay}"
+                    <ToggleButton Grid.Column="1" Classes="lock" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.AuxLevelLock, Mode=TwoWay}"
                                   Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                   AutomationProperties.Name="{loc:Text Key=LevelLock}" ToolTip.Tip="{loc:Text Key=LevelLock}"/>
                   </Grid>
@@ -556,7 +556,7 @@
                               Value="{Binding Main.LineInGainSliderDb, Mode=TwoWay}"
                               AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
                     </layout:MeterFader>
-                    <ToggleButton Grid.Column="1" Name="MatrixLineInLock" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.LineInLevelLock, Mode=TwoWay}"
+                    <ToggleButton Grid.Column="1" Name="MatrixLineInLock" Classes="lock" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.LineInLevelLock, Mode=TwoWay}"
                                   Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                                   AutomationProperties.Name="{loc:Text Key=LevelLock}" ToolTip.Tip="{loc:Text Key=LevelLock}"/>
                   </Grid>

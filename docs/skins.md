@@ -578,7 +578,7 @@ with a message saying why.
 
 | Token | Kind | Default | Range | What it paints |
 |---|---|---|---|---|
-| `Ox.Led.On` | colour | #3ecf7a |  | a connected device, a plugin that is processing, the button of a chain with one, a microphone's **EQ** button while its EQ runs, a matrix row's **Mic** button while one of its switches is on |
+| `Ox.Led.On` | colour | #3ecf7a |  | a connected device, a plugin that is processing, the button of a chain with one, a microphone's **EQ** button while its EQ runs, a matrix row's **Mic** button while one of its switches is on, a **Lock** key while its lock is on |
 | `Ox.Led.Off` | colour | #4a4f5c |  | a device that is not there |
 | `Ox.Led.Alert` | colour | #ff3c4e |  | a plugin bypassed or failed, the button of a chain with nothing processing, a microphone's **EQ** button while its EQ cannot run, the phantom power lamp on a matrix row's **Mic** button while phantom power is on |
 | `Ox.Meter.Fill` | colour | #3ecf7a |  | the quiet end of the scale |
@@ -709,7 +709,7 @@ for toggles, so a skin that sets only the older tokens behaves as it did.
 | `Ox.Toggle.BorderBrushChecked` | brush | framework |  | the ring of a toggle that is on |
 | `Ox.Bypass.Foreground` | brush | #ffffff |  | the plugin bypass key while the plugin is processing |
 | `Ox.Bypass.ForegroundBypassed` | brush | #ffffff |  | the same key while the plugin is bypassed |
-| `Ox.Lit.Background` | brush | framework |  | the face of a key lettered in `Ox.Led.On`: a plugin chain's button while a plugin processes, and a microphone's **EQ**, noise removal or dynamics button while it is on |
+| `Ox.Lit.Background` | brush | framework |  | the face of a key lettered in `Ox.Led.On`: a plugin chain's button while a plugin processes, and a microphone's **EQ**, noise removal or dynamics button while it is on, and a **Lock** key while its lock is on |
 | `Ox.Lit.BackgroundPointerOver` | brush | framework |  | that face under the pointer or held down |
 | `Ox.Lit.BorderBrush` | brush | framework |  | that key's ring |
 | `Ox.Chip.BorderThickness` | thickness | 0 | 0 to 16 | the ring of an input's binding chip and of the **EQ**, noise removal and dynamics buttons beside it |
