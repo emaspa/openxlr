@@ -145,7 +145,7 @@ move on.
     values. 21. **Mic output mute** on/off.
 22. **Polarity / polarization** toggle if present.
 23. (Optional confirmation) Change mic gain once **from the Stream Deck dial** instead of the
-    Wave Link UI. Log it. Result: the bytes should be identical to step 1–4, confirming the Stream Deck
+    Wave Link UI. Log it. Result: the bytes should be identical to steps 1 to 4, confirming the Stream Deck
     just drives Wave Link and there's no separate path. This is the one time re-enabling the
     Stream Deck app during capture is worth the noise.
 24. Stop capture, save.
@@ -191,7 +191,7 @@ Analysis steps on Linux:
 - Interfaces: If0 AudioControl (+ interrupt IN endpoint 0x81, 6 bytes, 1 ms, NOT user input,
   the Pro has no buttons/knob; watch it during the speaking test), If1/If2 audio streaming,
   **If3 vendor-specific class 0xFF, no endpoints, no kernel driver**, the control target.
-- Mic gain is ALSO a standard ALSA control on Linux (0–80 dB), already works without this
+- Mic gain is ALSO a standard ALSA control on Linux (0 to 80 dB), already works without this
   protocol; the capture is for phantom / low-cut / ClipGuard / monitor blend / mic-output.
 - No LEDs, no physical controls; LED/knob/button settings in a Wave Link config belong to
   the XLR Dock, not the Pro.
