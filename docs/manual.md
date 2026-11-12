@@ -4256,7 +4256,7 @@ profiles work as before. What changes on the mixes the unit builds:
 | Exclusive groups and the monitoring pause | Work, by taking channels out of the unit's mix. |
 | The USB Aux port | Plays the Aux mix, which the unit builds too while the port is on, at the same balance as the jacks and without Aux In. Your output volume no longer turns it down, and the monitoring pause leaves it playing. |
 | Mix volume and mute | On a mix the unit builds on its own for Headphones 2, Line Out or the USB Aux port, the mix's fader and mute move one level and one mute on the unit for the whole mix, and the channel faders stay where they are. The first jack's mix, and two mixes summed on a jack, still carry the mix volume in each channel's level. |
-| Maximizer | Each mix the unit builds on its own has the unit's maximizer, a **Max** button on the mix's master. See below. |
+| Maximizer | Each mix the unit builds on its own has the unit's maximizer, a **Max** button on the mix's master, or on its name line in Broadcast and Wave. See below. |
 | Mix meters | A mix the unit builds on its own, for a jack or the USB Aux port, shows the unit's own meter. It follows the faders and the mix volume, not the headphone volume or the output volume. The unit shows peaks, so a mix reads a little higher than in software mixing on the same audio. When a jack plays two mixes summed, each of them keeps this computer's meter, and so do Stream, Chat and every other mix the computer builds. The input meters are unchanged: they show each input as the unit sends it. |
 
 A greyed control says why in its tooltip. The plugin chain window, Mic
@@ -4270,9 +4270,11 @@ on a plugin of a mix the unit builds. Scripts use `setMixing` in the
 raises the mix and holds its peaks under about -1 dBFS, so a quiet mix
 comes up without clipping. While the unit builds a mix on its own, for a
 jack or the USB Aux port, the mix's master shows a **Max** button with the
-amount, or Off. Press it and move the slider from 0 (off) to 100. Each step
-adds about 0.2 dB, so 50 raises the mix by about 10 dB and 100 by about 20
-dB before the ceiling holds it back. Under the slider, **Reduction** shows
+amount, or Off. In Broadcast and Wave the button sits on the mix's name
+line, where a monitor mix has **Dry**, and reads **Max**, green while on
+with the amount under it. Press it and move the slider from Off to 100%.
+Each percent adds about 0.2 dB, so 50% raises the mix by about 10 dB and
+100% by about 20 dB before the ceiling holds it back. Under the slider, **Reduction** shows
 how far the unit is holding the mix down right now. A high reduction means
 the mix is being squeezed hard; lower the amount if it pumps. The mix's
 fader comes before the maximizer. While the maximizer is holding the mix

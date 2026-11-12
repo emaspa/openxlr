@@ -435,6 +435,16 @@ public sealed class MatrixColumnViewModel : ViewModelBase
     /// <summary>A monitor mix's head carries the dry switch, from a daemon that reports it, always visible.</summary>
     public bool ShowsDryChip => Mix.IsMonitor && Mix.HasMonitorDry;
 
+    /// <summary>
+    /// The dry switch stands before the maximizer's chip while the maximizer
+    /// is on, so the chip and the amount under it hold the head's right edge;
+    /// after it otherwise.
+    /// </summary>
+    public bool DryLeadsMaximizer => ShowsDryChip && Mix.ShowMaximizer && Mix.MaximizerOn;
+
+    /// <summary>The dry switch after the maximizer's chip, or alone: every case <see cref="DryLeadsMaximizer"/> is not.</summary>
+    public bool DryTrailsMaximizer => ShowsDryChip && !DryLeadsMaximizer;
+
     /// <summary>The dry switch's face: "Dry", or the mix's volume while the fader moves and for the hold after.</summary>
     public string DryChipText => ShowsVolumeChip ? Mix.VolumeText : Localizer.Text("MonitorDry");
 
@@ -461,15 +471,26 @@ public sealed class MatrixColumnViewModel : ViewModelBase
                 RefreshOutputs();
                 Raise(nameof(ShowsDryChip));
                 Raise(nameof(ShowsVolumeOnlyChip));
+                RaiseDryPlace();
                 break;
             case nameof(MixViewModel.HasMonitorDry):
                 Raise(nameof(ShowsDryChip));
                 Raise(nameof(ShowsVolumeOnlyChip));
+                RaiseDryPlace();
+                break;
+            case nameof(MixViewModel.ShowMaximizer) or nameof(MixViewModel.MaximizerOn):
+                RaiseDryPlace();
                 break;
             case nameof(MixViewModel.VolumeText):
                 if (ShowsVolumeChip) Raise(nameof(DryChipText));
                 break;
         }
+    }
+
+    private void RaiseDryPlace()
+    {
+        Raise(nameof(DryLeadsMaximizer));
+        Raise(nameof(DryTrailsMaximizer));
     }
 
     private void OnAppearanceChanged(object? sender, PropertyChangedEventArgs e)

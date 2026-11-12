@@ -286,6 +286,38 @@
             <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
         </Style>
 
+        <!-- The maximizer's chip in a matrix head, beside the dry switch: the dry
+             switch's face, grey while off and lamp green while on. -->
+        <Style Selector="Button.maxChip">
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{DynamicResource Ox.Control.BorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource Ox.Control.CornerRadius}"/>
+        </Style>
+        <Style Selector="Button.maxChip /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.Background}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Text.Secondary}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+        </Style>
+        <Style Selector="Button.maxChip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Ox.Control.BackgroundPointerOver}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrushPointerOver}"/>
+        </Style>
+        <Style Selector="Button.maxChip.on">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Led.On}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Led.On}"/>
+        </Style>
+        <Style Selector="Button.maxChip.on /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Led.On}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Ox.Led.On}"/>
+        </Style>
+        <Style Selector="Button.maxChip:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource Ox.Control.ForegroundDisabled}"/>
+        </Style>
+
         <!-- The button that opens a plugin chain wears the chain's state in the
              lamp colours: green while a plugin is processing, red when the chain
              has plugins and none is. An empty chain keeps the plain button. -->

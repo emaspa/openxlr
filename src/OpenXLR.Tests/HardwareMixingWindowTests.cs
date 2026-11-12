@@ -1,12 +1,16 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
+using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using OpenXLR.UI;
+using OpenXLR.UI.Layout;
 using OpenXLR.UI.Localization;
+using OpenXLR.UI.Skinning;
 using static OpenXLR.Tests.WindowLayoutTests;
 
 namespace OpenXLR.Tests;
@@ -198,6 +202,7 @@ internal static class HardwareMixingWindowTests
             Assert.True(monitor.ShowMaximizer);
             Assert.True(monitor.CanMaximize);
             Assert.True(monitor.MaximizerOn);
+            Assert.Equal("40%", monitor.MaximizerText);
             Assert.Equal(Localizer.Text("MaximizerTip"), monitor.MaximizerTip);
             Assert.False(vm.Mixes.Single(m => m.Id == "stream").ShowMaximizer);
             MethodInfo meters = typeof(MainViewModel).GetMethod("ApplyMeters", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -205,6 +210,38 @@ internal static class HardwareMixingWindowTests
             Assert.Equal(6.5, monitor.MaximizerReduction);
             meters.Invoke(vm, [JsonNode.Parse("""{"mix:monitor":[0.5,0.5]}""")!]);
             Assert.Equal(0, monitor.MaximizerReduction);
+            // A matrix skin shows the button in the mix's column head, on the
+            // name line where a monitor mix has its dry switch, for the mix the
+            // unit builds only, so the column's EQ and effects keep their places.
+            Size size = main.ClientSize;
+            SkinLayoutWindowTests.Wear("broadcast");
+            try
+            {
+                Layout(main, 1600, 1100);
+                Button matrix = main.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "MatrixMixMaximizer" && b.IsEffectivelyVisible);
+                Assert.Equal("monitor", ((MatrixColumnViewModel)matrix.DataContext!).Mix.Id);
+                Border head = matrix.GetVisualAncestors().OfType<Border>().First(b => b.Name == "MatrixColumn");
+                AssertInside(matrix, head);
+                TextBlock name = head.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == monitor.Name && t.IsEffectivelyVisible);
+                double middle(Control c) => c.TranslatePoint(new Point(0, c.Bounds.Height / 2), head)!.Value.Y;
+                Assert.True(Math.Abs(middle(matrix) - middle(name)) <= 1);
+                Button effects = head.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("matrixEffects"));
+                Assert.Same(effects.Parent, head.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "MatrixMixEq").Parent);
+                Assert.Equal(2, ((Panel)effects.Parent!).Children.Count);
+                Assert.Contains("on", matrix.Classes);
+                Assert.Equal(Localizer.Text("Maximizer"), matrix.Content);
+                // The amount reads under the chip while the maximizer is on.
+                TextBlock level = head.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "MatrixMixMaximizerLevel");
+                Assert.True(level.IsEffectivelyVisible);
+                Assert.Equal(monitor.MaximizerText, level.Text);
+                AssertInside(level, head);
+                double centre(Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, 0), head)!.Value.X;
+                Assert.True(Math.Abs(centre(level) - centre(matrix)) <= 1);
+                Assert.True(level.TranslatePoint(default, head)!.Value.Y >= matrix.TranslatePoint(new Point(0, matrix.Bounds.Height), head)!.Value.Y - 0.5);
+                Assert.Equal(Localizer.Format("MaximizerName", monitor.Name), AutomationProperties.GetName(matrix));
+                SkinLayoutWindowTests.CheckMatrixCells(main, main.MixMatrix!, "maximizer");
+            }
+            finally { SkinLayoutWindowTests.Wear(SkinPackage.DefaultId); Layout(main, size.Width, size.Height); }
             // A mix the unit builds only summed: greyed, with the daemon's sentence.
             JsonObject summed = Running();
             summed["disabled"]!["maximizer:monitor"] = MaximizerSentence;

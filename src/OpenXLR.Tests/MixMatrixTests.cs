@@ -267,6 +267,44 @@ public sealed class MixMatrixTests
     }
 
     [Fact]
+    public void TheDrySwitchStandsBeforeTheMaximizersChipWhileTheMaximizerIsOn()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        string State(string section, int amount) => $$"""
+            {"channels":[{"id":"xlr1","name":"XLR 1"}],
+             "mixes":[{"id":"monitor","name":"Monitor A","kind":"monitor","monitorDry":false{{section}},"maximizer":{{amount}}},
+                      {"id":"auxout","name":"Aux","kind":"auxPort","hardwareSection":36,"maximizer":{{amount}}}]}
+            """;
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(",\"hardwareSection\":0", 0))]);
+        using var matrix = new MixMatrixViewModel(model);
+        MatrixColumnViewModel monitor = matrix.Columns.Single(c => c.Mix.Id == "monitor");
+        MatrixColumnViewModel aux = matrix.Columns.Single(c => c.Mix.Id == "auxout");
+        var raised = new List<string?>();
+        monitor.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        // Off: the chip first, the dry switch at the edge.
+        Assert.True(monitor.Mix.ShowMaximizer);
+        Assert.False(monitor.DryLeadsMaximizer);
+        Assert.True(monitor.DryTrailsMaximizer);
+
+        // On: the dry switch moves before the chip.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State(",\"hardwareSection\":0", 26))]);
+        Assert.True(monitor.DryLeadsMaximizer);
+        Assert.False(monitor.DryTrailsMaximizer);
+        Assert.Contains(nameof(MatrixColumnViewModel.DryLeadsMaximizer), raised);
+        Assert.Equal("26%", monitor.Mix.MaximizerText);
+
+        // A mix the computer builds keeps its amount but shows no chip, so the switch stays put.
+        ApplyMixer.Invoke(model, [JsonNode.Parse(State("", 26))]);
+        Assert.False(monitor.DryLeadsMaximizer);
+        Assert.True(monitor.DryTrailsMaximizer);
+
+        // A mix with no dry switch has neither.
+        Assert.False(aux.DryLeadsMaximizer);
+        Assert.False(aux.DryTrailsMaximizer);
+    }
+
+    [Fact]
     public void AMonitorMixsChipIsItsDrySwitchAndShowsTheVolumeWhileTheMasterMoves()
     {
         var model = new MainViewModel(new DaemonClient());

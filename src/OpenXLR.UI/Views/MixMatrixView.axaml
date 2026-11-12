@@ -828,12 +828,43 @@
                            at the strip's, and before the move handle while that shows: grey while off, green
                            while on, and the volume in place of "Dry" while the master moves. -->
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <ToggleButton Name="MatrixDryChip" Classes="dryChip" Classes.showsVolume="{Binding ShowsVolumeChip}" Padding="5,0"
-                                      VerticalAlignment="Center" IsVisible="{Binding ShowsDryChip}"
+                        <!-- the dry switch again, before the maximizer's chip while that is on, so the chip
+                             and its amount hold the right edge; the same switch, one shown at a time -->
+                        <ToggleButton Name="MatrixDryChipLead" Classes="dryChip" Classes.showsVolume="{Binding ShowsVolumeChip}" Padding="5,0"
+                                      VerticalAlignment="Center" IsVisible="{Binding DryLeadsMaximizer}"
                                       IsChecked="{Binding Mix.MonitorDry, Mode=TwoWay}" Content="{Binding DryChipText}"
                                       FontSize="{DynamicResource UiText.FontSize11}"
                                       AutomationProperties.Name="{Binding DryName}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
-                        <Button Classes="ghost reorderHandle" Classes.fixedPlace="{Binding HandleHidden}"
+                        <!-- The Wave XLR Pro's maximizer while hardware mixing builds the mix on the unit, in
+                             the head beside the dry switch so the strip keeps its size: "Max", grey while off
+                             and green while on, the amount in its flyout. -->
+                        <Button Name="MatrixMixMaximizer" Classes="maxChip" Classes.on="{Binding Mix.MaximizerOn}" Padding="5,0"
+                                VerticalAlignment="Center" FontSize="{DynamicResource UiText.FontSize11}" IsVisible="{Binding Mix.ShowMaximizer}"
+                                IsEnabled="{Binding Mix.CanMaximize}" ToolTip.ShowOnDisabled="True"
+                                Content="{loc:Text Key=Maximizer}"
+                                AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}" ToolTip.Tip="{Binding Mix.MaximizerTip}">
+                          <Button.Flyout>
+                            <Flyout Placement="Bottom">
+                              <StackPanel Name="MatrixMixMaximizerPanel" Width="240" Spacing="6">
+                                <TextBlock Text="{loc:Text Key=MaximizerTitle}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                  <Slider Name="MatrixMixMaximizerAmount" Minimum="0" Maximum="100" SmallChange="1" LargeChange="10"
+                                          TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Mix.Maximizer, Mode=TwoWay}"
+                                          AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}"/>
+                                  <TextBlock Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
+                                <TextBlock Text="{loc:Text Key=MaximizerTip}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"/>
+                              </StackPanel>
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
+                        <ToggleButton Name="MatrixDryChip" Classes="dryChip" Classes.showsVolume="{Binding ShowsVolumeChip}" Padding="5,0"
+                                      VerticalAlignment="Center" IsVisible="{Binding DryTrailsMaximizer}"
+                                      IsChecked="{Binding Mix.MonitorDry, Mode=TwoWay}" Content="{Binding DryChipText}"
+                                      FontSize="{DynamicResource UiText.FontSize11}"
+                                      AutomationProperties.Name="{Binding DryName}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
+                        <Button Name="MatrixColumnHandle" Classes="ghost reorderHandle" Classes.fixedPlace="{Binding HandleHidden}"
                                 Content="↔" Tag="{Binding Mix}"
                                 AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"
                                 ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
@@ -848,8 +879,24 @@
                         <TextBlock Text="{Binding Mix.VolumeText}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Control.Foreground}"/>
                       </Border>
                     </Grid>
-                    <TextBlock layout:StripPanel.Part="outputs" Text="{Binding OutputsText}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
-                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding OutputsText}"/>
+                    <!-- what the mix plays to, and while the unit's maximizer is on its amount under the
+                         Max chip, which then stands last before the move handle -->
+                    <Grid layout:StripPanel.Part="outputs" ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                      <TextBlock Text="{Binding OutputsText}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
+                                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding OutputsText}"/>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                        <StackPanel.IsVisible>
+                          <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="Mix.ShowMaximizer"/>
+                            <Binding Path="Mix.MaximizerOn"/>
+                          </MultiBinding>
+                        </StackPanel.IsVisible>
+                        <TextBlock Name="MatrixMixMaximizerLevel" Text="{Binding Mix.MaximizerText}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}"
+                                   MinWidth="{Binding #MatrixMixMaximizer.Bounds.Width}" TextAlignment="Center"
+                                   AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}"/>
+                        <Panel Width="{Binding #MatrixColumnHandle.Bounds.Width}" IsVisible="{Binding #MatrixColumnHandle.IsVisible}"/>
+                      </StackPanel>
+                    </Grid>
                   </layout:StripPanel>
                 </DockPanel>
               </Border>
