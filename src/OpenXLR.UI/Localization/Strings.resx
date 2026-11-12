@@ -2405,9 +2405,6 @@ Select the interface OpenXLR drives</value>
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>The bank choice applies until the window closes, but could not be saved: {0}</value>
   </data>
-  <data name="PlaybackVolumeShort" xml:space="preserve">
-    <value>Vol.</value>
-  </data>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Playback volume</value>
   </data>

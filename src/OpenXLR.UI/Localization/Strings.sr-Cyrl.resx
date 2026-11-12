@@ -2301,9 +2301,6 @@
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>Избор банке важи до затварања прозора, али није сачуван: {0}</value>
   </data>
-  <data name="PlaybackVolumeShort" xml:space="preserve">
-    <value>Јач.</value>
-  </data>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Јачина репродукције</value>
   </data>

@@ -21,7 +21,7 @@ capture so you can retry.
 ### Playback volume
 
 In OpenXLR's **Browser tabs** window, choose a channel for Teams and
-activate the tab or PWA as usual. Select **Vol.** or the percentage beside
+activate the tab or PWA as usual. Select the volume button beside
 its channel picker. The level takes effect once the companion routes that
 tab. You can adjust two routed tabs independently even when they play
 into the same channel. A volume change leaves the capture running.

@@ -8,13 +8,15 @@
   <Button Name="PlaybackVolume" Content="{Binding Label}" IsEnabled="{Binding Enabled}"
           Padding="6,4" ToolTip.Tip="{Binding Hint}" ToolTip.ShowOnDisabled="True"
           AutomationProperties.Name="{loc:Text Key=PlaybackVolume}">
-    <!-- Reserve room for both labels so changing a level does not shift its row. -->
+    <!-- A speaker until the program plays below full volume, then the level.
+         The widest level holds the room so changing it does not shift the row. -->
     <Button.ContentTemplate>
       <DataTemplate x:DataType="x:String">
         <Panel>
           <TextBlock Text="100%" Opacity="0" AutomationProperties.AccessibilityView="Raw"/>
-          <TextBlock Text="{loc:Text Key=PlaybackVolumeShort}" Opacity="0" AutomationProperties.AccessibilityView="Raw"/>
-          <TextBlock Text="{Binding}"/>
+          <vm:LayoutIconBlock Icon="speaker" HorizontalAlignment="Center" AutomationProperties.AccessibilityView="Raw"
+                              IsVisible="{Binding Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+          <TextBlock Text="{Binding}" HorizontalAlignment="Center"/>
         </Panel>
       </DataTemplate>
     </Button.ContentTemplate>

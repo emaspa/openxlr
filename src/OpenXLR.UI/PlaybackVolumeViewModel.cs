@@ -23,8 +23,8 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     public bool Enabled => _enabled;
     public bool Website => website;
     public bool HasLevel => (_pending ?? _reported).Level is not null;
-    public string Label => ((_pending ?? _reported).Level ?? (_live < 1 ? _live : null)) is double level
-        ? $"{level * 100:0}%" : Localizer.Text("PlaybackVolumeShort");
+    /// <summary>The level the button shows; empty at full volume, saved or not, where it shows a speaker.</summary>
+    public string Label => Math.Round(Level * 100) < 100 ? $"{Level * 100:0}%" : "";
     public string Hint => website ? Localizer.Text("TabPlaybackVolumeHint")
         : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHint") : Localizer.Text("AppPlaybackVolumeHint");
     public string? Error { get => _error; private set => Set(ref _error, value); }

@@ -2301,9 +2301,6 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>May bisa ang napiling bank hanggang isara ang window, pero hindi ito ma-save: {0}</value>
   </data>
-  <data name="PlaybackVolumeShort" xml:space="preserve">
-    <value>Vol.</value>
-  </data>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Volume ng playback</value>
   </data>
