@@ -27,6 +27,34 @@
     "Ox.Meter.WarningLevel": 0.7,
     "Ox.Meter.HotLevel": 0.9
   },
+  "broadcast-amber": {
+    "Ox.Card.Background": "#222222",
+    "Ox.Text.Primary": "#e6e6e6",
+    "Ox.Text.Muted": "#8c8c8c",
+    "Ox.Led.On": "#ff9f3f",
+    "Ox.Led.Off": "#404040",
+    "Ox.Led.Alert": "#ef4444",
+    "Ox.Meter.Track": "#141414",
+    "Ox.Meter.Fill": "#ff9f3f",
+    "Ox.Meter.Warning": "#facc15",
+    "Ox.Meter.Hot": "#ef4444",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9
+  },
+  "broadcast-blue": {
+    "Ox.Card.Background": "#222222",
+    "Ox.Text.Primary": "#e6e6e6",
+    "Ox.Text.Muted": "#8c8c8c",
+    "Ox.Led.On": "#3fe6ff",
+    "Ox.Led.Off": "#404040",
+    "Ox.Led.Alert": "#ef4444",
+    "Ox.Meter.Track": "#141414",
+    "Ox.Meter.Fill": "#3fe6ff",
+    "Ox.Meter.Warning": "#facc15",
+    "Ox.Meter.Hot": "#ef4444",
+    "Ox.Meter.WarningLevel": 0.7,
+    "Ox.Meter.HotLevel": 0.9
+  },
   "catppuccin": {
     "Ox.Card.Background": "#232336",
     "Ox.Text.Primary": "#cdd6f4",

@@ -6,7 +6,7 @@ appearance values and, if it wants, where the header and the
 UI's sections go ([Layout](#layout)); it carries no markup, no script and
 no code, and it cannot reach a file outside its own folder.
 
-OpenXLR ships twenty appearances, all compiled into the application, so
+OpenXLR ships twenty-two appearances, all compiled into the application, so
 every package has them and there is nothing to install:
 
 - **Material**, the classic appearance, in a dark and a light palette (see
@@ -32,6 +32,13 @@ every package has them and there is nothing to install:
   microphone switches and plugins, and APPLICATIONS is under the matrix in columns of four, on a dark neutral
   palette. It opens the UI at 1224 by 1141. It is the reference for
   writing a layout skin; see [Layout](#layout).
+- **Broadcast Amber**, Broadcast with orange accents. Its meters, lamps,
+  checked keys, links and Flow's outputs are orange where Broadcast's are
+  green or blue; the arrangement, the size and everything else are
+  Broadcast's.
+- **Broadcast Blue**, Broadcast with the blue of Hi-Fi's display on its
+  meters, lamps, checked keys and links. Flow's outputs are a deeper blue,
+  so they stay apart from its cyan inputs.
 - **Compact Desk**, a dark matrix layout with a 600 pixel headphone column
   and a monitor toolbar that takes the remaining width. Wider name columns
   and faders expand to use the desk's space, muted faders stay readable,
@@ -1131,8 +1138,8 @@ UI keeps the size you gave it.
 
 A `size` that is not an object with both numbers in range, or that holds
 any other field, is reported in Options and the UI keeps its size. The
-skin's other values still apply. The three Hi-Fi skins are the shipped
-skins that name a size.
+skin's other values still apply. the three Broadcast skins and the three
+Hi-Fi skins are the shipped skins that name a size.
 
 ## Layout
 
