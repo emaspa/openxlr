@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
@@ -23,7 +24,7 @@
 
   <DockPanel Margin="16">
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,8">
-      <TextBlock Text="{loc:Text Key=VoiceChanger}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+      <skin:LitText Text="{loc:Text Key=VoiceChanger}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       <TextBlock Grid.Column="1" Text="{loc:Text Key=VoiceChangerMicrophone}" VerticalAlignment="Center"/>
       <ComboBox Grid.Column="2" Name="VoiceMicrophone" ItemsSource="{Binding Microphones}" SelectedItem="{Binding SelectedMicrophone, Mode=TwoWay}"
                 IsEnabled="{Binding CanPickMicrophone}" MinWidth="140" MaxWidth="240" VerticalAlignment="Center"
@@ -46,11 +47,11 @@
       <TextBlock Text="{loc:Text Key=VoicePitch}" VerticalAlignment="Center"/>
       <Slider Grid.Column="1" Name="VoicePitch" vm:FaderInput.Step="0.5" Minimum="-12" Maximum="12"
               Value="{Binding Pitch, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=VoicePitch}" ToolTip.Tip="{loc:Text Key=VoicePitchTip}"/>
-      <TextBlock Grid.Column="2" Name="VoicePitchText" Text="{Binding PitchText}" Classes="val" VerticalAlignment="Center" MinWidth="96" TextAlignment="Right"/>
+      <skin:LitText Grid.Column="2" Name="VoicePitchText" Text="{Binding PitchText}" Classes="val" VerticalAlignment="Center" MinWidth="96" TextAlignment="Right"/>
       <TextBlock Grid.Row="1" Text="{loc:Text Key=VoiceFormant}" VerticalAlignment="Center"/>
       <Slider Grid.Row="1" Grid.Column="1" Name="VoiceFormant" vm:FaderInput.Step="0.5" Minimum="-12" Maximum="12"
               Value="{Binding Formant, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=VoiceFormant}" ToolTip.Tip="{loc:Text Key=VoiceFormantTip}"/>
-      <TextBlock Grid.Row="1" Grid.Column="2" Name="VoiceFormantText" Text="{Binding FormantText}" Classes="val" VerticalAlignment="Center" MinWidth="96" TextAlignment="Right"/>
+      <skin:LitText Grid.Row="1" Grid.Column="2" Name="VoiceFormantText" Text="{Binding FormantText}" Classes="val" VerticalAlignment="Center" MinWidth="96" TextAlignment="Right"/>
     </Grid>
 
     <ScrollViewer Name="VoiceScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

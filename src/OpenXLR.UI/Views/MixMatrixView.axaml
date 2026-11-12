@@ -19,6 +19,11 @@
        Ox.* token. -->
 
   <UserControl.Styles>
+    <!-- The microphone switches button's phantom power lamp, on an input with phantom power.
+         A style rather than a binding, so a skin can hide it (Ox.Matrix.PhantomLamp). -->
+    <Style Selector="skin|StatusLed.noPhantom">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
     <Style Selector="Border.matrixHead">
       <Setter Property="Height" Value="{DynamicResource Ox.Matrix.RowHeight}"/>
     </Style>
@@ -118,7 +123,7 @@
             <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
             <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="0" Maximum="100"
                     Value="{Binding Unit.VoiceTuneStrength, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=VTStrength}"/>
-            <TextBlock Grid.Column="2" Text="{Binding Unit.VoiceTuneStrengthText}" Classes="val" VerticalAlignment="Center"/>
+            <skin:LitText Grid.Column="2" Text="{Binding Unit.VoiceTuneStrengthText}" Classes="val" VerticalAlignment="Center"/>
           </Grid>
         </StackPanel>
         <Panel IsVisible="{Binding CarriesExtraUnit}">
@@ -167,8 +172,8 @@
                   <vm:LayoutIconBlock Grid.Column="1" Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip"
                              Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" VerticalAlignment="Center"
                              IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                  <TextBlock Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                  <skin:LitText Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <!-- the strip's binding under its name: what feeds it, lit while linked. The
                        name and this line are one target over them that opens the binding
                        dialog, so a row keeps its height with a touch-sized target. -->
@@ -191,7 +196,7 @@
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" IsVisible="{Binding HasPhantom}"
+                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.noPhantom="{Binding !HasPhantom}"
                                       AutomationProperties.AccessibilityView="Raw"/>
                       <TextBlock Text="{loc:Text Key=MatrixProcessing}" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -206,10 +211,10 @@
                           Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsOwnClockButton}" Click="OnToggleOwnClock"
                           Content="{loc:Text Key=CaptureOwnClock}" AutomationProperties.Name="{Binding OwnClockName}" ToolTip.Tip="{Binding OwnClockTip}"/>
-                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
-                             Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
-                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
+                  <skin:LitText Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                                Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                                AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
@@ -312,8 +317,8 @@
                   <vm:LayoutIconBlock Grid.Column="1" Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip"
                              Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" VerticalAlignment="Center"
                              IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                  <TextBlock Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                  <skin:LitText Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <!-- the strip's binding under its name: what feeds it, lit while linked. The
                        name and this line are one target over them that opens the binding
                        dialog, so a row keeps its height with a touch-sized target. -->
@@ -336,7 +341,7 @@
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" IsVisible="{Binding HasPhantom}"
+                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.noPhantom="{Binding !HasPhantom}"
                                       AutomationProperties.AccessibilityView="Raw"/>
                       <TextBlock Text="{loc:Text Key=MatrixProcessing}" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -351,10 +356,10 @@
                           Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsOwnClockButton}" Click="OnToggleOwnClock"
                           Content="{loc:Text Key=CaptureOwnClock}" AutomationProperties.Name="{Binding OwnClockName}" ToolTip.Tip="{Binding OwnClockTip}"/>
-                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
-                             Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
-                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
+                  <skin:LitText Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                                Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                                AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
@@ -457,12 +462,12 @@
                   <vm:LayoutIconBlock Grid.Column="1" Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip"
                              Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" VerticalAlignment="Center"
                              IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                  <TextBlock Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                  <skin:LitText Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <!-- the level, which reads the channel's volume while the volume fader moves and for a second after -->
-                  <TextBlock Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
-                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
+                  <skin:LitText Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                                AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
@@ -532,12 +537,12 @@
                   <vm:LayoutIconBlock Grid.Column="1" Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip"
                              Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" VerticalAlignment="Center"
                              IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                  <TextBlock Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                  <skin:LitText Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <!-- the gain, which reads the channel's volume while the volume fader moves and for a second after -->
-                  <TextBlock Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
-                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
+                  <skin:LitText Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                                AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
@@ -609,8 +614,8 @@
                   <vm:LayoutIconBlock Grid.Column="1" Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip"
                              Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" VerticalAlignment="Center"
                              IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                  <TextBlock Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                  <skin:LitText Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <!-- a capture input's source under its name, opening its binding dialog.
                        A skin whose order leaves the part out gets the connection line. -->
                   <Grid Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="4"
@@ -635,7 +640,7 @@
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" IsVisible="{Binding HasPhantom}"
+                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.noPhantom="{Binding !HasPhantom}"
                                       AutomationProperties.AccessibilityView="Raw"/>
                       <TextBlock Text="{loc:Text Key=MatrixProcessing}" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -650,10 +655,10 @@
                           Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsOwnClockButton}" Click="OnToggleOwnClock"
                           Content="{loc:Text Key=CaptureOwnClock}" AutomationProperties.Name="{Binding OwnClockName}" ToolTip.Tip="{Binding OwnClockTip}"/>
-                  <TextBlock Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
-                             Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
-                             HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
-                             AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
+                  <skin:LitText Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                                Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
+                                AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
               </Border>
             <Border Width="{DynamicResource MatrixCellWidth}" Padding="4,0" Name="MatrixSource">
@@ -822,8 +827,8 @@
                       <vm:LayoutIconBlock Icon="{Binding Mix.Appearance.Icon}" Fallback="{Binding Mix.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}"
                                  VerticalAlignment="Center" IsVisible="{Binding ShowsIcon}"
                                  AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{Binding Mix.Name}"/>
-                      <TextBlock Grid.Column="1" Text="{Binding Mix.Name}" Classes="strip" VerticalAlignment="Center"
-                                 TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Mix.Name}"/>
+                      <skin:LitText Grid.Column="1" Text="{Binding Mix.Name}" Classes="strip" VerticalAlignment="Center"
+                                    TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Mix.Name}"/>
                       <!-- A monitor mix's dry switch, at the head's right edge as the FX button below sits
                            at the strip's, and before the move handle while that shows: grey while off, green
                            while on, and the volume in place of "Dry" while the master moves. -->
@@ -851,9 +856,9 @@
                                   <Slider Name="MatrixMixMaximizerAmount" Minimum="0" Maximum="100" SmallChange="1" LargeChange="10"
                                           TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Mix.Maximizer, Mode=TwoWay}"
                                           AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MaximizerName}}"/>
-                                  <TextBlock Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
+                                  <skin:LitText Grid.Column="1" Text="{Binding Mix.MaximizerText}" Classes="val" VerticalAlignment="Center"/>
                                 </Grid>
-                                <TextBlock Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
+                                <skin:LitText Text="{Binding Mix.MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
                                 <TextBlock Text="{loc:Text Key=MaximizerTip}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"/>
                               </StackPanel>
                             </Flyout>
@@ -939,8 +944,8 @@
                           <Slider Classes="matrixFader" vm:FaderInput.Step="0.01" vm:FaderInput.IsAdjusting="{Binding Adjusting, Mode=OneWayToSource}" Minimum="0" Maximum="1"
                                   Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
                         </layout:MeterFader>
-                        <TextBlock layout:StripPanel.Part="value" Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
-                                   MinWidth="22" TextAlignment="Right" VerticalAlignment="Center"/>
+                        <skin:LitText layout:StripPanel.Part="value" Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                                      MinWidth="22" TextAlignment="Right" VerticalAlignment="Center"/>
                       </layout:StripPanel>
                       <!-- the send's level over the fader, where the skin puts it there: a chip in the
                            buttons' own face at the top of the cell, only while the fader is being moved -->

@@ -81,6 +81,15 @@ public static class SkinService
 
     private static double ScaleText(double size) => size * TextSizePercent / NormalTextSize;
 
+    /// <summary>
+    /// A text size at the user's text size and the skin's own scale: a face
+    /// such as a segment display's runs larger than the usual one at the same
+    /// size, so its skin sets it smaller. Widths that hold text follow the
+    /// user's size only, since a smaller size of a wider face needs them all.
+    /// </summary>
+    private static double ScaleFont(double size) =>
+        ScaleText(size) * (_palette.Tokens.GetValueOrDefault("Ox.Font.Scale") is SkinNumber scale ? scale.Value : 1);
+
     private static bool IsFontSize(SkinToken token) => token.Name.EndsWith("FontSize", StringComparison.Ordinal);
 
     /// <summary>Save the text size and apply it to open windows, even when the preference cannot be saved.</summary>
@@ -103,7 +112,7 @@ public static class SkinService
                 bool font = IsFontSize(token);
                 if ((!font && token.Name is not ("Ox.Matrix.RowHeight" or "Ox.Matrix.NameWidth")) || token.Default is not double basis) continue;
                 double size = _palette.Tokens.GetValueOrDefault(token.Name) is SkinNumber number ? number.Value : basis;
-                Put(application.Resources, token.Name, font ? ScaleText(size) : Sized(token.Name, size)!);
+                Put(application.Resources, token.Name, font ? ScaleFont(size) : Sized(token.Name, size)!);
             }
         }
         Changed?.Invoke();
@@ -113,7 +122,7 @@ public static class SkinService
     {
         var resources = application.Resources;
         foreach (int size in TextSizeBases)
-            Put(resources, $"UiText.FontSize{size}", ScaleText(size));
+            Put(resources, $"UiText.FontSize{size}", ScaleFont(size));
         // A label column keeps the labels that fit it at Normal fitting at
         // every size, so rows of a card still line up.
         foreach (int width in LabelWidthBases)
@@ -124,9 +133,9 @@ public static class SkinService
         // overrides, so picking another size cannot scale them twice.
         foreach (string key in new[] { "ControlContentThemeFontSize", "ToolTipContentThemeFontSize", "TabItemHeaderFontSize" })
         {
-            if (TextSizePercent == NormalTextSize) resources.Remove(key);
+            if (ScaleFont(1) == 1) resources.Remove(key);
             else if (application.Styles.TryGetResource(key, application.ActualThemeVariant, out object? value) && value is double size)
-                Put(resources, key, ScaleText(size));
+                Put(resources, key, ScaleFont(size));
         }
     }
 
@@ -311,6 +320,8 @@ public static class SkinService
             errors.AddRange(MaterialLight.Errors);
         }
         _palette = palette;
+        // The text sizes follow the skin's font scale.
+        ApplyTextResources(application);
 
         var realizer = new Realizer(palette, errors);
         IResourceDictionary resources = application.Resources;
@@ -322,7 +333,7 @@ public static class SkinService
             // bad image never leaves a hole in the window.
             realized ??= token.Default;
             realized = Sized(token.Name, realized);
-            if (IsFontSize(token) && realized is double size) realized = ScaleText(size);
+            if (IsFontSize(token) && realized is double size) realized = ScaleFont(size);
 
             if (IsLive(token))
             {

@@ -14,6 +14,8 @@ internal static class DeckPalette
         "Ox.Card.Background", "Ox.Text.Primary", "Ox.Text.Muted", "Ox.Led.On",
         "Ox.Led.Off", "Ox.Led.Alert", "Ox.Meter.Track", "Ox.Meter.Fill",
         "Ox.Meter.Warning", "Ox.Meter.Hot", "Ox.Meter.WarningLevel", "Ox.Meter.HotLevel",
+        // A segment skin's unlit cells: set, the keys letter their text in segments too.
+        "Ox.Text.Ghost",
     ];
 
     internal static Dictionary<string, object> Read(IResourceDictionary resources)

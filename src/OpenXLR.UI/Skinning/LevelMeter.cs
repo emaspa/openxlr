@@ -45,6 +45,9 @@ public sealed class LevelMeter : Control
     public static readonly StyledProperty<double> SegmentGapProperty =
         AvaloniaProperty.Register<LevelMeter, double>(nameof(SegmentGap), 2);
 
+    public static readonly StyledProperty<double> SegmentWidthProperty =
+        AvaloniaProperty.Register<LevelMeter, double>(nameof(SegmentWidth));
+
     public static readonly StyledProperty<double> GlowProperty =
         AvaloniaProperty.Register<LevelMeter, double>(nameof(Glow));
 
@@ -75,7 +78,7 @@ public sealed class LevelMeter : Control
     static LevelMeter()
     {
         AffectsRender<LevelMeter>(LevelProperty, PresentationProperty, SegmentsProperty,
-            SegmentGapProperty, GlowProperty, TrackProperty, FillProperty, WarningProperty, HotProperty,
+            SegmentGapProperty, SegmentWidthProperty, GlowProperty, TrackProperty, FillProperty, WarningProperty, HotProperty,
             WarningLevelProperty, HotLevelProperty, CornerRadiusProperty, OrientationProperty);
         AffectsMeasure<LevelMeter>(PresentationProperty, OrientationProperty);
     }
@@ -102,6 +105,13 @@ public sealed class LevelMeter : Control
 
     /// <summary>The gap between those cells, in pixels.</summary>
     public double SegmentGap { get => GetValue(SegmentGapProperty); set => SetValue(SegmentGapProperty, value); }
+
+    /// <summary>
+    /// The width of every cell in pixels, or 0 to share the length between
+    /// <see cref="Segments"/> cells. With a width, the meter holds as many
+    /// cells as fit its length, like the fixed pitch of a display tube's bar.
+    /// </summary>
+    public double SegmentWidth { get => GetValue(SegmentWidthProperty); set => SetValue(SegmentWidthProperty, value); }
 
     /// <summary>
     /// How strongly the lit part glows, 0 for none to 1: a halo in each lit
@@ -195,6 +205,22 @@ public sealed class LevelMeter : Control
         double length = Math.Floor(Length(bounds));
         int cells = (int)Math.Clamp(Math.Round(Segments), 2, 64);
         int gap = (int)Math.Round(Math.Clamp(SegmentGap, 0, 8));
+        int pitch = (int)Math.Round(Math.Clamp(SegmentWidth, 0, 16));
+        if (pitch > 0)
+        {
+            // Cells of a fixed width with every gap the same: as many as the
+            // length holds, the few pixels left over split between the two
+            // ends, so no gap is wider than the rest.
+            int fit = (int)((length + gap) / (pitch + gap));
+            if (fit < 2)
+            {
+                Bar(context, bounds, level, warn, hot);
+                return;
+            }
+            double inset = Math.Floor((length - fit * pitch - gap * (fit - 1)) / 2.0);
+            Ladder(context, bounds, level, fit, pitch, i => inset + i * (pitch + gap));
+            return;
+        }
         // Every cell is the same whole number of pixels. The pixels that do
         // not divide evenly go to the gaps, at most one more to a gap and
         // spread along the ladder, so the first cell starts at the quiet edge
@@ -211,6 +237,12 @@ public sealed class LevelMeter : Control
         int spare = (int)(length - cell * cells - gap * (cells - 1));
         double Start(int i) => i * (cell + gap) + Math.Floor((double)i * spare / (cells - 1));
 
+        Ladder(context, bounds, level, cells, cell, Start);
+    }
+
+    /// <summary>A ladder of <paramref name="cells"/> cells, each <paramref name="cell"/> pixels long from <paramref name="start"/>.</summary>
+    private void Ladder(DrawingContext context, Rect bounds, double level, int cells, double cell, Func<int, double> start)
+    {
         // A cell lights when the level reaches its far edge, so a silent meter
         // is dark and a meter at the top is full.
         int on = (int)Math.Ceiling(level * cells - 1e-9);
@@ -218,11 +250,11 @@ public sealed class LevelMeter : Control
         // its green, warning and top zones whether or not they are lit.
         if (Glow > 0)
             for (int i = 0; i < on; i++)
-                Halo(context, ZoneAt((i + 1.0) / cells), Along(bounds, Start(i), Start(i) + cell));
+                Halo(context, ZoneAt((i + 1.0) / cells), Along(bounds, start(i), start(i) + cell));
         for (int i = 0; i < cells; i++)
         {
             IBrush? brush = i < on ? ZoneAt((i + 1.0) / cells) : Track;
-            Draw(context, brush, Along(bounds, Start(i), Start(i) + cell));
+            Draw(context, brush, Along(bounds, start(i), start(i) + cell));
         }
     }
 

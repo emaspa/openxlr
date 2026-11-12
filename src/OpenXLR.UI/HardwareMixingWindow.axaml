@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
@@ -12,7 +13,7 @@
        the one button that switches. Every colour is an Ox.* token through the
        shared text classes. -->
   <DockPanel Margin="16">
-    <TextBlock DockPanel.Dock="Top" Text="{loc:Text Key=HardwareMixingConfirmTitle}" Classes="title" Margin="0,0,0,8"/>
+    <skin:LitText DockPanel.Dock="Top" Text="{loc:Text Key=HardwareMixingConfirmTitle}" Classes="title" Margin="0,0,0,8"/>
     <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
       <TextBlock Name="HardwareMixingConfirmRefusal" Text="{Binding Refusal}" Classes="warn" TextWrapping="Wrap"
                  IsVisible="{Binding Refusal, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>

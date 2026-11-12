@@ -16,7 +16,7 @@ public static class BundledFonts
     public const string CollectionKey = "fonts:OpenXLR";
 
     /// <summary>The families the collection holds, as a skin names them.</summary>
-    public static readonly string[] Families = ["Fira Sans Condensed"];
+    public static readonly string[] Families = ["Fira Sans Condensed", "OpenXLR Segment 7", "OpenXLR Segment 14"];
 
     private static readonly Uri Key = new(CollectionKey, UriKind.Absolute);
 

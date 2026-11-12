@@ -575,6 +575,11 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   three stacked mix banks picked from keys and a typeface the UI carries
   itself. All three open the UI at the size their layout was drawn for. See
   [Skins](skins.md)
+- VFD Amber, VFD Blue and VFD Classic: the whole UI as a vacuum
+  fluorescent display in Broadcast's arrangement. All lettering is in a
+  bundled segment face over its unlit cells, meters are ladders of cells
+  and fader knobs are lit chips. The OpenDeck plugin
+  draws its keys and dial strips as the same display. See [Skins](skins.md)
 - The Wave skin: Broadcast's arrangement on a dark charcoal palette with
   grey faders and green meters. HEADPHONES and MONITOR's toolbar side by
   side above the mix matrix, INPUTS hidden until Arrange mode shows it, and
@@ -1338,11 +1343,11 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   a bezel, a flat or a bevelled mute cap. A meter is coloured by position on
   its scale, so a skin can give it a hi-fi green, amber and red ladder
   without the bar ever repainting itself end to end. What a skin leaves out
-  keeps the shipped default. Twenty-two appearances ship, all compiled into
+  keeps the shipped default. Twenty-five appearances ship, all compiled into
   the application: Material, the classic look, Deck, built from the
   OpenDeck plugin's key and dial art, one for each of the eleven
   Omarchy palettes, two of them light, Nyan Pink, Broadcast, Broadcast Amber,
-  Broadcast Blue, Compact Desk, Wave, Hi-Fi, Hi-Fi Amber and Hi-Fi Classic. The last eight also arrange the UI. Broadcast is the default: a new
+  Broadcast Blue, Compact Desk, Wave, Hi-Fi, Hi-Fi Amber, Hi-Fi Classic, VFD Amber, VFD Blue and VFD Classic. The last eleven also arrange the UI. Broadcast is the default: a new
   install, or one that never picked a skin, starts on it, and a skin the
   user picked, Material included, is kept. The picker is in Options, the
   choice lives in `ui.json` alone, and switching

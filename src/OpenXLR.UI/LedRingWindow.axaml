@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
@@ -14,14 +15,14 @@
     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
       <Slider Name="LedRingBrightness" vm:FaderInput.Step="1" Minimum="0" Maximum="100" Value="{Binding RingBrightness, Mode=TwoWay}"
               AutomationProperties.Name="{loc:Text Key=LedRingBrightness}" ToolTip.Tip="{loc:Text Key=LedRingBrightnessTip}"/>
-      <TextBlock Grid.Column="1" Text="{Binding RingBrightnessText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
+      <skin:LitText Grid.Column="1" Text="{Binding RingBrightnessText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
     </Grid>
 
     <TextBlock Text="{loc:Text Key=LedMeterBrightness}" Classes="h"/>
     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
       <Slider Name="LedMeterBrightness" vm:FaderInput.Step="1" Minimum="0" Maximum="100" Value="{Binding MeterBrightness, Mode=TwoWay}"
               AutomationProperties.Name="{loc:Text Key=LedMeterBrightness}" ToolTip.Tip="{loc:Text Key=LedMeterBrightnessTip}"/>
-      <TextBlock Grid.Column="1" Text="{Binding MeterBrightnessText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
+      <skin:LitText Grid.Column="1" Text="{Binding MeterBrightnessText}" Classes="val" VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
     </Grid>
 
     <!-- each colour: the swatches fill the field, which also takes a colour of the user's own -->

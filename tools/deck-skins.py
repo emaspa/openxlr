@@ -11,7 +11,7 @@ OUTPUT = ROOT / 'plugin/com.emaspa.openxlr.sdPlugin/skin-palettes.json'
 TOKENS = ('Ox.Card.Background', 'Ox.Text.Primary', 'Ox.Text.Muted',
           'Ox.Led.On', 'Ox.Led.Off', 'Ox.Led.Alert', 'Ox.Meter.Track',
           'Ox.Meter.Fill', 'Ox.Meter.Warning', 'Ox.Meter.Hot',
-          'Ox.Meter.WarningLevel', 'Ox.Meter.HotLevel')
+          'Ox.Meter.WarningLevel', 'Ox.Meter.HotLevel', 'Ox.Text.Ghost')
 
 
 def generate():

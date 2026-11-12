@@ -172,6 +172,16 @@
           "$ref": "#/$defs/brush",
           "description": "that button's ring"
         },
+        "Ox.Text.Ghost": {
+          "$ref": "#/$defs/brush",
+          "description": "the unlit cells behind all lettering, for a segment face such as OpenXLR Segment 14: each cell the face draws as a whole is drawn first with every segment in this colour, as a vacuum fluorescent display shows them. Transparent, the default, draws none. On Stream Deck keys a colour here also letters the keys in segments and draws them as a display"
+        },
+        "Ox.Text.LineSpacing": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16,
+          "description": "extra room between the lines of text that wraps, in pixels, for a face whose lettering fills its whole height"
+        },
         "Ox.Text.Primary": {
           "$ref": "#/$defs/brush",
           "description": "names and readouts"
@@ -232,6 +242,12 @@
           "maximum": 40,
           "description": "the UI's own title line"
         },
+        "Ox.Title.VersionFontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 40,
+          "description": "the version number's size where the header stands it beside the title (`\"version\": \"title\"`); unset, it keeps the header's small size"
+        },
         "Ox.Title.FontWeight": {
           "$ref": "#/$defs/fontWeight",
           "description": "that title line"
@@ -245,6 +261,10 @@
           "minimum": 0,
           "maximum": 1,
           "description": "a halo round that title, and that version number, in their own colour, as a backlit legend has; 0 for none"
+        },
+        "Ox.Title.FontFamily": {
+          "$ref": "#/$defs/fontFamily",
+          "description": "the title line's face, and the version number's beside it; unset, it keeps `Ox.Font.Family`"
         },
         "Ox.Strip.FontWeight": {
           "$ref": "#/$defs/fontWeight",
@@ -264,6 +284,10 @@
           "maximum": 1,
           "description": "a halo round that name and icon in their own colour, as a backlit legend has, and round a muted icon in its; 0 for none. A channel the layout colours has none"
         },
+        "Ox.Strip.FontFamily": {
+          "$ref": "#/$defs/fontFamily",
+          "description": "the face of a channel's or mix's name over its strip or row, and of an application's name; unset, it keeps `Ox.Font.Family`"
+        },
         "Ox.Value.FontFamily": {
           "$ref": "#/$defs/fontFamily",
           "description": "the numeric readouts"
@@ -272,9 +296,25 @@
           "$ref": "#/$defs/brush",
           "description": "the numeric readouts' lettering, such as a fader's level or a gain; unset, they keep `Ox.Text.Primary`"
         },
+        "Ox.Value.Glow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "a halo round the numeric readouts in their own colour, as a display's lit segments have; 0 for none"
+        },
+        "Ox.Value.Ghost": {
+          "$ref": "#/$defs/brush",
+          "description": "the unlit cells behind the numeric readouts, for a segment face: each cell the face draws as a whole is drawn first with every segment in this colour; unset, `Ox.Text.Ghost` covers them"
+        },
         "Ox.Font.Family": {
           "$ref": "#/$defs/fontFamily",
           "description": "the font the buttons, labels and dropdowns use"
+        },
+        "Ox.Font.Scale": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1.5,
+          "description": "multiplies every font size the skin and the text size option give, so a wide face such as a segment display's can fit; widths and spacing stay as they are"
         },
         "Ox.Led.On": {
           "$ref": "#/$defs/flatColour",
@@ -342,7 +382,13 @@
           "type": "number",
           "minimum": 0,
           "maximum": 8,
-          "description": "the gap between cells in pixels, `meter: segmented` only. Every cell is the same whole number of pixels; the pixels left over widen some gaps by one"
+          "description": "the gap between cells in pixels, `meter: segmented` only. Every cell is the same whole number of pixels; without `Ox.Meter.SegmentWidth` the pixels left over widen some gaps by one"
+        },
+        "Ox.Meter.SegmentWidth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16,
+          "description": "each cell's width in pixels, `meter: segmented` only, or 0 to share the length between `Ox.Meter.Segments` cells. With a width the meter holds as many cells as fit, every gap is the same, and the few pixels left over go to the two ends"
         },
         "Ox.Meter.Glow": {
           "type": "number",
@@ -920,6 +966,12 @@
           "minimum": 28,
           "maximum": 120,
           "description": "the height of a row: its head and every cell in it; a row whose head stacks a gain over the channel volume, or the **EQ** button over the chain's, is as tall as the two need, never less"
+        },
+        "Ox.Matrix.PhantomLamp": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "whether a row's microphone switches button (**Mic**) shows the phantom power lamp: 1 shows it, 0 hides it. Phantom power is still shown in the button's switches and in Mic setup"
         },
         "Ox.Matrix.MutedBackground": {
           "$ref": "#/$defs/brush",

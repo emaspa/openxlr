@@ -14,9 +14,9 @@ namespace OpenXLR.UI.Skinning;
 /// <summary>
 /// The styles for appearance values that have no default: the faces and
 /// rings a skin may give the keys the UI letters in a lamp colour, the
-/// rings of a muted key and a destructive one, the readouts' lettering, the
-/// colour and halo of the strip names and of the title, and the source chips
-/// drawn as badges.
+/// rings of a muted key and a destructive one, the readouts' lettering,
+/// unlit cells and halo, the face, colour and halo of the strip names and of
+/// the title, and the source chips drawn as badges.
 ///
 /// A style that read an unset token would paint nothing at all rather than
 /// leave the control as it was, and a chip whose theme were read from an
@@ -67,6 +67,11 @@ internal static class SkinOptionalStyles
         Face<Button>("danger"), Face<Button>("danger", ":pointerover"), Face<Button>("danger", ":pressed"),
     ];
     private static readonly Func<Selector?, Selector>[] Readouts = [x => x.OfType<TextBlock>().Class("val")];
+    // Every text block, the lettering the framework makes for a key's or a list's text included.
+    private static readonly Func<Selector?, Selector>[] AllText = [x => x.Is<TextBlock>()];
+    // Text that wraps; spacing on a single line would only make it taller.
+    private static readonly Func<Selector?, Selector>[] WrappedText =
+        [x => x.Is<TextBlock>().PropertyEquals(TextBlock.TextWrappingProperty, TextWrapping.Wrap)];
     // The name and icon over a channel strip or a mix, the icon a text block
     // to a style, and an application's name under Applications.
     private static readonly Func<Selector?, Selector>[] StripNames =
@@ -85,12 +90,17 @@ internal static class SkinOptionalStyles
     /// <summary>The same halo in the muted icon's colour.</summary>
     internal const string MutedGlowKey = "OxSkin.Strip.MutedGlowEffect";
 
+    // The version number when a skin stands it beside the title.
+    private static readonly Func<Selector?, Selector>[] TitleVersion = [x => x.OfType<TextBlock>().Class("titleVersion")];
     // The UI's own title line, and the version number when a skin stands it beside the title.
     private static readonly Func<Selector?, Selector>[] Titles =
         [x => x.OfType<TextBlock>().Class("title"), x => x.OfType<TextBlock>().Class("titleVersion")];
 
     /// <summary>The halo round the title, made from Ox.Title.Glow and its colour.</summary>
     internal const string TitleGlowKey = "OxSkin.Title.GlowEffect";
+
+    /// <summary>The halo round a lit reading, made from Ox.Value.Glow and the readouts' colour.</summary>
+    internal const string ValueGlowKey = "OxSkin.Value.GlowEffect";
     // XLR 1's and XLR 2's binding chips and a capture input's source chip.
     private static readonly Func<Selector?, Selector>[] Chips =
         [x => x.OfType<Button>().Class("bindingChip"), x => x.OfType<Button>().Class("captureChip")];
@@ -105,6 +115,10 @@ internal static class SkinOptionalStyles
         [x => x.OfType<Border>().Class("insertChip").Child().OfType<TextBlock>().Class("insertName")];
     private static readonly Func<Selector?, Selector>[] InsertOffLettering =
         [x => x.OfType<Border>().Class("insertChip").Class("off").Child().OfType<TextBlock>().Class("insertName")];
+
+    // The phantom power lamp on a matrix row's microphone switches button.
+    private static readonly Func<Selector?, Selector>[] PhantomLamp =
+        [x => x.OfType<Button>().Class("matrixProcessing").Descendant().OfType<StatusLed>().Name("MatrixPhantom")];
 
     private static readonly Func<Selector?, Selector>[] DeviceLamp = [x => x.OfType<StatusLed>().Class("deviceLamp")];
     private static readonly Func<Selector?, Selector>[] DisconnectedLettering =
@@ -174,7 +188,30 @@ internal static class SkinOptionalStyles
         Family("Ox.Lit.Background", "Ox.Lit.BackgroundPointerOver", "Ox.Lit.BorderBrush", LitRest, LitActive);
         if (Set("Ox.Mute.BorderBrushChecked") is { } muted) Add(Muted, ContentPresenter.BorderBrushProperty, muted);
         if (Set("Ox.Danger.BorderBrush") is { } danger) Add(Danger, ContentPresenter.BorderBrushProperty, danger);
-        if (Set("Ox.Value.Foreground") is { } value) Add(Readouts, TextBlock.ForegroundProperty, value);
+        Token? value = Set("Ox.Value.Foreground");
+        if (value is not null) Add(Readouts, TextBlock.ForegroundProperty, value);
+        // The unlit cells behind every text block's lettering, then the
+        // readouts' own. A readout, a name and a title are LitText, which
+        // keeps their halo off the cells.
+        // Transparent, the default, is no cells: every text block would
+        // otherwise paint a picture of nothing behind its lettering.
+        if (resources.TryGetValue("Ox.Text.Ghost", out object? unlit) && unlit is ISolidColorBrush { Color.A: > 0 })
+            Add(AllText, LitText.GhostProperty, new Token("Ox.Text.Ghost"));
+        // Room between wrapped lines, for a face whose lettering fills its whole height.
+        if (resources.TryGetValue("Ox.Text.LineSpacing", out object? spacing) && spacing is double between && between > 0)
+            Add(WrappedText, TextBlock.LineSpacingProperty, between);
+        if (Set("Ox.Value.Ghost") is { } ghost) Add(Readouts, LitText.GhostProperty, ghost);
+        if (Glow(resources, "Ox.Value.Glow", value?.Key ?? "Ox.Text.Primary", ValueGlowKey))
+            Add(Readouts, Visual.EffectProperty, new Token(ValueGlowKey));
+        if (Set("Ox.Strip.FontFamily") is { } stripFace) Add(StripNames, TextBlock.FontFamilyProperty, stripFace);
+        if (Set("Ox.Title.FontFamily") is { } titleFace) Add(Titles, TextBlock.FontFamilyProperty, titleFace);
+        if (Set("Ox.Title.VersionFontSize") is { } versionSize)
+        {
+            Add(TitleVersion, TextBlock.FontSizeProperty, versionSize);
+            // Its slot lifts a small number onto the title's baseline; one as
+            // tall as the title already stands on it.
+            Add(TitleVersion, Avalonia.Layout.Layoutable.MarginProperty, new Thickness(0, 0, 0, -3));
+        }
         if (Set("Ox.Strip.Foreground") is { } name) Add(StripNames, TextBlock.ForegroundProperty, name);
         Token? mutedIcon = Set("Ox.Strip.IconMuted");
         if (mutedIcon is not null) Add(MutedIcons, TextBlock.ForegroundProperty, mutedIcon);
@@ -188,6 +225,8 @@ internal static class SkinOptionalStyles
         if (title is not null) Add(Titles, TextBlock.ForegroundProperty, title);
         if (Glow(resources, "Ox.Title.Glow", title?.Key ?? "Ox.Text.Primary", TitleGlowKey))
             Add(Titles, Visual.EffectProperty, new Token(TitleGlowKey));
+        if (resources.TryGetValue("Ox.Matrix.PhantomLamp", out object? phantom) && phantom is 0d)
+            Add(PhantomLamp, Visual.IsVisibleProperty, false);
         if (resources.TryGetValue("Ox.Chip.Theme", out object? chip) && chip is ControlTheme)
         {
             var info = new Token("Ox.Text.Info");

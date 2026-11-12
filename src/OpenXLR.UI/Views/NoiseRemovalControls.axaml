@@ -1,4 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:skin="using:OpenXLR.UI.Skinning"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:OpenXLR.UI"
              xmlns:loc="using:OpenXLR.UI.Localization"
@@ -32,7 +33,7 @@
               Minimum="{Binding MinStrength, FallbackValue=0}" Maximum="{Binding MaxStrength, FallbackValue=100}"
               Value="{Binding Strength, Mode=TwoWay, FallbackValue=100}"
               AutomationProperties.Name="{loc:Text Key=NoiseRemovalStrengthName}" ToolTip.Tip="{loc:Text Key=NoiseRemovalStrengthTip}"/>
-      <TextBlock Grid.Column="2" Text="{Binding StrengthText, FallbackValue=''}" Classes="val" VerticalAlignment="Center"/>
+      <skin:LitText Grid.Column="2" Text="{Binding StrengthText, FallbackValue=''}" Classes="val" VerticalAlignment="Center"/>
     </Grid>
     <TextBlock Name="NoiseStatus" Text="{Binding Status, FallbackValue=''}" Classes="hint" TextWrapping="Wrap"
                IsVisible="{Binding ShowsReport, FallbackValue=False}"/>

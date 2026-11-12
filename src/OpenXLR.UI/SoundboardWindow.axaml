@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:skin="using:OpenXLR.UI.Skinning"
         xmlns:loc="using:OpenXLR.UI.Localization"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenXLR.UI"
@@ -58,7 +59,7 @@
 
   <DockPanel Margin="16">
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,8">
-      <TextBlock Text="{loc:Text Key=Soundboard}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+      <skin:LitText Text="{loc:Text Key=Soundboard}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       <CheckBox Grid.Column="1" Name="SoundboardEnabled" IsChecked="{Binding Enabled, Mode=TwoWay}" VerticalAlignment="Center"
                 IsVisible="{Binding CanImport}"
                 AutomationProperties.Name="{loc:Text Key=SoundboardSwitch}" ToolTip.Tip="{loc:Text Key=SoundboardSwitchTip}">
@@ -86,8 +87,8 @@
                 Value="{Binding Channel.Volume, Mode=TwoWay, FallbackValue=0}"
                 vm:FaderInput.IsAdjusting="{Binding Channel.VolumeAdjusting, Mode=OneWayToSource, FallbackValue=False}"
                 AutomationProperties.Name="{Binding MasterName}" ToolTip.Tip="{Binding MasterHint}"/>
-        <TextBlock Grid.Column="2" Name="SoundboardVolumeText" Text="{Binding Channel.VolumeText, FallbackValue=''}" Classes="val"
-                   VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
+        <skin:LitText Grid.Column="2" Name="SoundboardVolumeText" Text="{Binding Channel.VolumeText, FallbackValue=''}" Classes="val"
+                      VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
       </Grid>
       <TextBlock Name="SoundboardMasterHint" Text="{Binding MasterHint}" Classes="hint" TextWrapping="Wrap"/>
     </StackPanel>

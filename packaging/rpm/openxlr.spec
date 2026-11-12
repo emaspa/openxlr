@@ -205,6 +205,9 @@ install -Dm644 packaging/starter-sounds/CREDITS \
 # Fira Sans Condensed, compiled into the UI for the Hi-Fi skins.
 install -Dm644 src/OpenXLR.UI/Assets/Fonts/OFL.txt \
     %{buildroot}%{_licensedir}/openxlr/fira-sans/OFL.txt
+# OpenXLR Segment 7 and 14, from DSEG, compiled into the UI for the VFD skins.
+install -Dm644 src/OpenXLR.UI/Assets/Fonts/DSEG-OFL.txt \
+    %{buildroot}%{_licensedir}/openxlr/dseg/OFL.txt
 install -Dm644 README.md %{buildroot}%{_docdir}/openxlr/README.md
 
 %post
@@ -228,6 +231,7 @@ MSG
 %license %{_licensedir}/openxlr/vst3/
 %license %{_licensedir}/openxlr/starter-sounds/
 %license %{_licensedir}/openxlr/fira-sans/
+%license %{_licensedir}/openxlr/dseg/
 %doc %{_docdir}/openxlr/README.md
 %{_prefix}/lib/openxlr/
 %{_bindir}/openxlr

@@ -56,6 +56,7 @@ jobs:
         run: |
           python3 tools/deck-skins.py --check
           python3 tools/deck-icons.py --check
+          python3 tools/deck-segments.py --check
           python3 tools/eq-reference.py --check
           python3 tools/starter-sounds.py --check
           python3 tools/omarchy-skins.py --check

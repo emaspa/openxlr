@@ -66,8 +66,8 @@
               <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                <skin:LitText Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
               <!-- what feeds the strip, the interface's jack or another source, and why it is silent -->
               <StackPanel layout:StripPanel.Part="binding" Spacing="2">
@@ -87,7 +87,7 @@
                   <Slider Name="RackGain" vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Main.GainMaxDb}"
                           Value="{Binding Main.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Main.GainLocked}"
                           AutomationProperties.Name="{Binding Main.UnitInput1.GainName}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Main.GainText}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Main.GainText}" Classes="val" VerticalAlignment="Center"/>
                   <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="lock" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding Main.ShowGainLock}"
                                 IsChecked="{Binding Main.GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
@@ -103,7 +103,7 @@
                   <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Channel.Volume, Mode=TwoWay}"
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
@@ -129,7 +129,7 @@
                     <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
                     <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="0" Maximum="100"
                             Value="{Binding Main.VoiceTuneStrength, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=VTStrength}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Main.VoiceTuneStrengthText}" Classes="val" VerticalAlignment="Center"/>
+                    <skin:LitText Grid.Column="2" Text="{Binding Main.VoiceTuneStrengthText}" Classes="val" VerticalAlignment="Center"/>
                   </Grid>
                 </StackPanel>
                 <!-- an additional interface's switches, while this strip carries that interface's input -->
@@ -209,8 +209,8 @@
               <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                <skin:LitText Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
               <!-- what feeds the strip, the interface's jack or another source, and why it is silent -->
               <StackPanel layout:StripPanel.Part="binding" Spacing="2">
@@ -227,7 +227,7 @@
                   <Slider vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Main.GainMaxDb}"
                           Value="{Binding Main.Gain2Db, Mode=TwoWay}" IsEnabled="{Binding !Main.GainLocked}"
                           AutomationProperties.Name="{loc:Text Key=XLR2Gain}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Main.Gain2Text}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Main.Gain2Text}" Classes="val" VerticalAlignment="Center"/>
                 </Grid>
                 <!-- an additional interface's gain, while this strip carries that interface's input -->
                 <Panel IsVisible="{Binding CarriesExtraUnit}">
@@ -239,7 +239,7 @@
                   <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Channel.Volume, Mode=TwoWay}"
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
@@ -264,7 +264,7 @@
                     <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
                     <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="0" Maximum="100"
                             Value="{Binding Main.VoiceTuneStrength2, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=VTStrength}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Main.VoiceTuneStrength2Text}" Classes="val" VerticalAlignment="Center"/>
+                    <skin:LitText Grid.Column="2" Text="{Binding Main.VoiceTuneStrength2Text}" Classes="val" VerticalAlignment="Center"/>
                   </Grid>
                 </StackPanel>
                 <!-- an additional interface's switches, while this strip carries that interface's input -->
@@ -334,8 +334,8 @@
               <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                <skin:LitText Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterL}" AutomationProperties.Name="{Binding LeftLevelName}"/>
@@ -346,8 +346,8 @@
                   <Slider vm:FaderInput.Step="1" Minimum="-60" Maximum="0" Value="{Binding Main.AuxLevelDb, Mode=TwoWay}"
                           AutomationProperties.Name="{loc:Text Key=USBAuxIn}"/>
                   <!-- the level, or the channel's volume while its fader moves and for a second after -->
-                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
-                             AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
+                  <skin:LitText Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
+                                AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
                 </Grid>
                 <!-- the channel's own volume, after the Aux In level -->
                 <Grid Name="RackVolume" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" IsVisible="{Binding ShowsVolume}">
@@ -355,7 +355,7 @@
                           vm:FaderInput.IsAdjusting="{Binding Channel.VolumeAdjusting, Mode=OneWayToSource}"
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
@@ -382,8 +382,8 @@
               <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*">
                 <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                            IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                           TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                <skin:LitText Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                              TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
               </Grid>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterL}" AutomationProperties.Name="{Binding LeftLevelName}"/>
@@ -394,8 +394,8 @@
                   <Slider vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Main.LineInGainMaxDb}" Value="{Binding Main.LineInGainSliderDb, Mode=TwoWay}"
                           AutomationProperties.Name="{loc:Text Key=LineInGain}"/>
                   <!-- the gain, or the channel's volume while its fader moves and for a second after -->
-                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
-                             AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
+                  <skin:LitText Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
+                                AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
                 </Grid>
                 <!-- the channel's own volume, after the Line In gain -->
                 <Grid Name="RackVolume" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" IsVisible="{Binding ShowsVolume}">
@@ -403,7 +403,7 @@
                           vm:FaderInput.IsAdjusting="{Binding Channel.VolumeAdjusting, Mode=OneWayToSource}"
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
@@ -433,8 +433,8 @@
                 <Grid ColumnDefinitions="Auto,*">
                   <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                              IsVisible="{Binding ShowsIcon}" Margin="0,0,6,0" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
-                             TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
+                                TextTrimming="CharacterEllipsis" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
                 </Grid>
                 <!-- the connection line, while the skin leaves the source chip out -->
                 <TextBlock Text="{Binding Channel.CaptureLabel}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextTrimming="CharacterEllipsis"
@@ -458,7 +458,7 @@
                   <Slider Name="RackUnitGain" vm:FaderInput.Step="1" Minimum="0" Maximum="{Binding Unit.GainMaxDb, FallbackValue=80}"
                           Value="{Binding Unit.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
                           AutomationProperties.Name="{Binding Unit.GainName}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Unit.GainText}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Unit.GainText}" Classes="val" VerticalAlignment="Center"/>
                   <ToggleButton Grid.Column="2" Content="{loc:Text Key=Lock}" Classes="lock" FontSize="{DynamicResource UiText.FontSize11}" Padding="8,2"
                                 MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding Unit.ShowGainLock, FallbackValue=False}"
                                 IsChecked="{Binding Main.GainLocked, Mode=TwoWay}" VerticalAlignment="Center"
@@ -475,8 +475,8 @@
                           Value="{Binding Channel.CaptureGainDb, Mode=TwoWay}"
                           AutomationProperties.Name="{Binding Channel.CaptureGainName}" ToolTip.Tip="{Binding Channel.CaptureGainTip}"/>
                   <!-- the gain, or the channel's volume while its fader moves and for a second after -->
-                  <TextBlock Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
-                             AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
+                  <skin:LitText Grid.Column="1" Name="RackGainReadout" Text="{Binding Channel.Readout}" Classes="val" VerticalAlignment="Center" Margin="6,0,0,0"
+                                AutomationProperties.Name="{Binding Channel.ReadoutName}" ToolTip.Tip="{Binding Channel.ReadoutName}"/>
                 </Grid>
                 <!-- the channel's own volume, after the interface's gain; while the Wave XLR Pro's
                      direct path carries this channel to the jacks, a mark says it reaches the mixes only -->
@@ -485,7 +485,7 @@
                           vm:FaderInput.IsAdjusting="{Binding Channel.VolumeAdjusting, Mode=OneWayToSource}"
                           AutomationProperties.Name="{Binding Channel.Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
                           ToolTip.Tip="{Binding Channel.VolumeTip}"/>
-                  <TextBlock Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
+                  <skin:LitText Grid.Column="1" Text="{Binding Channel.VolumeText}" Classes="val" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="2" Name="RackVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                              Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                              AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
@@ -511,7 +511,7 @@
                     <TextBlock Text="{loc:Text Key=VTStrength}" Classes="h" VerticalAlignment="Center"/>
                     <Slider Grid.Column="1" vm:FaderInput.Step="1" Minimum="0" Maximum="100"
                             Value="{Binding Unit.VoiceTuneStrength, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=VTStrength}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding Unit.VoiceTuneStrengthText}" Classes="val" VerticalAlignment="Center"/>
+                    <skin:LitText Grid.Column="2" Text="{Binding Unit.VoiceTuneStrengthText}" Classes="val" VerticalAlignment="Center"/>
                   </Grid>
                 </StackPanel>
                 <!-- an additional interface's switches, while this strip carries that interface's input -->

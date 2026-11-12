@@ -66,9 +66,9 @@
                                     AutomationProperties.Name="{loc:Text Key=StreamState}"
                                     ToolTip.Tip="{Binding StatusText}"/>
                     <views:ApplicationIconView Grid.Column="2" Icon="{Binding Icon}" Label="{Binding Label}"/>
-                    <TextBlock Grid.Column="4" Text="{Binding Label}" Classes="body appName"
-                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                               ToolTip.Tip="{Binding Identity}"/>
+                    <skin:LitText Grid.Column="4" Text="{Binding Label}" Classes="body appName"
+                                  VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                  ToolTip.Tip="{Binding Identity}"/>
                     <ComboBox Grid.Column="5" HorizontalAlignment="Stretch"
                               ItemsSource="{Binding Channels}"
                               SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"

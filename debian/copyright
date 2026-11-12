@@ -79,11 +79,19 @@ Comment: The soundboard's starter sounds, installed in
  /usr/lib/openxlr/daemon/starter-sounds. Their CREDITS names each clip's
  source address, author and the edits made by tools/starter-sounds.py.
 
-Files: src/OpenXLR.UI/Assets/Fonts/*
+Files: src/OpenXLR.UI/Assets/Fonts/FiraSansCondensed-* src/OpenXLR.UI/Assets/Fonts/OFL.txt
 Copyright: 2012-2018 The Mozilla Foundation, Telefonica S.A., Carrois Corporate GbR
  and bBox Type GmbH
 License: OFL-1.1
 Comment: Fira Sans Condensed, compiled into the UI for the Hi-Fi skins.
+
+Files: src/OpenXLR.UI/Assets/Fonts/OpenXLRSegment* src/OpenXLR.UI/Assets/Fonts/DSEG-OFL.txt
+Copyright: 2018 keshikan (http://www.keshikan.net)
+License: OFL-1.1
+Comment: OpenXLR Segment 7 and 14, compiled into the UI for the VFD skins. They
+ are DSEG7 and DSEG14 Classic Italic with the space widened to one cell, the
+ point given a width of its own and an ellipsis added, renamed as the licence
+ requires because "DSEG" is a Reserved Font Name.
 
 License: GPL-3
  This program is free software: you can redistribute it and/or modify
