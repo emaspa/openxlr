@@ -1488,8 +1488,8 @@ on that pair read on the section's capture pair:
 - Whether amount 0 with the bypass clear is dry, or still holds peaks at
   the ceiling.
 - Byte 99 as section 0's mute.
-- The maximizers of sections 0, 36, 54 and 72, measured only through the
-  pattern of section 18's.
+- The maximizers of sections 0, 54 and 72, measured only through the
+  pattern of section 18's. Section 36's ran as OpenXLR drives it (above).
 
 ## 23. The capture taps of XLR 2, USB Aux and Line In (desk probe of 2026-11-11)
 
