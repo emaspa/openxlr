@@ -516,7 +516,7 @@
       },
       "applications": {
         "template": "application-columns",
-        "perColumn": 3
+        "perColumn": 6
       }
     }
   }

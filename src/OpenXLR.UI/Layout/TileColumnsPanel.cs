@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 
 namespace OpenXLR.UI.Layout;
 
@@ -12,6 +13,9 @@ namespace OpenXLR.UI.Layout;
 /// its widest tile. A column that does not fit goes on the next band, whole.
 /// Flexible columns use fewer rows when more columns fit across the panel.
 /// Their tiles share the remaining width up to the skin's limit.
+/// When the columns would not stand side by side, the tiles' names narrow, no
+/// further than <see cref="NameFloor"/>, so that as many columns as they can
+/// make room for stand beside each other instead of on bands below.
 /// </summary>
 public sealed class TileColumnsPanel : Panel
 {
@@ -41,7 +45,41 @@ public sealed class TileColumnsPanel : Panel
         double width = BaseTileWidth > 0 ? Math.Min(availableSize.Width, BaseTileWidth + 8) : availableSize.Width;
         var constraint = new Size(width, double.PositiveInfinity);
         foreach (Control child in Children) child.Measure(constraint);
+        if (Wrap && double.IsFinite(availableSize.Width)) Narrow(availableSize.Width);
         return Place(availableSize.Width, null);
+    }
+
+    /// <summary>The narrowest a tile's name gets to make room for another column.</summary>
+    public const double NameFloor = 64;
+
+    // Remeasures the tiles at the width that puts the most columns side by
+    // side, from all of them down to two, when their names can give up that
+    // much. A tile without a scrolling name has nothing to give up.
+    private void Narrow(double width)
+    {
+        List<Control> shown = Shown();
+        if (shown.Count <= PerColumn) return;
+        double[] slack = [.. shown.Select(child => child.GetVisualDescendants().OfType<ScrollingName>()
+            .Sum(name => Math.Max(0, name.DesiredSize.Width - NameFloor)))];
+        if (slack.All(s => s <= 0)) return;
+        double widest = shown.Max(child => child.DesiredSize.Width);
+        for (int across = (shown.Count - 1) / PerColumn + 1; across >= 2; across--)
+        {
+            double room = Math.Floor(width / across);
+            if (widest <= room) return;
+            if (shown.Where((child, i) => child.DesiredSize.Width - slack[i] > room).Any()) continue;
+            var narrow = new Size(room, double.PositiveInfinity);
+            foreach (Control child in shown) child.Measure(narrow);
+            return;
+        }
+    }
+
+    private List<Control> Shown()
+    {
+        var shown = new List<Control>();
+        foreach (Control child in Children)
+            if (child.IsVisible && child.DesiredSize.Width > 0 && child.DesiredSize.Height > 0) shown.Add(child);
+        return shown;
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -77,9 +115,7 @@ public sealed class TileColumnsPanel : Panel
     // above it instead of spreading its few tiles across the row.
     private Size Place(double width, double? arrange)
     {
-        var shown = new List<Control>();
-        foreach (Control child in Children)
-            if (child.IsVisible && child.DesiredSize.Width > 0 && child.DesiredSize.Height > 0) shown.Add(child);
+        List<Control> shown = Shown();
         int perColumn = PerColumn;
         if (perColumn > 1 && MaxTileWidth > 0 && shown.Count > 1 && double.IsFinite(width))
         {
