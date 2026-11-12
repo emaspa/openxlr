@@ -1598,9 +1598,10 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   device choices, the app registry, enforced defaults, `monitorMuted` (the
   monitoring pause, never part of a profile), `monitorMuteMicrophones` (the
   opt-in microphone pause, also never part of a profile), `routeAppsByDefault`,
-  `preserveBrowserOutputs`, `blockSize` and
-  `browserSiteChannels` (origin-to-channel defaults, all machine settings
-  absent from profiles), the software low
+  `preserveBrowserOutputs`, `blockSize`, `browserSiteChannels`
+  (origin-to-channel defaults), `appVolumes` (each application's saved
+  playback volume) and `browserSiteVolumes` (the tab volume remembered for
+  an origin), all machine settings absent from profiles, the software low
   cut, the insert chains, the microphone EQs (`eq`), noise removal
   (`noiseRemoval`), the voice changer (`voiceChanger`), the compressor
   (`compressor`), the expander (`expander`), where the EQs run

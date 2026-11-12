@@ -224,10 +224,12 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `enforcedDefaultSink` | the output held as the system default, or `@monitor`; `setEnforcedDefaults` and `setMainOutput` write it |
 | `enforcedDefaultSource` | the source held as the system default |
 | `appOverrides` | application identity to remembered channel |
+| `appVolumes` | application identity to the playback volume `setAppVolume` saved for it, 0 to 1 in hundredths, up to 512 entries. An entry the daemon cannot use is dropped. Machine settings, never in a profile |
 | `routeAppsByDefault` | apply name rules to applications without an explicit assignment; true when absent. False leaves them not managed. Explicit assignments still win. Machine setting, never recalled by a profile |
 | `blockSize` | the quantum forced on OpenXLR's graph in frames, 256, 512 or 1024; absent leaves it to PipeWire. Another value is dropped on load. Machine setting, never recalled by a profile; [API behaviour](api.md#block-size) |
 | `preserveBrowserOutputs` | leave recognized Chromium playback on its browser/desktop-selected output; false when absent. Machine setting, never recalled by a profile |
 | `browserSiteChannels` | up to 128 canonical HTTP(S) origins to application channel ids for the optional [browser companion](browser-routing.md). Deleting a channel moves its defaults to the fallback application channel; unknown channels in loaded settings are discarded. Machine settings only; live tab titles, ids and sessions are not saved |
+| `browserSiteVolumes` | up to 128 canonical HTTP(S) origins to the playback volume remembered for their routed tabs, 0 to 1 in hundredths; `setBrowserTabVolume` with `remember` writes it. Machine settings, never in a profile |
 | `knownApps` | `{identity, label, channelId}` for every application seen |
 | `lowCutHz` | the software low cut, 0, 80 or 120 |
 | `softClipGuard` | the software ClipGuard |
@@ -240,14 +242,16 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `compressor` | channel id to `{enabled, threshold, ratio, attack, release, knee, makeup}`, the microphone's [compressor](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
 | `expander` | channel id to `{enabled, threshold, ratio, range, attack, release, hold}`, the microphone's [expander](api.md#compressor-and-expander) on this computer; a microphone absent here has it off |
 | `eqProcessing` | channel id to `device` or `software`, where that microphone's EQ runs; machine wiring, never in a profile |
+| `dynamicsProcessing` | channel id to `device` or `software`, where that microphone's compressor and expander run; machine wiring, never in a profile |
 | `hardwareRestore` | `"18"` and `"54"` to 32 hex digits: the first 16 bytes of that section of the Wave XLR Pro's block 0x0001 as they were before a second or third jack feed first used it. The daemon writes them back and drops the entry once no jack plays that section. Any other section or length is dropped with a note; machine wiring, never in a profile |
 | `mixing` | `software` (the default) or `hardware`: where the mixes the Wave XLR Pro's jacks play are built, see [hardware mixing](api.md#hardware-mixing). Any other value is read as `software` with a note; machine wiring, never in a profile |
 | `hardwarePairs` | channel id to the USB playback pair it streams on in hardware mixing: 0 to 7. Pair 5 is a channel pair like the others in the mode, where the unit builds the Aux mix itself. An entry with another pair, or a pair an earlier entry holds, is dropped with a note. Kept across restarts and layout edits; machine wiring, never in a profile |
 | `hardwareSections` | feed (`monitor`, `monitor+monitor2`) to the section of the Wave XLR Pro's block 0x0001 it takes in hardware mixing: 0, 18 or 54. The Aux mix always takes section 36 and is not kept here. Checked like `hardwarePairs` |
 | `hardwareEntry` | while hardware mixing runs or is being left: `{section0, section36, section0Level, jacks, offsets, outputVolume, leaving}`, what the unit held before the mode (sections 0 and 36 as 32 hex digits, byte 98) and the mode's own levels (each jack's base in dB, how far each jack was lowered on entry, which leaving gives back, and the jacks' output volume). Absent otherwise. One that does not read is dropped whole with a note; machine wiring, never in a profile |
+| `mixMaximizer` | mix id to the Wave XLR Pro's maximizer amount, 1 to 100, which runs while [hardware mixing](api.md#hardware-mixing) builds the mix alone in a section. A mix absent here has it off, and an amount out of range is dropped. Never in a profile |
 | `compensateMixLatency` | the latency compensation switch across mixes, see [api.md](api.md) |
 | `exclusiveGroups` | exclusive channel groups, see [Exclusive groups](#exclusive-groups) |
-| `ducking` | the [ducking](api.md#ducking) setup, `{enabled, key, channels, mixes, sensitivity, amount, speed, processing}`; absent takes the defaults, off, and the next save writes them; one without `mixes` lowers in the default monitor mix. Unknown ids are dropped and an unknown preset or processing word is reset to its default, each with a note |
+| `ducking` | the [ducking](api.md#ducking) setup, `{enabled, keys, channels, mixes, sensitivity, amount, speed, processing}`, with one to eight `keys`; a file from before several keys holds `key`, one channel id, which loads as that one key. Absent takes the defaults, off, and the next save writes them; one without `mixes` lowers in the default monitor mix. Unknown ids are dropped and an unknown preset or processing word is reset to its default, each with a note |
 
 The microphone `eq` tables keep their band count, from one to sixteen. The
 four-band default is unchanged; a profile also retains the full table. A
@@ -345,8 +349,9 @@ debounced, retried behaviour.
 
 Every edit keeps the [ducking](api.md#ducking) setup in step in the same
 save: a deleted channel leaves `ducking.channels`, a deleted mix leaves
-`ducking.mixes`, and deleting the key channel turns ducking off and resets
-the key to `xlr1`. A new channel or mix is not added to the setup; a new
+`ducking.mixes`, and a deleted key leaves `ducking.keys`; deleting the last
+key turns ducking off and resets the keys to `xlr1`. A new channel or mix
+is not added to the setup; a new
 channel starts muted in every mix anyway. A rename keeps the id, so the
 setup is unchanged.
 
