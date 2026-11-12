@@ -38,10 +38,13 @@ Wave XLR Pro:
   paths and mixes keep the processed signal. The microphone's EQ,
   compressor and expander then run on this computer. Held per input and
   written again at each connect
-  ([manual](manual.md#raw-capture), [api.md](api.md#raw-capture)); the
-  register was measured on the desk unit, the feature not yet run there
+  ([manual](manual.md#raw-capture), [api.md](api.md#raw-capture));
+  checked on the desk unit on XLR 1, and on XLR 2 and Line In by their
+  bytes only ([hardware-support.md](hardware-support.md#wave-xlr-pro-0fd900b4))
 - Both headphone outputs: independent volumes, low-impedance mode
-- Mic/PC direct-monitor crossfade (inside the device, no host latency)
+- A zero-latency path from each XLR input to the headphone jacks, inside
+  the device, which follows that microphone's send in the Monitor mix.
+  The Pro has no Mic/PC crossfade
 - Physical output routing: Headphones 1, Headphones 2, Line Out and USB
   Aux are each switched in the device's hardware mixer
 - Hardware mixing (experimental, heard on one unit with Headphones 1 and
@@ -58,9 +61,10 @@ Wave XLR Pro:
   100 on each mix the unit builds alone, about 0.2 dB of make-up gain a
   step against a ceiling near -1 dBFS, with its reduction as a meter. The
   **Max** button on the mix's master, the terminal mixer's Outputs tab and
-  `setMixMaximizer` set it ([manual](manual.md#pro-maximizer)); not yet
-  heard on a unit as OpenXLR drives it
-- Ducking on the device, mapped from Wave Link on Windows: when the
+  `setMixMaximizer` set it ([manual](manual.md#pro-maximizer)); measured
+  on the desk unit as OpenXLR drives it, on the Aux mix's capture
+- Ducking on the device, mapped from USB captures of Wave Link on
+  Windows: when the
   [ducking](#submixer) setup fits what the unit can do (every key one of
   its inputs, XLR 1, XLR 2, USB Aux or Line In, and a whole mix on the
   jacks and Line Out or on the USB Aux port), the Pro
@@ -70,9 +74,11 @@ Wave XLR Pro:
   mixing, where the unit builds the jacks' mixes from a USB pair per
   channel, it ducks each chosen channel on its own, its own inputs
   included. Any of its inputs or any channel on a USB pair can be a key
-  there, and this computer ducks the mixes it builds alongside. Nobody has
-  yet heard the unit duck with a key other than XLR 1, or lower its own
-  inputs
+  there, and this computer ducks the mixes it builds alongside. On the
+  desk unit XLR 1 and XLR 2 ran as keys together in hardware mixing; a
+  channel on a USB pair as a key is not yet run on a unit, and the unit's
+  own inputs as lowered channels were checked by their bytes
+  ([hardware-support.md](hardware-support.md#wave-xlr-pro-0fd900b4))
 
 Wave XLR MK.2 and XLR Dock MK.2: gain, mute, phantom power, low cut,
 expander, voice tune with strength, ClipGuard, compressor, headphone
@@ -552,7 +558,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
 - The Broadcast skin, shipped with the application: the submixer as a mix
   matrix across the UI, HEADPHONES and MONITOR's toolbar side by side
   above it, INPUTS hidden until Arrange mode shows it, and APPLICATIONS
-  in columns of four under the matrix, on a dark neutral palette. It is the complete example
+  in columns of four under the matrix, on a dark neutral palette. It opens
+  the UI at 1224 by 1141. It is the complete example
   of a layout skin, and a copy to start from is in `docs/examples/skins`.
   See [Broadcast](manual.md#broadcast)
 - Compact Desk: a dark matrix skin with a bounded headphone column, a
@@ -1054,7 +1061,7 @@ restoration (Wave XLR, the first XLR Dock) get their last settings back
 on every fresh connect without a profile, and can be reset to the
 firmware defaults recorded after a power cycle. The Wave XLR Pro, which
 keeps its own settings, can be reset to OpenXLR's baseline instead:
-gain 30 dB, everything off, levels at half, the crossfade on PC. With no
+gain 30 dB, everything off, levels at half. With no
 Elgato device connected, profiles are kept under `generic` and hold the
 mixer scene alone, and recall on connect does not apply. App routing and the
 enforced system defaults are global and not part of a profile, so

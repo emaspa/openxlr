@@ -18,8 +18,8 @@ keeps working when sections are renumbered.
 ## 1. First run
 
 Start with [Getting started](getting-started.md) for the installation and
-first audio checks. The **Welcome guide** opens when the mixer window is
-first shown with a fresh UI configuration. It covers the microphone,
+first audio checks. The **Welcome guide** opens when the UI is
+first shown with a fresh configuration. It covers the microphone,
 monitoring, application routing, mixes, virtual microphones, processing,
 profiles, appearance, startup and support. Its shortcuts open the relevant mixer section, or the Options tab
 and card. The Monitor and docked submixer shortcuts unfold their sections
@@ -149,7 +149,7 @@ Audio → INTERFACE has **Recover microphone** for a stall it misses
 On the Wave XLR MK.2 and the XLR Dock MK.2 with firmware 1.0.15 or
 later, OpenXLR up to 0.6.5 did not turn ClipGuard off: the switch set the
 unit's gain lock, the one Wave Link offers, and ClipGuard stayed on.
-A newer release clears that lock when it connects to the unit, unless
+From 0.7.0 OpenXLR clears that lock when it connects to the unit, unless
 OpenXLR's own gain lock is on. Older firmware is not affected.
 
 If you only want hardware control and no mixer, turn off "Enable software
@@ -989,9 +989,10 @@ computer at the same time. The amount and speed are the same everywhere,
 and the reduction meter shows the deeper of the two.
 
 Keys other than XLR 1, and the unit's own inputs on the channel list, come
-from Wave Link captures, and nobody has heard them on a unit yet. Aux In
-and Line In as lowered channels are the least certain, since no capture
-shows them.
+from Wave Link captures. On one unit XLR 1 and XLR 2 ran as keys together
+in hardware mixing and the dip was heard; a channel on a USB pair as a key
+has not run on a unit yet. Aux In and Line In as lowered channels are the
+least certain, since no capture shows them.
 
 On the Pro, OpenXLR writes the setting every time the unit connects, which
 clears any ducking Wave Link left on it, extra keys included. On a unit
@@ -3255,7 +3256,7 @@ Options, APPEARANCE, **Mixer view** chooses how the SUBMIXER card is drawn:
 In a narrow UI, MONITOR puts the device picker above the volume row
 so both remain usable. Long device names shorten with an ellipsis; hover
 over the picker to read its full summary. In the Compact Desk, Wave and
-Nyan Pink skins, a wider main window gives the matrix and classic mixer
+Nyan Pink skins, a wider UI gives the matrix and classic mixer
 tiles more room, and application chips and columns move more tiles side by
 side. Their input, headphone and monitor faders stop at a maximum track
 width so the readouts stay close to the controls. These rules use logical
@@ -3508,7 +3509,7 @@ list for a narrow column or in columns, and open the submixer in its own window 
 first time you put it on (see [Separate mixer window](#separate-mixer-window)).
 
 Under the skin picker, one line says what the chosen skin does to the
-UI's arrangement, for example "This skin arranges the window: a grid,
+UI's arrangement, for example "This skin arranges the UI: a grid,
 an input rack, 2 mix banks." A skin without a layout keeps the usual
 arrangement. The next line says where the submixer goes: where you last
 put it, or, while you have not chosen, what the skin does with it.
@@ -5248,7 +5249,8 @@ settings. See
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference and the added plugin folders |
 | `~/.config/openxlr/active-device.json` | the interface picked last in the header, driven again after a restart |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
-| `~/.config/openxlr/leds.json` | the LED ring set from OpenXLR on a Wave XLR MK.2, written back each time it connects `~/.config/openxlr/rawcapture.json` | the inputs each interface sends to the computer before its own processing ([Raw capture](#raw-capture)) |
+| `~/.config/openxlr/leds.json` | the LED ring set from OpenXLR on a Wave XLR MK.2, written back each time it connects |
+| `~/.config/openxlr/rawcapture.json` | the inputs each interface sends to the computer before its own processing ([Raw capture](#raw-capture)) |
 | `~/.config/openxlr/soundboard.json` | the soundboard's clip library and whether it is on, written by the daemon ([api.md](api.md#soundboard)) |
 | `~/.local/share/openxlr/soundboard/` | the soundboard's clips, copied in when imported |
 | `~/.config/openxlr/wave-interfaces.json` | the units driven as additional interfaces, by instance id ([Multiple Wave interfaces](wave-interfaces.md)) |
