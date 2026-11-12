@@ -2359,9 +2359,6 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>La scelta del banco vale finché la finestra non si chiude, ma non è stato possibile salvarla: {0}</value>
   </data>
-  <data name="PlaybackVolumeShort" xml:space="preserve">
-    <value>Vol.</value>
-  </data>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Volume di riproduzione</value>
   </data>

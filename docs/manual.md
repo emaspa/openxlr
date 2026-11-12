@@ -1123,8 +1123,9 @@ routing. A remembered routing change is sent when you choose a different
 channel. When the mixer stops supplying an app list, both the APPLICATIONS
 card and the Manage list clear their stale entries.
 
-Select **Vol.** or the percentage beside a program's channel picker to
-adjust its playback volume from 0 to 100%. The same control in **Manage**
+Select the volume button beside a program's channel picker to adjust its
+playback volume from 0 to 100%. The button shows a speaker at full volume
+and the level below it. The same control in **Manage**
 works for remembered programs that are closed. OpenXLR uses the playback
 streams published through PipeWire. Audio that bypasses PipeWire does not
 appear here. This level applies to the

@@ -2391,9 +2391,6 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="BankChoiceNotSaved" xml:space="preserve">
     <value>Die Auswahl der Bänke gilt bis zum Schließen des Fensters, konnte aber nicht gespeichert werden: {0}</value>
   </data>
-  <data name="PlaybackVolumeShort" xml:space="preserve">
-    <value>Pegel</value>
-  </data>
   <data name="PlaybackVolume" xml:space="preserve">
     <value>Wiedergabelautstärke</value>
   </data>
