@@ -35,20 +35,19 @@ public sealed class DaemonUpgradeTests : IDisposable
     }
 
     [Fact]
-    public async Task AMissingSocketWithTheLockHeldIsAnOlderDaemonAndTheProbeLeavesTheLockAlone()
+    public async Task ADaemonOfThisReleaseThatIsRestartingIsNotAnOlderDaemon()
     {
-        using (FileStream? held = DaemonLock.TryAcquire(Lock))
-        {
-            Assert.NotNull(held);
-            Assert.Equal(DaemonPresence.OlderDaemon, await DaemonProbe.ProbeAsync(Socket, Lock, ClosedPort()));
-            // The probe took nothing: the holder still excludes a second daemon.
-            Assert.True(DaemonProbe.LockHeld(Lock));
-            Assert.Null(DaemonLock.TryAcquire(Lock));
-        }
-        Assert.Equal(DaemonPresence.NotRunning, await DaemonProbe.ProbeAsync(Socket, Lock, ClosedPort()));
-        // Nor does a probe keep a lock of its own afterwards.
-        using FileStream? next = DaemonLock.TryAcquire(Lock);
-        Assert.NotNull(next);
+        // Between taking the lock and starting its mixer and devices, a
+        // daemon of this release has bound its socket but does not accept.
+        // Shutting down, it stops accepting and holds the lock for seconds.
+        using FileStream? held = DaemonLock.TryAcquire(Lock);
+        Assert.NotNull(held);
+        using var listener = ControlSocketListener.Bind(Socket);
+        Assert.Equal(DaemonPresence.NotRunning, await DaemonProbe.ProbeAsync(Socket, ClosedPort()));
+        File.Delete(Socket);
+        Assert.Equal(DaemonPresence.NotRunning, await DaemonProbe.ProbeAsync(Socket, ClosedPort()));
+        // The probe took nothing: the holder still excludes a second daemon.
+        Assert.Null(DaemonLock.TryAcquire(Lock));
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public sealed class DaemonUpgradeTests : IDisposable
         try
         {
             Task<System.Net.Sockets.Socket> accepted = old.AcceptSocketAsync();
-            Assert.Equal(DaemonPresence.OlderDaemon, await DaemonProbe.ProbeAsync(Socket, Lock, port));
+            Assert.Equal(DaemonPresence.OlderDaemon, await DaemonProbe.ProbeAsync(Socket, port));
             using System.Net.Sockets.Socket peer = await accepted.WaitAsync(TimeSpan.FromSeconds(5));
             // A bare connect: the probe closed it without sending a byte.
             var buffer = new byte[16];
@@ -68,7 +67,7 @@ public sealed class DaemonUpgradeTests : IDisposable
             Assert.Equal(0, await peer.ReceiveAsync(buffer, SocketFlags.None, timeout.Token));
         }
         finally { old.Stop(); }
-        Assert.Equal(DaemonPresence.NotRunning, await DaemonProbe.ProbeAsync(Socket, Lock, port));
+        Assert.Equal(DaemonPresence.NotRunning, await DaemonProbe.ProbeAsync(Socket, port));
     }
 
     [Fact]
@@ -77,29 +76,18 @@ public sealed class DaemonUpgradeTests : IDisposable
         using (var dead = new System.Net.Sockets.Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified))
             dead.Bind(new UnixDomainSocketEndPoint(Socket));
         File.WriteAllText(Lock, "");
-        Assert.Equal(DaemonPresence.NotRunning, await DaemonProbe.ProbeAsync(Socket, Lock, ClosedPort()));
+        Assert.Equal(DaemonPresence.NotRunning, await DaemonProbe.ProbeAsync(Socket, ClosedPort()));
         File.Delete(Socket);
         using var listener = ControlSocketListener.Bind(Socket);
         listener.Socket.Listen(4);
-        Assert.Equal(DaemonPresence.Reachable, await DaemonProbe.ProbeAsync(Socket, Lock, ClosedPort()));
-    }
-
-    [Fact]
-    public async Task ADaemonThatHasJustTakenTheLockIsGivenTimeToBindItsSocket()
-    {
-        using FileStream? held = DaemonLock.TryAcquire(Lock);
-        Assert.NotNull(held);
-        Task<DaemonPresence> probe = DaemonProbe.ProbeAsync(Socket, Lock, ClosedPort());
-        await Task.Delay(50);
-        using var listener = ControlSocketListener.Bind(Socket);
-        listener.Socket.Listen(4);
-        Assert.Equal(DaemonPresence.Reachable, await probe);
+        Assert.Equal(DaemonPresence.Reachable, await DaemonProbe.ProbeAsync(Socket, ClosedPort()));
     }
 
     [Fact]
     public async Task ADaemonStartingDuringAProbeStillTakesTheLock()
     {
-        // The probe's shared lock, held across the daemon's first attempt.
+        // The shared lock of a client from 0.3.0 to 0.7.1, held across the
+        // daemon's first attempt.
         SafeFileHandle probe = File.OpenHandle(Lock, FileMode.OpenOrCreate, FileAccess.Read, FileShare.ReadWrite);
         Task release = Task.Run(async () => { await Task.Delay(60); probe.Dispose(); });
         using FileStream? daemon = DaemonLock.TryAcquire(Lock);
@@ -165,7 +153,7 @@ public sealed class DaemonUpgradeTests : IDisposable
     }
 
     [Fact]
-    public async Task TheInstalledAdapterNamesTheRestartWhileAnOlderDaemonHoldsTheLock()
+    public async Task TheInstalledAdapterReportsNoDaemonWhileOneHoldsTheLockWithoutAccepting()
     {
         string? runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", _directory);
@@ -181,11 +169,11 @@ public sealed class DaemonUpgradeTests : IDisposable
             Assert.Equal(1, result.ExitCode);
             JsonNode line = JsonNode.Parse(result.StdoutText.Trim())!;
             Assert.Equal("controlError", line["type"]!.GetValue<string>());
-            Assert.Equal("olderDaemon", line["reason"]!.GetValue<string>());
-            Assert.EndsWith("Restart it: systemctl --user restart openxlr-daemon", line["message"]!.GetValue<string>());
-            Assert.Contains("before the update", result.Stderr);
-            // The adapter is a client: it left the older daemon's lock alone.
-            Assert.True(DaemonProbe.LockHeld(DaemonLock.Path));
+            Assert.Equal("notRunning", line["reason"]!.GetValue<string>());
+            Assert.Equal("The OpenXLR daemon is not running.", line["message"]!.GetValue<string>());
+            Assert.DoesNotContain("before the update", result.Stderr);
+            // The adapter is a client: it left the daemon's lock alone.
+            Assert.Null(DaemonLock.TryAcquire());
         }
         finally { Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", runtime); }
     }

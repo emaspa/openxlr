@@ -14,9 +14,9 @@ public static class DaemonLock
     public static string Path => OpenXlrPaths.DaemonLockPath;
 
     /// <summary>
-    /// How long contention is retried. A client that cannot reach the control
-    /// socket tests the lock with a shared lock it drops at once (see
-    /// DaemonProbe); a daemon starting in that instant waits it out instead of
+    /// How long contention is retried. Clients from 0.3.0 to 0.7.1 that cannot
+    /// reach the control socket test the lock with a shared lock they drop at
+    /// once; a daemon starting in that instant waits it out instead of
     /// reporting another daemon.
     /// </summary>
     internal static readonly TimeSpan ContentionGrace = TimeSpan.FromMilliseconds(200);
