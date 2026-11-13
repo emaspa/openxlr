@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.7.0
+Version: 0.7.1
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -254,6 +254,12 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Fri Nov 13 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.7.1-1
+- Skins: Broadcast Amber and Broadcast Blue
+- Skins: VFD Amber, VFD Blue and VFD Classic, with the OpenXLR Segment fonts
+- Deck: keys and dial strips drawn as a display on the VFD skins
+- Docs: README, roadmap, features and manual brought to 0.7.0
+
 * Thu Nov 12 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.7.0-1
 - Mixer: playback volume for each application, remembered per program
 - Browser: playback volume for routed tabs, per tab or per website

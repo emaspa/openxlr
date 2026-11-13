@@ -1,3 +1,12 @@
+openxlr (0.7.1) resolute; urgency=medium
+
+  * Skins: Broadcast Amber and Broadcast Blue
+  * Skins: VFD Amber, VFD Blue and VFD Classic, with the OpenXLR Segment fonts
+  * Deck: keys and dial strips drawn as a display on the VFD skins
+  * Docs: README, roadmap, features and manual brought to 0.7.0
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Fri, 13 Nov 2026 04:54:10 +0000
+
 openxlr (0.7.0) resolute; urgency=medium
 
   * Mixer: playback volume for each application, remembered per program
