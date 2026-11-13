@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Win32.SafeHandles;
 
 #if OPENXLR_UI
 namespace OpenXLR.UI;
@@ -24,11 +23,14 @@ enum DaemonPresence
 {
     /// <summary>The control socket accepted this user's connection.</summary>
     Reachable,
-    /// <summary>No daemon holds the lock and nothing answers on the old port.</summary>
+    /// <summary>
+    /// Neither the socket nor the old port answered: no daemon, or one of
+    /// this release that is starting or stopping.
+    /// </summary>
     NotRunning,
     /// <summary>
-    /// A daemon is alive but does not serve the control socket: in practice
-    /// one from before the update, which listens on the loopback port.
+    /// The loopback port of the releases before the control socket answered:
+    /// a daemon from before the update.
     /// </summary>
     OlderDaemon,
     /// <summary>The control socket answered for another user and was refused.</summary>
@@ -40,16 +42,16 @@ enum DaemonPresence
 /// say what to do. Packages do not restart a running daemon, so after an
 /// upgrade the old daemon still runs, listening only on the loopback port.
 ///
-/// Two signals say a daemon is alive. The single-instance lock comes first:
-/// every release since 2026-09 takes it at the same path, which the Flatpak
-/// shares with the host (xdg-run/openxlr), so it works for native, Flatpak and
-/// source installs alike. It is a flock, and Linux has no way to test one
-/// without taking it (F_GETLK does not see flock locks, and /proc/locks hides
-/// holders in another PID namespace, such as a Flatpak instance), so the probe
-/// takes a shared lock and drops it at once; DaemonLock.TryAcquire retries
-/// contention briefly so a daemon starting in that instant is not turned away.
-/// The loopback port of the older releases is the second signal. Only a bare
-/// TCP connect is made there; nothing is sent.
+/// That port is the one sign of an older daemon: every release before the
+/// control socket listened on it, and no later one does. Only a bare TCP
+/// connect is made there; nothing is sent. The Flatpak shares the host's
+/// network, so the port answers across the sandbox as well.
+///
+/// The single-instance lock is no such sign. A daemon of this release holds
+/// it while its socket is not accepting: from the moment it starts until the
+/// mixer and devices are up, which takes seconds, and from the moment it
+/// stops accepting while it shuts down. A probe in either window during a
+/// restart would call it older, so the probe leaves the lock alone.
 /// </summary>
 #if OPENXLR_UI || OPENXLR_TUI
 internal
@@ -61,23 +63,11 @@ static class DaemonProbe
     /// <summary>The loopback port the releases before the control socket listened on.</summary>
     public const int LegacyPort = 37890;
 
-    /// <summary>How long a daemon that has just taken the lock gets to bind its socket.</summary>
-    internal static readonly TimeSpan StartupGrace = TimeSpan.FromMilliseconds(250);
-
-    public static async Task<DaemonPresence> ProbeAsync(string? socketPath = null, string? lockPath = null,
-        int legacyPort = LegacyPort, CancellationToken cancel = default)
+    public static async Task<DaemonPresence> ProbeAsync(string? socketPath = null, int legacyPort = LegacyPort,
+        CancellationToken cancel = default)
     {
         socketPath ??= OpenXlrPaths.ControlSocketPath;
-        lockPath ??= OpenXlrPaths.DaemonLockPath;
         if (await SocketAsync(socketPath, cancel).ConfigureAwait(false) is { } answered) return answered;
-        if (LockHeld(lockPath))
-        {
-            // A daemon of this release binds its socket right after taking
-            // the lock. Give one that is starting now the moment it needs.
-            await Task.Delay(StartupGrace, cancel).ConfigureAwait(false);
-            if (await SocketAsync(socketPath, cancel).ConfigureAwait(false) is { } late) return late;
-            return LockHeld(lockPath) ? DaemonPresence.OlderDaemon : DaemonPresence.NotRunning;
-        }
         return await LegacyPortAnswersAsync(legacyPort, cancel).ConfigureAwait(false)
             ? DaemonPresence.OlderDaemon : DaemonPresence.NotRunning;
     }
@@ -122,25 +112,6 @@ static class DaemonProbe
         catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AccessDenied) { return DaemonPresence.OtherUser; }
         catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException or ArgumentException
             && !cancel.IsCancellationRequested) { return null; }
-    }
-
-    /// <summary>
-    /// Whether another process holds the daemon lock. The shared lock taken
-    /// here conflicts only with the daemon's exclusive one and is released
-    /// before this returns. .NET opens a read-only FileStream with
-    /// flock(LOCK_SH | LOCK_NB), the same call family as the daemon's
-    /// FileShare.None, and reports EWOULDBLOCK as an IOException.
-    /// </summary>
-    internal static bool LockHeld(string path)
-    {
-        if (!OperatingSystem.IsLinux()) return false;
-        try
-        {
-            using SafeFileHandle handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            return false;
-        }
-        catch (IOException ex) when ((ex.HResult & 0xffff) is 11 or 32) { return true; }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
     }
 
     private static async Task<bool> LegacyPortAnswersAsync(int port, CancellationToken cancel)

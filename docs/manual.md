@@ -3633,10 +3633,15 @@ Releases before 0.3.0 served their clients on a loopback port with a
 token. Since 0.3.0 the daemon uses a private Unix socket instead, authenticated by
 Linux peer credentials ([section 6](#files)), so the new UI cannot talk to
 the old daemon at all. It still recognises one, because the old daemon
-holds the same single-instance lock and answers on its old port. The header then reads
+answers on its old port. The header then reads
 "Older daemon running" instead of "Daemon not running", and the banner says
 that a daemon from before the update is still running and this UI cannot
 connect to it.
+
+While the daemon restarts, the header reads "Daemon not running" for a few
+seconds. The daemon stops accepting connections before it takes the mixer
+down, and on start it accepts them only once the mixer and devices are up.
+The UI connects as soon as it does.
 
 Restart daemon in the banner does the same as the header's button. It
 restarts the `openxlr-daemon` user service; in the Flatpak it restarts the

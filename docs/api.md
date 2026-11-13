@@ -20,14 +20,15 @@ port cannot connect.
 
 A client that cannot reach the socket can tell why. A daemon from before
 the socket keeps running after an upgrade and serves only
-`127.0.0.1:37890`. It still holds `daemon.lock` in the same directory, an
-exclusive `flock`. The bundled clients test the lock with a shared,
-non-blocking `flock` that they release at once, and the daemon retries its
-own lock for 200 ms so a probe never turns a starting daemon away. A held
-lock with no socket is checked again after 250 ms, time enough for a
-starting daemon to bind its socket. If the lock is free they make a bare TCP connect to the old port and send nothing.
-Either sign means a daemon from before the update that must be restarted;
-neither means no daemon is running.
+`127.0.0.1:37890`. The bundled clients make a bare TCP connect to that port
+and send nothing. An answer means a daemon from before the update that must
+be restarted. No answer means no daemon is running, or one of this release
+is starting or stopping: it holds `daemon.lock` for its whole life but
+accepts on the socket only once its mixer and devices are up, which takes
+seconds, and stops accepting before it shuts them down. Clients from 0.3.0
+to 0.7.1 took the held lock as the sign of an older daemon and named one
+during every restart; the daemon still retries its own lock for 200 ms so
+their shared probe never turns a starting daemon away.
 
 A toolkit without Unix WebSocket support can run
 `openxlr-control`. This launcher is only a client: it starts no

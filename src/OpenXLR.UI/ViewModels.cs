@@ -125,8 +125,9 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private bool _olderDaemonRunning;
     /// <summary>
-    /// The control socket did not answer while a daemon is alive: one from
-    /// before the update, which only a restart replaces.
+    /// The control socket did not answer and the loopback port of the releases
+    /// before it did: a daemon from before the update, which only a restart
+    /// replaces. A daemon of this release that is restarting is not one.
     /// </summary>
     public bool OlderDaemonRunning
     {
