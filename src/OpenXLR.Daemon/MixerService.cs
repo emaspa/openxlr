@@ -737,6 +737,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
         // once, not at the next sweep, so a key lights and goes dark with it.
         try { if (_mixer.SoundboardActivityChanged()) Changed?.Invoke(); }
         catch (Exception ex) { _log.LogDebug("soundboard activity: {msg}", ex.Message); }
+        // A Bluetooth output left unlinked while its feed was silent is linked
+        // as soon as the feed has sound, not at the next sweep.
+        try { if (_mixer.WakeIdleOutputs()) Changed?.Invoke(); }
+        catch (Exception ex) { _log.LogDebug("idle output wake: {msg}", ex.Message); }
     }
 
     /// <summary>Raised at the meter refresh rate so the hub can push levels.</summary>

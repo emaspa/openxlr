@@ -87,6 +87,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     public Mixer(PipeWireAdapter? adapter = null)
     {
         _pw = adapter ?? new PipeWireAdapter();
+        // The field, not the reader: a rebuild replaces the reader.
+        LastSound = meter => _meters.LastSound(meter);
         // Every helper that died on its own goes on the daemon's timeline:
         // an insert chain, a microphone or mix EQ stage, ducking, a mix
         // delay or the soundboard player.
@@ -2800,6 +2802,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 PortLink? route = RouteFeedLocked(target);
                 _monitorRoutes[key] = route ?? new PortLink([]);
             }
+        PublishIdleFeedsLocked();
         CaptureMonitorMuteBaselinesLocked();
         SyncMonitorHardwareMutesLocked();
         // The soundboard's audition follows the mixes the outputs now play.
@@ -2819,6 +2822,53 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // capture was last noted for, by the card part of the node name.
     private readonly Dictionary<string, long> _playbackHeldSince = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _playbackHoldNoted = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// How long every mix of a Bluetooth output's feed stays silent before
+    /// the output's links come down. A link from a running mix keeps the
+    /// headphones' A2DP stream open even when it carries only zeros, and
+    /// multipoint headphones take an open stream as playback, so they never
+    /// switch to another device (issue #817).
+    /// </summary>
+    internal static readonly TimeSpan IdleRelease = TimeSpan.FromSeconds(10);
+    /// <summary>When a meter last read sound, on <see cref="Clock"/>, or null without that meter; tests replace it.</summary>
+    internal Func<string, long?> LastSound { get; init; }
+    // Route keys of the Bluetooth outputs left unlinked because their feed is
+    // silent, and, for the wake check outside the lock, each one's feed meters.
+    private readonly HashSet<string> _idleRoutes = [];
+    private volatile string[][] _idleFeeds = [];
+
+    private static string MixMeter(MixDefinition mix) => $"mix:{mix.Id}";
+
+    /// <summary>Whether a meter read sound within <see cref="IdleRelease"/>. A missing meter counts as sound.</summary>
+    private bool Sounding(string meter)
+        => LastSound(meter) is not long last || Clock() - last < (long)IdleRelease.TotalMilliseconds;
+
+    /// <summary>A Bluetooth output whose every feeding mix has been silent for <see cref="IdleRelease"/>.</summary>
+    private bool IdleLocked(string target, List<MixDefinition> mixes)
+        => target.StartsWith("bluez_output.", StringComparison.Ordinal) && mixes.Count > 0
+            && !mixes.Any(mix => Sounding(MixMeter(mix)));
+
+    /// <summary>Drop idle keys of outputs no longer routed and publish the feeds the wake check reads.</summary>
+    private void PublishIdleFeedsLocked()
+    {
+        if (_monitorMuted) _idleRoutes.Clear();
+        Dictionary<string, string> targets = MonitorRouteTargetsLocked().ToDictionary(t => t.Key, t => t.Target);
+        _idleRoutes.IntersectWith(targets.Keys);
+        _idleFeeds = [.. _idleRoutes.Select(key => MixesForOutputLocked(targets[key]).Select(MixMeter).ToArray())];
+    }
+
+    /// <summary>
+    /// Link an idle Bluetooth output again as soon as a mix of its feed has
+    /// sound, without waiting up to a second for the next sweep. Called at
+    /// the meter rate; it takes the mixer lock only once such a feed sounds.
+    /// True when a route came back.
+    /// </summary>
+    public bool WakeIdleOutputs()
+    {
+        string[][] feeds = _idleFeeds;
+        return feeds.Any(meters => meters.Any(Sounding)) && EnsureMonitorRoutes();
+    }
 
     /// <summary>
     /// Whether a route into <paramref name="target"/> waits for now: the
@@ -3023,9 +3073,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         int? pair = target.Contains('#') && !target.EndsWith("#usbaux", StringComparison.Ordinal)
             ? ProJackFeeds.Pairs[JackSlotLocked(target)] : null;
         _incompleteMonitorRoutes.Remove(key);
+        _idleRoutes.Remove(key);
         if (mixes.Count == 0) return null;
         // An empty route is tried again by the next sweep (EnsureMonitorRoutes).
         if (HoldPlaybackLocked(target)) return new PortLink([]);
+        // A silent Bluetooth output stays unlinked so its stream can stop.
+        if (IdleLocked(target, mixes))
+        {
+            _idleRoutes.Add(key);
+            return new PortLink([]);
+        }
         var pairs = new List<(string From, string To)>();
         try
         {
@@ -3138,17 +3195,33 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             if (!_built) return false;
             if (_monitorMuted)
             {
+                PublishIdleFeedsLocked();
                 int pending = _monitorRoutes.Count;
                 RemovePausedMonitorRoutesLocked();
                 return _monitorRoutes.Count != pending;
             }
-            if (_monitorOutputs.Count == 0) return false;
+            if (_monitorOutputs.Count == 0)
+            {
+                PublishIdleFeedsLocked();
+                return false;
+            }
             bool changed = false;
             foreach ((string key, string target) in MonitorRouteTargetsLocked())
             {
                 PortLink? route = _monitorRoutes.GetValueOrDefault(key);
                 if (route is { Pairs.Count: > 0 })
                 {
+                    // A Bluetooth output whose feed went silent lets its
+                    // stream stop. A refused disconnect keeps the route for
+                    // the next sweep.
+                    if (IdleLocked(target, MixesForOutputLocked(target)))
+                    {
+                        if (!_pw.EnsureUnlinked(route)) continue;
+                        _monitorRoutes[key] = new PortLink([]);
+                        _idleRoutes.Add(key);
+                        changed = true;
+                        continue;
+                    }
                     // A unit that re-enumerates brings its sink back with the
                     // port names the route remembers, often before its capture.
                     // Relinking then would start its playback first, so a
@@ -3178,6 +3251,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     changed = true;
                 }
             }
+            PublishIdleFeedsLocked();
             return changed;
         }
     }

@@ -48,6 +48,37 @@ public sealed class MeterSampleTests
     }
 
     [Theory]
+    [InlineData(0f, false)]      // the zeros a running mix delivers in silence
+    [InlineData(5e-5f, false)]   // -86 dBFS
+    [InlineData(2e-4f, true)]    // -74 dBFS
+    public void SoundStartsAboveMinus80Dbfs(float sample, bool sound)
+    {
+        byte[] input = Bytes([.. Enumerable.Repeat(sample, 400)]);
+        var result = MeterReader.AccumulateFrames(input, input.Length);
+        Assert.Equal(sound, MeterReader.IsSound(result.SumL, result.SumR, result.Frames));
+    }
+
+    [Fact]
+    public void LastSoundMovesWhenTheMeterReadsSound()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "openxlr-meter-" + Guid.NewGuid());
+        File.WriteAllBytes(path, Bytes([.. Enumerable.Repeat(1e-3f, 400)]));
+        try
+        {
+            using var meters = new MeterReader();
+            Assert.Null(meters.LastSound("test"));
+            // The samples arrive 200 ms after the process starts, which is a
+            // little before the meter notes its own start.
+            var process = new ProcessStartInfo("sh") { RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (string arg in new[] { "-c", "sleep 0.2; exec cat \"$1\"", "sh", path }) process.ArgumentList.Add(arg);
+            meters.Add("test", process);
+            long started = meters.LastSound("test")!.Value;
+            Assert.True(SpinWait.SpinUntil(() => meters.LastSound("test") >= started + 100, TimeSpan.FromSeconds(5)));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Theory]
     [InlineData(1024, 48000, 22)]
     [InlineData(256, 48000, 6)]
     [InlineData(2048, 48000, 43)]

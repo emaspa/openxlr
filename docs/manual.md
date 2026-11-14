@@ -964,6 +964,13 @@ feed. A new mix starts silent until you open its sends.
 If the headset disconnects, leave it ticked. It shows as **(not
 connected)** and gets its feed back when it returns.
 
+A Bluetooth headset is linked only while its feed has sound. After 10
+seconds of silence on every mix that feeds it, OpenXLR removes its links,
+so PipeWire can stop the headset's stream. Headphones that are also
+connected to a phone can then switch to the phone. The links come back as
+soon as a mix of the feed has sound above -80 dBFS, and the headset misses
+the start of that sound while its stream starts. Wired outputs stay linked.
+
 <a name="ducking"></a>
 #### Lower what you hear while you speak
 
