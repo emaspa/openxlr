@@ -165,6 +165,10 @@ top.
   own window in the UI, the terminal mixer, Deck keys and the API. Coded and
   tested offline and on a private PipeWire server; each voice is tuned by
   ear on the desk before it is called done.
+- [ ] Undo and redo: one history in the daemon, shared by every client,
+  first for send levels, volumes and mutes with Ctrl+Z in the UI, then
+  processing, the header buttons, the terminal mixer and Deck keys,
+  hardware controls, inserts, profile loads and layout edits.
 
 ### Devices
 

@@ -183,6 +183,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<string?> SetPreserveBrowserOutputsAsync(bool value)
         => EditLayoutAsync(new() { ["cmd"] = "setPreserveBrowserOutputs", ["value"] = value });
 
+    /// <summary><c>undo</c> or <c>redo</c> of the step the UI named; resolves to the daemon's refusal or null.</summary>
+    public Task<string?> StepHistoryAsync(string command, long step)
+        => EditLayoutAsync(new() { ["cmd"] = command, ["step"] = step });
+
     /// <summary>Latest scan evidence and effective bridge status; null on timeout or an older daemon.</summary>
     public Task<JsonNode?> RequestPluginDiagnosticsAsync(TimeSpan timeout)
         => QueryAsync("pluginDiagnostics", "getPluginDiagnostics", timeout);

@@ -63,6 +63,14 @@ scan plugins or start helpers, so they share the one HTTP command slot: while
 a command or another of these reads is in flight they answer 429.
 Changes still go through `/commands`.
 
+`{"cmd":"undo"}` and `{"cmd":"redo"}` through `/commands` step the daemon's
+[undo history](api.md#undo-and-redo), the one every client shares, and
+`/state` carries it as `history`. There is no resource of its own. A script
+that shows the user which step it undoes sends that step's id as well,
+`{"cmd":"undo","step":41}`, and is refused when another client changed the
+history first. HTTP requests count as one client when moves are joined into
+steps.
+
 Send `{"cmd":"getRuntimeDiagnostics"}` through `/commands` for the
 daemon's [runtime snapshot](api.md#runtime-snapshot). The ordinary
 `diagnostics` resource still returns the USB vendor blocks.

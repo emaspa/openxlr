@@ -76,6 +76,15 @@ public static class CommandValidation
             || cmd.Value.ValueKind == JsonValueKind.String && AudioClockRule.IsValidNode(cmd.Value.GetString())
             ? null : "setAudioClock: value must be null or the node name of an ALSA device, alsa_input. or alsa_output. followed by letters, digits, '_', '-' and '.'";
 
+    /// <summary><c>undo</c> and <c>redo</c>: <c>step</c> absent, null, or a whole number of at least 1.</summary>
+    internal static string? CheckHistory(Command cmd)
+        => cmd.Step.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+            || cmd.Step.ValueKind == JsonValueKind.Number && cmd.Step.TryGetInt64(out long step) && step >= 1
+            ? null : $"{cmd.Cmd}: step must be a whole number of at least 1";
+
+    /// <summary>The step id an <c>undo</c> or <c>redo</c> that passed <see cref="CheckHistory"/> names, or null.</summary>
+    internal static long? HistoryStep(Command cmd) => cmd.Step.ValueKind == JsonValueKind.Number ? cmd.Step.GetInt64() : null;
+
     public const int MaxText = 256;          // identities, labels, device names, symbols
     public const int MaxUri = 512;
     public const int MaxDevices = 16;

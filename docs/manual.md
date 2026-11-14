@@ -399,6 +399,43 @@ one-percentage-point steps. Additional touch contacts do not take over a drag.
 Incoming device or profile values retain their precision until you adjust
 them. Plugin parameter controls keep the steps supplied by their plugin.
 
+<a name="undo-and-redo"></a>
+### Undo and redo
+
+Press Ctrl+Z in the UI or the separate mixer window to take back the last
+mixer change, and Ctrl+Shift+Z or Ctrl+Y to put it back. A fader drag is
+one step, however long it took, and so is a quick run of arrow keys on one
+fader: moves of the same control less than a second apart join. While the
+cursor is in a text field, such as a name box, the keys belong to the
+field and undo its typing instead.
+
+Undo covers these changes for now:
+
+- a send level, a channel volume and a mix volume;
+- a send mute and a mix mute, including the sends an exclusive group closed
+  when you opened another member, which come back with the undo.
+
+The history belongs to the daemon, not to the UI. A move on a Deck dial,
+in the terminal mixer or over the API is a step in the same history, so
+Ctrl+Z in the UI can take back a fader you moved on the Deck. Undoing a
+send mute can open that send again, a microphone's send to Stream
+included. The history holds 50 steps and starts empty each time the
+daemon starts.
+
+Some things are never undone. Phantom power, the gain and level locks, the
+microphone mute on the unit or a Deck key, a capture input's mute and the
+monitoring pause stay as they are however far back you go. EQ, effects,
+inserts, hardware controls, routing and layout edits are not covered yet.
+Loading a profile, a profile recalled when the interface connects,
+deleting a channel or a mix, switching between software and hardware
+mixing, and switching to another interface empty the history: nothing
+before them can be undone.
+
+Undo writes a value back only where it is still what you left. If the
+desktop, the unit or a profile moved the control since, undo leaves it
+there and puts back the rest of the step. A step none of which can be put
+back is dropped, so the next Ctrl+Z takes the one before it.
+
 <a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
 

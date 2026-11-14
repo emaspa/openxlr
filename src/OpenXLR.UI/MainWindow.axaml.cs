@@ -59,6 +59,7 @@ public partial class MainWindow : Window
             new DesktopKeys.SoundClip(c.Id, c.Name, c.Mode, c.Seconds, c.Loop, c.Playing)), fresh);
         _ = _desktopKeys.StartAsync();
         DataContext = _vm;
+        HistoryKeys.Attach(this, redo => _ = _vm.StepHistoryAsync(redo));
         _client.Start();          // connects, and keeps retrying if the daemon isn't up yet
         // Queued rather than awaited: Options calls the restart on the UI thread.
         // A daemon from before the control socket answers only on its old port.

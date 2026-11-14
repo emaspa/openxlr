@@ -1967,6 +1967,40 @@ public sealed partial class MixerService : IHostedService, IDisposable
         return null;
     }
 
+    /// <summary>The live values an undo step compares, or null while the mixer is not built.</summary>
+    internal Dictionary<SceneKey, object>? ReadSceneValues(IReadOnlyCollection<SceneField> fields, Func<SceneKey, bool> keep)
+        => _mixer.Built ? _mixer.ReadSceneValues(fields, keep) : null;
+
+    /// <summary>
+    /// Write an undo or redo patch (see <see cref="Mixer.ApplyScenePatch"/>),
+    /// then push the hardware paths, the state and the save as a mixer
+    /// command does. Null while the mixer is not built or waits for the
+    /// audio server, which leaves the step where it is.
+    /// </summary>
+    internal IReadOnlyList<ScenePatchOutcome>? ApplyScenePatch(IReadOnlyList<ScenePatchEntry> entries)
+    {
+        if (WaitingForAudio || !_mixer.Built) return null;
+        IReadOnlyList<ScenePatchOutcome> outcomes;
+        try { outcomes = _mixer.ApplyScenePatch(entries); }
+        catch (InvalidOperationException) { return null; }
+        if (outcomes.Contains(ScenePatchOutcome.Applied))
+        {
+            SyncOutputSelectors();   // the Pro's hardware mic paths follow the sends and mutes
+            Changed?.Invoke();
+            ScheduleSave();
+        }
+        return outcomes;
+    }
+
+    /// <summary>The members of the channel's exclusive group, the channel included.</summary>
+    internal IReadOnlyList<string> ExclusivePeersOf(string channel) => _mixer.ExclusivePeersOf(channel);
+
+    /// <summary>The members of an exclusive group by id.</summary>
+    internal IReadOnlyList<string> ExclusiveGroupMembers(string group) => _mixer.ExclusiveGroupMembers(group);
+
+    /// <summary>The layout as it is now, for naming an undo step.</summary>
+    internal MixerConfig LayoutConfig => _mixer.Config;
+
     private int _sweepCount;
     private string? _resourceWarning;
     private string? _clockNoted;

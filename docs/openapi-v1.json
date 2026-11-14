@@ -674,6 +674,19 @@
                     "value": "hardware",
                     "check": true
                   }
+                },
+                "undo": {
+                  "summary": "Put back the values the newest step of the shared undo history changed, only while that step is still step 41",
+                  "value": {
+                    "cmd": "undo",
+                    "step": 41
+                  }
+                },
+                "redo": {
+                  "summary": "Write again the values the newest undone step put back",
+                  "value": {
+                    "cmd": "redo"
+                  }
                 }
               }
             }
