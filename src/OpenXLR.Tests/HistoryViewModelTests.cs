@@ -164,6 +164,36 @@ public sealed class HistoryViewModelTests
         Assert.Null(model.Notice);
     }
 
+    [Fact]
+    public void TheUnitsControlsAreNamedAndAnAdditionalInterfaceReadsTheDaemonsLabel()
+    {
+        var model = new HistoryViewModel(null, Names);
+        HistoryStepItem Unit(string kind, string control, string? channel = null, string? unit = null)
+            => new(1, kind, "English label", channel, Control: control, Unit: unit);
+        Assert.Equal(Localizer.Format("HistoryUnitGain", "XLR 1"), model.Name(Unit("unitGain", "gain", "xlr1")));
+        Assert.Equal(Localizer.Format("HistoryLowCut", "XLR 1"), model.Name(Unit("unitLowCut", "lowCut", "xlr1")));
+        Assert.Equal(Localizer.Format("HistoryClipGuard", "XLR 1"), model.Name(Unit("unitClipGuard", "clipGuard", "xlr1")));
+        Assert.Equal(Localizer.Format("HistoryExpander", "XLR 1"), model.Name(Unit("unitExpander", "expander", "xlr1")));
+        Assert.Equal(Localizer.Format("HistoryCompressor", "XLR 1"), model.Name(Unit("unitCompressor", "compressor", "xlr1")));
+        Assert.Equal(Localizer.Format("HistoryVoiceTune", "XLR 1"), model.Name(Unit("unitVoiceTune", "voiceTuneStrength", "xlr1")));
+        Assert.Equal(Localizer.Text("HistoryHeadphones"), model.Name(Unit("unitHeadphones", "hpVolumeDb")));
+        Assert.Equal(Localizer.Text("HistoryHeadphones2"), model.Name(Unit("unitHeadphones", "hp2VolumeDb")));
+        Assert.Equal(Localizer.Text("HistoryCrossfade"), model.Name(Unit("unitCrossfade", "crossfade")));
+        Assert.Equal(Localizer.Text("HistoryLowImpedance"), model.Name(Unit("unitLowImpedance", "lowImpedance")));
+        Assert.Equal(Localizer.Text("HistoryAuxLevel"), model.Name(Unit("unitAuxLevel", "auxLevelDb")));
+        Assert.Equal(Localizer.Text("HistoryLineInGain"), model.Name(Unit("unitLineInGain", "lineInGain")));
+        // A step on an additional interface carries its unit and no channel.
+        Assert.Equal("English label", model.Name(Unit("unitGain", "gain", unit: "0fd9:0070@0123456789abcdef")));
+        Assert.Equal("English label", model.Name(Unit("unitHeadphones", "hpVolumeDb", unit: "0fd9:0070@0123456789abcdef")));
+
+        model.Apply(JsonNode.Parse("""
+            {"undo":{"step":9,"kind":"unitHeadphones","control":"hp2VolumeDb","count":1,"label":"Headphone 2 volume"},
+             "redo":null,"undoSteps":1,"redoSteps":0,"note":null}
+            """));
+        Assert.Equal(new HistoryStepItem(9, "unitHeadphones", "Headphone 2 volume", Control: "hp2VolumeDb"), model.Undo);
+        Assert.Equal(Localizer.Format("UndoStep", Localizer.Text("HistoryHeadphones2")), model.UndoTip);
+    }
+
     private sealed class Hold : IDisposable
     {
         public void Dispose() { }

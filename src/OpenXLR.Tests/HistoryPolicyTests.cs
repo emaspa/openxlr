@@ -188,12 +188,11 @@ public sealed partial class HistoryPolicyTests
     public void ProfileLoadsDeletesAndModeSwitchesClearTheHistory(string command)
         => Assert.Equal(HistoryClass.Barrier, HistoryPolicy.ClassOf(command));
 
-    // Phantom power and the hardware mute go through set and setWaveControl,
-    // the locks through set and setOutputVolumeLock; the capture mute and the
-    // monitoring pause are live switches.
+    // Phantom power, the hardware mute and the unit's locks go through set
+    // and setWaveControl, which record only DeviceHistory's controls
+    // (HistoryDeviceTests); the output volume lock has a command of its own,
+    // and the capture mute and the monitoring pause are live switches.
     [Theory]
-    [InlineData("set")]
-    [InlineData("setWaveControl")]
     [InlineData("setOutputVolumeLock")]
     [InlineData("setCaptureMuted")]
     [InlineData("toggleCaptureMuted")]

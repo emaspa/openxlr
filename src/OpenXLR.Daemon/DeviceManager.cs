@@ -1166,95 +1166,167 @@ public sealed partial class DeviceManager : BackgroundService
     }
 
     /// <summary>Apply a client "set" command. Returns null on success, else an error string.</summary>
-    public string? Apply(string control, JsonElement value)
+    public string? Apply(string control, JsonElement value) => ApplyRecorded(control, value).Error;
+
+    /// <summary>
+    /// <see cref="Apply"/> for the undo history: on success, the unit it
+    /// wrote with the state held before the write and the readback after it.
+    /// </summary>
+    internal DeviceWrite ApplyRecorded(string control, JsonElement value)
     {
         lock (_gate)
         {
-            if (_device is null || !_device.Connected) return "no device connected";
-            string? unsupported = UnsupportedControlReason(EffectiveCapabilitiesLocked(_device), control);
-            if (unsupported is not null) return unsupported;
-            int? lineInWritten = null;
-            try
+            if (_device is null || !_device.Connected) return new("no device connected");
+            DeviceState? before = _last;
+            if (WriteControlLocked(_device, control, value) is { } error) return new(error);
+            return new(null, _device.Info.InstanceId, _device.Info.DisplayName, _stateStorageId is not null, before, _last);
+        }
+    }
+
+    /// <summary>
+    /// Write one control the way <c>set</c> does, under the device lock:
+    /// the capability check, the gain lock, the phantom settling clock, and
+    /// the readback, change note and state broadcast after the write. Null on
+    /// success.
+    /// </summary>
+    private string? WriteControlLocked(IAudioDevice dev, string control, JsonElement value)
+    {
+        string? unsupported = UnsupportedControlReason(EffectiveCapabilitiesLocked(dev), control);
+        if (unsupported is not null) return unsupported;
+        int? lineInWritten = null;
+        try
+        {
+            switch (control)
             {
-                switch (control)
-                {
-                    case ControlNames.Gain:
-                        if (GainIsLocked) return "gain is locked";
-                        _device.SetGainDb(value.GetInt32());
-                        break;
-                    case ControlNames.Mute: _device.SetMute(value.GetBoolean()); break;
-                    case ControlNames.LowCut: _device.SetLowCut(value.GetBoolean()); break;
-                    case ControlNames.Expander: _device.SetExpander(value.GetBoolean()); break;
-                    case ControlNames.VoiceTune: _device.SetVoiceTune(value.GetBoolean()); break;
-                    case ControlNames.VoiceTuneStrength: _device.SetVoiceTuneStrength(value.GetInt32()); break;
-                    case ControlNames.HpVolumeDb: _device.SetHpVolumeDb(value.GetDouble()); break;
-                    case ControlNames.LowImpedance: _device.SetLowImpedance(value.GetBoolean()); break;
-                    case ControlNames.Crossfade: _device.SetCrossfade(value.GetInt32()); break;
-                    case ControlNames.Phantom:
-                        _device.SetPhantom(value.GetBoolean());
-                        _phantomWroteAt = UtcNow;
-                        break;
-                    case ControlNames.ClipGuard: _device.SetClipGuard(value.GetBoolean()); break;
-                    case ControlNames.Compressor: _device.SetCompressor(value.GetBoolean()); break;
-                    case ControlNames.OutHp1: WriteMixLocked(_device, new ProMixPlan { Hp1 = value.GetBoolean() }, "set"); break;
-                    case ControlNames.OutHp2: WriteMixLocked(_device, new ProMixPlan { Hp2 = value.GetBoolean() }, "set"); break;
-                    case ControlNames.OutUsbAux: WriteMixLocked(_device, new ProMixPlan { UsbAux = value.GetBoolean() }, "set"); break;
-                    case ControlNames.OutLineOut: WriteMixLocked(_device, new ProMixPlan { LineOut = value.GetBoolean() }, "set"); break;
-                    case ControlNames.AuxLevelDb: _device.SetAuxLevelDb(value.GetDouble()); break;
-                    case ControlNames.AuxLevelLock: _device.SetAuxLevelLock(value.GetBoolean()); break;
-                    case ControlNames.LineInGain: lineInWritten = _device.SetLineInGainDb(value.GetInt32()); break;
-                    case ControlNames.LineInLevelLock: _device.SetLineInLevelLock(value.GetBoolean()); break;
-                    case ControlNames.RawCapture or ControlNames.RawCapture2 or ControlNames.LineInRawCapture:
-                        SetRawCaptureLocked(_device, RawCaptureControl(control)!.Value, value.GetBoolean());
-                        break;
-                    case "hp2VolumeDb": _device.SetHp2VolumeDb(value.GetDouble()); break;
-                    case "gain2":
-                        if (GainIsLocked) return "gain is locked";
-                        _device.SetGain2Db(value.GetInt32());
-                        break;
-                    case "gainLock":
-                        bool locking = value.GetBoolean();
-                        // The unit's own lock first: a failed write leaves
-                        // both locks as they were.
-                        if (_device.Capabilities.HardwareGainLock) _device.SetUnitGainLock(locking);
-                        if (locking) _gainLocked.Add(DevId(_device));
-                        else _gainLocked.Remove(DevId(_device));
-                        SaveGainLocks();
-                        break;
-                    case "mute2": _device.SetMute2(value.GetBoolean()); break;
-                    case "lowCut2": _device.SetLowCut2(value.GetBoolean()); break;
-                    case "expander2": _device.SetExpander2(value.GetBoolean()); break;
-                    case "voiceTune2": _device.SetVoiceTune2(value.GetBoolean()); break;
-                    case "voiceTuneStrength2": _device.SetVoiceTuneStrength2(value.GetInt32()); break;
-                    case "phantom2":
-                        _device.SetPhantom2(value.GetBoolean());
-                        _phantomWroteAt2 = UtcNow;
-                        break;
-                    case "clipGuard2": _device.SetClipGuard2(value.GetBoolean()); break;
-                    case "compressor2": _device.SetCompressor2(value.GetBoolean()); break;
-                    default: return $"unknown control '{control}'";
-                }
+                case ControlNames.Gain:
+                    if (GainIsLocked) return "gain is locked";
+                    dev.SetGainDb(value.GetInt32());
+                    break;
+                case ControlNames.Mute: dev.SetMute(value.GetBoolean()); break;
+                case ControlNames.LowCut: dev.SetLowCut(value.GetBoolean()); break;
+                case ControlNames.Expander: dev.SetExpander(value.GetBoolean()); break;
+                case ControlNames.VoiceTune: dev.SetVoiceTune(value.GetBoolean()); break;
+                case ControlNames.VoiceTuneStrength: dev.SetVoiceTuneStrength(value.GetInt32()); break;
+                case ControlNames.HpVolumeDb: dev.SetHpVolumeDb(value.GetDouble()); break;
+                case ControlNames.LowImpedance: dev.SetLowImpedance(value.GetBoolean()); break;
+                case ControlNames.Crossfade: dev.SetCrossfade(value.GetInt32()); break;
+                case ControlNames.Phantom:
+                    dev.SetPhantom(value.GetBoolean());
+                    _phantomWroteAt = UtcNow;
+                    break;
+                case ControlNames.ClipGuard: dev.SetClipGuard(value.GetBoolean()); break;
+                case ControlNames.Compressor: dev.SetCompressor(value.GetBoolean()); break;
+                case ControlNames.OutHp1: WriteMixLocked(dev, new ProMixPlan { Hp1 = value.GetBoolean() }, "set"); break;
+                case ControlNames.OutHp2: WriteMixLocked(dev, new ProMixPlan { Hp2 = value.GetBoolean() }, "set"); break;
+                case ControlNames.OutUsbAux: WriteMixLocked(dev, new ProMixPlan { UsbAux = value.GetBoolean() }, "set"); break;
+                case ControlNames.OutLineOut: WriteMixLocked(dev, new ProMixPlan { LineOut = value.GetBoolean() }, "set"); break;
+                case ControlNames.AuxLevelDb: dev.SetAuxLevelDb(value.GetDouble()); break;
+                case ControlNames.AuxLevelLock: dev.SetAuxLevelLock(value.GetBoolean()); break;
+                case ControlNames.LineInGain: lineInWritten = dev.SetLineInGainDb(value.GetInt32()); break;
+                case ControlNames.LineInLevelLock: dev.SetLineInLevelLock(value.GetBoolean()); break;
+                case ControlNames.RawCapture or ControlNames.RawCapture2 or ControlNames.LineInRawCapture:
+                    SetRawCaptureLocked(dev, RawCaptureControl(control)!.Value, value.GetBoolean());
+                    break;
+                case "hp2VolumeDb": dev.SetHp2VolumeDb(value.GetDouble()); break;
+                case "gain2":
+                    if (GainIsLocked) return "gain is locked";
+                    dev.SetGain2Db(value.GetInt32());
+                    break;
+                case "gainLock":
+                    bool locking = value.GetBoolean();
+                    // The unit's own lock first: a failed write leaves
+                    // both locks as they were.
+                    if (dev.Capabilities.HardwareGainLock) dev.SetUnitGainLock(locking);
+                    if (locking) _gainLocked.Add(DevId(dev));
+                    else _gainLocked.Remove(DevId(dev));
+                    SaveGainLocks();
+                    break;
+                case "mute2": dev.SetMute2(value.GetBoolean()); break;
+                case "lowCut2": dev.SetLowCut2(value.GetBoolean()); break;
+                case "expander2": dev.SetExpander2(value.GetBoolean()); break;
+                case "voiceTune2": dev.SetVoiceTune2(value.GetBoolean()); break;
+                case "voiceTuneStrength2": dev.SetVoiceTuneStrength2(value.GetInt32()); break;
+                case "phantom2":
+                    dev.SetPhantom2(value.GetBoolean());
+                    _phantomWroteAt2 = UtcNow;
+                    break;
+                case "clipGuard2": dev.SetClipGuard2(value.GetBoolean()); break;
+                case "compressor2": dev.SetCompressor2(value.GetBoolean()); break;
+                default: return $"unknown control '{control}'";
             }
-            catch (UsbHungException ex)
+        }
+        catch (UsbHungException ex)
+        {
+            NoteHung(ex);
+            return ex.Message;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+        // Reflect immediately; the poll loop will also catch it, but this
+        // makes the client's own change feel instant.
+        _last = Stamp(dev.ReadState());
+        // Each Line In gain write is logged with what the unit reads back.
+        if (lineInWritten is int written)
+            _log.LogInformation("{dev}: Line In gain written as {db} dB (block 0x0004 byte 76), read back as {readback} dB",
+                dev.Info.DisplayName, written, _last.LineInGainDb);
+        NoteChangedLocked();
+        RaiseFromLocked();
+        return null;
+    }
+
+    /// <summary>
+    /// Write an undo or redo step's hardware values to <paramref name="unit"/>,
+    /// under the device lock so the unit cannot change between the check and
+    /// the writes. Nothing is written unless this manager drives that very
+    /// unit now. The unit is read once; each entry is written only where it
+    /// still reads the expected value, through the same path as <c>set</c>,
+    /// and only for a control on <see cref="DeviceHistory"/>'s list, which
+    /// phantom power is never on. A gain under either gain lock, the Aux
+    /// level under its lock and the Line In gain under its lock are left
+    /// alone.
+    /// </summary>
+    internal IReadOnlyList<DevicePatchOutcome> ApplyPatch(string unit, IReadOnlyList<DevicePatchEntry> entries)
+    {
+        var outcomes = new DevicePatchOutcome[entries.Count];
+        lock (_gate)
+        {
+            if (_device is not { Connected: true } dev || dev.Info.InstanceId != unit)
             {
-                NoteHung(ex);
-                return ex.Message;
+                Array.Fill(outcomes, DevicePatchOutcome.Gone);
+                return outcomes;
             }
+            DeviceState live;
+            try { live = Stamp(dev.ReadState()); }
             catch (Exception ex)
             {
-                return ex.Message;
+                if (ex is UsbHungException hung) NoteHung(hung);
+                Array.Fill(outcomes, DevicePatchOutcome.Failed);
+                return outcomes;
             }
-            // Reflect immediately; the poll loop will also catch it, but this
-            // makes the client's own change feel instant.
-            _last = Stamp(_device.ReadState());
-            // Each Line In gain write is logged with what the unit reads back.
-            if (lineInWritten is int written)
-                _log.LogInformation("{dev}: Line In gain written as {db} dB (block 0x0004 byte 76), read back as {readback} dB",
-                    _device.Info.DisplayName, written, _last.LineInGainDb);
-            NoteChangedLocked();
-            RaiseFromLocked();
-            return null;
+            DeviceCapabilities capabilities = EffectiveCapabilitiesLocked(dev);
+            for (int i = 0; i < entries.Count; i++)
+            {
+                DevicePatchEntry entry = entries[i];
+                if (!DeviceHistory.Allowed(entry.Control) || UnsupportedControlReason(capabilities, entry.Control) is not null
+                    || DeviceHistory.Controls[entry.Control].Read(live) is not { } now || now.GetType() != entry.Target.GetType())
+                    outcomes[i] = DevicePatchOutcome.Failed;
+                else if (DeviceHistory.Near(now, entry.Target)) outcomes[i] = DevicePatchOutcome.AlreadyThere;
+                else if (!DeviceHistory.Near(now, entry.Expected)) outcomes[i] = DevicePatchOutcome.Changed;
+                else if (DeviceHistory.Locked(entry.Control, live, GainIsLocked)) outcomes[i] = DevicePatchOutcome.Locked;
+                else
+                {
+                    string? error;
+                    try { error = WriteControlLocked(dev, entry.Control, JsonSerializer.SerializeToElement(entry.Target)); }
+                    catch (Exception ex) { error = ex.Message; }
+                    outcomes[i] = error is null ? DevicePatchOutcome.Applied
+                        : error == "gain is locked" ? DevicePatchOutcome.Locked : DevicePatchOutcome.Failed;
+                    if (error is null && _last is { } read) live = read;
+                }
+            }
         }
+        return outcomes;
     }
 
     /// <summary>

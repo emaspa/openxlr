@@ -10,9 +10,12 @@ namespace OpenXLR.UI;
 /// One end of the daemon's undo history: the step's id for the guard, its
 /// kind, its English label, the ids it names and how many things a burst
 /// joined. An insert step names the insert in its channel's or mix's chain.
+/// A hardware step names its control, and the additional interface it
+/// changed in <see cref="Unit"/>.
 /// </summary>
 public sealed record HistoryStepItem(long Step, string Kind, string Label,
-    string? Channel = null, string? Mix = null, string? Group = null, int Count = 1, string? Insert = null);
+    string? Channel = null, string? Mix = null, string? Group = null, int Count = 1, string? Insert = null,
+    string? Control = null, string? Unit = null);
 
 /// <summary>The names the UI shows for the ids a step names; null for an id it does not know.</summary>
 internal sealed record HistoryNames(Func<string, string?> Channel, Func<string, string?> Mix, Func<string, string?> Group)
@@ -170,6 +173,20 @@ public sealed class HistoryViewModel : ViewModelBase
             "insertChain" when chain is not null => Localizer.Format("HistoryInsertChain", chain),
             "lowCut" when channel is not null => Localizer.Format("HistoryLowCut", channel),
             "clipGuard" when channel is not null => Localizer.Format("HistoryClipGuard", channel),
+            // The unit's own controls. A step on an additional interface
+            // names no channel and reads the daemon's label with the unit's name.
+            "unitGain" when channel is not null => Localizer.Format("HistoryUnitGain", channel),
+            "unitLowCut" when channel is not null => Localizer.Format("HistoryLowCut", channel),
+            "unitClipGuard" when channel is not null => Localizer.Format("HistoryClipGuard", channel),
+            "unitExpander" when channel is not null => Localizer.Format("HistoryExpander", channel),
+            "unitCompressor" when channel is not null => Localizer.Format("HistoryCompressor", channel),
+            "unitVoiceTune" when channel is not null => Localizer.Format("HistoryVoiceTune", channel),
+            "unitHeadphones" when step.Unit is null && step.Control == "hp2VolumeDb" => Localizer.Text("HistoryHeadphones2"),
+            "unitHeadphones" when step.Unit is null => Localizer.Text("HistoryHeadphones"),
+            "unitCrossfade" when step.Unit is null => Localizer.Text("HistoryCrossfade"),
+            "unitLowImpedance" when step.Unit is null => Localizer.Text("HistoryLowImpedance"),
+            "unitAuxLevel" when step.Unit is null => Localizer.Text("HistoryAuxLevel"),
+            "unitLineInGain" when step.Unit is null => Localizer.Text("HistoryLineInGain"),
             "monitorDry" when mix is not null => Localizer.Format("HistoryMonitorDry", mix),
             "ducking" => Localizer.Text("HistoryDucking"),
             _ => null,
@@ -198,7 +215,7 @@ public sealed class HistoryViewModel : ViewModelBase
            ? new(step, kindText, node["label"] is JsonValue label && label.TryGetValue(out string? text) ? text : kindText,
                Text(node["channel"]), Text(node["mix"]), Text(node["group"]),
                node["count"] is JsonValue count && count.TryGetValue(out int joined) && joined > 1 ? joined : 1,
-               Text(node["insert"]))
+               Text(node["insert"]), Text(node["control"]), Text(node["unit"]))
            : null;
 
     private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue(out string? text) && text.Length > 0 ? text : null;
