@@ -11,7 +11,7 @@ brand works in the mixer without hardware controls; see
 |---|---|---|
 | Wave XLR Pro | `0fd9:00b4` | exposed controls verified on hardware, the microphone EQ on the unit included; raw capture verified on XLR 1; ducking on the unit accepted by ear on the headphone jacks, keyed by XLR 1, with its presets (custom values not yet heard), and XLR 1 and XLR 2 as keys together taken by the unit in hardware mixing; hardware mixing (experimental) heard on Headphones 1 and the USB Aux port, two jacks on two feeds not yet, with the maximizer per mix measured on the Aux mix; the compressor and expander on the unit coded at the Wave:3 MK.2's layout, not yet checked |
 | XLR Dock | `0fd9:00a6` | exposed controls verified on hardware |
-| Wave XLR | `0fd9:007d` | core controls verified on hardware by community testers on two units (0.1.13) |
+| Wave XLR | `0fd9:007d` | core controls verified on hardware by community testers on two units (0.1.13); ClipGuard and the mic/PC crossfade coded from another project's map, not yet checked with OpenXLR |
 | Wave XLR MK.2 | `0fd9:00b6` | exposed controls verified on hardware by a community tester; the microphone EQ on the unit verified on hardware; from firmware 1.0.15 raw capture, the LED ring, the meter and status blocks and the unit's gain lock measured on the desk; the compressor and expander on the unit coded at the Wave:3 MK.2's layout, not yet checked |
 | XLR Dock MK.2 | `0fd9:00c7` | MK.2 backend with bank detection; exposed controls verified on the original 0x0103 unit, and the microphone EQ on the unit verified on firmware 1.0.15; the compressor and expander on the unit coded at the Wave:3 MK.2's layout, not yet checked |
 | Wave:3 | `0fd9:0070` | coded from public protocol research; on the maintainer's unit every control writes and reads back, and the gain, mute, the monitor balance and the desktop volume controls are verified |
@@ -1001,6 +1001,7 @@ opening a muted send, with simulated nodes. On real units, so far:
 | Edits on the embedded EQ graph heard live while the take loops | not yet checked | |
 | An insert's bypass and its editor opened from Shape | not yet checked | |
 | Phantom power from Position on a condenser, with the settling note on a Pro | not yet checked | |
+| Measure room noise in a real room: the 4 dB margin and the rule that asks again after talk, the expander's own meter with RNNoise and DeepFilterNet on, and the compressor's make-up gain taken out on a Wave:3 MK.2, an XLR Dock MK.2 and a Pro | not yet checked | |
 | The Position tips for a Wave:3's capsule: the side to speak into | not yet checked | |
 
 ## Every device gets
@@ -1026,6 +1027,14 @@ opening a muted send, with simulated nodes. On real units, so far:
   lists what an owner of two units checks
 - On switch, the hardware channels' monitor sends come up muted, so the
   newly patched mic does not reach the speakers until unmuted
+- Undo and redo of the unit's own controls from any client, where the
+  unit has them: gain, low cut, ClipGuard, expander, compressor, voice
+  tune, headphone levels, the crossfade, low impedance, the USB Aux level
+  and the Line In gain. A step never writes phantom power, the mute or a
+  lock, leaves a locked gain or level where it is, and goes only to the
+  unit it was made on. Checked on the desk's units, the Wave XLR Pro's
+  phantom power, level locks and gain lock included
+  ([manual](manual.md#undo-and-redo))
 - OpenDeck plugin: every switch, mute, and level on a Stream Deck, with
   live state
 
@@ -1042,8 +1051,9 @@ confirmed in a few minutes:
 4. Open an [issue](https://github.com/emaspa/openxlr/issues) with the
    archive and what you observed.
 
-MK.1 owners can help map low cut, ClipGuard, mic/PC crossfade and the
-hardware-save action with an ordered Wave Link capture. The
+MK.1 owners can help confirm ClipGuard and the mic/PC crossfade, and map
+the low cut and the hardware-save action with an ordered Wave Link
+capture. The
 [USB capture guide](usb-capture.md) explains the process in about 15
 minutes, no programming needed.
 

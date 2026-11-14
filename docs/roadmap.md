@@ -47,7 +47,9 @@ is measured over one that is described.
   the expander's switch and settings read back at the documented bytes,
   and ClipGuard is driven at the Wave XLR MK.2's offset.
   The Wave XLR and the first XLR Dock get their
-  last settings back on connect. Up to four additional interfaces run
+  last settings back on connect. The Wave XLR also drives ClipGuard and
+  the mic/PC crossfade at another project's offsets, not yet checked
+  with OpenXLR. Up to four additional interfaces run
   beside the primary one, and the one picked last is driven again after a
   restart.
 - [x] Mixer. Hardware, application and capture channels, monitor mixes,
@@ -66,6 +68,12 @@ is measured over one that is described.
   to channels through the Chromium companion, each with a volume of its
   own. A soundboard plays clips into SFX, with pages, audition,
   export and import, starter sounds, and keys on the Deck and the desktop.
+  Undo and redo, kept by the daemon and shared by every client, cover
+  sends, volumes, mutes, microphone and mix processing, insert chains and
+  the unit's own controls. Stream, Chat and Aux carry their master and
+  mute on the mix's own sink, one write per move. An option per Bluetooth
+  output unlinks it while its feed is silent, so multipoint headphones
+  can switch to another device.
 - [x] Plugins. LV2, CLAP and VST3 inserts on every input and mix, with
   generated controls and the plugin's own editor; Windows plugins through
   yabridge and the optional companion; installation from the UI; presets
@@ -82,8 +90,8 @@ is measured over one that is described.
   sizes, the Flow
   window and seven languages. The terminal mixer `openxlr-tui`, drawing the same skins. The
   OpenDeck plugin, with keys and dials drawn like the hardware. Desktop
-  keys through the portal and compositor-specific focused application
-  routing. The Omarchy bar plugin. A versioned HTTP API beside the WebSocket.
+  keys through the portal, microphone mute and push to talk among them,
+  and compositor-specific focused application routing. The Omarchy bar plugin. A versioned HTTP API beside the WebSocket.
 - [x] Daemon. A systemd notify service with a watchdog; recovery when
   PipeWire, pipewire-pulse, a device or a plugin host misbehaves; an
   incremental registry view and ALSA control events instead of polling,
@@ -91,7 +99,9 @@ is measured over one that is described.
   budgeted per client; a hard memory limit; an opt-in update notice; an
   installation receipt read back by `openxlr doctor`; a diagnostics
   archive from Options with the whole boot's journals, the kernel's USB
-  and sound messages and the state of each open ALSA device.
+  and sound messages and the state of each open ALSA device. A glitch
+  marker adds what the daemon saw in the 30 seconds before it to that
+  archive.
 - [x] Packages. AUR (Arch Linux, CachyOS and Omarchy), Debian and Ubuntu
   with a PPA, Fedora with COPR, a NixOS flake and module, and an
   experimental Flatpak bundle on each release. The packaged units stay
@@ -132,6 +142,8 @@ top.
     loud until the fix;
   - the Wave:3's dial modes, LED ring, ClipGuard and headphones by ear,
     and a replug; ClipGuard and the mic/PC mix on a Wave:1, from an owner;
+  - ClipGuard and the mic/PC crossfade on an original Wave XLR, from an
+    owner;
   - the Wave:3 MK.2's headphone level by ear, a replug, whether the float
     playback rule ends its microphone stall, and a Wave Link capture of
     its ClipGuard switch;
@@ -165,10 +177,10 @@ top.
   own window in the UI, the terminal mixer, Deck keys and the API. Coded and
   tested offline and on a private PipeWire server; each voice is tuned by
   ear on the desk before it is called done.
-- [ ] Undo and redo: one history in the daemon, shared by every client,
-  first for send levels, volumes and mutes with Ctrl+Z in the UI, then
-  processing, the header buttons, the terminal mixer and Deck keys,
-  hardware controls, inserts, profile loads and layout edits.
+- [ ] Undo and redo: one history in the daemon, shared by every client.
+  Send levels, volumes, mutes, processing, inserts and the unit's own
+  controls are recorded, with buttons in the UI's header, `u` and `U` in
+  the terminal mixer and Deck keys. Profile loads and layout edits come next.
 
 ### Devices
 
