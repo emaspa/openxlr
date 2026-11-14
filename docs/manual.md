@@ -5094,7 +5094,10 @@ full volume on its sweep and logs when it had to.
 WirePlumber remembers a level set on a sink and, from version 0.5, puts it
 back when the sink is created again. The Stream, Chat and Aux sinks opt
 out of that with `state.restore-props=false`, so a daemon restart or a
-rebuilt graph never opens them at a remembered level or mute. On
+rebuilt graph never opens them at a remembered level or mute. The daemon
+opens them at their saved master and mute instead, before any channel
+links in, so a Stream mix saved muted stays silent while the daemon
+restarts. On
 WirePlumber 0.4 the opt-out works through the rule the `.deb` installs
 (`54-openxlr-owned-state.lua`).
 

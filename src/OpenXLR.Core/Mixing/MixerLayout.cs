@@ -140,6 +140,21 @@ public sealed partial record MixerConfig
                 ?? FallbackApplicationChannel)?.Id ?? StreamMatcher.Ignore;
 
     /// <summary>
+    /// This layout with the saved master and mute of every mix that is not a
+    /// monitor mix, by the rule <see cref="Mixer.ApplySettings"/> recalls them
+    /// with, so the build opens Stream, Chat and Aux at them. A monitor mix's
+    /// master is its sink's desktop volume and is left as it is.
+    /// </summary>
+    public MixerConfig WithSavedMasters(MixerSettings? settings) => settings is null ? this : this with
+    {
+        Mixes = [.. Mixes.Select(m => m.Kind == MixKind.Monitor ? m : m with
+        {
+            Volume = settings.MixVolumes.TryGetValue(m.Id, out double volume) && double.IsFinite(volume) ? volume : m.Volume,
+            Muted = settings.MixMuted.Contains(m.Id) || m.Muted && !settings.MixVolumes.ContainsKey(m.Id),
+        })],
+    };
+
+    /// <summary>
     /// Restore ordered editable nodes without replacing hardware or Aux.
     /// Old files retain the default layout. Invalid entries are ignored, and
     /// an empty application list heals to System as a safe routing destination.

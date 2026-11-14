@@ -217,6 +217,49 @@ public sealed partial class MonitorVolumeIntegrationTests(ITestOutputHelper outp
     }
 
     /// <summary>
+    /// A recorded mix saved muted is silent from its first moment: the build
+    /// writes its sink's master and mute before any channel's combine loads
+    /// and links into it, not with the settings restored after the build.
+    /// </summary>
+    [MonitorPipeWireFact]
+    public void ARecordedMixSavedMutedOpensMutedBeforeAnyChannelLinksIntoIt()
+    {
+        string directory = Directory.CreateTempSubdirectory("openxlr-vmix-open-").FullName;
+        string? path = Environment.GetEnvironmentVariable("PATH");
+        string pactl = (path ?? "").Split(Path.PathSeparator).Select(d => Path.Combine(d, "pactl")).First(File.Exists);
+        ExecutableScript.Write(Path.Combine(directory, "pactl"), $$"""
+            echo "$*" >> "${0%/*}/calls"
+            exec '{{pactl}}' "$@"
+            """);
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        var settings = new MixerSettings { MixVolumes = new() { ["stream"] = .5, ["chat"] = 1 }, MixMuted = ["stream"] };
+        try
+        {
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + path);
+            BuildVirtualMixes(mixer, pw, VirtualMixConfig().WithSavedMasters(settings));
+            string[] calls = File.ReadAllLines(Path.Combine(directory, "calls"));
+            int volume = Array.IndexOf(calls, $"set-sink-volume {SinkOf("stream")} 50%");
+            int mute = Array.IndexOf(calls, $"set-sink-mute {SinkOf("stream")} 1");
+            int combine = Array.FindIndex(calls, c => c.StartsWith("load-module module-combine-sink", StringComparison.Ordinal));
+            Assert.True(volume >= 0 && mute >= 0 && combine > volume && combine > mute, string.Join('\n', calls));
+            MixerState state = mixer.Snapshot();
+            Assert.Equal((.5, true), state.Mixes.Single(m => m.Id == "stream") is var stream ? (stream.Volume, stream.Muted) : default);
+            Assert.True(SpinWait.SpinUntil(() => pw.OwnSinkLevels().Single(s => s.Name == SinkOf("stream")) is { Muted: true } level
+                && Math.Abs(level.DesktopVolume - .5) < .01, TimeSpan.FromSeconds(3)), "The Stream sink did not open muted at half volume.");
+            SettleSends(mixer);
+            CaptureLevel(0, "OpenXLR_ch_test", MicrophoneOf("stream"), virtualMicrophone: true);
+            CaptureLevel(ThroughSend(1), "OpenXLR_ch_test", MicrophoneOf("chat"), virtualMicrophone: true);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", path);
+            Directory.Delete(directory, true);
+        }
+    }
+
+    /// <summary>
     /// The cost of one master move with eleven channels, as on the desk: one
     /// helper process on the mix sink, for a recorded mix as for a monitor
     /// mix, whatever the number of channels. The times are reported.
