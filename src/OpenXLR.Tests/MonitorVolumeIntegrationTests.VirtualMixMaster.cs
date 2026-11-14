@@ -175,42 +175,34 @@ public sealed partial class MonitorVolumeIntegrationTests(ITestOutputHelper outp
     }
 
     /// <summary>
-    /// What WirePlumber does with a mix sink it has saved state for. The
-    /// test runner seeds a quarter-volume muted entry for
-    /// <c>OpenXLR_mix_restored</c> and <c>OpenXLR_test_restoredoff</c>, and a
-    /// third sink learns its state here from a desktop write before it is
-    /// created again. Whether the saved state comes back depends on the
-    /// WirePlumber version, so the readings are reported; a sink that opts
-    /// out with <c>state.restore-props=false</c> must keep its own level, and
-    /// the sweep must put every mix sink back where the mixer holds it.
+    /// WirePlumber keeps saved state for a mix sink and, from 0.5, puts it
+    /// back when the sink is created again. The test runner seeds a
+    /// quarter-volume muted entry for <c>OpenXLR_mix_restored</c>, and a
+    /// second recorded mix learns its state here from a desktop write before
+    /// the mixer builds the graph again. A recorded mix's sink opts out with
+    /// <c>state.restore-props=false</c>, so both open at full volume and
+    /// unmuted, and stay there.
     /// </summary>
     [MonitorPipeWireFact]
-    public void WirePlumberStateOnARecreatedMixSinkIsReportedAndTheSweepHoldsTheSink()
+    public void ARecreatedRecordedMixSinkKeepsNoSavedDesktopState()
     {
         var pw = new PipeWireAdapter();
         using var registry = pw.WatchGraph();
         using var mixer = new Mixer(pw);
-        const string restored = "OpenXLR_mix_restored", optedOut = "OpenXLR_test_restoredoff", learned = "OpenXLR_mix_learned";
+        const string restored = "OpenXLR_mix_restored", learned = "OpenXLR_mix_learned";
         BuildVirtualMixes(mixer, pw, VirtualMixConfig("restored", "learned"));
-        uint optOut = OptedOutSink(optedOut);
         try
         {
-            Report("seeded, after creation", restored, optedOut);
-            Thread.Sleep(2000);
-            Report("seeded, after 2 s", restored, optedOut);
-            Assert.Equal((1.0, false), Level(optedOut));
-
+            Assert.Equal((1.0, false), Level(restored));
             // A level the desktop wrote is saved, then the mixer builds the
             // graph again and the sink is created anew under the same name.
             Pactl("set-sink-volume", learned, "30%");
             Pactl("set-sink-mute", learned, "1");
             Thread.Sleep(1500);
-            mixer.Build(VirtualMixConfig("restored", "learned"));
-            Report("learned, after creation", learned);
+            BuildVirtualMixes(mixer, pw, VirtualMixConfig("restored", "learned"));
+            foreach (string sink in new[] { restored, learned, SinkOf("stream"), SinkOf("chat"), SinkOf("auxout") })
+                Assert.Equal((1.0, false), Level(sink));
             Thread.Sleep(2000);
-            Report("learned, after 2 s", learned);
-
-            mixer.EnsureOwnSinkLevels();
             foreach (string sink in new[] { restored, learned, SinkOf("stream"), SinkOf("chat"), SinkOf("auxout") })
                 Assert.Equal((1.0, false), Level(sink));
         }
@@ -219,30 +211,9 @@ public sealed partial class MonitorVolumeIntegrationTests(ITestOutputHelper outp
             // Leave nothing saved that a later test could get back.
             Pactl("set-sink-volume", learned, "100%");
             Pactl("set-sink-mute", learned, "0");
-            ProcessRunner.Run("pactl", ["unload-module", optOut.ToString(CultureInfo.InvariantCulture)]);
         }
 
         (double Volume, bool Muted) Level(string sink) => (pw.GetSinkVolume(sink) ?? -1, pw.GetSinkMuted(sink));
-
-        void Report(string moment, params string[] sinks)
-        {
-            foreach (string sink in sinks)
-            {
-                (double volume, bool muted) = Level(sink);
-                output.WriteLine($"{sink} {moment}: volume {volume.ToString(CultureInfo.InvariantCulture)}{(muted ? ", muted" : "")}");
-            }
-        }
-
-        // A mix sink as the mixer creates one, with the opt-out combines
-        // carry, under a name no channel feeds.
-        static uint OptedOutSink(string name)
-        {
-            ProcessResult result = ProcessRunner.Run("pactl", ["load-module", "module-null-sink", "sink_name=" + name,
-                "media.class=Audio/Sink", "sink_properties=\"node.description='Opted out' node.suspend-on-idle=false "
-                + "priority.session=100 node.virtual=false state.restore-props=false\""]);
-            Assert.True(result.Ok, result.Stderr);
-            return uint.Parse(result.StdoutText.Trim(), CultureInfo.InvariantCulture);
-        }
     }
 
     /// <summary>
