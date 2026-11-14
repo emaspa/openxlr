@@ -666,6 +666,18 @@
   <data name="DiagnosticsSavedTo" xml:space="preserve">
     <value>saved to {0}</value>
   </data>
+  <data name="MarkGlitch" xml:space="preserve">
+    <value>Mark a glitch</value>
+  </data>
+  <data name="MarkGlitchHint" xml:space="preserve">
+    <value>Heard a crackle or a dropout? Mark it at once, here or with Ctrl+G in the main window, then collect diagnostics: timeline.txt in the archive shows what changed in the 30 seconds before each mark.</value>
+  </data>
+  <data name="GlitchMarkedAt" xml:space="preserve">
+    <value>Glitch marked at {0}</value>
+  </data>
+  <data name="GlitchNotMarked" xml:space="preserve">
+    <value>Not marked: {0}</value>
+  </data>
   <data name="DirectMonitorBlendLeftOnlyYourMicRight" xml:space="preserve">
     <value>Direct-monitor blend: left = only your mic, right = only PC audio</value>
   </data>

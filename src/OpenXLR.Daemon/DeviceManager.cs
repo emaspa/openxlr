@@ -107,6 +107,12 @@ public sealed partial class DeviceManager : BackgroundService
     public DeviceManager(ILogger<DeviceManager> log, IConfiguration config, IHostApplicationLifetime? lifetime = null)
         : this(log, config, DeviceRegistry.DetectAll, lifetime, keepsChoice: true) { }
 
+    /// <summary>
+    /// The daemon's event timeline. The primary's manager owns it; the mixer,
+    /// the hub and the additional interfaces' managers write to the same one.
+    /// </summary>
+    public EventTimeline Timeline { get; }
+
     // Set when the host begins to stop. The loop runs on until this service's
     // own turn to stop, after the mixer's teardown; opening a unit meanwhile
     // (an eight second deadline, then reads that time out on a wedged one)
@@ -122,10 +128,13 @@ public sealed partial class DeviceManager : BackgroundService
     /// Save setActiveDevice's choice and start from the saved one, which wins
     /// over <paramref name="preferredModel"/>: the primary's manager only.
     /// </param>
+    /// <param name="timeline">The timeline to write to; a new one when null, as for the primary.</param>
     internal DeviceManager(ILogger<DeviceManager> log, IConfiguration config, Func<IReadOnlyList<IAudioDevice>> detect,
-        IHostApplicationLifetime? lifetime = null, TimeProvider? time = null, ushort? preferredModel = null, bool keepsChoice = false)
+        IHostApplicationLifetime? lifetime = null, TimeProvider? time = null, ushort? preferredModel = null, bool keepsChoice = false,
+        EventTimeline? timeline = null)
     {
         _time = time ?? TimeProvider.System;
+        Timeline = timeline ?? new EventTimeline(_time);
         lifetime?.ApplicationStopping.Register(StopConnecting);
         _detect = detect;
         _log = log;
@@ -192,6 +201,7 @@ public sealed partial class DeviceManager : BackgroundService
             {
                 // The one way the primary moves on purpose, said in the journal.
                 _log.LogInformation("setActiveDevice: driving {target} instead of {current}", target.DisplayName, _device.Info.DisplayName);
+                Timeline.Record(TimelineKind.Device, $"switching to {target.DisplayName} from {_device.Info.DisplayName}");
                 // Settings still waiting for the debounce belong to the old
                 // device; write them before its snapshot goes. Drop disposes
                 // the transport even when disconnect fails, so its USB
@@ -488,7 +498,11 @@ public sealed partial class DeviceManager : BackgroundService
         {
             // Once per distinct message at warning; the retries that follow
             // every few seconds go to debug.
-            if (ex.Message != _lastLoopError) _log.LogWarning("device loop: {msg}", ex.Message);
+            if (ex.Message != _lastLoopError)
+            {
+                _log.LogWarning("device loop: {msg}", ex.Message);
+                Timeline.Record(TimelineKind.Device, $"device loop: {ex.Message}");
+            }
             else _log.LogDebug("device loop: {msg}", ex.Message);
             _lastLoopError = ex.Message;
             // The last good read is what an unplugged unit was left at.
@@ -546,6 +560,11 @@ public sealed partial class DeviceManager : BackgroundService
             : $"{dev.Info.DisplayName} {dev.Info.VendorId:x4}:{dev.Info.ProductId:x4}";
         _lastUsbFault = $"{DateTime.UtcNow:O} {device}, kernel {KernelRelease()}: {ex.Message}";
         bool setAside = dev is not null && _hung.NoteHung(dev.Info.InstanceId);
+        // The name and the count only: the transfer's payload stays in the
+        // journal and the vendor block dump, where the archive masks it.
+        Timeline.Record(TimelineKind.Usb, dev is null ? "a USB transfer never returned"
+            : $"a USB transfer to {dev.Info.DisplayName} never returned (hung transfer {_hung.HungCount(dev.Info.InstanceId)} of {HungTransferPolicy.Limit}"
+              + (setAside ? "; it is set aside)" : "; it is reconnected)"));
         if (setAside)
         {
             // A device that hangs on every transfer is not worth a reconnect
@@ -604,6 +623,7 @@ public sealed partial class DeviceManager : BackgroundService
             // -5, LIBUSB_ERROR_NOT_FOUND: the unit re-enumerated, which is the point.
             if (code is not (0 or -5)) return $"the USB reset of {device.Info.DisplayName} failed (libusb error {code})";
             _log.LogInformation("{dev} was reset on USB (libusb {code}); reconnecting it", device.Info.DisplayName, code);
+            Timeline.Record(TimelineKind.Usb, $"{device.Info.DisplayName} was reset on USB");
             _resetReturn = (instance, NowMs + (long)ResetReturnWindow.TotalMilliseconds);
             // Give the kernel the moment it takes to let go of the unit and
             // bind it again, so the reopen does not catch the old device.
@@ -612,6 +632,19 @@ public sealed partial class DeviceManager : BackgroundService
             Drop();
             return null;
         }
+    }
+
+    private bool _scanned;
+
+    /// <summary>The units a scan found that the one before did not, and those it no longer found.</summary>
+    private void NoteAttachedLocked(IReadOnlyList<DeviceInfo> before, IReadOnlyList<DeviceInfo> now)
+    {
+        // The first scan is what was attached at start, not a change.
+        if (!_scanned) { _scanned = true; return; }
+        foreach (DeviceInfo unit in now.Where(d => !before.Any(b => b.InstanceId == d.InstanceId)))
+            Timeline.Record(TimelineKind.Device, $"{unit.DisplayName} came onto the USB bus");
+        foreach (DeviceInfo unit in before.Where(b => !now.Any(d => d.InstanceId == b.InstanceId)))
+            Timeline.Record(TimelineKind.Device, $"{unit.DisplayName} left the USB bus");
     }
 
     private static string KernelRelease()
@@ -626,7 +659,11 @@ public sealed partial class DeviceManager : BackgroundService
         {
             if (_suspended) return;
             IReadOnlyList<IAudioDevice> all = _detect();
+            IReadOnlyList<DeviceInfo> before = _detected;
             _detected = [.. all.Select(d => d.Info)];
+            // The primary's scan sees every supported unit: one that came onto
+            // the bus or left it goes on the timeline, driven or not.
+            if (_keepsChoice) NoteAttachedLocked(before, _detected);
             // A unit that left the bus is no longer the one not answering.
             if (_unansweredId is { } silent && !all.Any(d => d.Info.InstanceId == silent)) ClearUnansweredLocked();
             // The unit went away under its transport without a drop: clients
@@ -636,6 +673,7 @@ public sealed partial class DeviceManager : BackgroundService
                 // No failed transfer says this anywhere else.
                 _log.LogWarning("{dev} closed without a failed USB transfer (its USB helper exited); its state is gone until it reconnects",
                     gone.Info.DisplayName);
+                Timeline.Record(TimelineKind.Device, $"{gone.Info.DisplayName} closed: its USB helper exited");
                 RaiseFromLocked();
                 ForgetEq();
                 ForgetDynamics();
@@ -653,6 +691,7 @@ public sealed partial class DeviceManager : BackgroundService
                     _hung.Returned(aside);
                     _setAsideWarning = null;
                     _log.LogInformation("{instance} is back on the bus after being set aside; driving it again", aside);
+                    Timeline.Record(TimelineKind.Usb, $"{returned.Info.DisplayName} is back on the bus after being set aside");
                 }
             }
             if (_device is { Connected: true } && !StandInGivesWayLocked(all)) return;
@@ -708,6 +747,7 @@ public sealed partial class DeviceManager : BackgroundService
                 _log.LogInformation("{dev}: {note}", dev.Info.DisplayName, eqNote);
             if (_unansweredId is not null && _unansweredId != dev.Info.InstanceId) ClearUnansweredLocked();
             _log.LogInformation("connected {dev}", dev.Info.DisplayName);
+            Timeline.Record(TimelineKind.Device, $"connected {dev.Info.DisplayName}");
             if (dev.ConnectionNote is string note) _log.LogWarning("{dev}: {note}", dev.Info.DisplayName, note);
             _lastLoopError = null;
             bool powerCycled = _absentInstances.Remove(dev.Info.InstanceId) || AddressChanged(dev.Info);
@@ -1016,6 +1056,7 @@ public sealed partial class DeviceManager : BackgroundService
         {
             if (note.Warning) _log.LogWarning("{note}", note.Text);
             else _log.LogInformation("{note}", note.Text);
+            Timeline.Record(TimelineKind.Card, note.Text);
         }
         // A switch of unit or a restore that came in meanwhile has replaced
         // the watch; what this one found no longer applies.
@@ -1082,6 +1123,7 @@ public sealed partial class DeviceManager : BackgroundService
                 ClearUnansweredLocked();
                 recovered = true;
                 _log.LogInformation("{dev} answers USB reads again", _device.Info.DisplayName);
+                Timeline.Record(TimelineKind.Usb, $"{_device.Info.DisplayName} answers USB reads again");
             }
             bool changed = _last is null || now != _last;
             if (changed)
@@ -1110,6 +1152,7 @@ public sealed partial class DeviceManager : BackgroundService
             _unansweredId = unit.InstanceId;
             _log.LogWarning("{dev} does not answer USB reads ({error}). OpenXLR keeps reconnecting it and shows the last values it read; " +
                             "if it stays this way, unplug the device and plug it back in.", unit.DisplayName, error);
+            Timeline.Record(TimelineKind.Usb, $"{unit.DisplayName} does not answer USB reads ({error})");
         }
         _unansweredWarning = $"{unit.DisplayName} does not answer USB reads ({error}). The values shown are the last ones read from it " +
                              "and OpenXLR keeps reconnecting it; if this does not clear, unplug the device and plug it back in.";
@@ -1568,6 +1611,7 @@ public sealed partial class DeviceManager : BackgroundService
             try { _device?.Disconnect(); } catch { /* ignore */ }
             try { _device?.Dispose(); } catch { /* the helper is gone either way */ }
             bool was = _device is not null;
+            if (_device is { } dropped) Timeline.Record(TimelineKind.Device, $"{dropped.Info.DisplayName} is no longer driven");
             _device = null;
             _last = null;
             _published = NothingDriven;

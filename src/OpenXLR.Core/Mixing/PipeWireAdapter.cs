@@ -119,6 +119,17 @@ public sealed class PipeWireAdapter
     /// <summary>Hand the journal one line, when the daemon gave this adapter somewhere to put it.</summary>
     internal void Note(string line) => _note?.Invoke(line);
 
+    /// <summary>
+    /// Where the mixer puts an entry for the daemon's event timeline: a kind
+    /// from <see cref="TimelineKind"/> and a short sentence. Called from the
+    /// sweep and command threads, sometimes under the mixer's lock, so the
+    /// receiver only stores it and returns.
+    /// </summary>
+    public Action<string, string>? Events { get; set; }
+
+    /// <summary>One timeline entry, when the daemon gave this adapter a timeline.</summary>
+    internal void Event(string kind, string text) => Events?.Invoke(kind, text);
+
     internal PipeWireAdapter(Func<DspFeatureAvailability> clipGuardAvailabilityOverride)
     {
         _clipGuardAvailabilityOverride = clipGuardAvailabilityOverride;
@@ -1872,6 +1883,7 @@ public sealed class PipeWireAdapter
                         throw new InvalidOperationException($"{info.Name} has no editor the native host can open; select the filter chain.");
                     var host = new NativePluginHost(insert, node, channels, rate, info.Path, _note);
                     _nativeHosts.Add(host);
+                    Event(TimelineKind.Plugin, $"plugin host started for {InsertName(insert)} on {node}");
                     // Wine starts behind a bridged plugin and outlives this
                     // helper, so from here on it is this daemon's to end.
                     if (host.Bridged) _wine.HelperStarted();

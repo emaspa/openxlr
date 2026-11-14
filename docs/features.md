@@ -1412,6 +1412,14 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   build identities, state
   receive time and connection status distinguish source rebuilds and
   retained state from an earlier connection
+- Glitch marker: Ctrl+G in the UI or the terminal mixer, a button in
+  Options, SUPPORT, or a Deck key marks the moment a crackle or dropout was
+  heard. The daemon keeps a ten minute record, in memory, of what changed
+  around the audio (devices on the bus, USB faults, card profiles, capture
+  stalls, the graph, plugin hosts, the clock and block size, own clock
+  underruns, application streams on channels), without polling for it, and
+  the diagnostics archive's `timeline.txt` lists each marker with the 30
+  seconds before it ([manual](manual.md#glitch-marker))
 - Deep Wine trace checkbox in Options, SUPPORT for reproducing a bridged
   plugin scan failure. Enable it, Rescan, collect diagnostics, then disable
   it. Scans get much slower and produce large logs. The switch takes effect

@@ -296,6 +296,9 @@
     <StackPanel Name="ApplicationNotices">
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <!-- a glitch just marked with Ctrl+G or from Options, for a few seconds -->
+    <TextBlock Name="GlitchNotice" Text="{Binding GlitchNotice}" Classes="h" TextWrapping="Wrap"
+               Margin="0,0,0,8" IsVisible="{Binding GlitchNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
     <!-- a card profile without a microphone input and a microphone resampled
          to another device's clock are the warnings with a manual section of
          their own; the card profile wins when both are there -->

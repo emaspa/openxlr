@@ -642,6 +642,18 @@
   <data name="DiagnosticsSavedTo" xml:space="preserve">
     <value>guardado en {0}</value>
   </data>
+  <data name="MarkGlitch" xml:space="preserve">
+    <value>Marcar un fallo</value>
+  </data>
+  <data name="MarkGlitchHint" xml:space="preserve">
+    <value>¿Has oído un chasquido o un corte? Márcalo enseguida, aquí o con Ctrl+G en la ventana principal, y luego recopila el diagnóstico: timeline.txt en el archivo muestra lo que cambió en los 30 segundos anteriores a cada marca.</value>
+  </data>
+  <data name="GlitchMarkedAt" xml:space="preserve">
+    <value>Fallo marcado a las {0}</value>
+  </data>
+  <data name="GlitchNotMarked" xml:space="preserve">
+    <value>No se marcó: {0}</value>
+  </data>
   <data name="DirectMonitorBlendLeftOnlyYourMicRight" xml:space="preserve">
     <value>Mezcla de monitorización directa: izquierda = solo micrófono, derecha = solo audio del PC</value>
   </data>

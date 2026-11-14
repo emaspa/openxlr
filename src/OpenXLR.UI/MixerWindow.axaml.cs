@@ -56,6 +56,13 @@ public partial class MixerWindow : Window
             if (e.Key == Key.Enter) CommitCustom();
         }, RoutingStrategies.Bubble, handledEventsToo: true);
         MixerScaleCustom.LostFocus += (_, _) => CommitCustom();
+        // The main window's Ctrl+G, for a mixer that was popped out of it.
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (!MainWindow.IsGlitchKey(e) || DataContext is not MainViewModel model) return;
+            e.Handled = true;
+            _ = model.MarkGlitchAsync();
+        }, RoutingStrategies.Tunnel);
         UpdateControlSizing();
         SkinService.Changed += UpdateControlSizing;
         MixerScroll.PropertyChanged += (_, e) =>

@@ -626,6 +626,18 @@
   <data name="DiagnosticsSavedTo" xml:space="preserve">
     <value>сачувано у {0}</value>
   </data>
+  <data name="MarkGlitch" xml:space="preserve">
+    <value>Означи сметњу</value>
+  </data>
+  <data name="MarkGlitchHint" xml:space="preserve">
+    <value>Чуо си пуцкетање или прекид? Одмах га означи, овде или са Ctrl+G у главном прозору, па прикупи дијагностику: timeline.txt у архиви показује шта се променило у 30 секунди пре сваке ознаке.</value>
+  </data>
+  <data name="GlitchMarkedAt" xml:space="preserve">
+    <value>Сметња означена у {0}</value>
+  </data>
+  <data name="GlitchNotMarked" xml:space="preserve">
+    <value>Није означено: {0}</value>
+  </data>
   <data name="DirectMonitorBlendLeftOnlyYourMicRight" xml:space="preserve">
     <value>Однос директног слушања: лево = само микрофон, десно = само звук рачунара</value>
   </data>

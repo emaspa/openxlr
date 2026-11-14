@@ -336,8 +336,10 @@ public sealed class WaveInterfaces : BackgroundService
                 {
                     string id = device.Info.InstanceId;
                     if (_sessions.ContainsKey(id)) continue;
+                    // Its connects, drops and USB faults go on the primary's timeline.
                     var session = new DeviceManager(_deviceLog, _configuration,
-                        () => [.. Volatile.Read(ref _available).Where(d => d.Info.InstanceId == id && id != Volatile.Read(ref _reserved))]);
+                        () => [.. Volatile.Read(ref _available).Where(d => d.Info.InstanceId == id && id != Volatile.Read(ref _reserved))],
+                        timeline: _primary.Timeline);
                     session.SetSessionStorageId(id);
                     session.StateChanged += _ => Changed?.Invoke();
                     session.EqStatusChanged += () => EqStatusChanged?.Invoke();

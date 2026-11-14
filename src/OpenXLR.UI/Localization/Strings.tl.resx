@@ -626,6 +626,18 @@
   <data name="DiagnosticsSavedTo" xml:space="preserve">
     <value>na-save sa {0}</value>
   </data>
+  <data name="MarkGlitch" xml:space="preserve">
+    <value>Markahan ang glitch</value>
+  </data>
+  <data name="MarkGlitchHint" xml:space="preserve">
+    <value>May narinig na lagitik o putol? Markahan agad, dito o gamit ang Ctrl+G sa pangunahing window, saka kolektahin ang diagnostics: ipinapakita ng timeline.txt sa archive kung ano ang nagbago sa 30 segundo bago ang bawat marka.</value>
+  </data>
+  <data name="GlitchMarkedAt" xml:space="preserve">
+    <value>Namarkahan ang glitch nang {0}</value>
+  </data>
+  <data name="GlitchNotMarked" xml:space="preserve">
+    <value>Hindi namarkahan: {0}</value>
+  </data>
   <data name="DirectMonitorBlendLeftOnlyYourMicRight" xml:space="preserve">
     <value>Direct-monitor blend: kaliwa = mikropono lang, kanan = PC audio lang</value>
   </data>

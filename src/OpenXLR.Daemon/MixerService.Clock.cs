@@ -107,6 +107,8 @@ public sealed partial class MixerService
         _log.LogInformation(node is null
             ? "audio clock: removed {path}; WirePlumber chooses again after it restarts"
             : "audio clock: wrote {path} for {node}; it applies after WirePlumber restarts", ClockRulePath, node);
+        Timeline.Record(TimelineKind.Clock, node is null ? "the audio clock rule was removed; it applies after WirePlumber restarts"
+            : $"the audio clock rule now names {node}; it applies after WirePlumber restarts");
         SyncClockRule();
         Changed?.Invoke();
         return null;
@@ -126,6 +128,7 @@ public sealed partial class MixerService
         try
         {
             _log.LogInformation("restarting WirePlumber for the audio clock rule");
+            Timeline.Record(TimelineKind.Clock, "restarting WirePlumber for the audio clock rule");
             ProcessResult result;
             try { result = await ProcessRunner.RunAsync(Systemctl, AudioClockRule.RestartArguments, TimeSpan.FromSeconds(30)); }
             catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
@@ -136,6 +139,7 @@ public sealed partial class MixerService
             {
                 string why = result.TimedOut ? "timed out" : result.Stderr.Trim() is { Length: > 0 } text ? text : $"exit code {result.ExitCode}";
                 _log.LogWarning("WirePlumber did not restart: {why}", why);
+                Timeline.Record(TimelineKind.Clock, $"WirePlumber did not restart: {why}");
                 return "restartAudioServices: systemctl --user restart wireplumber failed: " + why;
             }
             lock (_clockRuleGate) _clockRuleRemoved = false;

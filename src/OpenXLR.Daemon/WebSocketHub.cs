@@ -261,6 +261,17 @@ public sealed partial class WebSocketHub
             case "getRuntimeDiagnostics":
                 await reply(new RuntimeDiagnosticsMessage(OpenXLR.Core.RuntimeSnapshot.Capture()));
                 break;
+            case "markGlitch":
+                error = CommandValidation.CheckMarkGlitch(cmd);
+                if (error is not null) break;
+                GlitchMarker marker = _devices.Timeline.Mark(cmd.Label);
+                // One journal line, so the moment can be found beside the
+                // audio server's own messages in the archive.
+                _log.LogInformation("the user marked a glitch{from}", marker.Label is null ? "" : $" ({marker.Label})");
+                break;
+            case "getTimeline":
+                await reply(_devices.Timeline.Snapshot());
+                break;
             case "getSoundCheckTake":
                 await reply(SoundCheckTakeMessage.From(_mixer.CurrentSoundCheckTake()));
                 break;

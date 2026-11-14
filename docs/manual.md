@@ -4422,8 +4422,8 @@ the bypass of one insert or of a whole chain, a desktop output's mute, a
 5% step up or down in its volume, or its selection as the enforced system
 default, the routing of the focused
 application, a profile to recall, an [EQ profile](#eq-profile-keys) to
-load on a microphone, or the next member of an
-[exclusive group](#exclusive-groups). A group key shows the group's name
+load on a microphone, the next member of an
+[exclusive group](#exclusive-groups), or a [glitch marker](#glitch-marker). A group key shows the group's name
 and the member that is heard, or None; a press unmutes the next member in
 the mixes the current one was heard in and mutes the current one. With
 every member muted the key shows an alert, because there is nothing to
@@ -5126,9 +5126,56 @@ truncated credentials. If this masking exceeds its time limit, the archive
 contains an omission notice in place of that log's text, never its
 unredacted contents. The original log on disk is kept.
 
+<a name="glitch-marker"></a>
+#### Marking a glitch
+
+A crackle or a dropout is over before you can open Options. Mark the moment
+instead, as soon as you hear it, and collect diagnostics afterwards:
+
+- in the UI, press **Ctrl+G** in the main window or in the mixer's own
+  window once it is popped out, or choose **Mark a glitch** in Options,
+  SUPPORT;
+- on the Stream Deck, press a Toggle key set to **Mark a glitch for the
+  diagnostics archive**, under **Diagnostics** in the key's settings;
+- in the terminal mixer, press **Ctrl+G** on any tab.
+
+The UI shows "Glitch marked at" and the time for a few seconds, above the
+mixer and beside the button in Options; the terminal mixer says the same on
+its bottom line, and the Deck key shows the host's check mark. Nothing else
+changes: no audio is restarted and no audio is recorded. The daemon writes
+"the user marked a glitch" to its journal, so the moment can be found in
+`journal.txt` next to the audio server's lines in `audio-journal.txt`.
+
+The daemon keeps a record of what changed around the audio for the last ten
+minutes, at most 500 entries, in memory only: an interface that came onto
+the USB bus, left it, connected or dropped, a USB transfer that hung, a USB
+reset, a card profile note, a capture that stalled or was recovered, the
+mixer's graph built, repaired or lost, a plugin host that started or stopped
+on its own, the device that drives the graph, the block size and the audio
+clock rule, an underrun or overrun on a capture input's own clock, and an
+application that started or stopped playing on a mixer channel. A marker
+keeps the 30 seconds before it from the moment it is made, so an archive
+collected an hour later still holds them. The last 20 markers are kept until
+the daemon restarts.
+
+The archive's `timeline.txt` lists each marker with its time and where it was
+marked from, then every entry of its 30 seconds with how many seconds before
+the marker it came, then the whole record. Times are the computer's local
+time to the millisecond, as in the journals. An empty window means nothing
+OpenXLR watches changed before the glitch: no device, graph or plugin host
+event. Look next at the audio server and the USB controller in
+`audio-journal.txt`, `kernel-log.txt` and `alsa-pcm.txt` below. The record cannot say where an xrun happened, for the
+reason given under `alsa-pcm.txt`. It names devices by model, never by
+serial, and applications by name, never by what they play, and it goes
+through the same redaction as the journals.
+
 For audio glitches, collect while the problem is present and before restarting
 the daemon, if possible. Collection reads the current state without changing
 audio, recording samples or starting plugins. The extra reports are:
+
+- `timeline.txt`: the glitch markers and the event record described in
+  [marking a glitch](#glitch-marker). An older daemon, or one that does not
+  answer, leaves a line saying so.
 
 - `usb-topology.txt`: `lsusb -t`, showing USB port and hub relationships,
   drivers and connection speeds. Match bus and device numbers with
@@ -6191,6 +6238,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Everywhere | `1` to `9`, Tab, Shift+Tab | choose a section |
 | Everywhere | `F1`, `?` | show help |
 | Everywhere | `q`, Ctrl+C | quit; in a text prompt `q` is text and Ctrl+C quits |
+| Everywhere | Ctrl+G | mark a [glitch](#glitch-marker) for the diagnostics archive, in a text prompt too |
 | Mixer | Up/Down, PageUp/PageDown | choose a channel, or jump ten channels |
 | Mixer | Left/Right | choose the mix the sends feed |
 | Mixer | Home, End | choose the masters or the last channel |

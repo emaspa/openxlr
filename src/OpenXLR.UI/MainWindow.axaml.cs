@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Threading;
@@ -34,6 +35,9 @@ public partial class MainWindow : Window
     internal const string GarbledMicrophoneManualLink = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#garbled-mic";
 
     public MainWindow() : this(new DaemonClient(), syncDesktopVolume: true) { }
+
+    /// <summary>Ctrl+G, the UI's key for marking a glitch, in the main window and the separate mixer window.</summary>
+    internal static bool IsGlitchKey(KeyEventArgs e) => e.Key == Key.G && e.KeyModifiers == KeyModifiers.Control;
 
     /// <summary>
     /// For the window tests, which point the client at a port nothing serves
@@ -79,6 +83,13 @@ public partial class MainWindow : Window
         SetupTray();
         RestoreSectionState();
         SetupReordering();
+        // Ctrl+G marks a glitch from anywhere in the window, a text box included.
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (!IsGlitchKey(e)) return;
+            e.Handled = true;
+            _ = _vm.MarkGlitchAsync();
+        }, RoutingStrategies.Tunnel);
         Opened += async (_, _) =>
         {
             if (_automaticUpdateCheckStarted) return;

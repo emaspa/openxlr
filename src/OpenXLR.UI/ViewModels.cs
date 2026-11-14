@@ -2,6 +2,7 @@ using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -163,6 +164,37 @@ public sealed partial class MainViewModel : ViewModelBase
     public string StatusLine => !DaemonConnected ? OlderDaemonRunning ? Localizer.Text("OlderDaemonRunning") : Localizer.Text("DaemonNotRunning")
         : DeviceConnected ? DeviceName
         : Localizer.Text("NoDevice");
+
+    // --- the glitch marker ---
+
+    /// <summary>How long the main window says a glitch was marked.</summary>
+    public static readonly TimeSpan GlitchNoticeHold = TimeSpan.FromSeconds(4);
+
+    /// <summary>Starts the notice's hold and calls back when it ends; tests run it by hand.</summary>
+    internal Func<TimeSpan, Action, IDisposable> StartGlitchNoticeHold { get; set; } =
+        (after, elapsed) => DispatcherTimer.RunOnce(elapsed, after);
+
+    private IDisposable? _glitchNoticeHold;
+    private string? _glitchNotice;
+
+    /// <summary>The sentence that says a glitch was just marked, or why not; null once its hold ends.</summary>
+    public string? GlitchNotice { get => _glitchNotice; private set => Set(ref _glitchNotice, value); }
+
+    /// <summary>
+    /// Mark a glitch on the daemon's timeline, from Options or Ctrl+G. The
+    /// sentence it returns says it was marked, at what time, or why not, and
+    /// the main window shows it for <see cref="GlitchNoticeHold"/>.
+    /// </summary>
+    public async Task<string> MarkGlitchAsync()
+    {
+        string at = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        string? error = await _client.MarkGlitchAsync();
+        string text = error is null ? Localizer.Format("GlitchMarkedAt", at) : Localizer.Format("GlitchNotMarked", error);
+        _glitchNoticeHold?.Dispose();
+        GlitchNotice = text;
+        _glitchNoticeHold = StartGlitchNoticeHold(GlitchNoticeHold, () => GlitchNotice = null);
+        return text;
+    }
 
     // --- hardware controls ---
 
