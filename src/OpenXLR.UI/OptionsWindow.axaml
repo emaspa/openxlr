@@ -502,6 +502,14 @@
                   <TextBlock Grid.Column="2" Name="DiagStatus" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}"
                              VerticalAlignment="Center" TextWrapping="Wrap"/>
                 </Grid>
+                <!-- a glitch marked here, or with Ctrl+G in the main window, is in the next archive -->
+                <TextBlock Text="{loc:Text Key=MarkGlitchHint}"
+                           FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                <Grid ColumnDefinitions="Auto,10,*">
+                  <Button Name="MarkGlitchButton" Content="{loc:Text Key=MarkGlitch}" Padding="14,5" Click="OnMarkGlitch"/>
+                  <TextBlock Grid.Column="2" Name="GlitchStatus" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}"
+                             VerticalAlignment="Center" TextWrapping="Wrap"/>
+                </Grid>
               </StackPanel>
             </Border>
           </StackPanel>

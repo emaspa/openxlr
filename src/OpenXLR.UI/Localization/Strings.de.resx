@@ -673,6 +673,18 @@
   <data name="DiagnosticsSavedTo" xml:space="preserve">
     <value>Gespeichert unter {0}</value>
   </data>
+  <data name="MarkGlitch" xml:space="preserve">
+    <value>Störung markieren</value>
+  </data>
+  <data name="MarkGlitchHint" xml:space="preserve">
+    <value>Ein Knacken oder einen Aussetzer gehört? Markiere ihn gleich, hier oder mit Ctrl+G im Hauptfenster, und sammle dann die Diagnose: timeline.txt im Archiv zeigt, was sich in den 30 Sekunden vor jeder Markierung geändert hat.</value>
+  </data>
+  <data name="GlitchMarkedAt" xml:space="preserve">
+    <value>Störung um {0} markiert</value>
+  </data>
+  <data name="GlitchNotMarked" xml:space="preserve">
+    <value>Nicht markiert: {0}</value>
+  </data>
   <data name="DirectMonitorBlendLeftOnlyYourMicRight" xml:space="preserve">
     <value>Direktes Monitoring: links nur Mikrofon, rechts nur PC-Audio</value>
   </data>

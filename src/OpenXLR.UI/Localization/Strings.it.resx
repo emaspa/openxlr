@@ -651,6 +651,18 @@
   <data name="DiagnosticsSavedTo" xml:space="preserve">
     <value>salvata in {0}</value>
   </data>
+  <data name="MarkGlitch" xml:space="preserve">
+    <value>Segna un disturbo</value>
+  </data>
+  <data name="MarkGlitchHint" xml:space="preserve">
+    <value>Hai sentito un crepitio o un'interruzione? Segnalo subito, qui o con Ctrl+G nella finestra principale, poi raccogli la diagnostica: timeline.txt nell'archivio mostra cosa è cambiato nei 30 secondi prima di ogni segno.</value>
+  </data>
+  <data name="GlitchMarkedAt" xml:space="preserve">
+    <value>Disturbo segnato alle {0}</value>
+  </data>
+  <data name="GlitchNotMarked" xml:space="preserve">
+    <value>Non segnato: {0}</value>
+  </data>
   <data name="DirectMonitorBlendLeftOnlyYourMicRight" xml:space="preserve">
     <value>Bilanciamento del monitoraggio diretto: sinistra = solo il tuo microfono, destra = solo l'audio del PC</value>
   </data>

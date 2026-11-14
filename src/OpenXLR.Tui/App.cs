@@ -157,6 +157,8 @@ internal sealed class App
         Link.ClearError();
 
         if (key.Ctrl && key.Is('c')) { Stop(); return; }
+        // Ctrl+G marks a glitch wherever the keys are, a prompt included.
+        if (key.Ctrl && key.Is('g')) { MarkGlitch(); return; }
         if (Prompting) { Typing(key); return; }
         bool typing = Current.WantsText;
         if (!typing && key.Is('q')) { Stop(); return; }
@@ -186,6 +188,18 @@ internal sealed class App
 
         if (key.Is('q')) { Stop(); return; }
         if (!typing && key.Is('?')) { _help = true; return; }
+    }
+
+    /// <summary>
+    /// Ctrl+G: put a glitch marker on the daemon's timeline, which the next
+    /// diagnostics archive shows with what changed before it. A daemon that
+    /// refuses it says so on the bottom line, as any refused command does.
+    /// </summary>
+    private void MarkGlitch()
+    {
+        if (!Link.Connected) { Say("Not marked: the daemon is not connected"); return; }
+        Link.Send("markGlitch", body => body["label"] = "terminal mixer");
+        Say($"Glitch marked at {Time.GetLocalNow().ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}");
     }
 
     private void Typing(KeyPress key)
@@ -412,6 +426,7 @@ internal sealed class App
         [
             "Sections  1-9 or Tab / Shift+Tab. F1 or ? opens this table.",
             "Quit      q or Ctrl+C. In a text prompt use Ctrl+C to quit.",
+            "Glitch    Ctrl+G marks a glitch for the diagnostics archive.",
             "Mixer     Up/Down channel; Home masters; End last channel.",
             "          Left/Right mix; PgUp/PgDn jump ten channels.",
             "          Space mute; -/+ five points; [/] one point.",

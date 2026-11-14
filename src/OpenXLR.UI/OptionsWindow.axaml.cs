@@ -252,6 +252,13 @@ public partial class OptionsWindow : Window
         }
     }
 
+    /// <summary>Mark a glitch now; the line beside the button says it was marked, or why not.</summary>
+    private async void OnMarkGlitch(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OptionsViewModel vm) return;
+        GlitchStatus.Text = await vm.Main.MarkGlitchAsync();
+    }
+
     private async void OnDesktopKeys(object? sender, RoutedEventArgs e)
     {
         if (DataContext is OptionsViewModel vm && _desktopKeys is not null)

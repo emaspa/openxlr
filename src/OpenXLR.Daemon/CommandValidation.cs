@@ -85,6 +85,16 @@ public static class CommandValidation
     /// <summary>The step id an <c>undo</c> or <c>redo</c> that passed <see cref="CheckHistory"/> names, or null.</summary>
     internal static long? HistoryStep(Command cmd) => cmd.Step.ValueKind == JsonValueKind.Number ? cmd.Step.GetInt64() : null;
 
+    /// <summary>
+    /// <c>markGlitch</c>: an optional <c>label</c> saying where the glitch was
+    /// marked, 1 to <see cref="EventTimeline.LabelLimit"/> characters without
+    /// control characters.
+    /// </summary>
+    internal static string? CheckMarkGlitch(Command cmd)
+        => cmd.Label is null || cmd.Label.Length is > 0 and <= EventTimeline.LabelLimit && !cmd.Label.Any(char.IsControl)
+            && !string.IsNullOrWhiteSpace(cmd.Label)
+            ? null : $"markGlitch: label must be 1 to {EventTimeline.LabelLimit} characters without control characters";
+
     public const int MaxText = 256;          // identities, labels, device names, symbols
     public const int MaxUri = 512;
     public const int MaxDevices = 16;
@@ -365,6 +375,10 @@ public static class CommandValidation
                 return null;   // no arguments; the driven unit's capabilities decide
             case "restartDaemon":
                 return null;   // no arguments
+            case "markGlitch":
+                return CheckMarkGlitch(cmd);
+            case "getTimeline":
+                return null;   // no arguments; a read
             case "setAudioClock":
                 return CheckAudioClock(cmd);
             case "setLed":

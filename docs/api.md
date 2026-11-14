@@ -120,6 +120,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `mixingPlan` | in answer to `setMixing` with `check` | what [hardware mixing](#hardware-mixing) would do with the layout as it stands: `wanted`, `active`, `reason`, `note`, `pairs`, `sections`, `jacks`, `cells` (section start to bytes 0 to 13 as hex, the membership's bit 12 the maximizer's bypass), `clamped`, `disabled` and `entryOffsetsDb`. Nothing changes |
 | `diagnostics` | in answer to `getDiagnostics` | `blocks`, mapping vendor block names to hex strings or read errors. An XLR Dock adds `paths`, the card number and the path each of its gain, mute and headphone controls takes (`Alsa` through the card's mixer, `Block` through the dock's config block when the card lacks the control, `None` when the USB handle is closed too, so the control is unavailable), and `alsa`, the values read through the card. A Wave XLR Pro adds its five hardware mixes decoded from block 0x0001: `section0`, `section18`, `section36`, `section54` and `section72` (each member with its level, the pairs the section ducks, the raw ducking fields, the maximizer's amount and whether it is bypassed, and for sections 18 to 72 the level and mute bytes; section 0 shows its mute byte, 99, raw), `outputs` (the section each jack, the USB Aux port and Line Out plays), `section0Level` (byte 98), `xlr1Capture` and `xlr2Capture` (bytes 94 and 95, whether each microphone's capture is taken before or after the unit's processing), `usbAuxCapture` (byte 96, which showed no effect on USB Aux's capture) and `lineInCapture` (byte 97: as it arrives, after the insert return, after the ducker, or silent); a block of another layout gives `sections` saying why it was not decoded instead. It adds its meters decoded from block 0x0002, each line naming only what moves, levels in dBFS and `-` for silence: `meterDucking` (each ducker that lowers its source or hears its key: the source, the reduction, the key level and its output left and right), `meterLevels` (each of the 35 level points with a level: each input before the unit's processing, after it, after the insert return and after the ducker, each USB pair as it arrives and after its ducker, and the five mix sections), `meterOutputs` (Headphones 1, Headphones 2, Line Out and the USB Aux port), `meterMaximizers` and `meterDynamics` (the expanders, compressors and Voice Tune, read only for diagnostics); a block of another length gives `meters` saying why. A Wave XLR MK.2 on firmware 1.0.15 or later adds `meterBlock` and `statusBlock`, its blocks 0x0002 and 0x0006 as hex, with `meterLevels` (the input, headphones, USB, processed, after-insert and monitor mix levels, left/right, `-` for silence), `meterDynamics` (the expander's and compressor's reduction, key level and output) and `status` (whether a microphone and headphones are plugged in, the microphone detection value, whether the unit is storing its settings, and the sample rate); a block of another length gives `meters` or `status` saying why (see [hardware support](hardware-support.md#mk2-meter-status)). adds `usbCapture`, block 0x0001 byte 4 decoded: whether its capture is taken before or after the unit's processing. `usbFault` carries the last USB fault of this run and `error` a dump that failed |
 | `runtimeDiagnostics` | in answer to `getRuntimeDiagnostics` | the daemon build version and ID, and the [runtime snapshot](#runtime-snapshot) |
+| `timeline` | in answer to `getTimeline` | the daemon's [event timeline](#event-timeline): `now`, `since`, `capacity`, `spanSeconds`, `windowSeconds`, `overflowed`, `events` and `markers` |
 | `meters` | 15 Hz while the mixer is built | `levels`, an object mapping each key below to its values: live stereo levels per channel (`ch:<id>`) and mix (`mix:<id>`), `[left, right]` from 0 at -60 dBFS and below to 1 at 0 dBFS (a mix the Wave XLR Pro builds in [hardware mixing](#hardware-mixing) reads the unit's own meter), and `duck:<id>` for each mix with a running software [ducking](#ducking) stage, or ducked by a Wave XLR Pro that holds the setup: one value, the reduction in dB now (0 while the key is quiet). `max:<id>` carries the reduction in dB of the Wave XLR Pro's maximizer on a mix the unit builds alone in [hardware mixing](#hardware-mixing), while it runs (an amount above 0) and the unit's meters are read. While a client keeps a [meter before the chain](#meter-before-the-chain) running, `in:<id>` carries that microphone's `[rms, peak, clip]`, and while a [Sound Check](#sound-check) take loops, `take:<id>` carries one value, where the loop is across the take from 0 to 1. While a [soundboard](#soundboard) clip plays, `clip:<id>` carries `[position, voices]`: how far its newest voice is, 0 to 1, and how many voices play it; the key is absent while the clip is silent. While a client keeps a microphone's [compressor and expander](#compressor-and-expander) levels coming with `watchDynamics` and its stage runs, or a unit that reports them runs them, `exp:<id>` and `comp:<id>` each carry `[input, reduction, output]` in dB |
 | `soundCheckTake` | once, when the Sound Check helper finishes a take, and in answer to `getSoundCheckTake` | `channel`, `take` (the take's number in the session, from 1), `seconds` (its length) and `peaks` (200 values from 0 to 1, the peak of each stretch of the take in order); without a take `channel` is null, `take` 0 and `peaks` empty. See [Sound Check](#sound-check) |
 | `soundboard` | in answer to `getSoundboard` | `soundboard`, the same object as the state's `mixer.soundboard`. See [Soundboard](#soundboard) |
@@ -391,6 +392,8 @@ that final acknowledgement (or an `error` without a request id):
 | `restartDaemon` | none | stop cleanly with exit code 75, so a service manager with `Restart=on-failure` or `Restart=always` starts the daemon again; a daemon run by hand just stops. The Flatpak UI sends it to a daemon running as a user service ([Flatpak](flatpak.md)) |
 | `getDiagnostics` | none | vendor block dump for bug reports |
 | `getRuntimeDiagnostics` | none | reply `runtimeDiagnostics` with `daemonBuildVersion`, `daemonBuildId` and a numerical `snapshot` from the daemon that answers. See [runtime snapshot](#runtime-snapshot) |
+| `markGlitch` | optional `label` | mark a glitch the user heard: put a marker on the [event timeline](#event-timeline) with the time now and the entries of the 30 seconds before it, and write one line to the daemon's journal, `the user marked a glitch`, with the label in brackets when one was given. `label` says where it was marked, 1 to 32 characters without control characters: the UI sends `UI`, the OpenDeck plugin `Deck` and the terminal mixer `terminal mixer`. Works with the mixer off and with no interface connected |
+| `getTimeline` | none | reply `timeline` with the [event timeline](#event-timeline) and the glitch markers. A read; nothing changes |
 
 Profiles live in one directory per connected interface model. While no
 interface is connected they live in `generic`, whatever the strips are bound
@@ -1830,6 +1833,45 @@ resident, peak, locked and swapped memory and the proportional share of
 mapped memory. An unavailable kernel counter is absent. The snapshot
 does not contain addresses, memory contents, arguments or environment
 variables. It works even with the mixer off or no interface attached.
+
+## Event timeline
+
+The daemon keeps a record of what changed around the audio in the last ten
+minutes, in memory only, and a glitch marked with `markGlitch` is read
+against it.
+The diagnostics archive writes it to `timeline.txt`. It cannot say where an
+xrun happened: PipeWire reports those only through its profiler, which drops
+a driver's report above 16 KiB, and the mixer's graph is larger than that.
+
+Each entry of `events` is `{at, kind, text}`: the time in UTC, one of the
+kinds below, and one sentence. The ring holds the last `spanSeconds` (600)
+of entries, at most `capacity` (500); `overflowed` counts the entries
+dropped because the ring was full, so a reader knows the ten minutes are not
+complete. `since` is when the daemon started and `now` when it answered.
+
+| Kind | Entries |
+|---|---|
+| `daemon` | the daemon started |
+| `device` | a supported interface came onto the USB bus or left it, was connected, is no longer driven, was switched to by `setActiveDevice`, closed because its USB helper exited, or the device loop failed (the first time for each message) |
+| `usb` | a USB transfer that never returned, with its count against the set-aside limit, a USB reset, a unit set aside that is back, a unit that stops or starts answering reads |
+| `card` | each card profile note the daemon logs for the driven unit |
+| `capture` | the capture rescue's stalls, relinks, USB resets and reopened sources, and the hardware inputs' notes about their capture source |
+| `mixer` | the mixer's graph built, not built, lost, torn down or answering again after a wait, its sweep failing or running again, sinks, sends and stage streams put back after something outside OpenXLR changed them, hardware mixing entering and leaving, and every note the mixer writes to the journal, such as a plugin's last message or a sample rate change |
+| `plugin` | a native plugin host started for an insert, and any helper that stopped on its own (an insert chain, an EQ, ducking or delay stage, the soundboard player), with its last message and whether it is started again or left off |
+| `clock` | the device that drives the mixer's graph and any microphone that follows it resampled, the audio clock rule written or removed, WirePlumber restarted for it, `setBlockSize`, and each underrun or overrun a capture input's own clock bridge counts |
+| `stream` | an application stream started or stopped playing on a mixer channel, by the application's name and the channel; a stream's own title is never recorded |
+| `marker` | a glitch the user marked |
+
+Entries come from events the daemon already handles; nothing polls for
+them, and an idle daemon adds none. Devices are named by model, never by
+serial or instance id, and the clock by the devices' descriptions rather
+than their node names.
+
+Each of `markers` is `{at, label, before}`: when it was marked, the label
+or null, and the entries of the 30 seconds (`windowSeconds`) before it,
+oldest first, copied at that moment. The last 20 markers are kept for the
+daemon's run, whatever the ring has dropped since. A daemon restart empties
+both.
 
 ## Plugin discovery diagnostics
 

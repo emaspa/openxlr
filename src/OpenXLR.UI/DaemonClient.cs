@@ -96,6 +96,17 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     internal Task<JsonNode?> RequestRuntimeDiagnosticsAsync(TimeSpan timeout)
         => QueryAsync("runtimeDiagnostics", "getRuntimeDiagnostics", timeout);
 
+    /// <summary>The daemon's event timeline and glitch markers (a <c>timeline</c> message); null on timeout or from an older daemon.</summary>
+    internal Task<JsonNode?> RequestTimelineAsync(TimeSpan timeout)
+        => QueryAsync("timeline", "getTimeline", timeout);
+
+    /// <summary>
+    /// Mark a glitch on the daemon's timeline now, as marked from the UI.
+    /// Null once it is marked, else why not.
+    /// </summary>
+    public Task<string?> MarkGlitchAsync()
+        => EditLayoutAsync(new() { ["cmd"] = "markGlitch", ["label"] = "UI" });
+
     /// <summary>
     /// The dry run of hardware mixing: what <c>setMixing hardware</c> would do
     /// with the layout as it stands, as the daemon's <c>mixingPlan</c>
@@ -435,7 +446,7 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
                 _lastState = new(text, DateTimeOffset.UtcNow, true);
                 StateReceived?.Invoke(node);
             }
-            else if (type is "diagnostics" or "runtimeDiagnostics") StoreReply(type, node);
+            else if (type is "diagnostics" or "runtimeDiagnostics" or "timeline") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
             else if (type == "nativeEditorRulesChanged") NativeEditorRulesChanged?.Invoke();
             else if (type == "browserTabActivation")

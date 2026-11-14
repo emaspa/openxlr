@@ -57,7 +57,7 @@ internal static class HistoryPolicy
     private static readonly string[] Ignored =
     [
         "undo", "redo",
-        "getState", "getBrowserSession", "syncBrowserTabs", "activateBrowserTab", "getDiagnostics", "getRuntimeDiagnostics",
+        "getState", "getBrowserSession", "syncBrowserTabs", "activateBrowserTab", "getDiagnostics", "getRuntimeDiagnostics", "markGlitch", "getTimeline",
         "getSoundCheckTake", "getSoundboard", "importClip", "exportSoundboard", "importSoundboard", "restoreStarterSounds",
         "listPlugins", "getNativeEditorRules", "setNativeEditorRule", "getPluginDiagnostics", "getPluginSetup",
         "setPluginWineTrace", "installPlugin", "addWindowsPluginFolder", "removeWindowsPluginFolder", "getWindowsPluginFiles",

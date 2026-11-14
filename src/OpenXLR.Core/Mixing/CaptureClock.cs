@@ -227,12 +227,38 @@ public sealed partial class Mixer
             foreach (string id in _clockBridges.Keys.Where(id => !_config.Channels.Any(c => c.Id == id && c.CaptureSource is not null
                 && c.CaptureOwnClock)).ToArray())
                 RemoveClockBridgeLocked(id);
-            string summary = string.Join("\n", _config.Channels.Where(c => c.CaptureSource is not null && c.CaptureOwnClock)
-                .Select(c => (c.Id, State: CaptureClockStateLocked(c)))
-                .Select(s => $"{s.Id}|{s.State.Running}|{s.State.Underruns}|{s.State.Overruns}|{Math.Round(s.State.DelayMs ?? -1)}|{s.State.Error}"));
+            var states = _config.Channels.Where(c => c.CaptureSource is not null && c.CaptureOwnClock)
+                .Select(c => (Channel: c, State: CaptureClockStateLocked(c))).ToList();
+            string summary = string.Join("\n", states
+                .Select(s => $"{s.Channel.Id}|{s.State.Running}|{s.State.Underruns}|{s.State.Overruns}|{Math.Round(s.State.DelayMs ?? -1)}|{s.State.Error}"));
             if (summary == _clockBridgeSummary) return false;
+            NoteBridgeRunsLocked(states);
             _clockBridgeSummary = summary;
             return true;
+        }
+    }
+
+    // The underruns and overruns each bridge had counted when last looked at.
+    private readonly Dictionary<string, (long Underruns, long Overruns)> _clockBridgeRuns = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// A bridge that counted another underrun or overrun since the last look
+    /// goes on the daemon's timeline: it is the one place the mixer itself
+    /// sees audio dropped. A bridge started afresh counts from zero again.
+    /// </summary>
+    private void NoteBridgeRunsLocked(IReadOnlyList<(ChannelDefinition Channel, CaptureClockStatus State)> states)
+    {
+        foreach (string id in _clockBridgeRuns.Keys.Where(id => !states.Any(s => s.Channel.Id == id)).ToArray())
+            _clockBridgeRuns.Remove(id);
+        foreach ((ChannelDefinition channel, CaptureClockStatus state) in states)
+        {
+            (long Underruns, long Overruns) now = (state.Underruns, state.Overruns);
+            if (_clockBridgeRuns.TryGetValue(channel.Id, out var before)
+                && (now.Underruns > before.Underruns || now.Overruns > before.Overruns)
+                && now.Underruns >= before.Underruns && now.Overruns >= before.Overruns)
+                _pw.Event(TimelineKind.Clock, $"{channel.Name}'s own clock bridge counted "
+                    + $"{now.Underruns - before.Underruns} underrun(s) and {now.Overruns - before.Overruns} overrun(s)");
+            _clockBridgeRuns[channel.Id] = now;
         }
     }
 }

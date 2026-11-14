@@ -84,7 +84,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     private MeterReader _meters = new();
 
-    public Mixer(PipeWireAdapter? adapter = null) => _pw = adapter ?? new PipeWireAdapter();
+    public Mixer(PipeWireAdapter? adapter = null)
+    {
+        _pw = adapter ?? new PipeWireAdapter();
+        // Every helper that died on its own goes on the daemon's timeline:
+        // an insert chain, a microphone or mix EQ stage, ducking, a mix
+        // delay or the soundboard player.
+        _restarts.Noted = (key, reason, blocked) => _pw.Event(TimelineKind.Plugin,
+            $"{key} stopped on its own{(string.IsNullOrWhiteSpace(reason) ? "" : $" ({Shorten(reason.Trim())})")}"
+            + (blocked ? "; it is left off after repeated failures" : "; it is started again"));
+    }
+
+    private static string Shorten(string text) => text.Length <= RestartPolicy.ReasonCap ? text : text[..RestartPolicy.ReasonCap];
 
     /// <summary>
     /// Live stereo channel and mix levels, the mixes a Wave XLR Pro builds in
@@ -3405,12 +3416,22 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 _streams[s.Id] = placed;
                 // Transient plumbing (Wine's probe streams, bare runtime
                 // binaries) is routed but never remembered as an app.
-                if (!PipeWireAdapter.IsPlumbingIdentity(identity)) _apps[identity] = placed;
+                if (!PipeWireAdapter.IsPlumbingIdentity(identity))
+                {
+                    _apps[identity] = placed;
+                    // The application's name and the channel only: a
+                    // stream's own label can be a song or a page title.
+                    _pw.Event(TimelineKind.Stream, $"{identity} started playing on {ch.Name}");
+                }
                 changed = true;
             }
 
             foreach (int gone in _streams.Keys.Where(k => !seen.ContainsKey(k)).ToList())
             {
+                if (_streams[gone] is { } ended && ended.ChannelId != StreamMatcher.Ignore && !ended.BrowserHeld
+                    && !PipeWireAdapter.IsPlumbingIdentity(ended.Identity))
+                    _pw.Event(TimelineKind.Stream, $"{ended.Identity} stopped playing on "
+                        + (_config.Channels.FirstOrDefault(c => c.Id == ended.ChannelId)?.Name ?? ended.ChannelId));
                 _streams.Remove(gone);
                 changed = true;
             }

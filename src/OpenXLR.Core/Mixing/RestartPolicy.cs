@@ -33,7 +33,14 @@ internal sealed class RestartPolicy(Func<long> clock, int limit = 3, long window
             _failures[key] = (1, now, reason);
         else
             _failures[key] = (Math.Min(seen.Count + 1, limit), seen.Since, reason ?? seen.Reason);
+        Noted?.Invoke(key, reason, Blocked(key));
     }
+
+    /// <summary>
+    /// Told of each death <see cref="Failed"/> records: the chain's key, what
+    /// its helper last said, and whether the chain is now given up on.
+    /// </summary>
+    public Action<string, string?, bool>? Noted { get; set; }
 
     /// <summary>Whether a chain has failed too often to be worth building again.</summary>
     public bool Blocked(string key)

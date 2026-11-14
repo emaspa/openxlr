@@ -15,6 +15,7 @@ import { isEqTarget, eqTarget, eqStep, eqCommand, eqLabel, eqDial } from "./micr
 import { isVoiceTarget, voiceTarget, voiceMode, voicePress, voiceRelease, voiceLabel } from "./voice-changer.mjs";
 import { isEqProfileTarget, eqProfileTarget, eqProfilePress, eqProfileLabel } from "./eq-profiles.mjs";
 import { CLIP_ACTION, clipKey, clipIdOf, clipPress, clipProgress, progressBucket, clipAppearance, clipChoices } from "./soundboard.mjs";
+import { isGlitchTarget, glitchPress, glitchValue, GLITCH_LABEL } from "./glitch-marker.mjs";
 
 // ---------- launch arguments ----------
 const arg = (name) => {
@@ -493,6 +494,7 @@ const supported = (target) => deviceTargetSupported(daemonState?.capabilities, t
 // need the key's saved meta for id fallback, so they take the instance.
 function toggleValue(target, inst) {
   if (!target) return null;
+  if (isGlitchTarget(target)) return glitchValue(daemonUp && daemonState !== null);
   if (isVoiceTarget(target)) return voiceTarget(mixer(), target)?.lit ?? null;
   // Lit while the microphone's EQ is on and holds the profile's bands.
   if (isEqProfileTarget(target)) return eqProfileTarget(daemonState, target)?.lit ?? null;
@@ -647,6 +649,7 @@ function outputVolume(name) {
 
 function toggleLabel(target, inst) {
   if (!target) return "OpenXLR";
+  if (isGlitchTarget(target)) return GLITCH_LABEL;
   if (isVoiceTarget(target)) return voiceLabel(voiceTarget(mixer(), target), target);
   if (isEqProfileTarget(target)) return eqProfileLabel(eqProfileTarget(daemonState, target), target);
   if (isEqTarget(target)) {
@@ -992,6 +995,8 @@ function onKeyDown(context, inst, inMultiAction = false) {
   const cur = toggleValue(t, inst);
   if (cur === null) { send({ event: "showAlert", context }); return; }
   if (isVoiceTarget(t)) { onVoiceDown(context, inst, t, inMultiAction); return; }
+  // A marker on the daemon's timeline: the check mark says it was taken.
+  if (isGlitchTarget(t)) { keyCommands.enqueue(context, glitchPress()); return; }
   if (isEqProfileTarget(t)) {
     // One loadEqProfile, after any EQ dial turn still waiting, so the
     // profile is what the microphone ends up with. A profile the

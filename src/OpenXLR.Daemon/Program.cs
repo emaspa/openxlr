@@ -91,6 +91,9 @@ ControlApi.Configure(builder, control);
 
 var app = builder.Build();
 app.Services.GetRequiredService<WebSocketHub>();   // construct so it subscribes to StateChanged
+// The timeline's first entry, so an archive shows where its record begins.
+app.Services.GetRequiredService<DeviceManager>().Timeline.Record(OpenXLR.Core.Mixing.TimelineKind.Daemon,
+    $"OpenXLR daemon {DaemonVersion.Current} started");
 
 app.UseWebSockets();
 ApiEndpoints.Map(app);

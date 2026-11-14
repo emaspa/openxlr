@@ -77,6 +77,9 @@ public static partial class Diagnostics
                 native audio-server and session-manager journal entries from the current boot,
                 kernel messages about USB, sound and power management from the current boot,
                 the status of open ALSA devices, application audio metadata,
+                the daemon's event timeline of the last ten minutes and its glitch
+                markers, which name devices, plugins and the applications that
+                played on mixer channels,
                 a summary of playback and recording streams and their connected
                 audio nodes, system and desktop session details, and the
                 versions reported by local audio tools,
@@ -113,6 +116,7 @@ public static partial class Diagnostics
             // The vendor blocks are a separate fresh query.
             await File.WriteAllTextAsync(Path.Combine(work, "daemon-state.json"),
                 CleanJson(StateForArchive(observation.Json)));
+            await WriteTimelineAsync(client, work, Clean, secrets, TimeSpan.FromSeconds(5));
             var blocks = await client.RequestDiagnosticsAsync(TimeSpan.FromSeconds(5));
             await File.WriteAllTextAsync(Path.Combine(work, "device-blocks.json"),
                 blocks is null ? JsonOmission("No reply from the daemon.")

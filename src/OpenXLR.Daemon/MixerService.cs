@@ -84,6 +84,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
     private readonly SettingsSaver _saves;
     public NativeEditorPolicy EditorPolicy { get; }
 
+    /// <summary>The daemon's event timeline, which the mixer writes to.</summary>
+    internal EventTimeline Timeline { get; }
+
     /// <summary>
     /// The folder each new service reads the starter sounds from: the one
     /// installed beside the daemon. The test process points it at a folder
@@ -112,10 +115,25 @@ public sealed partial class MixerService : IHostedService, IDisposable
         // service's turn: the services stopped before it spend the same 45 s.
         lifetime?.ApplicationStopping.Register(() => Interlocked.CompareExchange(ref _stopStarted, Environment.TickCount64, 0));
         EditorPolicy = editorPolicy ?? new NativeEditorPolicy();
-        _pipeWire = new PipeWireAdapter(_progress.Mark, note => _log.LogInformation("{msg}", note));
-        _mixer = new(_pipeWire) { InputNote = note => _log.LogWarning("hardware input: {note}", note) };
+        // The mixer's journal notes and its own timeline entries both go on
+        // the device manager's timeline, the one the hub reads.
+        EventTimeline timeline = Timeline = devices.Timeline;
+        _pipeWire = new PipeWireAdapter(_progress.Mark, note =>
+        {
+            _log.LogInformation("{msg}", note);
+            timeline.Record(TimelineKind.Mixer, note);
+        }) { Events = timeline.Record };
+        _mixer = new(_pipeWire)
+        {
+            InputNote = note =>
+            {
+                _log.LogWarning("hardware input: {note}", note);
+                timeline.Record(TimelineKind.Capture, "hardware input: " + note);
+            },
+        };
         _devices.HardwareMixingEntry = () => _mixer.HardwareEntryNow is { Leaving: false } entry ? entry : null;
-        _rescue = new CaptureRescue(_log, _mixer, () => _devices.ActiveInfo, () => _devices.ActiveCapabilities, _devices.ResetUnitUsb);
+        _rescue = new CaptureRescue(new TimelineLog(_log, timeline, TimelineKind.Capture), _mixer,
+            () => _devices.ActiveInfo, () => _devices.ActiveCapabilities, _devices.ResetUnitUsb);
         _eqPort = new DeviceEqPort(devices, waveInterfaces);
         // A unit confirming or refusing an EQ is followed at once, off the
         // device lock: a hand-over from the unit waits for its confirmation.
@@ -151,6 +169,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         if (_mixer.GraphPresent() is not false) { _graphMissing = 0; return false; }
         if (++_graphMissing < 2) return false;
         _log.LogWarning("the submixer graph is gone (pipewire-pulse restarted?); restarting the daemon to rebuild it");
+        Timeline.Record(TimelineKind.Mixer, "the mixer's graph is gone (pipewire-pulse restarted?); the daemon restarts to build it again");
         // ForgetGraph empties the mixer, so this is the last chance to write
         // and the end of writing, exactly as at a clean stop.
         if (_saves.Close(write: _saves.Pending) is string err) _log.LogWarning("settings not saved before the restart: {err}", err);
@@ -256,6 +275,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         SaveEntryNow();
         _log.LogInformation("hardware mixing: entering; jack levels {hp1} / {hp2} / {lineout} dB lowered to {base1} / {base2} / {base3} dB",
             levels["hp1"], levels["hp2"], levels["lineout"], entry.Jacks["hp1"], entry.Jacks["hp2"], entry.Jacks["lineout"]);
+        Timeline.Record(TimelineKind.Mixer, "hardware mixing: entering");
         DriveHardwareMixingLocked(plan);
         return true;
     }
@@ -310,12 +330,16 @@ public sealed partial class MixerService : IHostedService, IDisposable
             if (!held) return;
             if (_mixer.EnterHardwareGraph(plan.Pairs, plan.Sections, plan.ReturnPairs, plan.CuePair)) ScheduleSave();
             _log.LogInformation("hardware mixing: running; pairs {pairs}", string.Join(", ", plan.Pairs.Select(p => $"{p.Key} {p.Value}")));
+            Timeline.Record(TimelineKind.Mixer, "hardware mixing: running");
         }
         else if (_mixer.DriveHardwareMixing(plan.Pairs, plan.Sections, plan.ReturnPairs, plan.CuePair)) ScheduleSave();
         _devices.EnsureMix(full, out bool kept);
         if (kept) _hardwareMisses = 0;
         else if (++_hardwareMisses == HardwareMissLimit)
+        {
             _log.LogWarning("hardware mixing: the Wave XLR Pro did not keep {count} writes in a row; leaving the mode for this run", HardwareMissLimit);
+            Timeline.Record(TimelineKind.Mixer, $"hardware mixing: the Wave XLR Pro did not keep {HardwareMissLimit} writes in a row");
+        }
         foreach ((string jack, double db) in new[] { ("hp1", levels.Hp1Db!.Value), ("hp2", levels.Hp2Db!.Value), ("lineout", levels.LineOutDb!.Value) })
         {
             byte now = ProJackLevels.ByteOf(db);
@@ -384,6 +408,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         _jackWritten.Clear();
         SaveEntryNow();
         _log.LogInformation("hardware mixing: leaving ({why})", plan.Wanted ? plan.Reason : "switched off");
+        Timeline.Record(TimelineKind.Mixer, $"hardware mixing: leaving ({(plan.Wanted ? plan.Reason : "switched off")})");
         return true;
     }
 
@@ -569,6 +594,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             _mixer.ForgetHardwareEntry();
             SaveEntryNow();
             _log.LogInformation("hardware mixing: left; the Wave XLR Pro is back as it was before it");
+            Timeline.Record(TimelineKind.Mixer, "hardware mixing: left");
         }
 
         // The device latches aux-return routing at playback-stream start, so a
@@ -827,6 +853,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         catch (Exception ex)
         {
             _log.LogError("failed to build submix graph: {msg}", ex.Message);
+            Timeline.Record(TimelineKind.Mixer, $"the mixer's graph was not built: {ex.Message}; retrying");
             DiscardPartialGraph();
             // No audio server is a degraded operating mode, not a deadlock.
             _checkingProgress = false;
@@ -854,7 +881,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
     {
         if (_graphWatch is null)
         {
-            _graphWatch = _pipeWire.WatchGraph(note => _log.LogInformation("{msg}", note));
+            _graphWatch = _pipeWire.WatchGraph(note =>
+            {
+                _log.LogInformation("{msg}", note);
+                Timeline.Record(TimelineKind.Mixer, note);
+            });
             _pipeWire.PlaybackStreamArrived -= OnPlaybackStreamArrived;
             _pipeWire.PlaybackStreamArrived += OnPlaybackStreamArrived;
         }
@@ -931,6 +962,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
         _log.LogInformation("submix graph built ({mixes} mixes, {channels} channels){route}",
             _mixer.Config.Mixes.Count, _mixer.Config.Channels.Count,
             output is null ? "" : $", monitor -> {output}");
+        Timeline.Record(TimelineKind.Mixer, $"the mixer's graph was built ({_mixer.Config.Mixes.Count} mixes, {_mixer.Config.Channels.Count} channels)");
 
         // Sweep for new application streams and route them to their channel.
         // One second is responsive enough that audio lands in the right place
@@ -991,6 +1023,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             {
                 BuildGraph(output, before);
                 _log.LogInformation("the audio server answers again; submix graph built after {n} failed attempt(s)", failures);
+                Timeline.Record(TimelineKind.Mixer, $"the audio server answers again, after {failures} failed attempt(s)");
                 return;
             }
             catch (Exception ex)
@@ -1056,8 +1089,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
             stop.ThrowIfCancellationRequested();
             bool monitorChanged = _mixer.SyncOwnSinkLevels(out IReadOnlyList<string> restoredSinks);
             if (restoredSinks.Count > 0)
+            {
                 _log.LogWarning("restored the expected level and mute of {n} OpenXLR sink(s) or stage stream(s) ({names}); something outside OpenXLR had changed them",
                     restoredSinks.Count, string.Join(", ", restoredSinks));
+                Timeline.Record(TimelineKind.Mixer, $"restored the level and mute of {string.Join(", ", restoredSinks)}; something outside OpenXLR had changed them");
+            }
             // Collect what the plugins' own editors changed before the
             // healing pass below, so a chain that is about to be rebuilt
             // comes back with the values its editor last showed.
@@ -1077,11 +1113,17 @@ public sealed partial class MixerService : IHostedService, IDisposable
             // links the graph again, comes back with its channel's sink.
             _mixer.EnsureCellLevels(out IReadOnlyList<string> heldSends, out IReadOnlyList<string> reloadedChannels);
             if (heldSends.Count > 0)
+            {
                 _log.LogInformation("put {n} send(s) back on their faders ({cells}); something outside OpenXLR had changed them",
                     heldSends.Count, string.Join(", ", heldSends));
+                Timeline.Record(TimelineKind.Mixer, $"put {string.Join(", ", heldSends)} back on their faders; something outside OpenXLR had changed them");
+            }
             if (reloadedChannels.Count > 0)
+            {
                 _log.LogWarning("reloaded the sink of {channels} to make its sends again; a send's stream had ended",
                     string.Join(", ", reloadedChannels));
+                Timeline.Record(TimelineKind.Mixer, $"reloaded the sink of {string.Join(", ", reloadedChannels)}: a send's stream had ended");
+            }
             stop.ThrowIfCancellationRequested();
             bool changed = _mixer.SyncStreams();
             // A level the desktop or the program moved is a setting too.
@@ -1149,6 +1191,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             {
                 _lastSweepError = null;
                 _log.LogInformation("stream sweep recovered");
+                Timeline.Record(TimelineKind.Mixer, "the mixer's sweep runs again");
             }
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
@@ -1163,6 +1206,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             {
                 _lastSweepError = ex.Message;
                 _log.LogWarning("stream sweep: {msg} (repeats logged at debug level)", ex.Message);
+                Timeline.Record(TimelineKind.Mixer, $"the mixer's sweep failed: {ex.Message}");
             }
             else _log.LogDebug("stream sweep: {msg}", ex.Message);
         }
@@ -1232,6 +1276,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             if (_saves.Close(write: true) is string stopErr) _log.LogWarning("settings not saved at stop: {err}", stopErr);
             _mixer.TearDown();
             _log.LogInformation("submix graph torn down");
+            Timeline.Record(TimelineKind.Mixer, "the mixer's graph was torn down");
         }
         else _saves.Close(write: false);
         // One line for whatever the limit cut short.
@@ -1491,8 +1536,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     Changed?.Invoke();
                     return null;
                 case "setBlockSize":
-                    _saves.RunSaved(() => _mixer.SetBlockSize(
-                        cmd.Value.ValueKind is System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetInt32(), s => s.Save()));
+                    int? frames = cmd.Value.ValueKind is System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetInt32();
+                    _saves.RunSaved(() => _mixer.SetBlockSize(frames, s => s.Save()));
+                    Timeline.Record(TimelineKind.Clock, frames is int f ? $"block size set to {f} frames" : "block size set to automatic");
                     Changed?.Invoke();
                     return null;
                 case "setPreserveBrowserOutputs":
@@ -2036,7 +2082,19 @@ public sealed partial class MixerService : IHostedService, IDisposable
         _clockNoted = line;
         if (clock!.MicResampled) _log.LogWarning("{line}", line);
         else _log.LogInformation("{line}", line);
+        Timeline.Record(TimelineKind.Clock, ClockEvent(clock));
     }
+
+    /// <summary>
+    /// The clock line for the timeline, by the devices' names as the UI shows
+    /// them rather than their node names, which carry a unit's serial.
+    /// </summary>
+    internal static string ClockEvent(MixerClock clock)
+        => clock.Driver is not { } driver ? "no device drives the mixer's graph"
+            : $"{driver.Description} drives the mixer's graph"
+              + string.Concat(clock.Followers.Where(f => f.Resampled).Select(f => $"; {f.Description} follows it resampled"))
+              + string.Concat(clock.Bridged.Select(b => b.Separate ? $"; {b.Description} runs on its own clock, bridged"
+                  : $"; {b.Description} is set to its own clock but runs in the mixer's graph"));
 
     /// <summary>A microphone's interface follows another device's clock, in one sentence, or null.</summary>
     public string? ClockWarning => _mixer.Built ? NamedClock(_mixer.GraphClock)?.Warning() : null;

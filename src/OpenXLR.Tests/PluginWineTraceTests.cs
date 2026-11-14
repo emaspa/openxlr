@@ -174,7 +174,8 @@ internal sealed class PluginWineTraceFixture : IAsyncDisposable
     private readonly WebApplication _app;
     public WebSocketHub Hub { get; }
 
-    public PluginWineTraceFixture()
+    /// <param name="log">Where the daemon's journal lines go, for a test that reads them; nowhere when null.</param>
+    public PluginWineTraceFixture(ILoggerProvider? log = null)
     {
         foreach (var (name, value) in new Dictionary<string, string?>
         {
@@ -191,6 +192,7 @@ internal sealed class PluginWineTraceFixture : IAsyncDisposable
         }
         var builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
+        if (log is not null) builder.Logging.AddProvider(log);
         builder.Services.AddSingleton<DeviceManager>();
         builder.Services.AddSingleton<MixerService>();
         builder.Services.AddSingleton<WebSocketHub>();

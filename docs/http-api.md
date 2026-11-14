@@ -75,6 +75,10 @@ Send `{"cmd":"getRuntimeDiagnostics"}` through `/commands` for the
 daemon's [runtime snapshot](api.md#runtime-snapshot). The ordinary
 `diagnostics` resource still returns the USB vendor blocks.
 
+`{"cmd":"markGlitch","label":"script"}` through `/commands` marks a glitch,
+and `{"cmd":"getTimeline"}` returns the [event timeline](api.md#event-timeline)
+with the markers. Neither has a resource of its own.
+
 The mixer resource reports `routeAppsByDefault`. Send
 `{"cmd":"setRouteAppsByDefault","value":false}` through `/commands` to leave
 unassigned apps not managed. Explicit assignments still apply. This is a
