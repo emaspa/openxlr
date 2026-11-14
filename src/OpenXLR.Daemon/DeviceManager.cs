@@ -1289,6 +1289,8 @@ public sealed partial class DeviceManager : BackgroundService
                 (c.Gain && s.GainDb != p.GainDb ||
                  c.Gain && c.XlrInputs > 1 && s.Gain2Db != p.Gain2Db);
             bool gainRestored = GainIsLocked && restoring && c.Gain && s.GainDb != p.GainDb;
+            // An MK.1 state saved before its ClipGuard and mix were read holds placeholders for both.
+            bool placeholders = s.ClipGuardAndMixRead == true && p.ClipGuardAndMixRead is null;
             try
             {
                 if (c.Gain && !lockApplies && s.GainDb != p.GainDb) _device.SetGainDb(p.GainDb);
@@ -1298,7 +1300,7 @@ public sealed partial class DeviceManager : BackgroundService
                 if (c.VoiceTune && s.VoiceTune != p.VoiceTune) _device.SetVoiceTune(p.VoiceTune);
                 if (c.VoiceTune && s.VoiceTuneStrength != p.VoiceTuneStrength) _device.SetVoiceTuneStrength(p.VoiceTuneStrength);
                 if (c.Phantom && s.Phantom != p.Phantom) { _device.SetPhantom(p.Phantom); _phantomWroteAt = UtcNow; }
-                if (c.ClipGuard && s.ClipGuard != p.ClipGuard) _device.SetClipGuard(p.ClipGuard);
+                if (c.ClipGuard && !placeholders && s.ClipGuard != p.ClipGuard) _device.SetClipGuard(p.ClipGuard);
                 if (c.Compressor && s.Compressor != p.Compressor) _device.SetCompressor(p.Compressor);
                 if (c.Gain && c.XlrInputs > 1 && !lockApplies && s.Gain2Db != p.Gain2Db) _device.SetGain2Db(p.Gain2Db);
                 if (c.Mute && c.XlrInputs > 1 && s.Mute2 != p.Mute2) _device.SetMute2(p.Mute2);
@@ -1312,7 +1314,7 @@ public sealed partial class DeviceManager : BackgroundService
                 if (c.HpVolume && s.HpVolumeDb != p.HpVolumeDb) _device.SetHpVolumeDb(p.HpVolumeDb);
                 if (c.HpVolume && c.HpOutputs > 1 && s.Hp2VolumeDb != p.Hp2VolumeDb) _device.SetHp2VolumeDb(p.Hp2VolumeDb);
                 if (c.LowImpedance && s.LowImpedance != p.LowImpedance) _device.SetLowImpedance(p.LowImpedance);
-                if (c.Crossfade && s.Crossfade != p.Crossfade) _device.SetCrossfade(p.Crossfade);
+                if (c.Crossfade && !placeholders && s.Crossfade != p.Crossfade) _device.SetCrossfade(p.Crossfade);
                 if (c.AuxInput && s.AuxLevelDb != p.AuxLevelDb) _device.SetAuxLevelDb(p.AuxLevelDb);
                 if (c.AuxInput && s.AuxLevelLock != p.AuxLevelLock) _device.SetAuxLevelLock(p.AuxLevelLock);
                 // A snapshot from before the Line In existed holds none and leaves the unit's gain alone.
