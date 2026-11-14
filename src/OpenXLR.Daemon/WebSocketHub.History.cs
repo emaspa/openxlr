@@ -103,7 +103,7 @@ public sealed partial class WebSocketHub
         }
         string? reason = changed > 0 ? "it changed since"
             : gone > 0 ? "its channel or mix no longer exists"
-            : failed > 0 ? "the audio server refused it" : null;
+            : failed > 0 ? "it could not be written" : null;
         string? note = reason is null ? null : $"{char.ToUpperInvariant(verb[0])}{verb[1..]} skipped part of {label}: {reason}.";
         History.Complete(step, redo, done, done.Count > 0 ? note : null);
         _stateBroadcasts.Signal();

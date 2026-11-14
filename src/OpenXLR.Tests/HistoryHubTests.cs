@@ -12,7 +12,7 @@ namespace OpenXLR.Tests;
 /// what undo and redo write back, what they skip and what clears them.
 /// </summary>
 [Collection("xdg-config")]
-public sealed class HistoryHubTests
+public sealed partial class HistoryHubTests
 {
     [Fact]
     public async Task AFaderIsUndoneAndRedone()
@@ -259,6 +259,7 @@ public sealed class HistoryHubTests
                 case "$*" in
                     'list sinks short') printf '1\tOpenXLR_mix_monitor\n2\tOpenXLR_mix_stream\n' ;;
                     'list sink-inputs') /bin/cat "$dir/legs" ;;
+                    load-module*) echo 90 ;;
                 esac
                 exit 0
                 """);

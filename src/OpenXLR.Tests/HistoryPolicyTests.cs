@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using OpenXLR.Core;
 using OpenXLR.Core.Mixing;
 using OpenXLR.Daemon;
 
@@ -53,6 +54,74 @@ public sealed partial class HistoryPolicyTests
     [InlineData("cycleExclusiveGroup")]
     public void SendsVolumesAndMutesAreRecorded(string command)
         => Assert.Equal(HistoryClass.Recorded, HistoryPolicy.ClassOf(command));
+
+    [Theory]
+    [InlineData("setEq")]
+    [InlineData("setEqEnabled")]
+    [InlineData("setEqBand")]
+    [InlineData("loadEqProfile")]
+    [InlineData("setNoiseRemoval")]
+    [InlineData("setVoiceChanger")]
+    [InlineData("setCompressor")]
+    [InlineData("setExpander")]
+    [InlineData("setLowCutHz")]
+    [InlineData("setSoftClipGuard")]
+    [InlineData("setMonitorDry")]
+    [InlineData("setDucking")]
+    public void MicrophoneAndMixProcessingIsRecorded(string command)
+        => Assert.Equal(HistoryClass.Recorded, HistoryPolicy.ClassOf(command));
+
+    // Where processing runs is machine wiring; the maximizer is a hardware
+    // mixing value and comes with the hardware controls.
+    [Theory]
+    [InlineData("setEqProcessing")]
+    [InlineData("setDynamicsProcessing")]
+    [InlineData("setDuckingProcessing")]
+    [InlineData("setMixMaximizer")]
+    [InlineData("watchDynamics")]
+    public void WhereProcessingRunsIsNotRecorded(string command)
+        => Assert.Equal(HistoryClass.Ignored, HistoryPolicy.ClassOf(command));
+
+    [Fact]
+    public void AnEqCommandOnAMixIsItsOutputEqAndOnAChannelTheMicrophones()
+    {
+        HistoryTarget mix = HistoryPolicy.TargetOf(new Command { Cmd = "setEqBand", Mix = "stream" }, _ => [], _ => [])!;
+        Assert.Equal(("mixEq", "stream"), (mix.Kind, mix.Mix));
+        Assert.Equal([SceneField.MixEq], mix.Fields);
+        Assert.False(mix.Keep(new(SceneField.MixEq, "monitor")));
+
+        HistoryTarget channel = HistoryPolicy.TargetOf(new Command { Cmd = "loadEqProfile", Channel = "xlr2" }, _ => [], _ => [])!;
+        Assert.Equal(("eq", "xlr2"), (channel.Kind, channel.Channel));
+        Assert.Equal([SceneField.Eq], channel.Fields);
+        Assert.True(channel.Keep(new(SceneField.Eq, "xlr2")));
+        Assert.False(channel.Keep(new(SceneField.Eq, "xlr1")));
+    }
+
+    [Fact]
+    public void EveryKindHasALabel()
+    {
+        var layout = new MixerConfig
+        {
+            Channels = [new("xlr1", "Mic 1")],
+            Mixes = [new("monitor", "Monitor", MixKind.Monitor)],
+        };
+        foreach (string kind in HistoryPolicy.Kinds)
+        {
+            string label = HistoryPolicy.LabelOf(new HistoryTarget(kind, "xlr1", "monitor", null, [], _ => true), layout);
+            Assert.NotEqual(kind, label);
+        }
+    }
+
+    [Fact]
+    public void TwoDuckingSetupsWithTheSameListsAreTheSame()
+    {
+        var a = new DuckingScene { Keys = ["xlr1"], Channels = ["music"], Mixes = ["monitor"] };
+        var b = new DuckingScene { Keys = ["xlr1"], Channels = ["music"], Mixes = ["monitor"] };
+        Assert.True(SceneValues.Same(a, b));
+        Assert.True(SceneValues.Near(a, b));
+        Assert.False(SceneValues.Same(a, b with { Channels = ["music", "game"] }));
+        Assert.False(SceneValues.Same(a, b with { Enabled = true }));
+    }
 
     [Theory]
     [InlineData("loadProfile")]
