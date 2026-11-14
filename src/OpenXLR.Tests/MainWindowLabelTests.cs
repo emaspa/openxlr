@@ -1,5 +1,6 @@
 using System.Globalization;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Media;
@@ -12,9 +13,14 @@ namespace OpenXLR.Tests;
 
 internal static class MainWindowLabelTests
 {
-    /// <summary>A button's text: its string content, or the first line of a panel such as Profiles with its active profile.</summary>
+    /// <summary>
+    /// A button's text: its string content, the screen reader's name of a
+    /// button drawn with a glyph, such as undo and redo, or the first line of
+    /// a panel such as Profiles with its active profile.
+    /// </summary>
     private static string? Label(Button button)
-        => button.Content as string ?? (button.Content as Panel)?.Children.OfType<TextBlock>().FirstOrDefault()?.Text;
+        => button.Content as string ?? (AutomationProperties.GetName(button) is { Length: > 0 } name ? name : null)
+           ?? (button.Content as Panel)?.Children.OfType<TextBlock>().FirstOrDefault()?.Text;
 
     internal static void Check(MainWindow main)
     {
@@ -24,7 +30,7 @@ internal static class MainWindowLabelTests
         CheckText(title);
         CheckText(main.FindControl<TextBlock>("HeaderVersion")!);
         var actions = header.GetVisualDescendants().OfType<Button>().Where(b => b.IsVisible && b.Name != "DevicePicker").ToArray();
-        Assert.Equal(new[] { "⚙", Localizer.Text("Profiles"), Localizer.Text("Arrange"), Localizer.Text("Flow"), Localizer.Text("RestartDaemon"), Localizer.Text("About") }, actions.Select(Label));
+        Assert.Equal(new[] { "⚙", Localizer.Text("Undo"), Localizer.Text("Redo"), Localizer.Text("Profiles"), Localizer.Text("Arrange"), Localizer.Text("Flow"), Localizer.Text("RestartDaemon"), Localizer.Text("About") }, actions.Select(Label));
         foreach (Button action in actions)
             foreach (TextBlock label in action.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsVisible))
                 CheckText(label);

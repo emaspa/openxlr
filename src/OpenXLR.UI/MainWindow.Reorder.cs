@@ -385,6 +385,7 @@ public partial class MainWindow
     {
         Control Action(string id) => id switch
         {
+            SkinHeaderActions.History => HistoryButtons,
             SkinHeaderActions.Profiles => ProfilesButton,
             SkinHeaderActions.Arrange => ArrangeButton,
             SkinHeaderActions.Flow => FlowButton,

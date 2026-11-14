@@ -2271,6 +2271,81 @@
   <data name="MoreActions" xml:space="preserve">
     <value>Још радњи</value>
   </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Опозови</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>Понови</value>
+  </data>
+  <data name="UndoStep" xml:space="preserve">
+    <value>Опозови: {0} (Ctrl+Z)</value>
+  </data>
+  <data name="RedoStep" xml:space="preserve">
+    <value>Понови: {0} (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="NothingToUndo" xml:space="preserve">
+    <value>Нема шта да се опозове (Ctrl+Z)</value>
+  </data>
+  <data name="NothingToRedo" xml:space="preserve">
+    <value>Нема шта да се понови (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="UndidStep" xml:space="preserve">
+    <value>Опозвано: {0}</value>
+  </data>
+  <data name="RedidStep" xml:space="preserve">
+    <value>Поновљено: {0}</value>
+  </data>
+  <data name="HistorySendLevel" xml:space="preserve">
+    <value>ниво за {0} у {1}</value>
+  </data>
+  <data name="HistoryChannelVolume" xml:space="preserve">
+    <value>јачина за {0}</value>
+  </data>
+  <data name="HistoryMixVolume" xml:space="preserve">
+    <value>јачина за {0}</value>
+  </data>
+  <data name="HistorySendMute" xml:space="preserve">
+    <value>утишавање за {0} у {1}</value>
+  </data>
+  <data name="HistoryMixMute" xml:space="preserve">
+    <value>утишавање за {0}</value>
+  </data>
+  <data name="HistoryExclusiveGroup" xml:space="preserve">
+    <value>пребацивање у {0}</value>
+  </data>
+  <data name="HistoryEq" xml:space="preserve">
+    <value>EQ за {0}</value>
+  </data>
+  <data name="HistoryMixEq" xml:space="preserve">
+    <value>EQ за {0}</value>
+  </data>
+  <data name="HistoryNoiseRemoval" xml:space="preserve">
+    <value>уклањање шума за {0}</value>
+  </data>
+  <data name="HistoryVoiceChanger" xml:space="preserve">
+    <value>мењач гласа за {0}</value>
+  </data>
+  <data name="HistoryCompressor" xml:space="preserve">
+    <value>компресор за {0}</value>
+  </data>
+  <data name="HistoryExpander" xml:space="preserve">
+    <value>експандер за {0}</value>
+  </data>
+  <data name="HistoryLowCut" xml:space="preserve">
+    <value>одсецање ниских за {0}</value>
+  </data>
+  <data name="HistoryClipGuard" xml:space="preserve">
+    <value>ClipGuard за {0}</value>
+  </data>
+  <data name="HistoryMonitorDry" xml:space="preserve">
+    <value>суви монитор у {0}</value>
+  </data>
+  <data name="HistoryDucking" xml:space="preserve">
+    <value>пригушивање</value>
+  </data>
+  <data name="HistoryMore" xml:space="preserve">
+    <value>{0} и још {1}</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Микс приказан у банци {0}</value>
   </data>

@@ -2272,7 +2272,7 @@
         "actions": {
           "type": "array",
           "uniqueItems": true,
-          "maxItems": 6,
+          "maxItems": 7,
           "items": {
             "$ref": "#/$defs/layoutHeaderAction"
           },
@@ -2281,7 +2281,7 @@
         "overflow": {
           "type": "array",
           "uniqueItems": true,
-          "maxItems": 6,
+          "maxItems": 7,
           "items": {
             "$ref": "#/$defs/layoutHeaderAction"
           },
@@ -2299,6 +2299,7 @@
     },
     "layoutHeaderAction": {
       "enum": [
+        "history",
         "profiles",
         "arrange",
         "flow",

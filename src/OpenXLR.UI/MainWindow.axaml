@@ -217,6 +217,46 @@
         </Grid>
         <WrapPanel Name="HeaderActions" Grid.Column="3" ItemSpacing="8" LineSpacing="4" Margin="8,0,0,0"
                    HorizontalAlignment="Right" ItemsAlignment="End" VerticalAlignment="Center">
+          <!-- undo and redo through the daemon's history, which every client
+               shares. Hidden with a daemon from before undo. A side with
+               nothing on it is disabled and its tooltip says so. The arrows
+               are drawn in the lettering's colour, since a skin's font may
+               have no arrow glyphs. After a step the flyout names it, or
+               what was skipped or refused, for three seconds. -->
+          <StackPanel Name="HistoryButtons" Orientation="Horizontal" Spacing="2" IsVisible="{Binding History.IsReported}">
+            <FlyoutBase.AttachedFlyout>
+              <Flyout Placement="BottomEdgeAlignedRight" ShowMode="Transient" OverlayDismissEventPassThrough="True">
+                <TextBlock Name="HistoryNotice" Text="{Binding History.Notice}" FontSize="{DynamicResource UiText.FontSize12}"
+                           TextWrapping="Wrap" MaxWidth="360"/>
+              </Flyout>
+            </FlyoutBase.AttachedFlyout>
+            <Button Name="UndoButton" Padding="8,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost" VerticalContentAlignment="Center"
+                    IsEnabled="{Binding History.CanUndo}" Click="OnUndo"
+                    AutomationProperties.Name="{loc:Text Key=Undo}"
+                    ToolTip.Tip="{Binding History.UndoTip}" ToolTip.ShowOnDisabled="True">
+              <!-- a blank line of the label's font under the arrow keeps the button
+                   as tall as its lettered neighbours in any skin's font -->
+              <Panel>
+                <TextBlock Text=" "/>
+                <Path Name="UndoGlyph" Height="{DynamicResource UiText.FontSize12}" Stretch="Uniform"
+                      Stroke="{Binding $self.(TextElement.Foreground)}" StrokeThickness="1.5"
+                      StrokeLineCap="Round" StrokeJoin="Round"
+                      Data="M 5,1 L 1,5 L 5,9 M 1,5 H 10 A 4,4 0 0 1 10,13 H 6"/>
+              </Panel>
+            </Button>
+            <Button Name="RedoButton" Padding="8,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost" VerticalContentAlignment="Center"
+                    IsEnabled="{Binding History.CanRedo}" Click="OnRedo"
+                    AutomationProperties.Name="{loc:Text Key=Redo}"
+                    ToolTip.Tip="{Binding History.RedoTip}" ToolTip.ShowOnDisabled="True">
+              <Panel>
+                <TextBlock Text=" "/>
+                <Path Name="RedoGlyph" Height="{DynamicResource UiText.FontSize12}" Stretch="Uniform"
+                      Stroke="{Binding $self.(TextElement.Foreground)}" StrokeThickness="1.5"
+                      StrokeLineCap="Round" StrokeJoin="Round"
+                      Data="M 10,1 L 14,5 L 10,9 M 14,5 H 5 A 4,4 0 0 0 5,13 H 9"/>
+              </Panel>
+            </Button>
+          </StackPanel>
           <DropDownButton Name="ProfilesButton" Padding="10,3" FontSize="{DynamicResource UiText.FontSize12}" Classes="ghost"
                           ToolTip.Tip="{loc:Text Key=SaveAndRecallCompleteScenesHardwareDSPPlus}">
             <!-- the profile last recalled or saved, in brackets after the label; a long name shortens -->

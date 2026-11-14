@@ -2271,6 +2271,81 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
   <data name="MoreActions" xml:space="preserve">
     <value>Iba pang aksyon</value>
   </data>
+  <data name="Undo" xml:space="preserve">
+    <value>I-undo</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>I-redo</value>
+  </data>
+  <data name="UndoStep" xml:space="preserve">
+    <value>I-undo ang {0} (Ctrl+Z)</value>
+  </data>
+  <data name="RedoStep" xml:space="preserve">
+    <value>I-redo ang {0} (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="NothingToUndo" xml:space="preserve">
+    <value>Walang ia-undo (Ctrl+Z)</value>
+  </data>
+  <data name="NothingToRedo" xml:space="preserve">
+    <value>Walang ire-redo (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="UndidStep" xml:space="preserve">
+    <value>Na-undo ang {0}</value>
+  </data>
+  <data name="RedidStep" xml:space="preserve">
+    <value>Na-redo ang {0}</value>
+  </data>
+  <data name="HistorySendLevel" xml:space="preserve">
+    <value>level ng {0} sa {1}</value>
+  </data>
+  <data name="HistoryChannelVolume" xml:space="preserve">
+    <value>volume ng {0}</value>
+  </data>
+  <data name="HistoryMixVolume" xml:space="preserve">
+    <value>volume ng {0}</value>
+  </data>
+  <data name="HistorySendMute" xml:space="preserve">
+    <value>mute ng {0} sa {1}</value>
+  </data>
+  <data name="HistoryMixMute" xml:space="preserve">
+    <value>mute ng {0}</value>
+  </data>
+  <data name="HistoryExclusiveGroup" xml:space="preserve">
+    <value>pagpapalit sa {0}</value>
+  </data>
+  <data name="HistoryEq" xml:space="preserve">
+    <value>EQ ng {0}</value>
+  </data>
+  <data name="HistoryMixEq" xml:space="preserve">
+    <value>EQ ng {0}</value>
+  </data>
+  <data name="HistoryNoiseRemoval" xml:space="preserve">
+    <value>pag-alis ng ingay ng {0}</value>
+  </data>
+  <data name="HistoryVoiceChanger" xml:space="preserve">
+    <value>pampalit ng boses ng {0}</value>
+  </data>
+  <data name="HistoryCompressor" xml:space="preserve">
+    <value>compressor ng {0}</value>
+  </data>
+  <data name="HistoryExpander" xml:space="preserve">
+    <value>expander ng {0}</value>
+  </data>
+  <data name="HistoryLowCut" xml:space="preserve">
+    <value>low cut ng {0}</value>
+  </data>
+  <data name="HistoryClipGuard" xml:space="preserve">
+    <value>ClipGuard ng {0}</value>
+  </data>
+  <data name="HistoryMonitorDry" xml:space="preserve">
+    <value>dry na monitor sa {0}</value>
+  </data>
+  <data name="HistoryDucking" xml:space="preserve">
+    <value>ducking</value>
+  </data>
+  <data name="HistoryMore" xml:space="preserve">
+    <value>{0} at {1} pa</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Mix na ipinapakita sa bank {0}</value>
   </data>

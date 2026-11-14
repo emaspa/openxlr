@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Input;
 using OpenXLR.UI;
+using OpenXLR.UI.Localization;
 
 namespace OpenXLR.Tests;
 
@@ -49,7 +50,7 @@ public sealed class HistoryKeysTests
         {
             sent.Add((command, step));
             return Task.FromResult<string?>(command == "redo" ? "redo: the history changed" : null);
-        });
+        }) { StartNoticeHold = (_, _) => new NoHold() };
         Assert.Null(await model.RunAsync(redo: false));
         Assert.Empty(sent);
         Assert.False(model.IsReported);
@@ -61,7 +62,8 @@ public sealed class HistoryKeysTests
             """));
         Assert.True(model.IsReported);
         Assert.True(model.CanUndo && model.CanRedo);
-        Assert.Equal("Undo skipped part of Stream mute: it changed since.", await model.RunAsync(redo: false));
+        // The note is an earlier step's until a state shows this one moved, so the step is named.
+        Assert.Equal(Localizer.Format("UndidStep", "XLR 1 level in Monitor A"), await model.RunAsync(redo: false));
         Assert.Equal("redo: the history changed", await model.RunAsync(redo: true));
         Assert.Equal([("undo", 4L), ("redo", 3L)], sent);
 
@@ -69,6 +71,11 @@ public sealed class HistoryKeysTests
         Assert.False(model.CanUndo);
         Assert.Null(await model.RunAsync(redo: false));
         Assert.Equal(2, sent.Count);
+    }
+
+    private sealed class NoHold : IDisposable
+    {
+        public void Dispose() { }
     }
 
     private static void Press(Control target, Key key, KeyModifiers modifiers)
