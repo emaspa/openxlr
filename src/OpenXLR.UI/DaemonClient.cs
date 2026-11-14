@@ -101,11 +101,12 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
         => QueryAsync("timeline", "getTimeline", timeout);
 
     /// <summary>
-    /// Mark a glitch on the daemon's timeline now, as marked from the UI.
-    /// Null once it is marked, else why not.
+    /// Mark a glitch on the daemon's timeline now. <paramref name="label"/>
+    /// says where it was marked: <c>UI</c> from the UI itself, <c>Desktop key</c>
+    /// from a desktop key. Null once it is marked, else why not.
     /// </summary>
-    public Task<string?> MarkGlitchAsync()
-        => EditLayoutAsync(new() { ["cmd"] = "markGlitch", ["label"] = "UI" });
+    public Task<string?> MarkGlitchAsync(string label = "UI")
+        => EditLayoutAsync(new() { ["cmd"] = "markGlitch", ["label"] = label });
 
     /// <summary>
     /// The dry run of hardware mixing: what <c>setMixing hardware</c> would do

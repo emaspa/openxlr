@@ -4356,4 +4356,13 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="MicSetupShapeExpanderHint" xml:space="preserve">
     <value>Ang Sukda ang kasaba sa kwarto sa lakang nga Level mobutang sa threshold nga gamay ra ang taas sa imong kwarto.</value>
   </data>
+  <data name="AddGlitchKey" xml:space="preserve">
+    <value>Idugang ang key nga momarka og glitch alang sa archive sa diagnostics</value>
+  </data>
+  <data name="KeyMarkGlitch" xml:space="preserve">
+    <value>Markahi ang glitch alang sa archive sa diagnostics</value>
+  </data>
+  <data name="GlitchKeyNote" xml:space="preserve">
+    <value>Ang glitch key momarka sa higayon sama sa Ctrl+G, bisan samtang natago ang UI sa tray. Unya tigoma ang diagnostics: ang timeline.txt sa archive nagpakita kung unsay nausab sa 30 ka segundo sa wala pa ang matag marka.</value>
+  </data>
 </root>

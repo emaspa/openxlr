@@ -4432,4 +4432,13 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="MicSetupShapeExpanderHint" xml:space="preserve">
     <value>Misura il rumore della stanza, nel passo Livello, mette la soglia appena sopra la tua stanza.</value>
   </data>
+  <data name="AddGlitchKey" xml:space="preserve">
+    <value>Aggiungi un tasto che segna un disturbo per l'archivio di diagnostica</value>
+  </data>
+  <data name="KeyMarkGlitch" xml:space="preserve">
+    <value>Segna un disturbo per l'archivio di diagnostica</value>
+  </data>
+  <data name="GlitchKeyNote" xml:space="preserve">
+    <value>Il tasto del disturbo segna il momento come Ctrl+G, anche con l'interfaccia nascosta nel vassoio di sistema. Poi raccogli la diagnostica: timeline.txt nell'archivio mostra cosa è cambiato nei 30 secondi prima di ogni segno.</value>
+  </data>
 </root>

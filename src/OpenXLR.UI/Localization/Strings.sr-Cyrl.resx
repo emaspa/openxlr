@@ -4356,4 +4356,13 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="MicSetupShapeExpanderHint" xml:space="preserve">
     <value>Измери шум собе у кораку Ниво поставља праг мало изнад твоје собе.</value>
   </data>
+  <data name="AddGlitchKey" xml:space="preserve">
+    <value>Додај тастер који означава сметњу за архиву дијагностике</value>
+  </data>
+  <data name="KeyMarkGlitch" xml:space="preserve">
+    <value>Означи сметњу за архиву дијагностике</value>
+  </data>
+  <data name="GlitchKeyNote" xml:space="preserve">
+    <value>Тастер за сметњу означава тренутак као Ctrl+G, и док је кориснички интерфејс скривен у системској палети. Затим прикупи дијагностику: timeline.txt у архиви показује шта се променило у 30 секунди пре сваке ознаке.</value>
+  </data>
 </root>

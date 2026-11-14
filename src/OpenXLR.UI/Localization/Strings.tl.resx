@@ -4356,4 +4356,13 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="MicSetupShapeExpanderHint" xml:space="preserve">
     <value>Itinatakda ng Sukatin ang ingay ng kuwarto sa hakbang na Level ang threshold na bahagyang mas mataas sa kuwarto mo.</value>
   </data>
+  <data name="AddGlitchKey" xml:space="preserve">
+    <value>Magdagdag ng key na nagmamarka ng glitch para sa archive ng diagnostics</value>
+  </data>
+  <data name="KeyMarkGlitch" xml:space="preserve">
+    <value>Markahan ang glitch para sa archive ng diagnostics</value>
+  </data>
+  <data name="GlitchKeyNote" xml:space="preserve">
+    <value>Minamarkahan ng glitch key ang sandali gaya ng Ctrl+G, kahit nakatago ang UI sa tray. Pagkatapos, kolektahin ang diagnostics: ipinapakita ng timeline.txt sa archive kung ano ang nagbago sa 30 segundo bago ang bawat marka.</value>
+  </data>
 </root>

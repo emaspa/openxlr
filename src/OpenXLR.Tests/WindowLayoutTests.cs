@@ -469,6 +469,7 @@ public sealed class WindowLayoutTests
                 Assert.Contains(keyWindow.GetVisualDescendants().OfType<CheckBox>(), b => Equals(b.Content, Localizer.Text("AddStopClipsKey")));
                 Assert.Contains(keyWindow.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == Localizer.Text("AddMicMuteKey"));
                 Assert.Contains(keyWindow.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == Localizer.Text("AddPushToTalkKey"));
+                Assert.Contains(keyWindow.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == Localizer.Text("AddGlitchKey"));
                 Capture(keyWindow, "desktop-output-keys-360");
                 keyWindow.Close();
 
