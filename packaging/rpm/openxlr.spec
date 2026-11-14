@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.7.1
+Version: 0.8.0
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -254,6 +254,17 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Sat Nov 14 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.8.0-1
+- Mixer: undo and redo for levels, mutes, processing, insert chains and the unit's controls, shared by every client
+- UI, Deck and terminal mixer: undo and redo buttons, keys and shortcuts
+- Diagnostics: mark a glitch against a daemon event timeline, from the UI or a desktop key
+- Desktop keys: microphone mute and push to talk
+- Mic setup: measure the room for the expander's threshold
+- Devices: ClipGuard and the mic/PC crossfade on the original Wave XLR
+- Mixer: Stream, Chat and Aux carry their master and mute on the mix sink, one write per move
+- Mixer: an option lets a Bluetooth output switch to another device while its feed is silent
+- UI: faders send one value at a time; no older daemon warning during a restart
+
 * Fri Nov 13 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.7.1-1
 - Skins: Broadcast Amber and Broadcast Blue
 - Skins: VFD Amber, VFD Blue and VFD Classic, with the OpenXLR Segment fonts
