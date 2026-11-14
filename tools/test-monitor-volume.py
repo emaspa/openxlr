@@ -138,6 +138,9 @@ def main():
                     for kind, suffix in (("Audio/Sink", "input"), ("Audio/Source", "output"),
                                          ("Stream/Input/Audio", "input"), ("Stream/Output/Audio", "output")):
                         keys.append(f"{kind}:media.name:{description} {suffix}")
+                # Two mix sinks with saved desktop state, for the test that
+                # reports what WirePlumber restores onto a recreated mix sink.
+                keys += ["Audio/Sink:node.name:OpenXLR_mix_restored", "Audio/Sink:node.name:OpenXLR_test_restoredoff"]
                 values = {"volume": 0.125, "mute": True, "channelVolumes": [0.125]}
                 lines = ["[stream-properties]" if modern else "[restore-stream]"]
                 for key in keys:

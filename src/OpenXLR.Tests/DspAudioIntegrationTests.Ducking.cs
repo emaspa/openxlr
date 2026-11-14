@@ -39,6 +39,31 @@ public sealed partial class DspAudioIntegrationTests
         f.Level("chat", .05);
     }
 
+    /// <summary>
+    /// A recorded mix's master and mute scale a mix with a duck bus at its
+    /// virtual microphone, and the ducking depth stays what the plan says: the
+    /// key comes from the key channel's sink, before any send or master.
+    /// </summary>
+    [DspPipeWireFact]
+    public void AVirtualMixMasterAndMuteScaleADuckedMixWithoutChangingItsDepth()
+    {
+        using var f = new DuckAudio();
+        f.Mixer.SetDuckingPlan(DuckPlan);
+        f.Signal(.5, .1, 0);
+        f.Level("stream", .5 + DuckedMusic);
+        // Master 0.5 is an eighth of the amplitude on the desktop's cubic scale.
+        f.Mixer.SetMixVolume("stream", .5);
+        f.Level("stream", .125 * (.5 + DuckedMusic));
+        DuckWait(() => f.Mixer.ReadMeters().TryGetValue("duck:stream", out double[]? meter)
+            && meter.Length == 1 && Math.Abs(meter[0] - 12) < .05, "The reduction meter did not stay at 12 dB.");
+        f.Mixer.SetMixMuted("stream", true);
+        f.Level("stream", 0);
+        f.Mixer.SetMixMuted("stream", false);
+        f.Level("stream", .125 * (.5 + DuckedMusic));
+        f.Mixer.SetMixVolume("stream", 1);
+        f.Level("stream", .5 + DuckedMusic);
+    }
+
     [DspPipeWireFact]
     public void DuckingRecoversWithinTheFastReleaseWhenTheKeyStops()
     {
