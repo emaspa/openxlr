@@ -223,7 +223,23 @@
                are drawn in the lettering's colour, since a skin's font may
                have no arrow glyphs. After a step the flyout names it, or
                what was skipped or refused, for three seconds. -->
-          <StackPanel Name="HistoryButtons" Orientation="Horizontal" Spacing="2" IsVisible="{Binding History.IsReported}">
+          <StackPanel Name="HistoryButtons" Orientation="Horizontal" Spacing="4" IsVisible="{Binding History.IsReported}">
+            <!-- A side with nothing on it keeps the face and outline of the
+                 chips around it and only dims its arrow, so the pair does not
+                 fade out of the row while the history is empty. The framework
+                 button sets its disabled face on the template's presenter, a
+                 key face fades the whole control, so both are undone here. -->
+            <StackPanel.Styles>
+              <Style Selector="Button:disabled">
+                <Setter Property="Background" Value="{DynamicResource Ox.Ghost.Background}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+                <Setter Property="Opacity" Value="1"/>
+              </Style>
+              <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource Ox.Ghost.Background}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource Ox.Control.BorderBrush}"/>
+              </Style>
+            </StackPanel.Styles>
             <FlyoutBase.AttachedFlyout>
               <Flyout Placement="BottomEdgeAlignedRight" ShowMode="Transient" OverlayDismissEventPassThrough="True">
                 <TextBlock Name="HistoryNotice" Text="{Binding History.Notice}" FontSize="{DynamicResource UiText.FontSize12}"
