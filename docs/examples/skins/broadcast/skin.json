@@ -160,7 +160,7 @@
       ]
     },
     "regions": {
-      "header": { "actions": ["profiles", "flow", "arrange", "restart-daemon", "version", "about"] },
+      "header": { "actions": ["profiles", "history", "flow", "arrange", "restart-daemon", "version", "about"] },
       "monitor": { "template": "output-toolbar" },
       "submixer": {
         "template": "mix-matrix",

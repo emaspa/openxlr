@@ -80,7 +80,7 @@ internal static partial class SkinLayoutWindowTests
             Assert.Same(grid, Card("HeadphonesTile").Parent);
             Assert.Same(desk, Card("ApplicationsTile").Parent);
             // Every action in the row, in the skin's order, and no overflow menu.
-            Assert.Equal(["ProfilesButton", "FlowButton", "ArrangeButton", "RestartDaemonButton", "HeaderVersion", "AboutButton", "HistoryButtons", "HeaderOverflow"],
+            Assert.Equal(["ProfilesButton", "HistoryButtons", "FlowButton", "ArrangeButton", "RestartDaemonButton", "HeaderVersion", "AboutButton", "HeaderOverflow"],
                 window.FindControl<WrapPanel>("HeaderActions")!.Children.Select(c => c.Name));
             Assert.Empty(window.FindControl<StackPanel>("HeaderOverflowItems")!.Children);
             Assert.False(window.FindControl<DropDownButton>("HeaderOverflow")!.IsVisible);

@@ -30,7 +30,7 @@ internal static class MainWindowLabelTests
         CheckText(title);
         CheckText(main.FindControl<TextBlock>("HeaderVersion")!);
         var actions = header.GetVisualDescendants().OfType<Button>().Where(b => b.IsVisible && b.Name != "DevicePicker").ToArray();
-        Assert.Equal(new[] { "⚙", Localizer.Text("Undo"), Localizer.Text("Redo"), Localizer.Text("Profiles"), Localizer.Text("Arrange"), Localizer.Text("Flow"), Localizer.Text("RestartDaemon"), Localizer.Text("About") }, actions.Select(Label));
+        Assert.Equal(new[] { "⚙", Localizer.Text("Profiles"), Localizer.Text("Undo"), Localizer.Text("Redo"), Localizer.Text("Arrange"), Localizer.Text("Flow"), Localizer.Text("RestartDaemon"), Localizer.Text("About") }, actions.Select(Label));
         foreach (Button action in actions)
             foreach (TextBlock label in action.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsVisible))
                 CheckText(label);

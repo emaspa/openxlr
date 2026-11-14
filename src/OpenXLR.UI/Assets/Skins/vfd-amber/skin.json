@@ -291,6 +291,7 @@
       "header": {
         "actions": [
           "profiles",
+          "history",
           "flow",
           "arrange",
           "restart-daemon",

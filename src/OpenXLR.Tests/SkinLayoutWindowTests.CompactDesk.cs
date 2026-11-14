@@ -36,7 +36,7 @@ internal static partial class SkinLayoutWindowTests
             object?[] contents = [.. sections.Select(section => section.Content)];
             window.Show();
             Wear("compact-desk");
-            Assert.Equal(["ProfilesButton", "FlowButton", "ArrangeButton", "HistoryButtons", "HeaderOverflow"],
+            Assert.Equal(["ProfilesButton", "HistoryButtons", "FlowButton", "ArrangeButton", "HeaderOverflow"],
                 window.FindControl<WrapPanel>("HeaderActions")!.Children.Select(c => c.Name));
             Assert.Equal(["RestartDaemonButton", "HeaderVersion", "AboutButton"],
                 window.FindControl<StackPanel>("HeaderOverflowItems")!.Children.Select(c => c.Name));

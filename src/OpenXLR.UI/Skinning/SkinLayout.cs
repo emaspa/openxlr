@@ -103,7 +103,7 @@ public static class SkinHeaderActions
     public const string Version = "version";
     public const string About = "about";
 
-    public static IReadOnlyList<string> All { get; } = [History, Profiles, Arrange, Flow, RestartDaemon, Version, About];
+    public static IReadOnlyList<string> All { get; } = [Profiles, History, Arrange, Flow, RestartDaemon, Version, About];
 
     public static bool Exists(string id) => All.Contains(id, StringComparer.Ordinal);
 }

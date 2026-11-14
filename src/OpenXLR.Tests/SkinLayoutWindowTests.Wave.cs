@@ -49,7 +49,7 @@ internal static partial class SkinLayoutWindowTests
         Assert.Same(desk, Card("ApplicationsTile").Parent);
         Assert.Equal(8, desk.Spacing);
         Assert.Equal(8, grid.ColumnSpacing);
-        Assert.Equal(["ProfilesButton", "FlowButton", "ArrangeButton", "RestartDaemonButton", "HeaderVersion", "AboutButton", "HistoryButtons", "HeaderOverflow"],
+        Assert.Equal(["ProfilesButton", "HistoryButtons", "FlowButton", "ArrangeButton", "RestartDaemonButton", "HeaderVersion", "AboutButton", "HeaderOverflow"],
             window.FindControl<WrapPanel>("HeaderActions")!.Children.Select(c => c.Name));
         Assert.Empty(window.FindControl<StackPanel>("HeaderOverflowItems")!.Children);
 

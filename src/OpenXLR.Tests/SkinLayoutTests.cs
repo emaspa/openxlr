@@ -285,7 +285,7 @@ public sealed class SkinLayoutTests
         Assert.False(Taken("""{"version":1,"regions":{"header":{"version":"row"}}}""").Header.VersionByTitle);
         SkinLayout layout = Taken("""{"version":1,"regions":{"header":{"version":"title","overflow":["about"]}}}""");
         Assert.True(layout.Header.VersionByTitle);
-        Assert.Equal(["history", "profiles", "arrange", "flow", "restart-daemon"], layout.Header.Row);
+        Assert.Equal(["profiles", "history", "arrange", "flow", "restart-daemon"], layout.Header.Row);
         Refused("""{"version":1,"regions":{"header":{"version":"title","actions":["version"]}}}""", "layout.regions.header.version");
         Refused("""{"version":1,"regions":{"header":{"version":"title","overflow":["version"]}}}""", "layout.regions.header.version");
         Refused("""{"version":1,"regions":{"header":{"version":"beside"}}}""", "layout.regions.header.version");
