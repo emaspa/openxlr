@@ -52,6 +52,9 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>The LED ring of a unit that has one OpenXLR sets: the LEDs window edits it.</summary>
     public LedRingViewModel LedRing { get; }
 
+    /// <summary>The daemon's undo history, which Ctrl+Z and Ctrl+Shift+Z step through.</summary>
+    public HistoryViewModel History { get; }
+
     private readonly DaemonClient _client;
     private bool _applying;
 
@@ -66,6 +69,7 @@ public sealed partial class MainViewModel : ViewModelBase
         VoiceChanger = new VoiceChangerViewModel(client);
         HardwareMixing = new HardwareMixingViewModel(client);
         LedRing = new LedRingViewModel(client);
+        History = new HistoryViewModel(client.StepHistoryAsync);
         LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
@@ -82,6 +86,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 ActiveProfile = null;
                 ResetWaveInterfaces();
                 ResetBrowserTabs();
+                History.Reset();
                 ResetAppRouting();
                 Soundboard.Reset();
                 VoiceChanger.Reset();
@@ -1112,6 +1117,7 @@ public sealed partial class MainViewModel : ViewModelBase
             ApplyBrowserTabs(node["mixer"]);
             ApplyAppRouting(node["mixer"]);
             Ducking.Apply(node["ducking"], node["mixer"]);
+            History.Apply(node["history"]);
             Soundboard.Apply(node["mixer"]?["soundboard"], Channels, node["mixer"] is JsonObject);
             HardwareMixing.Apply(node["mixer"],
                 node["capabilities"]?["hardwareMixing"] is JsonValue hardwareMixing && hardwareMixing.TryGetValue(out bool canMix) && canMix);
@@ -1250,6 +1256,12 @@ public sealed partial class MainViewModel : ViewModelBase
         _ = _client.LoadProfileAsync(name);
     }
     public void DeleteProfile(string name) => _ = _client.DeleteProfileAsync(name);
+
+    /// <summary>Undo, or with <paramref name="redo"/> redo, the newest step; a refusal or a skipped part shows in the status line.</summary>
+    public async Task StepHistoryAsync(bool redo)
+    {
+        if (await History.RunAsync(redo) is { } sentence) Status = sentence;
+    }
 
     /// <summary>Raised after a daemon state push has been applied (UI thread).</summary>
     public event Action? StateApplied;

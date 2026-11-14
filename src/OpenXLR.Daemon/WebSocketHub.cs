@@ -11,7 +11,7 @@ namespace OpenXLR.Daemon;
 /// "set" commands into the <see cref="DeviceManager"/>. One client's change is
 /// broadcast to all, so the UI, the OpenDeck plugin, and any CLI stay in sync.
 /// </summary>
-public sealed class WebSocketHub
+public sealed partial class WebSocketHub
 {
     private const int MaxCommandBytes = 64 * 1024;
     private static readonly JsonSerializerOptions Json = new()
@@ -119,6 +119,7 @@ public sealed class WebSocketHub
             EqProfileProblem = eqProfiles.Problem,
             Detected = [.. _devices.Detected().Select(d => new DetectedDevice(d.UsbId, d.Name, d.Active))],
             WaveInterfaces = _waveInterfaces?.Snapshot(),
+            History = History.State(),
         };
     }
 
@@ -419,7 +420,7 @@ public sealed class WebSocketHub
                 // Profile recall and input binding changes share this gate.
                 // A folder cannot be removed between checking its users and
                 // creating an insert from it on another client.
-                lock (_installGate) error = _mixer.Apply(cmd);
+                lock (_installGate) error = ApplyMixer(cmd, null);
                 stateOnError = true;
                 break;
             case "setMixing" when cmd.Check.ValueKind == JsonValueKind.True:
@@ -516,11 +517,12 @@ public sealed class WebSocketHub
             case "stopAudition":
                 // On a WebSocket, browserOwner is that connection's id: a clip
                 // pressed in hold mode belongs to it until released.
-                error = _mixer.Apply(cmd, browserOwner);       // broadcasts on success
+                error = ApplyMixer(cmd, browserOwner);       // broadcasts on success; records an undo step
                 stateOnError = true;
                 break;
             case "setActiveDevice":
                 error = cmd.Device is null ? "setActiveDevice: missing 'device'" : _devices.SetActiveDevice(cmd.Device);
+                if (error is null) ClearHistory();
                 break;
             case "setWaveInterfaceEnabled":
             {
@@ -534,7 +536,7 @@ public sealed class WebSocketHub
                 if (error is null && !enable && cmd.Device != _devices.PublishedInfo?.InstanceId && _mixer.Snapshot() is { } mixer)
                     foreach (string channel in WaveInterfaces.CaptureChannelsFrom(mixer.Channels, sources, cmd.Device,
                         cmd.KeepChannels.ValueKind == JsonValueKind.True))
-                        if ((error = _mixer.Apply(new Command { Cmd = "deleteChannel", Channel = channel })) is not null) break;
+                        if ((error = ApplyMixer(new Command { Cmd = "deleteChannel", Channel = channel }, null)) is not null) break;
                 stateOnError = true;
                 if (error is null) Broadcast(Snapshot());
                 break;
@@ -564,7 +566,14 @@ public sealed class WebSocketHub
             case "loadProfile":
             case "deleteProfile":
                 lock (_installGate) error = HandleProfile(cmd);
+                if (error is null && HistoryPolicy.ClassOf(cmd.Cmd) == HistoryClass.Barrier) ClearHistory();
                 if (error is null) Broadcast(Snapshot());   // list (and loaded state) changed
+                break;
+            case "undo":
+            case "redo":
+                error = CommandValidation.CheckHistory(cmd);
+                if (error is null) lock (_installGate) error = ApplyHistory(cmd);
+                stateOnError = true;
                 break;
             case "setRecallOnConnect":
                 lock (_installGate) error = HandleRecallOnConnect(cmd);
@@ -575,6 +584,7 @@ public sealed class WebSocketHub
                 break;
             case "resetDevice":
                 error = _devices.ResetToDefaults();   // the state change broadcasts itself
+                if (error is null) ClearHistory();
                 if (error is null) _log.LogInformation("reset {dev} to its firmware defaults", ActiveDeviceId());
                 break;
             case "recoverCapture":
@@ -771,6 +781,7 @@ public sealed class WebSocketHub
                     if (_stopping.IsCancellationRequested || _devices.CurrentConnection != connection ||
                         Interlocked.Read(ref _manualProfileRevision) != expectedRevision) return;
                     string? err = ApplyLoadedProfile(connection, name!, profile);
+                    if (err is null) ClearHistory();
                     if (err is null) _log.LogInformation("recalled profile '{name}' on connect of {dev}", name, devId);
                     else _log.LogWarning("recall of profile '{name}' on connect of {dev}: {err}", name, devId, err);
                 }

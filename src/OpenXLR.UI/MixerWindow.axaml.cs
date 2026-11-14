@@ -79,6 +79,10 @@ public partial class MixerWindow : Window
             }, DispatcherPriority.Background);
         };
         Closed += (_, _) => SkinService.Changed -= UpdateControlSizing;
+        HistoryKeys.Attach(this, redo =>
+        {
+            if (DataContext is MainViewModel model) _ = model.StepHistoryAsync(redo);
+        });
     }
 
     internal void Attach(Control panel, object? model, Window origin)

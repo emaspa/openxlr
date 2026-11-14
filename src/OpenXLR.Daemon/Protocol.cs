@@ -28,6 +28,9 @@ public sealed record Command
     /// </summary>
     [JsonPropertyName("requestId")] public string? RequestId { get; init; }
 
+    /// <summary>"undo" / "redo": the step id the client showed, so a history another client changed first is refused.</summary>
+    [JsonPropertyName("step")] public System.Text.Json.JsonElement Step { get; init; }
+
     /// <summary>For "set": the control name (see <see cref="ControlNames"/>).</summary>
     [JsonPropertyName("control")] public string? Control { get; init; }
 
@@ -406,7 +409,36 @@ public sealed record StateMessage
 
     /// <summary>Every attached supported interface, so clients can offer a picker.</summary>
     [JsonPropertyName("detected")] public IReadOnlyList<DetectedDevice>? Detected { get; init; }
+
+    /// <summary>The undo history's two ends (see <see cref="HistoryState"/>); absent from an older daemon.</summary>
+    [JsonPropertyName("history")] public HistoryState? History { get; init; }
 }
+
+/// <summary>
+/// The undo history as clients see it: the step <c>undo</c> and the step
+/// <c>redo</c> would take, each null when there is none, how many steps each
+/// side holds, and one sentence about the last undo or redo when it skipped
+/// something, null otherwise.
+/// </summary>
+public sealed record HistoryState(
+    [property: JsonPropertyName("undo"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] HistoryStepInfo? Undo,
+    [property: JsonPropertyName("redo"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] HistoryStepInfo? Redo,
+    [property: JsonPropertyName("undoSteps")] int UndoSteps,
+    [property: JsonPropertyName("redoSteps")] int RedoSteps,
+    [property: JsonPropertyName("note"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Note);
+
+/// <summary>
+/// One step: its id for the <c>step</c> guard, its kind with the ids it
+/// names, how many things a burst joined, and an English label.
+/// </summary>
+public sealed record HistoryStepInfo(
+    [property: JsonPropertyName("step")] long Step,
+    [property: JsonPropertyName("kind")] string Kind,
+    [property: JsonPropertyName("channel")] string? Channel,
+    [property: JsonPropertyName("mix")] string? Mix,
+    [property: JsonPropertyName("group")] string? Group,
+    [property: JsonPropertyName("count")] int Count,
+    [property: JsonPropertyName("label")] string Label);
 
 /// <summary>
 /// Ducking, present whenever the daemon runs, on any device or none: the

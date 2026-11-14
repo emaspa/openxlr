@@ -777,6 +777,18 @@ member. On a Wave XLR Pro, XLR 1 in a group gives up the zero-latency
 hardware path to the jacks, because the group mutes through the mixer.
 See [Exclusive groups](manual.md#exclusive-groups).
 
+### Undo and redo
+
+Ctrl+Z in the UI takes back the last change to a send level, a channel or
+mix volume, a send mute or a mix mute, and Ctrl+Shift+Z or Ctrl+Y puts it
+back. The history lives in the daemon and every client shares it, so a
+fader moved on a Deck dial or over the API is undone the same way. A fader
+drag or a dial turn is one step. Undo never touches phantom power, a lock,
+the hardware mute or the monitoring pause, and it leaves alone a value
+something else moved since. Loading a profile, deleting a channel or mix,
+switching the mixing mode or the active interface clears the history.
+See [Undo and redo](manual.md#undo-and-redo).
+
 ### Soundboard
 
 Short clips play into the SFX channel, so SFX's fader, mutes and sends
