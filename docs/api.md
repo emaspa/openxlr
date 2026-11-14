@@ -286,7 +286,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setLayoutAppearance` | exactly one of `channel`, `mix`, `output`; `appearance {icon, colour, hidden}` | replace one channel's, mix's or headphone output's appearance; `output` is `phones1` or `phones2`. `icon` is empty (the default for the item's kind), `none` (no icon), one of the text glyphs ● ♪ ♫ ✦ ◆ ▶ ◉, or an icon name of a lower-case letter and up to 31 lower-case letters, digits or hyphens; the daemon checks a name's shape, not that any client can draw it. `colour` is null or `#RRGGBB`, `hidden` leaves a channel's strip or a mix's master and column out of the full mixer and is refused for an output; an omitted field takes its default. No node, link, level or order changes |
 | `setChannelMuted` | `channel`, `mix`, `value` | one send mute. Unmuting a send of a channel in an exclusive group first mutes every send of the group's other members, in every mix |
 | `cycleExclusiveGroup` | `group` | switch an exclusive group to its next member in member order. The next member is unmuted in every mix the current member was heard in, and the current member is muted everywhere. An error when no member is unmuted |
-| `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters; monitor volume range 0 to 1.5, other mixes 0 to 1; values outside the range are clamped |
+| `setMixVolume` / `setMixMuted` | `mix`, `value` | mix masters, one write to the mix's own sink for every kind of mix; monitor volume range 0 to 1.5, other mixes 0 to 1; values outside the range are clamped |
 | `undo` | optional `step` | put back the values the newest step of the [undo history](#undo-and-redo) changed. With `step`, the id from `history.undo.step`, the command runs only while the newest step has that id |
 | `redo` | optional `step` | write again the values the newest undone step put back, under the same rule, with the id from `history.redo.step` |
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed, at most 16; a newly listed output is fed by `defaultMonitorMix`. A missing sink stays selected and saved, and is linked when it appears. A client that lists outputs for the user keeps the missing ones in the list it sends |
@@ -491,8 +491,17 @@ PipeWire's raw linear amplitude; the daemon takes the cube root when reading
 and writes percentages back with `pactl`.
 `setMixVolume` and `setMixMuted` update those sinks directly, leaving channel
 sends and other mixes unchanged, except for the explicit open during a global pause described below. Monitor gain is applied once, at the mix
-sink before its inserts. Non-monitor masters still apply to the channel
-sends and retain their 0 to 1 range.
+sink before its inserts. Every other mix (Stream, Chat, Aux and the user's
+virtual microphones) also carries its master and mute on its mix sink, in
+one write whatever the number of channels, with a 0 to 1 range. That sink
+is not a desktop master. A desktop change to it leaves `volume` and `muted`
+alone, and the sweep puts the sink back at the stored master and mute.
+The master acts before the mix's EQ, inserts and meter, so the virtual
+microphone, the Aux port and every output following the mix hear it. An
+application that plays straight into the mix's playback device follows
+it too. The daemon creates these sinks with `state.restore-props=false`,
+so the session manager never restores a remembered level on them after a
+rebuild.
 
 The selected physical sinks mirror monitoring: the global pause mutes them,
 and resuming restores their previous native mute flags. A selected sink whose
@@ -602,8 +611,8 @@ its mixer settings when the graph is built; the latest recall wins.
 Every channel has a volume of its own, a master for everything the
 channel sends. Each send is already one internal stream of
 the channel's combine sink, with its own volume. The daemon sets that
-stream to the send level times the channel volume, times the mix master
-when the mix is not a monitor mix. The channel volume therefore adds no
+stream to the send level times the channel volume; the mix master is the
+mix sink's own volume. The channel volume therefore adds no
 node, no link and no delay. All three values are on the desktop scale the
 send levels and masters use, so halving the channel volume takes the same
 number of decibels off every send. The channel's sink stays at full desktop

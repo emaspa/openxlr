@@ -113,15 +113,15 @@ public sealed partial class MonitorVolumeIntegrationTests
                 return cells.ToDictionary(cell => cell, cell => legs[cell]);
             }
 
-            // A leg's gain: its send level times the channel volume times the
-            // master where the mix has no desktop master, set in whole percent
-            // and applied on the cubic scale.
+            // A leg's gain: its send level times the channel volume, set in
+            // whole percent and applied on the cubic scale. Every mix's master
+            // is on its sink.
             static double Target(MixerState state, string cell, double volume)
             {
                 int bar = cell.IndexOf('|', StringComparison.Ordinal);
                 ChannelStatus channel = state.Channels.Single(c => c.Id == cell[..bar]);
                 MixStatus mix = state.Mixes.Single(m => m.Id == cell[(bar + 1)..]);
-                double gain = Mixer.SendGain(channel.Levels[mix.Id], volume, mix.Kind == "monitor" ? 1 : mix.Volume);
+                double gain = Mixer.SendGain(channel.Levels[mix.Id], volume, 1);
                 return Math.Pow(Math.Round(gain * 100) / 100, 3);
             }
         }

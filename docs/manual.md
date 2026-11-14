@@ -5083,10 +5083,13 @@ while the OpenXLR Stream and Chat microphones sit some 15 dB lower, with
 every send and master at 100, one of OpenXLR's own sinks has been turned
 down. The channel sinks are playback devices, and a desktop applet or
 the session manager restoring a remembered level can set one to half
-volume. Only the Monitor A and Monitor B sinks carry a master of their
-own; on every other OpenXLR sink the volume is not a control, so turning
-it down only cuts audio. The daemon puts those other sinks back to full
-volume on its sweep and logs when it had to.
+volume. Only the monitor mix sinks, such as Monitor A and Monitor B,
+take their master from the desktop. The Stream, Chat and Aux sinks carry
+their mix's master and mute too, but the daemon alone sets them: a desktop
+slider shows the master, and a move on it is put back to the master on
+the next sweep. On every other OpenXLR sink the volume is not a control,
+so turning it down only cuts audio. The daemon puts those sinks back to
+full volume on its sweep and logs when it had to.
 
 WirePlumber remembers a level set on a sink and, from version 0.5, puts it
 back when the sink is created again. The Stream, Chat and Aux sinks opt

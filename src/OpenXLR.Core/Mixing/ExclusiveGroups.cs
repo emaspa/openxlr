@@ -229,7 +229,7 @@ public sealed partial class Mixer
 
     /// <summary>
     /// Apply the sends into these mixes, and with <paramref name="masters"/>
-    /// the monitor mixes' sink volume and mute first. With groups present the
+    /// each mix sink's volume and mute, which carry the mix master, first. With groups present the
     /// muted sends go before the open ones, so a member never opens while a
     /// peer is still heard.
     /// </summary>
@@ -237,10 +237,10 @@ public sealed partial class Mixer
     {
         if (masters)
             foreach (string mix in mixes)
-                if (MonitorMixLocked(mix) is { } monitor)
+                if (MixLocked(mix) is { } sink)
                 {
-                    _pw.SetSinkVolume(monitor.SinkName, _mixVolume.GetValueOrDefault(mix, 1));
-                    _pw.SetSinkMuted(monitor.SinkName, _mixMuted.Contains(mix));
+                    _pw.SetSinkVolume(sink.SinkName, _mixVolume.GetValueOrDefault(mix, 1));
+                    _pw.SetSinkMuted(sink.SinkName, _mixMuted.Contains(mix));
                 }
         bool grouped = _config.ExclusiveGroups.Count > 0;
         if (grouped)

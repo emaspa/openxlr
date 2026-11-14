@@ -449,7 +449,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   output (a blend for headphones or speakers that publishes no
   microphone), and Aux (what a second computer on the USB Aux port
   receives)
-- Per-channel, per-mix send levels and mutes; per-mix masters
+- Per-channel, per-mix send levels and mutes; per-mix masters and mutes,
+  each one write to the mix's own sink whatever the number of channels
 - A volume for every channel that scales every send of the channel at
   once, like the channel level in Wave Link 3. It is folded into the send
   streams the mixer already has, so it adds no node and no delay. XLR 1,

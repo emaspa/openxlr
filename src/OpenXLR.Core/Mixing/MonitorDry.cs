@@ -20,7 +20,8 @@ namespace OpenXLR.Core.Mixing;
 /// carries a dry monitor mix, the channel's own
 /// send into that mix (and its duck bus leg) is held closed and the dry send
 /// takes the send level, the channel volume and the mutes instead; the mix
-/// master is the monitor sink's own volume, so it applies to both alike.
+/// master is the mix sink's own volume, as on every mix, so it applies to
+/// both alike.
 ///
 /// The dry send carries a mix only while the route is ready (every monitor
 /// mix has its leg) and fed. Until then, and while Sound Check runs on the

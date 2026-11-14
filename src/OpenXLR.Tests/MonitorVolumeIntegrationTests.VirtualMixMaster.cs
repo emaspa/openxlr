@@ -217,12 +217,12 @@ public sealed partial class MonitorVolumeIntegrationTests(ITestOutputHelper outp
     }
 
     /// <summary>
-    /// The cost of one master move on a recorded mix with eleven channels, as
-    /// on the desk: the helper processes it starts and the time it takes. A
-    /// monitor mix's move is measured beside it.
+    /// The cost of one master move with eleven channels, as on the desk: one
+    /// helper process on the mix sink, for a recorded mix as for a monitor
+    /// mix, whatever the number of channels. The times are reported.
     /// </summary>
     [MonitorPipeWireFact]
-    public void AVirtualMixMasterMoveIsTimed()
+    public void AVirtualMixMasterMoveIsOneWriteToItsSink()
     {
         int runs = 0;
         var pw = new PipeWireAdapter(() => Interlocked.Increment(ref runs));
@@ -248,7 +248,49 @@ public sealed partial class MonitorVolumeIntegrationTests(ITestOutputHelper outp
             }
             output.WriteLine($"setMixVolume {mix}: helpers {string.Join('/', counts)}, "
                 + $"ms {string.Join('/', times.Select(t => t.ToString("0", CultureInfo.InvariantCulture)))}");
-            Assert.All(counts, count => Assert.True(count >= 1));
+            Assert.All(counts, count => Assert.Equal(1, count));
+        }
+    }
+
+    /// <summary>
+    /// A desktop applet moving or muting a recorded mix's sink does not
+    /// change the master: the sweep puts the sink back at the stored master
+    /// and mute, and the virtual microphone hears the master again.
+    /// </summary>
+    [MonitorPipeWireFact]
+    public void TheSweepPutsARecordedMixSinkBackAtItsMasterAndMute()
+    {
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw);
+        BuildVirtualMixes(mixer, pw, VirtualMixConfig());
+        mixer.SetMixVolume("stream", .5);
+        SettleSends(mixer);
+        CaptureLevel(ThroughSend(.5), "OpenXLR_ch_test", MicrophoneOf("stream"), virtualMicrophone: true);
+
+        Desktop("100%", "0", amplitude: 1, muted: false);
+        Assert.Contains(SinkOf("stream"), mixer.EnsureOwnSinkLevels());
+        Assert.Equal(.5, pw.GetSinkVolume(SinkOf("stream")));
+        Assert.False(pw.GetSinkMuted(SinkOf("stream")));
+        Assert.Equal(.5, mixer.Snapshot().Mixes.Single(m => m.Id == "stream").Volume);
+        CaptureLevel(ThroughSend(.5), "OpenXLR_ch_test", MicrophoneOf("stream"), virtualMicrophone: true);
+
+        mixer.SetMixMuted("stream", true);
+        Desktop("50%", "0", amplitude: .125, muted: false);
+        Assert.Contains(SinkOf("stream"), mixer.EnsureOwnSinkLevels());
+        Assert.True(pw.GetSinkMuted(SinkOf("stream")));
+        Assert.True(mixer.Snapshot().Mixes.Single(m => m.Id == "stream").Muted);
+        CaptureLevel(0, "OpenXLR_ch_test", MicrophoneOf("stream"), virtualMicrophone: true);
+        Assert.DoesNotContain(SinkOf("stream"), mixer.EnsureOwnSinkLevels());
+
+        void Desktop(string volume, string mute, double amplitude, bool muted)
+        {
+            Pactl("set-sink-volume", SinkOf("stream"), volume);
+            Pactl("set-sink-mute", SinkOf("stream"), mute);
+            // The sweep reads the registry, which shows the write a moment later.
+            Assert.True(SpinWait.SpinUntil(() => pw.OwnSinkLevels().Single(s => s.Name == SinkOf("stream")) is { } level
+                && level.Muted == muted && Math.Abs(level.Volume - amplitude) < .01, TimeSpan.FromSeconds(3)),
+                "The registry did not show the desktop write.");
         }
     }
 

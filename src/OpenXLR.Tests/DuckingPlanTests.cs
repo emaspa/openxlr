@@ -72,12 +72,13 @@ public sealed class DuckingPlanTests
         f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor", "music|stream"));
         f.Mixer.SetChannelVolume("music", .5);
         f.Mixer.SetLevel("music", "stream", .8);
+        // The masters and the mix mute are on the mix sinks, not on the legs.
         f.Mixer.SetMixVolume("stream", .5);
-        Assert.Equal(((0.0, true), (.2, false)), f.Targets("music", "stream"));
+        Assert.Equal(((0.0, true), (.4, false)), f.Targets("music", "stream"));
         f.Mixer.SetMixVolume("monitor", .4);
         Assert.Equal(((0.0, true), (.5, false)), f.Targets("music", "monitor"));
         f.Mixer.SetMixMuted("stream", true);
-        Assert.Equal(((0.0, true), (.2, true)), f.Targets("music", "stream"));
+        Assert.Equal(((0.0, true), (.4, false)), f.Targets("music", "stream"));
         f.Mixer.SetChannelMuted("music", "monitor", true);
         Assert.True(f.Targets("music", "monitor").Bus.Muted);
         f.Mixer.SetExclusiveGroup(null, "Players", ["music", "chat"], _ => null);
@@ -208,7 +209,7 @@ public sealed class DuckingPlanTests
     public void ASendWritesOnlyTheLevelOrMuteThatChanged()
     {
         using var f = new Sends();
-        f.Mixer.SetMixVolume("stream", 1);   // every send into Stream written once
+        f.Call("ReapplyMixLocked", "stream");   // every send into Stream written once
         f.Clear();
         f.Mixer.SetLevel("music", "stream", .5);
         Assert.Equal(["set-sink-input-volume 31 50%"], f.CellWrites);
@@ -222,10 +223,9 @@ public sealed class DuckingPlanTests
         f.Mixer.SetChannelMuted("music", "stream", true);
         Assert.Equal(["set-sink-input-mute 31 1"], f.CellWrites);
         f.Clear();
-        // A master move on a recorded mix writes each send's level and no mute.
+        // A master move on a recorded mix writes its sink and no send.
         f.Mixer.SetMixVolume("stream", .5);
-        Assert.Equal(["set-sink-input-volume 11 50%", "set-sink-input-volume 21 50%", "set-sink-input-volume 31 30%",
-            "set-sink-input-volume 41 50%"], f.CellWrites);
+        Assert.Empty(f.CellWrites);
     }
 
     [Fact]
@@ -255,6 +255,53 @@ public sealed class DuckingPlanTests
         f.Clear();
         f.Mixer.ForgetGraph();
         Assert.Empty(f.Field<System.Collections.IDictionary>("_legWritten"));
+    }
+
+    [Fact]
+    public void ARecordedMixMasterAndMuteAreOneWriteToItsSink()
+    {
+        using var f = new Sends();
+        f.Mixer.SetDuckingPlan(Plan("xlr1", "music|stream"));
+        f.Clear();
+        f.Mixer.SetMixVolume("stream", .5);
+        Assert.Equal(["set-sink-volume OpenXLR_mix_stream 50%"], f.Writes);
+        f.Clear();
+        f.Mixer.SetMixMuted("stream", true);
+        Assert.Equal(["set-sink-mute OpenXLR_mix_stream 1"], f.Writes);
+        f.Clear();
+        f.Mixer.SetMixVolume("stream", 2);   // a recorded mix stays within 100%
+        Assert.Equal(["set-sink-volume OpenXLR_mix_stream 100%"], f.Writes);
+        // An undo of a master is one write too.
+        f.Clear();
+        var outcomes = f.Mixer.ApplyScenePatch([new(new(SceneField.MixVolume, "stream"), 1.0, .5)]);
+        Assert.Equal([ScenePatchOutcome.Applied], outcomes);
+        Assert.Equal(["set-sink-volume OpenXLR_mix_stream 50%"], f.Writes);
+    }
+
+    [Fact]
+    public void TheSweepHoldsARecordedMixSinkAtItsMasterAndADuckBusAtFullLevel()
+    {
+        using var f = new Sends();
+        f.Mixer.SetMixVolume("stream", .8);
+        f.Mixer.SetMixMuted("stream", true);
+        f.Clear();
+        // The desktop moved the Stream sink, its duck bus and the Monitor sink.
+        IReadOnlyList<OwnSinkLevel> levels =
+        [
+            new("OpenXLR_mix_stream", .125, false) { DesktopVolume = .5 },
+            new("OpenXLR_mix_stream.duck", .125, false) { DesktopVolume = .5 },
+            new("OpenXLR_mix_monitor", .125, false) { DesktopVolume = .5 },
+        ];
+        var restored = (IReadOnlyList<string>)f.Call("EnsureOwnSinkLevelsLocked", levels, Array.Empty<OwnStageStream>())!;
+        Assert.Equal(["OpenXLR_mix_stream", "OpenXLR_mix_stream.duck"], restored);
+        Assert.Equal(["set-sink-volume OpenXLR_mix_stream 80%", "set-sink-mute OpenXLR_mix_stream 1",
+            "set-sink-volume OpenXLR_mix_stream.duck 100%"], f.Writes);
+        // A sink already on its master and mute is left alone.
+        f.Clear();
+        restored = (IReadOnlyList<string>)f.Call("EnsureOwnSinkLevelsLocked",
+            (IReadOnlyList<OwnSinkLevel>)[new("OpenXLR_mix_stream", .512, true) { DesktopVolume = .8 }], Array.Empty<OwnStageStream>())!;
+        Assert.Empty(restored);
+        Assert.Empty(f.Writes);
     }
 
     [Fact]

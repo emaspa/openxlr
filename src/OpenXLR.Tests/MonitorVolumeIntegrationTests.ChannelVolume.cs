@@ -132,8 +132,11 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.Null(mixer.SetMonitorFeed(Output, "monitor"));
             CaptureLevel(0.1 * Math.Pow(Gain("test", "monitor"), 3), "OpenXLR_ch_test", Output);
 
-            double Gain(string channel, string mix)
-                => level[$"{channel}|{mix}"] * volumes[channel] * (mix == "chat" ? ChatMaster : 1);
+            // What a send's leg carries, and what the mix hears: the Chat
+            // master is the Chat sink's own volume, after the leg.
+            double Send(string channel, string mix) => level[$"{channel}|{mix}"] * volumes[channel];
+
+            double Gain(string channel, string mix) => Send(channel, mix) * (mix == "chat" ? ChatMaster : 1);
 
             void AssertLegs()
             {
@@ -148,7 +151,7 @@ public sealed partial class MonitorVolumeIntegrationTests
                     $"{cell}={(legs.TryGetValue(cell, out var leg) ? leg.Volume : double.NaN):0.######} want {Math.Pow(GainOf(cell), 3):0.######}")));
             }
 
-            double GainOf(string cell) => Gain(cell[..cell.IndexOf('|')], cell[(cell.IndexOf('|') + 1)..]);
+            double GainOf(string cell) => Send(cell[..cell.IndexOf('|')], cell[(cell.IndexOf('|') + 1)..]);
 
             void WaitForLegs() => Assert.True(SpinWait.SpinUntil(() =>
             {
