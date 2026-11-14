@@ -4296,4 +4296,73 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="PushToTalkDaemonLost" xml:space="preserve">
     <value>Die Verbindung zum Daemon ist während Push-to-Talk abgebrochen. OpenXLR schaltet die Mikrofone wieder stumm, sobald der Daemon zurück ist.</value>
   </data>
+  <data name="MicSetupExpanderHint" xml:space="preserve">
+    <value>Senkt das Mikrofon ab, während du nicht sprichst, damit der Raum zwischen deinen Worten verschwindet. Er kommt nach der Rauschentfernung und vor dem EQ.</value>
+  </data>
+  <data name="MicSetupRoomHint" xml:space="preserve">
+    <value>Stelle zuerst die Verstärkung oben und die Rauschentfernung im Schritt Shape ein. Drücke dann Raumrauschen messen und sei fünf Sekunden still, mit dem Raum so wie auf Sendung: Lüfter, Computer und Fenster wie sonst. OpenXLR liest den Pegel, den der Expander hört, und schlägt eine Schwelle knapp darüber vor. Nichts ändert sich, bis du sie übernimmst, und eine spätere Änderung der Verstärkung oder der Rauschentfernung heißt erneut messen.</value>
+  </data>
+  <data name="MicSetupMeasureRoom" xml:space="preserve">
+    <value>Raumrauschen messen</value>
+  </data>
+  <data name="MicSetupApplyRoom" xml:space="preserve">
+    <value>Schwelle übernehmen</value>
+  </data>
+  <data name="MicSetupNoExpander" xml:space="preserve">
+    <value>Der Daemon meldet für dieses Mikrofon keinen Expander.</value>
+  </data>
+  <data name="MicSetupRoomListening" xml:space="preserve">
+    <value>Der Raum wird gemessen. Bleib still, noch {0:0} s.</value>
+  </data>
+  <data name="MicSetupRoomMeasured" xml:space="preserve">
+    <value>Das Raumrauschen erreichte an seinem lauten Ende {0:0} dBFS, dort, wo der Expander hört.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredRaw" xml:space="preserve">
+    <value>Das Raumrauschen erreichte an seinem lauten Ende {0:0} dBFS, vor der Rauschentfernung, der Expander hört es also leiser.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredFloor" xml:space="preserve">
+    <value>Der Raum blieb unter {0:0} dBFS, dem unteren Ende der Anzeige.</value>
+  </data>
+  <data name="MicSetupRoomNotHeard" xml:space="preserve">
+    <value>Es war gar nichts zu hören. Prüfe, ob das Mikrofon angeschlossen und nicht stummgeschaltet ist und ob dieser Kanal es aufnimmt, und miss dann erneut.</value>
+  </data>
+  <data name="MicSetupRoomFloor" xml:space="preserve">
+    <value>Nichts erreichte die Anzeige, die bei -60 dBFS beginnt. Der Raum kann sehr still sein, oder das Mikrofon ist nicht zu hören. Miss zuerst deine Stimme mit Suggest gain im Schritt Level und dann erneut den Raum.</value>
+  </data>
+  <data name="MicSetupRoomTalking" xml:space="preserve">
+    <value>Der Pegel schwankte zu stark für einen stillen Raum: Jemand hat gesprochen oder etwas war laut. Eine Schwelle daraus könnte deine Stimme abschneiden, also bleib still und miss erneut.</value>
+  </data>
+  <data name="MicSetupRoomSet" xml:space="preserve">
+    <value>Vorgeschlagene Schwelle: {0} dB, knapp über dem Raumrauschen.</value>
+  </data>
+  <data name="MicSetupRoomQuiet" xml:space="preserve">
+    <value>Der Raum ist sehr still, der Expander hat also wenig zu entfernen. Vorgeschlagene Schwelle: {0} dB.</value>
+  </data>
+  <data name="MicSetupRoomLoud" xml:space="preserve">
+    <value>Der Raum ist fast so laut wie deine Stimme. {0} dB ist die höchste Schwelle, die deine leiseren Worte noch durchlässt, der Expander kann also nur einen Teil des Rauschens entfernen. Geh näher ans Mikrofon und senke die Verstärkung entsprechend, oder versuche die Rauschentfernung, und miss dann erneut.</value>
+  </data>
+  <data name="MicSetupRoomVoiceTooQuiet" xml:space="preserve">
+    <value>Bei dieser Verstärkung ist deine Stimme zu leise, als dass der Expander sie vom Raum unterscheiden könnte. Erhöhe die Verstärkung im Schritt Level und miss dann erneut.</value>
+  </data>
+  <data name="MicSetupRoomNoVoice" xml:space="preserve">
+    <value>Im Schritt Level wurde keine Stimme gemessen, die Schwelle bleibt also nur unter dem Pegel, den Suggest gain anstrebt. Nutze Suggest gain, um sie an deiner eigenen Stimme zu prüfen.</value>
+  </data>
+  <data name="MicSetupRoomApplied" xml:space="preserve">
+    <value>Expander an, Schwelle {0} dB. Wenn du die Verstärkung oder die Rauschentfernung änderst, miss den Raum erneut.</value>
+  </data>
+  <data name="MicSetupRoomStale" xml:space="preserve">
+    <value>Verstärkung, Rauschentfernung oder Mikrofon haben sich seit der Raummessung geändert. Miss erneut.</value>
+  </data>
+  <data name="MicSetupRoomSession" xml:space="preserve">
+    <value>Eine Mikrofon-Setup-Sitzung läuft. Beende sie zuerst im Schritt Listen: Eine Aufnahme oder deine Stimme in den Monitoren ist nicht der Raum.</value>
+  </data>
+  <data name="MicSetupRoomGated" xml:space="preserve">
+    <value>Der Expander auf {0} ist an, und die Anzeige dieses Mikrofons liest nach ihm. Schalte den Expander aus, miss und übernimm dann die Schwelle.</value>
+  </data>
+  <data name="MicSetupRoomInterrupted" xml:space="preserve">
+    <value>Eine Mikrofon-Setup-Sitzung hat begonnen, die Messung wurde also beendet. Miss erneut, wenn sie vorbei ist.</value>
+  </data>
+  <data name="MicSetupShapeExpanderHint" xml:space="preserve">
+    <value>Raumrauschen messen im Schritt Level setzt die Schwelle knapp über deinen Raum.</value>
+  </data>
 </root>

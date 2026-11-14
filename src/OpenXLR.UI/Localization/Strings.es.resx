@@ -3983,4 +3983,73 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="PushToTalkDaemonLost" xml:space="preserve">
     <value>La conexión con el daemon se cortó durante pulsar para hablar. OpenXLR vuelve a silenciar los micrófonos en cuanto el daemon vuelve.</value>
   </data>
+  <data name="MicSetupExpanderHint" xml:space="preserve">
+    <value>Baja el micrófono mientras no hablas, para que la sala desaparezca entre tus palabras. Va después de la eliminación de ruido y antes del EQ.</value>
+  </data>
+  <data name="MicSetupRoomHint" xml:space="preserve">
+    <value>Ajusta primero la ganancia de arriba y la eliminación de ruido en el paso Shape. Después pulsa Medir el ruido de la sala y quédate en silencio cinco segundos, con la sala como estará al aire: ventiladores, ordenador y ventanas como siempre. OpenXLR lee el nivel que oye el expansor y sugiere un umbral justo por encima. Nada cambia hasta que lo apliques, y un cambio posterior de la ganancia o de la eliminación de ruido obliga a medir de nuevo.</value>
+  </data>
+  <data name="MicSetupMeasureRoom" xml:space="preserve">
+    <value>Medir el ruido de la sala</value>
+  </data>
+  <data name="MicSetupApplyRoom" xml:space="preserve">
+    <value>Aplicar umbral</value>
+  </data>
+  <data name="MicSetupNoExpander" xml:space="preserve">
+    <value>El daemon no informa de expansor para este micrófono.</value>
+  </data>
+  <data name="MicSetupRoomListening" xml:space="preserve">
+    <value>Escuchando la sala. Quédate en silencio, quedan {0:0} s.</value>
+  </data>
+  <data name="MicSetupRoomMeasured" xml:space="preserve">
+    <value>El ruido de la sala llegó a {0:0} dBFS en su parte más alta, donde escucha el expansor.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredRaw" xml:space="preserve">
+    <value>El ruido de la sala llegó a {0:0} dBFS en su parte más alta, antes de la eliminación de ruido, así que el expansor lo oye más bajo.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredFloor" xml:space="preserve">
+    <value>La sala se quedó por debajo de {0:0} dBFS, el fondo del medidor.</value>
+  </data>
+  <data name="MicSetupRoomNotHeard" xml:space="preserve">
+    <value>No se oyó nada. Comprueba que el micrófono está conectado, no silenciado y que es el que graba este canal, y vuelve a medir.</value>
+  </data>
+  <data name="MicSetupRoomFloor" xml:space="preserve">
+    <value>Nada llegó al medidor, que empieza en -60 dBFS. Puede que la sala sea muy silenciosa o que el micrófono no se oiga. Mide primero tu voz con Suggest gain en el paso Level y después vuelve a medir la sala.</value>
+  </data>
+  <data name="MicSetupRoomTalking" xml:space="preserve">
+    <value>El nivel se movió demasiado para una sala en silencio: alguien habló o hubo un ruido fuerte. Un umbral sacado de aquí podría cortar tu voz, así que quédate en silencio y vuelve a medir.</value>
+  </data>
+  <data name="MicSetupRoomSet" xml:space="preserve">
+    <value>Umbral sugerido: {0} dB, justo por encima del ruido de la sala.</value>
+  </data>
+  <data name="MicSetupRoomQuiet" xml:space="preserve">
+    <value>La sala es muy silenciosa, así que el expansor tiene poco que quitar. Umbral sugerido: {0} dB.</value>
+  </data>
+  <data name="MicSetupRoomLoud" xml:space="preserve">
+    <value>La sala suena casi tan fuerte como tu voz. {0} dB es el umbral más alto que aún deja pasar tus palabras más suaves, así que el expansor solo puede quitar parte del ruido. Acércate al micrófono y baja la ganancia en la misma medida, o prueba la eliminación de ruido, y vuelve a medir.</value>
+  </data>
+  <data name="MicSetupRoomVoiceTooQuiet" xml:space="preserve">
+    <value>Con esta ganancia tu voz es demasiado baja para que el expansor la distinga de la sala. Sube la ganancia en el paso Level y vuelve a medir.</value>
+  </data>
+  <data name="MicSetupRoomNoVoice" xml:space="preserve">
+    <value>No se midió ninguna voz en el paso Level, así que el umbral solo se mantiene por debajo del nivel que busca Suggest gain. Usa Suggest gain para comprobarlo con tu propia voz.</value>
+  </data>
+  <data name="MicSetupRoomApplied" xml:space="preserve">
+    <value>Expansor activo, umbral {0} dB. Si cambias la ganancia o la eliminación de ruido, vuelve a medir la sala.</value>
+  </data>
+  <data name="MicSetupRoomStale" xml:space="preserve">
+    <value>La ganancia, la eliminación de ruido o el micrófono han cambiado desde que se midió la sala. Vuelve a medir.</value>
+  </data>
+  <data name="MicSetupRoomSession" xml:space="preserve">
+    <value>Hay una sesión de Mic setup en marcha. Detenla primero en el paso Listen: una toma o tu voz en los monitores no es la sala.</value>
+  </data>
+  <data name="MicSetupRoomGated" xml:space="preserve">
+    <value>El expansor de {0} está activo y el medidor de este micrófono lee después de él. Desactiva el expansor, mide y después aplica el umbral.</value>
+  </data>
+  <data name="MicSetupRoomInterrupted" xml:space="preserve">
+    <value>Empezó una sesión de Mic setup, así que la medición se detuvo. Vuelve a medir cuando termine.</value>
+  </data>
+  <data name="MicSetupShapeExpanderHint" xml:space="preserve">
+    <value>Medir el ruido de la sala, en el paso Level, pone el umbral justo por encima de tu sala.</value>
+  </data>
 </root>

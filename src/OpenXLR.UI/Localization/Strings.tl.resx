@@ -4275,4 +4275,73 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="PushToTalkDaemonLost" xml:space="preserve">
     <value>Naputol ang koneksyon sa daemon habang push to talk. Mina-mute muli ng OpenXLR ang mga microphone sa sandaling bumalik ang daemon.</value>
   </data>
+  <data name="MicSetupExpanderHint" xml:space="preserve">
+    <value>Hinihinaan ang mikropono habang hindi ka nagsasalita, kaya nawawala ang tunog ng kuwarto sa pagitan ng mga salita mo. Nasa pagkatapos ng pag-alis ng ingay at bago ang EQ.</value>
+  </data>
+  <data name="MicSetupRoomHint" xml:space="preserve">
+    <value>Itakda muna ang gain sa itaas at ang pag-alis ng ingay sa hakbang na Hubugin. Pagkatapos, pindutin ang Sukatin ang ingay ng kuwarto at manahimik nang limang segundo, habang ang kuwarto ay gaya ng sa on air: mga bentilador, computer at bintana gaya ng dati. Babasahin ng OpenXLR ang level na naririnig ng expander at magmumungkahi ng threshold na bahagyang mas mataas dito. Walang magbabago hangga't hindi mo ito inilalapat, at kapag binago mo pagkatapos ang gain o ang pag-alis ng ingay, kailangang sukatin muli.</value>
+  </data>
+  <data name="MicSetupMeasureRoom" xml:space="preserve">
+    <value>Sukatin ang ingay ng kuwarto</value>
+  </data>
+  <data name="MicSetupApplyRoom" xml:space="preserve">
+    <value>Ilapat ang threshold</value>
+  </data>
+  <data name="MicSetupNoExpander" xml:space="preserve">
+    <value>Walang iniuulat na expander ang daemon para sa mikroponong ito.</value>
+  </data>
+  <data name="MicSetupRoomListening" xml:space="preserve">
+    <value>Pinakikinggan ang kuwarto. Manahimik, {0:0} s na lang.</value>
+  </data>
+  <data name="MicSetupRoomMeasured" xml:space="preserve">
+    <value>Umabot sa {0:0} dBFS ang ingay ng kuwarto sa pinakamalakas nito, kung saan nakikinig ang expander.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredRaw" xml:space="preserve">
+    <value>Umabot sa {0:0} dBFS ang ingay ng kuwarto sa pinakamalakas nito, bago ang pag-alis ng ingay, kaya mas mahina itong naririnig ng expander.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredFloor" xml:space="preserve">
+    <value>Nanatili ang kuwarto sa ilalim ng {0:0} dBFS, ang pinakamababa ng meter.</value>
+  </data>
+  <data name="MicSetupRoomNotHeard" xml:space="preserve">
+    <value>Walang narinig. Tiyaking nakakonekta ang mikropono, hindi naka-mute at ito ang nire-record ng channel na ito, saka sukatin muli.</value>
+  </data>
+  <data name="MicSetupRoomFloor" xml:space="preserve">
+    <value>Walang umabot sa meter, na nagsisimula sa -60 dBFS. Maaaring napakatahimik ng kuwarto, o hindi naririnig ang mikropono. Sukatin muna ang boses mo gamit ang Magmungkahi ng gain sa hakbang na Level, saka sukatin muli ang kuwarto.</value>
+  </data>
+  <data name="MicSetupRoomTalking" xml:space="preserve">
+    <value>Masyadong gumalaw ang level para sa tahimik na kuwarto: may nagsalita o may malakas na tunog. Maaaring maputol ang boses mo sa threshold mula rito, kaya manahimik at sukatin muli.</value>
+  </data>
+  <data name="MicSetupRoomSet" xml:space="preserve">
+    <value>Iminumungkahing threshold: {0} dB, bahagyang mas mataas sa ingay ng kuwarto.</value>
+  </data>
+  <data name="MicSetupRoomQuiet" xml:space="preserve">
+    <value>Napakatahimik ng kuwarto, kaya kaunti lang ang aalisin ng expander. Iminumungkahing threshold: {0} dB.</value>
+  </data>
+  <data name="MicSetupRoomLoud" xml:space="preserve">
+    <value>Halos kasinlakas ng boses mo ang kuwarto. Ang {0} dB ang pinakamataas na threshold na nagpapalusot pa sa mas mahihinang salita mo, kaya bahagi lang ng ingay ang maaalis ng expander. Lumapit sa mikropono at ibaba ang gain nang katumbas, o subukan ang pag-alis ng ingay, saka sukatin muli.</value>
+  </data>
+  <data name="MicSetupRoomVoiceTooQuiet" xml:space="preserve">
+    <value>Sa gain na ito, masyadong mahina ang boses mo para maihiwalay ito ng expander sa kuwarto. Itaas ang gain sa hakbang na Level, saka sukatin muli.</value>
+  </data>
+  <data name="MicSetupRoomNoVoice" xml:space="preserve">
+    <value>Walang nasukat na boses sa hakbang na Level, kaya pinananatili lang ang threshold sa ilalim ng level na tinutumbok ng Magmungkahi ng gain. Gamitin ang Magmungkahi ng gain para suriin ito laban sa sarili mong boses.</value>
+  </data>
+  <data name="MicSetupRoomApplied" xml:space="preserve">
+    <value>Naka-on ang expander, threshold {0} dB. Kung babaguhin mo ang gain o ang pag-alis ng ingay, sukatin muli ang kuwarto.</value>
+  </data>
+  <data name="MicSetupRoomStale" xml:space="preserve">
+    <value>Nagbago ang gain, ang pag-alis ng ingay o ang mikropono mula nang sukatin ang kuwarto. Sukatin muli.</value>
+  </data>
+  <data name="MicSetupRoomSession" xml:space="preserve">
+    <value>May tumatakbong session ng Setup ng mic. Ihinto muna ito sa hakbang na Makinig: hindi ang kuwarto ang isang take o ang boses mo sa mga monitor.</value>
+  </data>
+  <data name="MicSetupRoomGated" xml:space="preserve">
+    <value>Naka-on ang expander sa {0}, at pagkatapos nito bumabasa ang meter ng mikroponong ito. I-off ang expander, sukatin, saka ilapat ang threshold.</value>
+  </data>
+  <data name="MicSetupRoomInterrupted" xml:space="preserve">
+    <value>Nagsimula ang isang session ng Setup ng mic, kaya huminto ang pagsukat. Sukatin muli kapag natapos ito.</value>
+  </data>
+  <data name="MicSetupShapeExpanderHint" xml:space="preserve">
+    <value>Itinatakda ng Sukatin ang ingay ng kuwarto sa hakbang na Level ang threshold na bahagyang mas mataas sa kuwarto mo.</value>
+  </data>
 </root>

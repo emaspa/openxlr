@@ -144,6 +144,17 @@ public sealed class DynamicsParameterViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Set the value and send it at once rather than after the slider's
+    /// pause, so a change sent next, such as the switch, reaches the daemon
+    /// after it.
+    /// </summary>
+    internal void SendNow(double value)
+    {
+        Value = value;
+        SliderSync.Flush(Key);
+    }
+
     /// <summary>The value with its unit: "-18 dB", "3:1", "5 ms".</summary>
     public string Text => Format(Range, _value);
 

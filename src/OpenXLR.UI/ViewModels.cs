@@ -1439,7 +1439,11 @@ public sealed partial class MainViewModel : ViewModelBase
             else if (kv.Key.StartsWith("comp:", StringComparison.Ordinal) && kv.Value is JsonArray compressor)
                 Channels.FirstOrDefault(x => x.Id == kv.Key[5..])?.Dynamics?.Compressor.ApplyLevels(compressor);
             else if (kv.Key.StartsWith("exp:", StringComparison.Ordinal) && kv.Value is JsonArray expander)
+            {
                 Channels.FirstOrDefault(x => x.Id == kv.Key[4..])?.Dynamics?.Expander.ApplyLevels(expander);
+                // Mic setup's room measurement reads the expander's input while it listens.
+                MicSetupOf(kv.Key[4..])?.ApplyExpanderLevel(expander);
+            }
             else if (kv.Key.StartsWith("take:", StringComparison.Ordinal) && kv.Value is JsonArray position)
                 MicSetupOf(kv.Key[5..])?.ApplyPosition(position);
         }

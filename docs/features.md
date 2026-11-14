@@ -925,12 +925,19 @@ not click where it starts over. **Processed** and **Raw** flip between the micro
 without its processing on the same take, in the loop helper with a 20 ms
 crossfade and no chain rebuilt, and **Hear myself** puts the processed
 microphone in the monitor mix for the session only, and the window says
-how much latency that adds. **Shape** holds the microphone EQ's graph,
+how much latency that adds. **Shape** holds noise removal, the expander's
+switch and threshold, the microphone EQ's graph,
 edited in place, the unit's and XLR 1's software low cut and ClipGuard, the
 insert chain with bypass, editor and add effect, and seven starting
 presets for speech, each applied as one
 EQ change with a one-step undo and lit while the EQ holds it, all heard
-live while the take loops. On
+live while the take loops. **Measure room noise**, on Level beside
+Suggest gain, listens to five seconds
+of the quiet room at the expander's own input, after noise removal, and
+proposes a threshold 4 dB over the room's peaks, kept 15 dB under the
+voice Suggest gain measured. It asks to measure again after talk or a loud
+sound, says when it hears no microphone, waits while a session runs, and
+writes the threshold, with the expander switched on, only when applied. On
 the Wave XLR Pro the session turns the zero-latency
 path off, since it cannot carry effects. The take stays in the native
 helper's memory and is discarded on stop; a session ends by itself on a

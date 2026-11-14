@@ -25,7 +25,7 @@ public partial class MicSetupWindow : Window
     private static MicSetupWindow? _open;
 
     private readonly DispatcherTimer _meter = new() { Interval = MeterRenewal };
-    // Suggest gain's countdown, and its end when the meter sends nothing.
+    // Suggest gain's and Measure room noise's countdown, and their end when the meter sends nothing.
     private readonly DispatcherTimer _measure = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private bool _closing, _closed, _moving;
     private MicSetupViewModel? _watched;
@@ -37,7 +37,7 @@ public partial class MicSetupWindow : Window
         _measure.Tick += (_, _) =>
         {
             Setup?.MeasureTick();
-            if (Setup is not { Measuring: true }) _measure.Stop();
+            if (Setup is not ({ Measuring: true } or { MeasuringRoom: true })) _measure.Stop();
         };
         FitScreen();
         Opened += (_, _) => { FitScreen(); KeepMeter(); _meter.Start(); };
@@ -47,7 +47,7 @@ public partial class MicSetupWindow : Window
             _measure.Stop();
             // A normal close already ended its measurement before waiting.
             // Another window may now be measuring the same input.
-            if (!_closing) Setup?.CancelGainMeasure();
+            if (!_closing) Setup?.CancelMeasures();
             Watch(null);
             if (_open == this) _open = null;
         };
@@ -65,7 +65,7 @@ public partial class MicSetupWindow : Window
             if (_open == this) _open = null;
             _meter.Stop();
             _measure.Stop();
-            vm.CancelGainMeasure();
+            vm.CancelMeasures();
             IsEnabled = false; // Do not queue a new recording behind the pending stop.
             await vm.StopOnCloseAsync();
             _closed = true;
@@ -226,6 +226,22 @@ public partial class MicSetupWindow : Window
         if (Setup is not { } vm) return;
         vm.StartGainMeasure();
         _measure.Start();
+    }
+
+    private void OnMeasureRoom(object? sender, RoutedEventArgs e)
+    {
+        if (Setup is not { } vm) return;
+        vm.StartRoomMeasure();
+        if (vm.MeasuringRoom) _measure.Start();
+    }
+
+    private void OnApplyRoom(object? sender, RoutedEventArgs e) => Setup?.ApplyRoom();
+    private void OnDiscardRoom(object? sender, RoutedEventArgs e) => Setup?.DiscardRoom();
+
+    /// <summary>The expander's own window, with its levels, graph and the rest of its settings.</summary>
+    private void OnExpanderWindow(object? sender, RoutedEventArgs e)
+    {
+        if (Setup?.Expander is { } expander) DynamicsWindows.Show(this, expander);
     }
 
     private void OnAcceptGain(object? sender, RoutedEventArgs e) => Setup?.AcceptGain();

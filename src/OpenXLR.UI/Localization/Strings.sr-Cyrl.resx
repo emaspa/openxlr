@@ -4275,4 +4275,73 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="PushToTalkDaemonLost" xml:space="preserve">
     <value>Веза са демоном је прекинута током говора на притисак. OpenXLR поново искључује звук микрофона чим се демон врати.</value>
   </data>
+  <data name="MicSetupExpanderHint" xml:space="preserve">
+    <value>Утишава микрофон док не говориш, па соба нестаје између твојих речи. Долази после уклањања шума и пре EQ-а.</value>
+  </data>
+  <data name="MicSetupRoomHint" xml:space="preserve">
+    <value>Прво подеси појачање изнад и уклањање шума у кораку Обликовање. Затим притисни Измери шум собе и ћути пет секунди, са собом као у етеру: вентилатори, рачунар и прозори као и обично. OpenXLR чита ниво који експандер чује и предлаже праг мало изнад њега. Ништа се не мења док га не примениш, а каснија промена појачања или уклањања шума значи ново мерење.</value>
+  </data>
+  <data name="MicSetupMeasureRoom" xml:space="preserve">
+    <value>Измери шум собе</value>
+  </data>
+  <data name="MicSetupApplyRoom" xml:space="preserve">
+    <value>Примени праг</value>
+  </data>
+  <data name="MicSetupNoExpander" xml:space="preserve">
+    <value>Демон не пријављује експандер за овај микрофон.</value>
+  </data>
+  <data name="MicSetupRoomListening" xml:space="preserve">
+    <value>Слушам собу. Ћути, преостало: {0:0} s.</value>
+  </data>
+  <data name="MicSetupRoomMeasured" xml:space="preserve">
+    <value>Шум собе је у најгласнијим тренуцима достигао {0:0} dBFS, тамо где експандер слуша.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredRaw" xml:space="preserve">
+    <value>Шум собе је у најгласнијим тренуцима достигао {0:0} dBFS, пре уклањања шума, па га експандер чује тише.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredFloor" xml:space="preserve">
+    <value>Соба је остала испод {0:0} dBFS, дна мерача.</value>
+  </data>
+  <data name="MicSetupRoomNotHeard" xml:space="preserve">
+    <value>Ништа се не чује. Провери да ли је микрофон повезан, да није утишан и да ли га овај канал снима, па измери поново.</value>
+  </data>
+  <data name="MicSetupRoomFloor" xml:space="preserve">
+    <value>Ништа није стигло до мерача, који почиње од -60 dBFS. Соба је можда веома тиха, или се микрофон не чује. Прво измери свој глас са Предложи појачање у кораку Ниво, па поново измери собу.</value>
+  </data>
+  <data name="MicSetupRoomTalking" xml:space="preserve">
+    <value>Ниво се превише мењао за тиху собу: неко је говорио или се чуло нешто гласно. Праг одавде би могао да сече твој глас, па ћути и измери поново.</value>
+  </data>
+  <data name="MicSetupRoomSet" xml:space="preserve">
+    <value>Предложени праг: {0} dB, мало изнад шума собе.</value>
+  </data>
+  <data name="MicSetupRoomQuiet" xml:space="preserve">
+    <value>Соба је веома тиха, па експандер нема много шта да уклони. Предложени праг: {0} dB.</value>
+  </data>
+  <data name="MicSetupRoomLoud" xml:space="preserve">
+    <value>Соба је скоро гласна као твој глас. {0} dB је највиши праг који још пропушта твоје тише речи, па експандер може да уклони само део шума. Приђи ближе микрофону и смањи појачање у истој мери, или пробај уклањање шума, па измери поново.</value>
+  </data>
+  <data name="MicSetupRoomVoiceTooQuiet" xml:space="preserve">
+    <value>При овом појачању твој глас је превише тих да би га експандер разликовао од собе. Повећај појачање у кораку Ниво, па измери поново.</value>
+  </data>
+  <data name="MicSetupRoomNoVoice" xml:space="preserve">
+    <value>У кораку Ниво није измерен глас, па се праг држи само испод нивоа ком тежи Предложи појачање. Покрени Предложи појачање да га провериш на свом гласу.</value>
+  </data>
+  <data name="MicSetupRoomApplied" xml:space="preserve">
+    <value>Експандер укључен, праг {0} dB. Ако промениш појачање или уклањање шума, поново измери собу.</value>
+  </data>
+  <data name="MicSetupRoomStale" xml:space="preserve">
+    <value>Појачање, уклањање шума или микрофон су се променили од мерења собе. Измери поново.</value>
+  </data>
+  <data name="MicSetupRoomSession" xml:space="preserve">
+    <value>Сесија подешавања микрофона је у току. Прво је заустави у кораку Слушање: снимак или твој глас у мониторима нису соба.</value>
+  </data>
+  <data name="MicSetupRoomGated" xml:space="preserve">
+    <value>Експандер на уређају {0} је укључен, а мерач овог микрофона чита после њега. Искључи експандер, измери, па примени праг.</value>
+  </data>
+  <data name="MicSetupRoomInterrupted" xml:space="preserve">
+    <value>Почела је сесија подешавања микрофона, па је мерење заустављено. Измери поново кад се заврши.</value>
+  </data>
+  <data name="MicSetupShapeExpanderHint" xml:space="preserve">
+    <value>Измери шум собе у кораку Ниво поставља праг мало изнад твоје собе.</value>
+  </data>
 </root>
