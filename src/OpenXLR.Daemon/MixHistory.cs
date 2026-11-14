@@ -15,6 +15,7 @@ internal sealed class HistoryStep
     public string? Channel { get; init; }
     public string? Mix { get; init; }
     public string? Group { get; init; }
+    public string? Insert { get; init; }
     public required string Label { get; init; }
     /// <summary>The connection the step came from; HTTP requests count as one.</summary>
     public required string Client { get; init; }
@@ -29,7 +30,7 @@ internal sealed class HistoryStep
     public HistoryStepInfo Info()
     {
         string label = Targets.Count > 1 ? $"{Label} and {Targets.Count - 1} more" : Label;
-        return new(Id, Kind, Channel, Mix, Group, Math.Max(1, Targets.Count), label);
+        return new(Id, Kind, Channel, Mix, Group, Math.Max(1, Targets.Count), label) { Insert = Insert };
     }
 }
 
@@ -95,6 +96,7 @@ internal sealed class MixHistory
                 Channel = target.Channel,
                 Mix = target.Mix,
                 Group = target.Group,
+                Insert = target.Insert,
                 Label = label,
                 Client = client,
                 Last = now,

@@ -55,6 +55,9 @@ public sealed partial class InsertsViewModel : ViewModelBase
     public bool CanMicSetup { get => _canMicSetup; internal set => Set(ref _canMicSetup, value); }
     public MicSetupViewModel MicSetup { get; }
 
+    /// <summary>The name an insert in this chain shows, or null when the chain does not hold it.</summary>
+    internal string? InsertLabel(string id) => Items.FirstOrDefault(i => i.Id == id)?.Label;
+
     public Task ShowNativeEditorAsync(InsertViewModel insert)
         => insert.IsDetached ? Task.CompletedTask : _client.ShowInsertUiAsync(_channel, insert.Id);
 

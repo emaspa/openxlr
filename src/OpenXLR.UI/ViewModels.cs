@@ -73,7 +73,16 @@ public sealed partial class MainViewModel : ViewModelBase
         History = new HistoryViewModel(client.StepHistoryAsync, new HistoryNames(
             id => Channels.FirstOrDefault(c => c.Id == id)?.Name,
             id => Mixes.FirstOrDefault(m => m.Id == id)?.Name,
-            id => ExclusiveGroups.FirstOrDefault(g => g.Id == id)?.Name));
+            id => ExclusiveGroups.FirstOrDefault(g => g.Id == id)?.Name)
+        {
+            Insert = (chain, id) => (chain switch
+            {
+                "xlr1" => Inserts,
+                "xlr2" => Inserts2,
+                _ when chain.StartsWith("mix:", StringComparison.Ordinal) => Mixes.FirstOrDefault(m => m.Id == chain[4..])?.Inserts,
+                _ => Channels.FirstOrDefault(c => c.Id == chain)?.Inserts,
+            })?.InsertLabel(id),
+        });
         LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;

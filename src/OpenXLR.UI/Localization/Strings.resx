@@ -2435,6 +2435,18 @@ Select the interface OpenXLR drives</value>
   <data name="HistoryExpander" xml:space="preserve">
     <value>{0} expander</value>
   </data>
+  <data name="HistoryInsertParam" xml:space="preserve">
+    <value>{0} settings on {1}</value>
+  </data>
+  <data name="HistoryInsertBypass" xml:space="preserve">
+    <value>{0} bypass on {1}</value>
+  </data>
+  <data name="HistoryInsertName" xml:space="preserve">
+    <value>{0} name on {1}</value>
+  </data>
+  <data name="HistoryInsertChain" xml:space="preserve">
+    <value>{0} inserts</value>
+  </data>
   <data name="HistoryLowCut" xml:space="preserve">
     <value>{0} low cut</value>
   </data>

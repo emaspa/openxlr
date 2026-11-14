@@ -1,8 +1,8 @@
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>
-/// The mixer values an undo step can carry: sends, volumes and mutes, and
-/// the processing of microphones and mixes. A later field is added here,
+/// The mixer values an undo step can carry: sends, volumes and mutes, the
+/// processing of microphones and mixes, and insert chains. A later field is added here,
 /// read in <see cref="Mixer.ReadSceneValues"/> and written in
 /// <see cref="Mixer.ApplyScenePatch"/>. A processing field holds a whole
 /// setting, so one EQ is one value however many bands a drag moved.
@@ -39,6 +39,34 @@ public enum SceneField
     MonitorDry,
     /// <summary>The ducking setup without where it runs, keyed by <see cref="SceneKeys.Ducking"/>; a <see cref="DuckingScene"/>.</summary>
     Ducking,
+    /// <summary>One insert chain, keyed by its chain key (a channel id or <c>mix:&lt;id&gt;</c>); an <see cref="InsertChain"/>.</summary>
+    Inserts,
+}
+
+/// <summary>
+/// One insert chain as an undo step holds it: each insert in order, with its
+/// plugin, name, bypass, host and control values, copied so a later move of
+/// a control cannot reach the step. Two chains are the same when all of
+/// that is. Whether an insert runs on its own block is where it runs, like
+/// the processing switches, so it is carried but not compared, and a chain
+/// put back keeps the choice each insert has now.
+/// </summary>
+public sealed record InsertChain
+{
+    public InsertChain(IEnumerable<InsertDefinition> inserts)
+        => Inserts = [.. inserts.Select(i => i with { Params = new Dictionary<string, double>(i.Params) })];
+
+    public IReadOnlyList<InsertDefinition> Inserts { get; }
+
+    public bool Equals(InsertChain? other)
+        => other is not null && Inserts.Count == other.Inserts.Count && Inserts.Zip(other.Inserts).All(p => SameInsert(p.First, p.Second));
+
+    public override int GetHashCode() => Inserts.Count;
+
+    private static bool SameInsert(InsertDefinition a, InsertDefinition b)
+        => a.Id == b.Id && a.Kind == b.Kind && a.Plugin == b.Plugin && a.Label == b.Label && a.Bypass == b.Bypass
+            && a.NativeHost == b.NativeHost && a.Params.Count == b.Params.Count
+            && a.Params.All(p => b.Params.TryGetValue(p.Key, out double value) && value.Equals(p.Value));
 }
 
 /// <summary>The keys of the scene values that are not a channel's, a cell's or a mix's.</summary>
@@ -215,6 +243,8 @@ public sealed partial class Mixer
         SceneField.MonitorDry => _config.Mixes.Where(m => m.Kind == MixKind.Monitor).Select(m => new SceneKey(field, m.Id)),
         SceneField.LowCut or SceneField.SoftClipGuard => [new SceneKey(field, SceneKeys.FirstMicrophone)],
         SceneField.Ducking => [new SceneKey(field, SceneKeys.Ducking)],
+        SceneField.Inserts => _config.Channels.Where(c => c.ChainWidth is not null).Select(c => new SceneKey(field, c.Id))
+            .Concat(_config.Mixes.Select(m => new SceneKey(field, MixKey(m)))),
         _ => [],
     };
 
@@ -236,6 +266,7 @@ public sealed partial class Mixer
         SceneField.SoftClipGuard => key.Key == SceneKeys.FirstMicrophone ? _softClipGuard : null,
         SceneField.MonitorDry => MonitorMixLocked(key.Key) is not null ? _dryMonitors.Contains(key.Key) : null,
         SceneField.Ducking => key.Key == SceneKeys.Ducking ? DuckingSetupLocked().ToScene() : null,
+        SceneField.Inserts => IsInsertChannel(key.Key) ? new InsertChain(InsertsFor(key.Key)) : null,
         _ => null,
     };
 
@@ -317,7 +348,43 @@ public sealed partial class Mixer
             case SceneField.Ducking:
                 RestoreDuckingLocked((DuckingScene)value);
                 break;
+            case SceneField.Inserts:
+                RestoreChainLocked(key.Key, (InsertChain)value);
+                break;
         }
+    }
+
+    /// <summary>
+    /// Put one insert chain back. A chain whose structure stays the same
+    /// (the same plugins in the same order, each with the same bypass and
+    /// host) keeps its running plugins: new control values are pushed into
+    /// them live, and a name changes nothing that runs. Any other chain is
+    /// built again, as <c>setInserts</c> builds it, so a plugin that comes
+    /// back starts from its saved control values. An insert keeps the own
+    /// block choice it has now; one that comes back takes the one it had.
+    /// </summary>
+    private void RestoreChainLocked(string key, InsertChain chain)
+    {
+        List<InsertDefinition> before = InsertsFor(key);
+        _inserts[key] = [.. chain.Inserts.Select(i => i with
+        {
+            Params = new Dictionary<string, double>(i.Params),
+            NativeHost = i.RunsNatively,
+            OwnBlock = before.FirstOrDefault(b => b.Id == i.Id && b.Kind == i.Kind && b.Plugin == i.Plugin)?.OwnBlock ?? i.OwnBlock,
+        })];
+        if (!_built) return;
+        bool rebuild;
+        if (MixForKey(key) is not null)
+        {
+            (ChainStructure structure, bool chained) = MixChainLocked(key);
+            rebuild = ChainNeedsRebuildLocked(key, structure, chained);
+        }
+        else
+        {
+            InputRoute route = InputRouteLocked(_config.Channels.First(c => c.Id == key), null);
+            rebuild = ChainNeedsRebuildLocked(key, route.Structure, route.Chained);
+        }
+        if (rebuild || !PushChainParamsLocked(key, before)) RewireInsertKeyLocked(key);
     }
 
     /// <summary>

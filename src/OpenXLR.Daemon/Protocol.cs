@@ -438,7 +438,12 @@ public sealed record HistoryStepInfo(
     [property: JsonPropertyName("mix")] string? Mix,
     [property: JsonPropertyName("group")] string? Group,
     [property: JsonPropertyName("count")] int Count,
-    [property: JsonPropertyName("label")] string Label);
+    [property: JsonPropertyName("label")] string Label)
+{
+    /// <summary>The insert an insert step names, in the chain of its <see cref="Channel"/> or <see cref="Mix"/>.</summary>
+    [JsonPropertyName("insert")]
+    public string? Insert { get; init; }
+}
 
 /// <summary>
 /// Ducking, present whenever the daemon runs, on any device or none: the

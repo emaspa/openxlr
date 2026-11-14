@@ -55,7 +55,7 @@ public sealed partial class WebSocketHub
             var changes = new List<SceneChange>();
             foreach ((SceneKey key, object was) in before)
                 if (after.TryGetValue(key, out object? now) && !SceneValues.Same(was, now)) changes.Add(new(key, was, now));
-            if (History.Record(client?.ToString("N") ?? "http", target, HistoryPolicy.LabelOf(target, _mixer.LayoutConfig), changes))
+            if (History.Record(client?.ToString("N") ?? "http", target, HistoryPolicy.LabelOf(target, _mixer.LayoutConfig, _mixer.InsertName), changes))
                 _stateBroadcasts.Signal();
         }
         catch (Exception ex) { _log.LogWarning(ex, "history: could not record {command}", cmd.Cmd); }

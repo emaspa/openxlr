@@ -2331,6 +2331,18 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="HistoryExpander" xml:space="preserve">
     <value>expander sa {0}</value>
   </data>
+  <data name="HistoryInsertParam" xml:space="preserve">
+    <value>mga setting sa {0} sulod sa {1}</value>
+  </data>
+  <data name="HistoryInsertBypass" xml:space="preserve">
+    <value>bypass sa {0} sulod sa {1}</value>
+  </data>
+  <data name="HistoryInsertName" xml:space="preserve">
+    <value>ngalan sa {0} sulod sa {1}</value>
+  </data>
+  <data name="HistoryInsertChain" xml:space="preserve">
+    <value>mga insert sa {0}</value>
+  </data>
   <data name="HistoryLowCut" xml:space="preserve">
     <value>low cut sa {0}</value>
   </data>

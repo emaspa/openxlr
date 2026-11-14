@@ -1505,7 +1505,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     {
         if (!_mixer.Built) return NotBuiltError;
         if (RefusedInHardwareMixing(cmd) is { } refused) return refused;
-        string? invalid = CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.PluginCatalog.Find);
+        string? invalid = CommandValidation.Check(cmd, _mixer, FindPlugin);
         if (invalid is not null) return invalid;
         try
         {
@@ -2037,6 +2037,13 @@ public sealed partial class MixerService : IHostedService, IDisposable
         }
         return outcomes;
     }
+
+    /// <summary>The plugin an insert names, for checking a command; a test hands in its own catalogue.</summary>
+    internal Func<InsertDefinition, PluginInfo?> FindPlugin { get; set; } = OpenXLR.Core.Mixing.PluginCatalog.Find;
+
+    /// <summary>The name an insert shows, by its chain key and id: its own, its plugin's, or its id; null when it is not in the chain.</summary>
+    internal string? InsertName(string key, string id)
+        => _mixer.InsertInChain(key, id) is { } insert ? insert.Label ?? FindPlugin(insert)?.Name ?? insert.Id : null;
 
     /// <summary>The members of the channel's exclusive group, the channel included.</summary>
     internal IReadOnlyList<string> ExclusivePeersOf(string channel) => _mixer.ExclusivePeersOf(channel);

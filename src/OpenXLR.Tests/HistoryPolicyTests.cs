@@ -112,6 +112,61 @@ public sealed partial class HistoryPolicyTests
         }
     }
 
+    [Theory]
+    [InlineData("setInsertParam")]
+    [InlineData("setInsertBypass")]
+    [InlineData("setInserts")]
+    [InlineData("renameInsert")]
+    public void InsertEditsAreRecorded(string command)
+        => Assert.Equal(HistoryClass.Recorded, HistoryPolicy.ClassOf(command));
+
+    // Where an insert runs and its editor window are not what it does.
+    [Theory]
+    [InlineData("setInsertOwnBlock")]
+    [InlineData("showInsertUi")]
+    public void AnInsertsOwnBlockAndItsEditorAreNotRecorded(string command)
+        => Assert.Equal(HistoryClass.Ignored, HistoryPolicy.ClassOf(command));
+
+    [Fact]
+    public void AnInsertStepComparesItsWholeChainAndNamesTheInsert()
+    {
+        HistoryTarget param = HistoryPolicy.TargetOf(
+            new Command { Cmd = "setInsertParam", Channel = "xlr1", InsertId = "comp", Symbol = "threshold" }, _ => [], _ => [])!;
+        Assert.Equal(("insertParam", "xlr1", null, "comp"), (param.Kind, param.Channel, param.Mix, param.Insert));
+        Assert.Equal([SceneField.Inserts], param.Fields);
+        Assert.True(param.Keep(new(SceneField.Inserts, "xlr1")));
+        Assert.False(param.Keep(new(SceneField.Inserts, "xlr2")));
+
+        HistoryTarget mix = HistoryPolicy.TargetOf(new Command { Cmd = "setInserts", Channel = "mix:stream" }, _ => [], _ => [])!;
+        Assert.Equal(("insertChain", null, "stream", null), (mix.Kind, mix.Channel, mix.Mix, mix.Insert));
+        Assert.True(mix.Keep(new(SceneField.Inserts, "mix:stream")));
+
+        // Two inserts of one burst are two things; one insert's controls are one.
+        HistoryTarget other = param with { Insert = "gate" };
+        Assert.NotEqual(param.Identity, other.Identity);
+
+        var layout = new MixerConfig { Channels = [new("xlr1", "Mic 1")], Mixes = [new("stream", "Stream", MixKind.VirtualMic)] };
+        Assert.Equal("Voice settings on Mic 1", HistoryPolicy.LabelOf(param, layout, (key, id) => key == "xlr1" && id == "comp" ? "Voice" : null));
+        Assert.Equal("comp settings on Mic 1", HistoryPolicy.LabelOf(param, layout));
+        Assert.Equal("Stream inserts", HistoryPolicy.LabelOf(mix, layout));
+    }
+
+    [Fact]
+    public void TwoChainsAreTheSameWhateverBlockTheirInsertsRunOn()
+    {
+        var comp = new InsertDefinition { Id = "comp", Kind = "lv2", Plugin = "urn:test:comp", Params = new() { ["threshold"] = -20 } };
+        var chain = new InsertChain([comp]);
+        Assert.True(SceneValues.Same(chain, new InsertChain([comp with { OwnBlock = true, Params = new() { ["threshold"] = -20 } }])));
+        Assert.False(SceneValues.Same(chain, new InsertChain([comp with { Params = new() { ["threshold"] = -21 } }])));
+        Assert.False(SceneValues.Same(chain, new InsertChain([comp with { Params = new() { ["threshold"] = -20, ["ratio"] = 4 } }])));
+        Assert.False(SceneValues.Same(chain, new InsertChain([comp with { Bypass = true }])));
+        Assert.False(SceneValues.Same(chain, new InsertChain([comp with { Label = "Voice" }])));
+        Assert.False(SceneValues.Same(chain, new InsertChain([comp, comp with { Id = "comp2" }])));
+        // The step holds a copy: a control moved later does not reach it.
+        comp.Params["threshold"] = -40;
+        Assert.Equal(-20, chain.Inserts[0].Params["threshold"]);
+    }
+
     [Fact]
     public void TwoDuckingSetupsWithTheSameListsAreTheSame()
     {

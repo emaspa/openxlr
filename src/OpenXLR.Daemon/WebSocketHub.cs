@@ -430,8 +430,9 @@ public sealed partial class WebSocketHub
             case "setInserts":
                 // Profile recall and input binding changes share this gate.
                 // A folder cannot be removed between checking its users and
-                // creating an insert from it on another client.
-                lock (_installGate) error = ApplyMixer(cmd, null);
+                // creating an insert from it on another client. The
+                // connection only tells the undo history who sent it.
+                lock (_installGate) error = ApplyMixer(cmd, browserOwner);
                 stateOnError = true;
                 break;
             case "setMixing" when cmd.Check.ValueKind == JsonValueKind.True:

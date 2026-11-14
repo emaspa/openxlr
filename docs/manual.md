@@ -432,7 +432,10 @@ Undo covers these changes for now:
   loaded onto either;
 - a microphone's noise removal, voice changer, compressor and expander;
 - the software low cut and ClipGuard on XLR 1, a monitor mix's dry
-  monitor switch, and the ducking setup.
+  monitor switch, and the ducking setup;
+- on any input or mix, a plugin's control, its bypass and its name, and
+  plugins added, removed or reordered in the chain, including a preset, an
+  A/B slot or a pasted chain you put in its place.
 
 Undo puts back an EQ, an effect or the ducking setup whole. Undoing a
 change to one band puts back the EQ as it was before, every band and the
@@ -440,6 +443,20 @@ on switch with it. A drag across several bands or a turn of a compressor
 knob is one step, like a fader drag. An EQ or a compressor that runs on
 the interface goes back to the interface. Undo leaves alone where each one
 runs, on the interface or on this computer, and the Pro's maximizer.
+
+Undo puts back a plugin chain whole. A drag of one plugin control is one
+step, and so is a Deck key that bypasses a whole chain. Undoing a control
+keeps the plugins running and sets the control back in them, and undoing a
+rename changes only the name. Undoing a bypass, or a plugin you added, removed or moved, builds that
+chain again, with a short gap in its audio, as the same edit by hand does.
+A plugin that comes back starts with the controls and the name it had,
+since those are what OpenXLR saves. Nothing else of it comes back: its
+internal state, a preset or sample file you picked in its own editor, or
+anything it changed without reporting a control. A Windows plugin can take
+a few seconds to start again. Changes you make in a plugin's own editor are
+not steps; use the editor's own undo for those. Once the editor has moved a
+control, Ctrl+Z leaves that chain's older steps alone. Undo also leaves
+alone whether a plugin runs on its own block.
 
 The history belongs to the daemon, not to the UI. A move on a Deck dial,
 in the terminal mixer or over the API is a step in the same history, so
@@ -450,8 +467,8 @@ daemon starts.
 
 Some things are never undone. Phantom power, the gain and level locks, the
 microphone mute on the unit or a Deck key, a capture input's mute and the
-monitoring pause stay as they are however far back you go. Inserts,
-hardware controls, routing and layout edits are not covered yet.
+monitoring pause stay as they are however far back you go. Hardware
+controls, routing and layout edits are not covered yet.
 Loading a profile, a profile recalled when the interface connects,
 deleting a channel or a mix, switching between software and hardware
 mixing, and switching to another interface empty the history: nothing
@@ -1417,7 +1434,8 @@ and its Level Lock as they are.
 4. Chains and exposed parameter values are saved with the mixer and
    profiles. OpenXLR does not save opaque plugin state, sample-file
    selections or a plugin's own presets. OpenXLR's presets of control
-   values are described below.
+   values are described below. Ctrl+Z takes back a chain edit, with the
+   limits in [Undo and redo](#undo-and-redo).
 
 The generated controls cover the parameters the daemon read from the
 plugin. After recalling a profile, preset or A/B slot, a control without a

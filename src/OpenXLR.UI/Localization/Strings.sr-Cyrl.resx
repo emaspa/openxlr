@@ -2331,6 +2331,18 @@
   <data name="HistoryExpander" xml:space="preserve">
     <value>експандер за {0}</value>
   </data>
+  <data name="HistoryInsertParam" xml:space="preserve">
+    <value>подешавања за {0} у {1}</value>
+  </data>
+  <data name="HistoryInsertBypass" xml:space="preserve">
+    <value>заобилажење за {0} у {1}</value>
+  </data>
+  <data name="HistoryInsertName" xml:space="preserve">
+    <value>име за {0} у {1}</value>
+  </data>
+  <data name="HistoryInsertChain" xml:space="preserve">
+    <value>ефекти за {0}</value>
+  </data>
   <data name="HistoryLowCut" xml:space="preserve">
     <value>одсецање ниских за {0}</value>
   </data>

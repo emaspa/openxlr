@@ -22,8 +22,11 @@ internal enum HistoryClass
 internal sealed record HistoryTarget(string Kind, string? Channel, string? Mix, string? Group,
     IReadOnlyCollection<SceneField> Fields, Func<SceneKey, bool> Keep)
 {
+    /// <summary>The insert a step names in its chain, which is the channel's or the mix's.</summary>
+    public string? Insert { get; init; }
+
     /// <summary>One string per thing a step changes, so a burst can say how many it joined.</summary>
-    public string Identity => $"{Kind}|{Channel}|{Mix}|{Group}";
+    public string Identity => $"{Kind}|{Channel}|{Mix}|{Group}|{Insert}";
 }
 
 /// <summary>
@@ -49,6 +52,7 @@ internal static class HistoryPolicy
         "setEq", "setEqEnabled", "setEqBand", "loadEqProfile",
         "setNoiseRemoval", "setVoiceChanger", "setCompressor", "setExpander",
         "setLowCutHz", "setSoftClipGuard", "setMonitorDry", "setDucking",
+        "setInsertBypass", "setInsertParam", "setInserts", "renameInsert",
     ];
 
     private static readonly string[] Barriers =
@@ -59,8 +63,9 @@ internal static class HistoryPolicy
     // Everything else. Phantom power, the locks and the live switches
     // (hardware mute, capture mute, the monitoring pause) stay here for good,
     // and so does where processing runs (setEqProcessing,
-    // setDynamicsProcessing, setDuckingProcessing), which is machine wiring;
-    // the hardware, insert and layout commands until their milestones. The
+    // setDynamicsProcessing, setDuckingProcessing, and an insert's own
+    // block, setInsertOwnBlock), which is machine wiring;
+    // the hardware and layout commands until their milestones. The
     // maximizer is a hardware mixing value and goes with the hardware. setWaveInterfaceEnabled is a barrier only through the
     // deleteChannel it sends for a unit's capture channels.
     private static readonly string[] Ignored =
@@ -72,7 +77,7 @@ internal static class HistoryPolicy
         "setPluginWineTrace", "installPlugin", "addWindowsPluginFolder", "removeWindowsPluginFolder", "getWindowsPluginFiles",
         "removeWindowsPluginInserts", "setWindowsPluginEnabled", "deleteWindowsPlugin", "syncWindowsPlugins",
         "addPluginSearchPath", "removePluginSearchPath", "rescanPlugins",
-        "setInputBinding", "setCaptureSource", "setInserts", "set",
+        "setInputBinding", "setCaptureSource", "set",
         "createCaptureChannel", "createChannel", "renameChannel", "createMix", "renameMix", "setLayoutOrder",
         "setExclusiveGroup", "deleteExclusiveGroup", "setLayoutAppearance",
         "setCaptureGain", "setCaptureMuted", "setCaptureOwnClock", "toggleCaptureMuted",
@@ -83,7 +88,7 @@ internal static class HistoryPolicy
         "setMonitorFeed", "setOutputVolume", "setOutputVolumeLock", "setEnforcedDefaults", "setAuxPortEnabled",
         "setMixLatencyCompensation",
         "soundCheck", "setSoundCheckRaw", "setSoundCheckHearMyself", "watchInputMeter",
-        "setInsertBypass", "setInsertOwnBlock", "setInsertParam", "renameInsert", "showInsertUi",
+        "setInsertOwnBlock", "showInsertUi",
         "setEqProcessing", "setMixMaximizer", "setDynamicsProcessing", "watchDynamics", "setDuckingProcessing",
         "setSoundboard", "updateClip", "renameClipPage", "deleteClip", "setClipOrder", "playClip", "releaseClip",
         "stopClip", "stopClips", "auditionClip", "stopAudition",
@@ -106,7 +111,8 @@ internal static class HistoryPolicy
     /// <summary>The kinds a step can have, one per recorded category, as the state names them.</summary>
     internal static readonly IReadOnlyList<string> Kinds =
         ["sendLevel", "channelVolume", "mixVolume", "sendMute", "mixMute", "exclusiveGroup",
-            "eq", "mixEq", "noiseRemoval", "voiceChanger", "compressor", "expander", "lowCut", "clipGuard", "monitorDry", "ducking"];
+            "eq", "mixEq", "noiseRemoval", "voiceChanger", "compressor", "expander", "lowCut", "clipGuard", "monitorDry", "ducking",
+            "insertParam", "insertBypass", "insertName", "insertChain"];
 
     /// <summary>
     /// What a recorded command changes, or null when it does not name its
@@ -165,17 +171,32 @@ internal static class HistoryPolicy
                 return new("monitorDry", null, mix, null, [SceneField.MonitorDry], key => key.Key == mix);
             case "setDucking":
                 return new("ducking", null, null, null, [SceneField.Ducking], _ => true);
+            // The whole chain is one value, so a control drag, a bypass and a
+            // chain key's burst all compare the chain they leave behind.
+            case "setInsertParam" when cmd.Channel is { } chain && cmd.InsertId is { } insert:
+                return Chain("insertParam", chain) with { Insert = insert };
+            case "setInsertBypass" when cmd.Channel is { } chain && cmd.InsertId is { } insert:
+                return Chain("insertBypass", chain) with { Insert = insert };
+            case "renameInsert" when cmd.Channel is { } chain && cmd.InsertId is { } insert:
+                return Chain("insertName", chain) with { Insert = insert };
+            case "setInserts" when cmd.Channel is { } chain:
+                return Chain("insertChain", chain);
             default:
                 return null;
         }
     }
 
-    /// <summary>One English phrase for a step, with the names the layout gives its ids now.</summary>
-    internal static string LabelOf(HistoryTarget target, MixerConfig layout)
+    /// <summary>
+    /// One English phrase for a step, with the names the layout gives its ids
+    /// now; <paramref name="insertName"/> names an insert by its chain key and id.
+    /// </summary>
+    internal static string LabelOf(HistoryTarget target, MixerConfig layout, Func<string, string, string?>? insertName = null)
     {
         string Channel() => layout.Channels.FirstOrDefault(c => c.Id == target.Channel)?.Name ?? target.Channel ?? "";
         string Mix() => layout.Mixes.FirstOrDefault(m => m.Id == target.Mix)?.Name ?? target.Mix ?? "";
         string Group() => layout.ExclusiveGroups.FirstOrDefault(g => g.Id == target.Group)?.Name ?? target.Group ?? "";
+        string ChainName() => target.Mix is not null ? Mix() : Channel();
+        string Insert() => (target.Insert is { } id ? insertName?.Invoke(target.Mix is { } m ? $"mix:{m}" : target.Channel ?? "", id) ?? id : "");
         return target.Kind switch
         {
             "sendLevel" => $"{Channel()} level in {Mix()}",
@@ -194,11 +215,22 @@ internal static class HistoryPolicy
             "clipGuard" => $"{Channel()} ClipGuard",
             "monitorDry" => $"Dry monitor in {Mix()}",
             "ducking" => "Ducking",
+            "insertParam" => $"{Insert()} settings on {ChainName()}",
+            "insertBypass" => $"{Insert()} bypass on {ChainName()}",
+            "insertName" => $"{Insert()} name on {ChainName()}",
+            "insertChain" => $"{ChainName()} inserts",
             _ => target.Kind,
         };
     }
 
     private static string Cell(string channel, string mix) => $"{channel}|{mix}";
+
+    /// <summary>A step on one insert chain: a channel's, or a mix's under <c>mix:&lt;id&gt;</c>.</summary>
+    private static HistoryTarget Chain(string kind, string key)
+    {
+        bool mix = key.StartsWith("mix:", StringComparison.Ordinal);
+        return new(kind, mix ? null : key, mix ? key[4..] : null, null, [SceneField.Inserts], k => k.Key == key);
+    }
 
     private static string ChannelOf(string cell)
     {
