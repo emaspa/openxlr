@@ -2420,8 +2420,13 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             if (MonitorMixForSinkLocked(sink.Name) is not null) continue;
             bool microphone = microphones.Remove(sink.Name);
             bool managed = microphone && (_monitorMuteMicrophones || _microphonePausePending);
-            bool muted = microphone && MicrophonesPausedLocked;
-            bool off = Math.Abs(sink.Volume - 1.0) > 0.01;
+            // A recorded mix's sink carries the mix master and mute; every
+            // other own sink is held at full level.
+            MixDefinition? recorded = RecordedMixForSinkLocked(sink.Name);
+            double target = recorded is null ? 1.0 : _mixVolume.GetValueOrDefault(recorded.Id, 1.0);
+            bool muted = microphone && MicrophonesPausedLocked || recorded is not null && _mixMuted.Contains(recorded.Id);
+            bool off = recorded is null ? Math.Abs(sink.Volume - 1.0) > 0.01
+                : Math.Round(sink.DesktopVolume * 100) != Math.Round(target * 100);
             if (managed && (sink.Muted != muted || _microphonePauseRepairs.ContainsKey(sink.Name)))
             {
                 _microphonePauseRepairs.TryAdd(sink.Name, default);
@@ -2433,7 +2438,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             if (!off && (managed || sink.Muted == muted)) continue;
             try
             {
-                if (off) _pw.SetSinkVolume(sink.Name, 1.0);
+                if (off) _pw.SetSinkVolume(sink.Name, target);
                 if (!managed && sink.Muted != muted) _pw.SetSinkMuted(sink.Name, muted);
                 restored.Add(sink.Name);
             }
@@ -3342,17 +3347,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
-    /// <summary>Master level for a mix, scaling every channel feeding it.</summary>
+    /// <summary>
+    /// Master level for a mix: its sink's own volume, one write whatever
+    /// feeds the mix. A monitor mix goes to 150%, any other mix to 100%.
+    /// </summary>
     public void SetMixVolume(string mixId, double volume)
     {
         lock (_gate)
         {
-            MixDefinition? monitor = MonitorMixLocked(mixId);
-            volume = Math.Clamp(volume, 0, monitor is not null ? PipeWireAdapter.MaxSinkVolume : 1);
-            if (monitor is not null) _pw.SetSinkVolume(monitor.SinkName, volume);
+            volume = Math.Clamp(volume, 0, MixVolumeMaximumLocked(mixId));
+            if (MasterSinkLocked(mixId) is { } mix) _pw.SetSinkVolume(mix.SinkName, volume);
             _mixVolume[mixId] = volume;
-            if (monitor is null) ReapplyMixLocked(mixId);
-            else PushDuckKeyOpenLocked();
+            PushDuckKeyOpenLocked();
         }
     }
 
@@ -3363,9 +3369,17 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             MixDefinition? monitor = MonitorMixLocked(mixId);
             if (monitor is null)
             {
+                // The intent is kept even when the sink refuses the write:
+                // the sweep holds the sink at it, so a mute fails toward
+                // silence on the next pass at the latest.
                 if (muted) _mixMuted.Add(mixId); else _mixMuted.Remove(mixId);
-                ReapplyMixLocked(mixId);
+                if (MasterSinkLocked(mixId) is { } mix)
+                {
+                    try { _pw.SetSinkMuted(mix.SinkName, muted); }
+                    catch (InvalidOperationException ex) { _pw.Note($"The mute of mix {mixId} waits for the sweep: {ex.Message}"); }
+                }
                 SyncMonitorHardwareMutesLocked();
+                PushDuckKeyOpenLocked();
                 return;
             }
             bool replaceSelection = !muted && _monitorMuted;
@@ -3879,18 +3893,17 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     /// <summary>
     /// What a send's leg should carry: the send level with the channel
-    /// volume, and the master only when the mix has no desktop master; and
-    /// whether it is muted, including while an exclusive peer's mute is
-    /// still waiting (<paramref name="waiting"/>).
+    /// volume; and whether it is muted, including while an exclusive peer's
+    /// mute is still waiting (<paramref name="waiting"/>). The mix master and
+    /// mute are the mix sink's own volume and mute, never a leg's.
     /// </summary>
     private (double Level, bool Muted) CellTargetLocked(string channelId, string mixId, out bool waiting)
     {
         string cell = Cell(channelId, mixId);
         bool monitor = MonitorMixLocked(mixId) is not null;
-        double level = SendGain(_levels.GetValueOrDefault(cell, 0.0), ChannelVolumeLocked(channelId),
-            monitor ? 1 : _mixVolume.GetValueOrDefault(mixId, 1.0));
+        double level = SendGain(_levels.GetValueOrDefault(cell, 0.0), ChannelVolumeLocked(channelId), 1);
         waiting = !_muted.Contains(cell) && ExclusivePeerPendingLocked(channelId);
-        bool muted = waiting || _muted.Contains(cell) || (!monitor && _mixMuted.Contains(mixId));
+        bool muted = waiting || _muted.Contains(cell);
         if (IsHardwareMicLocked(channelId) && monitor && OnAnyJackFeedLocked(mixId))
             muted = true;   // the hardware direct path carries it to the jacks
         else if (monitor && HearsMyselfLocked(channelId, mixId))
@@ -3904,7 +3917,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         return (level, muted);
     }
 
-    /// <summary>Channel send, with the channel volume, and the master only when the mix has no desktop master.</summary>
+    /// <summary>Channel send, with the channel volume; the master is on the mix sink.</summary>
     private void ApplyCellLocked(string channelId, string mixId)
     {
         string cell = Cell(channelId, mixId);
@@ -4148,6 +4161,23 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     private MixDefinition? MonitorMixLocked(string mixId)
         => _config.Mixes.FirstOrDefault(m => m.Id == mixId && m.Kind == MixKind.Monitor);
+
+    private MixDefinition? MixLocked(string mixId) => _config.Mixes.FirstOrDefault(m => m.Id == mixId);
+
+    /// <summary>
+    /// The mix whose sink a master or mute command writes: a monitor mix
+    /// always, as before, and any other mix once the graph is built, since
+    /// until then it has no sink and the stored value goes on at the build.
+    /// </summary>
+    private MixDefinition? MasterSinkLocked(string mixId) => MonitorMixLocked(mixId) ?? (_built ? MixLocked(mixId) : null);
+
+    /// <summary>
+    /// The recorded mix (Stream, Chat, Aux or another that is not a monitor)
+    /// whose own sink this is, by exact name: a duck bus is a sink of its own
+    /// and is held at full level like any other.
+    /// </summary>
+    private MixDefinition? RecordedMixForSinkLocked(string name)
+        => _config.Mixes.FirstOrDefault(m => m.Kind != MixKind.Monitor && m.SinkName == name);
 
     private double MixVolumeMaximumLocked(string mixId)
         => MonitorMixLocked(mixId) is not null ? PipeWireAdapter.MaxSinkVolume : 1;

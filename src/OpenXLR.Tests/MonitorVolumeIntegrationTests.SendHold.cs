@@ -76,8 +76,8 @@ public sealed partial class MonitorVolumeIntegrationTests
     /// <summary>
     /// Run the daemon's send sweep until every send's leg carries what the
     /// mixer reports for it, read back from pw-dump: the send level with the
-    /// channel volume, the master where the mix has no desktop master, and
-    /// the mute. A test that records audio straight after a build or a layout
+    /// channel volume, and the send's own mute. The mix master and mute are
+    /// on the mix sink, not on any send. A test that records audio straight after a build or a layout
     /// edit waits here, because the daemon only promises the fader from its
     /// sweep on: a leg can grow late, and the session manager can move a new
     /// one after the mixer set it.
@@ -94,9 +94,8 @@ public sealed partial class MonitorVolumeIntegrationTests
             foreach (ChannelStatus channel in state.Channels)
                 foreach (MixStatus mix in state.Mixes)
                 {
-                    bool monitor = mix.Kind == "monitor";
-                    double gain = channel.Levels[mix.Id] * (channel.Volume ?? 1) * (monitor ? 1 : mix.Volume);
-                    bool muted = channel.MutedIn.Contains(mix.Id) || (!monitor && mix.Muted);
+                    double gain = channel.Levels[mix.Id] * (channel.Volume ?? 1);
+                    bool muted = channel.MutedIn.Contains(mix.Id);
                     string cell = $"{channel.Id}|{mix.Id}";
                     if (!legs.TryGetValue(cell, out var leg))
                         off.Add(cell + " has no leg");

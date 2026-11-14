@@ -6,8 +6,8 @@ namespace OpenXLR.Core.Mixing;
 /// fader sits before its auxiliary sends. It adds no node to the graph. Each
 /// send is already one internal stream of the channel's combine sink with a
 /// volume of its own, so the channel volume is folded into that number: the
-/// stream carries the send level times the channel volume, times the mix
-/// master where the mix has no desktop master of its own. Audio takes the
+/// stream carries the send level times the channel volume. The mix master
+/// is the mix sink's own volume, for every kind of mix. Audio takes the
 /// same path it always did, with no added latency.
 ///
 /// On XLR 1, XLR 2 and Aux In it comes after the interface's gain or Aux In
@@ -24,9 +24,10 @@ public sealed partial class Mixer
     private readonly Dictionary<string, double> _channelVolume = [];
 
     /// <summary>
-    /// The volume a send's internal stream is given: the send level, the
-    /// channel volume, and the mix master (unity for a monitor mix, whose
-    /// master is its sink's own volume). The stream volume is on the desktop's
+    /// A send level scaled by the channel volume and by
+    /// <paramref name="mixVolume"/>. A send's internal stream is given it
+    /// with the mix volume at unity, since every mix's master is its sink's
+    /// own volume. The stream volume is on the desktop's
     /// cubic scale, where multiplying two values multiplies their gains, so
     /// halving the channel volume takes the same number of decibels off every
     /// send whatever its level.
