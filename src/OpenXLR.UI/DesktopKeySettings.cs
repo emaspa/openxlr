@@ -21,6 +21,17 @@ internal sealed record DesktopKeySettings
     public List<string> Clips { get; init; } = [];
     /// <summary>A key that stops every clip.</summary>
     public bool ClipsStop { get; init; }
+    /// <summary>A key that mutes the chosen microphones, or turns them on when every one is muted.</summary>
+    public bool MicMute { get; init; }
+    /// <summary>A key that turns the chosen microphones on while it is down; setting it up mutes them.</summary>
+    public bool PushToTalk { get; init; }
+    /// <summary>
+    /// The microphones both keys cover, by mixer channel id: XLR 1 when none
+    /// is chosen. One list for both, so the key that opens a microphone is
+    /// never the only one that can mute it.
+    /// </summary>
+    public List<string> Microphones { get; init; } = [DefaultMicrophone];
+    internal const string DefaultMicrophone = "xlr1";
     internal static string MainKey(string device) => "main_" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(device)))[..24].ToLowerInvariant();
     internal static bool ValidOutput(string? name) => name is { Length: > 0 and <= 256 } && !name.Any(char.IsControl)
         && (name == "@monitor" || (!name.Contains('#') && name[0] is not ('@' or '-') && !name.All(char.IsAsciiDigit)));
@@ -36,6 +47,8 @@ internal sealed record DesktopKeySettings
         FocusChannels = [.. (FocusChannels ?? []).Where(ValidId).Distinct(StringComparer.Ordinal).Take(32)],
         Clips = [.. (Clips ?? []).Where(ValidClip).Distinct(StringComparer.Ordinal).Take(64)],
         MainOutputs = [.. (MainOutputs ?? []).Where(ValidOutput).Distinct(StringComparer.Ordinal).Take(16)],
+        Microphones = (Microphones ?? []).Where(ValidId).Distinct(StringComparer.Ordinal).Take(16).ToList() is { Count: > 0 } microphones
+            ? microphones : [DefaultMicrophone],
         OutputControls = OutputControls && (OutputDevice is null || (ValidOutput(OutputDevice) && OutputDevice != "@monitor")),
     };
     internal static DesktopKeySettings Load()

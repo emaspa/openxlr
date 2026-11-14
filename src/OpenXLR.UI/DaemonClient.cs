@@ -516,6 +516,19 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task SetCaptureMutedAsync(string channel, bool muted)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setCaptureMuted", ["channel"] = channel, ["value"] = muted });
 
+    /// <summary>
+    /// A microphone mute with the daemon's answer, for the desktop keys,
+    /// which show a refusal: <c>set</c> with <c>mute</c> or <c>mute2</c> on
+    /// the primary interface, <c>setWaveControl</c> on an additional one
+    /// (<paramref name="device"/> its instance id), and
+    /// <c>setCaptureMuted</c> on a capture input's source
+    /// (<paramref name="control"/> null). Null on success.
+    /// </summary>
+    public Task<string?> SetMicrophoneMutedAsync(string channel, string? device, string? control, bool muted)
+        => control is null ? EditLayoutAsync(new() { ["cmd"] = "setCaptureMuted", ["channel"] = channel, ["value"] = muted })
+            : device is null ? EditLayoutAsync(new() { ["cmd"] = "set", ["control"] = control, ["value"] = muted })
+            : SetWaveControlAsync(device, control, muted);
+
     /// <summary>Put a capture input's device on its own clock, or back on the mixer's.</summary>
     public Task SetCaptureOwnClockAsync(string channel, bool on)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setCaptureOwnClock", ["channel"] = channel, ["value"] = on });

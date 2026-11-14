@@ -10,7 +10,7 @@ using Tmds.DBus.Protocol;
 namespace OpenXLR.Tests;
 
 [Collection("xdg-config")]
-public sealed class DesktopKeysTests
+public sealed partial class DesktopKeysTests
 {
     [DesktopBusTheory]
     [InlineData(false, false, true)]

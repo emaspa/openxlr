@@ -4221,4 +4221,58 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
   <data name="MicSetupGainLocked" xml:space="preserve">
     <value>Naka-lock ang input gain.</value>
   </data>
+  <data name="AddMicMuteKey" xml:space="preserve">
+    <value>Magdagdag ng key na nagmu-mute at nag-a-unmute sa mga microphone</value>
+  </data>
+  <data name="AddPushToTalkKey" xml:space="preserve">
+    <value>Magdagdag ng push-to-talk key: bukas lang ang mga microphone habang nakapindot ito</value>
+  </data>
+  <data name="PushToTalkNote" xml:space="preserve">
+    <value>Kapag na-set up ang push to talk, mamu-mute ang mga microphone na may tsek sa ibaba, at ganoon din sa bawat pagbukas ng UI; binubuksan sila ng key habang nakapindot ito at mina-mute kapag binitawan. Sa Plasma, mas maagang mamu-mute sila sa pagbitaw ng kahit anong key o sa pagpindot ng ibang shortcut. Mamu-mute din sila kapag natapos ang pagpindot dahil sa shortcut session, sa koneksyon sa daemon o sa UI.</value>
+  </data>
+  <data name="PushToTalkUnavailableNote" xml:space="preserve">
+    <value>Kailangan ng push to talk ang desktop na nag-uulat ng pagbitaw ng key, gaya ng KDE Plasma, GNOME at Hyprland. Hindi pa ito iniuulat ng desktop na ito: pindutin at bitawan ang ibang OpenXLR key, saka buksan muli ang window na ito.</value>
+  </data>
+  <data name="MicKeysNote" xml:space="preserve">
+    <value>Sakop ng dalawang microphone key ang mga microphone na may tsek dito, o ang XLR 1 kung walang may tsek. Mina-mute ng isang pindot ng mute key ang lahat habang may isang bukas, at binubuksan ang lahat kapag naka-mute ang bawat isa.</value>
+  </data>
+  <data name="MicKeyUnavailable" xml:space="preserve">
+    <value>{0} (hindi ito iniuulat ng daemon ngayon)</value>
+  </data>
+  <data name="KeyToggleMicMute" xml:space="preserve">
+    <value>I-toggle ang mute ng microphone</value>
+  </data>
+  <data name="KeyPushToTalk" xml:space="preserve">
+    <value>Push to talk</value>
+  </data>
+  <data name="MicKeyNoMicrophones" xml:space="preserve">
+    <value>Wala sa mga napiling microphone ang mamu-mute ngayon: hindi sila iniuulat ng daemon, o hindi nakakonekta ang kanilang interface.</value>
+  </data>
+  <data name="MicKeyMuted" xml:space="preserve">
+    <value>Naka-mute ang mga microphone: {0}.</value>
+  </data>
+  <data name="MicKeyUnmuted" xml:space="preserve">
+    <value>Bukas ang mga microphone: {0}.</value>
+  </data>
+  <data name="MicKeyNotReported" xml:space="preserve">
+    <value>Hindi iniuulat ngayon: {0}.</value>
+  </data>
+  <data name="MicKeyRefused" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="PushToTalkOpen" xml:space="preserve">
+    <value>Push to talk: bukas ang {0} habang nakapindot ang key.</value>
+  </data>
+  <data name="PushToTalkClosed" xml:space="preserve">
+    <value>Push to talk: naka-mute ang {0}.</value>
+  </data>
+  <data name="PushToTalkNoRelease" xml:space="preserve">
+    <value>Iniwang naka-mute ng push to talk ang mga microphone: hindi pa iniuulat ng desktop na ito ang pagbitaw ng key. Bitawan ang key at pindutin muli.</value>
+  </data>
+  <data name="PushToTalkCloseFailed" xml:space="preserve">
+    <value>Hindi na-mute muli ng push to talk ang isang microphone. {0}</value>
+  </data>
+  <data name="PushToTalkDaemonLost" xml:space="preserve">
+    <value>Naputol ang koneksyon sa daemon habang push to talk. Mina-mute muli ng OpenXLR ang mga microphone sa sandaling bumalik ang daemon.</value>
+  </data>
 </root>

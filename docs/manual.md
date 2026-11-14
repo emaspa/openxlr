@@ -5751,6 +5751,68 @@ soundboard is off. Turn it on first." A key coming up is queued past the 16
 waiting presses, up to 64 more, so a held clip hears its release. At most 64
 clip keys are kept.
 
+<a name="microphone-keys"></a>
+### Microphone mute and push-to-talk keys
+
+In **Desktop keys**, select **Add a key that mutes and unmutes the
+microphones**, **Add a push-to-talk key**, or both, tick the microphones they
+cover, then choose **Apply and configure keys**. The list shows XLR 1 and
+XLR 2 where the unit has them and every capture input, an additional
+interface's included. Both keys cover the same microphones, so the ones push
+to talk opens are the ones the mute key mutes. With none ticked they cover
+XLR 1. A ticked microphone the mixer does not show now stays ticked, so
+applying while the daemon is down or a capture device is unplugged keeps it.
+
+Each microphone is muted where its strip's **Mute** mutes it, with the
+commands the Deck's mute keys send: the unit's own mute for an input of the
+primary interface (`set` with `mute` or `mute2`) or of an additional one
+(`setWaveControl`), and the source's mute for a capture input OpenXLR does
+not drive (`setCaptureMuted`). XLR 1 or XLR 2 bound to another source has no
+mute these keys can reach; tick the capture channel that carries the unit's
+input instead (see [input bindings](api.md#input-bindings)). A microphone
+whose interface is not connected, or that the daemon does not report, is
+skipped and named in the status line.
+
+The mute key is called **Toggle microphone mute**. It suggests the keyboard's
+microphone mute key, `XF86AudioMicMute`, to the desktop. A press mutes every
+covered microphone while any of them is on, and turns them all on when every
+one is muted. Where the desktop reports keys coming up, holding the key down
+toggles once, however often the desktop repeats it. When the daemon refuses
+one microphone, Desktop keys shows its sentence after the microphone's name
+and the others still change.
+
+**Push to talk** turns the covered microphones on while its key is down and
+mutes them when it comes up. Setting it up mutes them, and so does every
+start of the UI while it is set up, so the key is what opens them. A
+microphone the daemon does not report yet, at login for example, is muted
+once it does. A key repeating while held changes nothing.
+
+Push to talk needs the key's release. The shortcut portals of KDE Plasma,
+GNOME and Hyprland report it, and there the option is offered from the start.
+On any other desktop Desktop keys keeps the option off, with a note, until
+the desktop has reported one key coming up. Press and let go of another
+OpenXLR key, then open Desktop keys again. A push-to-talk key set up earlier
+waits the same way: its press leaves the microphones muted and the status
+line says why. Its own release counts, so the next press works.
+
+A hold that ends without its release mutes the microphones again. That
+happens when the shortcut session closes or is replaced, when the keys are
+applied again, when the daemon connection drops and when the UI quits. After
+a dropped connection the mute goes out with the first state of the next one.
+A UI that quits waits up to two seconds for the mute to reach the daemon. On Plasma the release works as it does for Hold
+clips above: any key coming up, or another shortcut, ends the hold and mutes
+the microphones, even while you still hold the push-to-talk key. Press it
+again to talk. Give push to talk a shortcut with an ordinary key, since a
+shortcut of modifier keys alone fires as the key comes up. A window that
+grabs the keyboard, such as a virtual machine or a remote desktop, can take
+the release; the microphones then stay on until you press and let go of the
+key again, or press the mute key. A mute the daemon refuses is shown in
+Desktop keys.
+
+Push to talk lives in the UI, not in the daemon. A UI that is killed rather
+than closed sends no mute, and its next start mutes the microphones. The
+unit's own mute and the strip's **Mute** keep working alongside the keys.
+
 <a name="output-keys"></a>
 ### Output volume, mute and system output keys
 

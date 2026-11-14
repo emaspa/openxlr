@@ -4692,4 +4692,58 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="LedRingResetTip" xml:space="preserve">
     <value>Full brightness and white in every mode, as the unit ships. OpenXLR stops writing its own LEDs back.</value>
   </data>
+  <data name="AddMicMuteKey" xml:space="preserve">
+    <value>Add a key that mutes and unmutes the microphones</value>
+  </data>
+  <data name="AddPushToTalkKey" xml:space="preserve">
+    <value>Add a push-to-talk key: the microphones are on only while it is down</value>
+  </data>
+  <data name="PushToTalkNote" xml:space="preserve">
+    <value>Setting up push to talk mutes the microphones ticked below, and so does every start of the UI; the key turns them on while it is down and mutes them when it comes up. On Plasma, letting go of any key or pressing another shortcut mutes them early. A hold that ends with the shortcut session, the daemon connection or the UI mutes them too.</value>
+  </data>
+  <data name="PushToTalkUnavailableNote" xml:space="preserve">
+    <value>Push to talk needs a desktop that reports keys coming up, as KDE Plasma, GNOME and Hyprland do. This desktop has not reported one yet: press and let go of another OpenXLR key, then open this window again.</value>
+  </data>
+  <data name="MicKeysNote" xml:space="preserve">
+    <value>Both microphone keys cover the microphones ticked here, XLR 1 when none is. A press of the mute key mutes them all while any is on, and turns them all on when every one is muted.</value>
+  </data>
+  <data name="MicKeyUnavailable" xml:space="preserve">
+    <value>{0} (the daemon does not report it now)</value>
+  </data>
+  <data name="KeyToggleMicMute" xml:space="preserve">
+    <value>Toggle microphone mute</value>
+  </data>
+  <data name="KeyPushToTalk" xml:space="preserve">
+    <value>Push to talk</value>
+  </data>
+  <data name="MicKeyNoMicrophones" xml:space="preserve">
+    <value>None of the chosen microphones can be muted now: the daemon does not report them, or their interface is not connected.</value>
+  </data>
+  <data name="MicKeyMuted" xml:space="preserve">
+    <value>Microphones muted: {0}.</value>
+  </data>
+  <data name="MicKeyUnmuted" xml:space="preserve">
+    <value>Microphones on: {0}.</value>
+  </data>
+  <data name="MicKeyNotReported" xml:space="preserve">
+    <value>Not reported now: {0}.</value>
+  </data>
+  <data name="MicKeyRefused" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="PushToTalkOpen" xml:space="preserve">
+    <value>Push to talk: {0} on while the key is down.</value>
+  </data>
+  <data name="PushToTalkClosed" xml:space="preserve">
+    <value>Push to talk: {0} muted.</value>
+  </data>
+  <data name="PushToTalkNoRelease" xml:space="preserve">
+    <value>Push to talk left the microphones muted: this desktop has not reported a key coming up yet. Let go of the key and press it again.</value>
+  </data>
+  <data name="PushToTalkCloseFailed" xml:space="preserve">
+    <value>Push to talk could not mute a microphone again. {0}</value>
+  </data>
+  <data name="PushToTalkDaemonLost" xml:space="preserve">
+    <value>The daemon connection dropped during push to talk. OpenXLR mutes the microphones again as soon as the daemon is back.</value>
+  </data>
 </root>

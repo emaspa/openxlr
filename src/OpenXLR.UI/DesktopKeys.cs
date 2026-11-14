@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Tmds.DBus.Protocol;
@@ -10,10 +11,30 @@ using Tmds.DBus.Protocol;
 namespace OpenXLR.UI;
 
 /// <summary>Global keys live with the UI, including while it is hidden in the tray.</summary>
-internal sealed class DesktopKeys(DaemonClient client) : IDisposable
+internal sealed class DesktopKeys : IDisposable
 {
     internal const string StopClipsKey = "clips_stop";
+    internal const string MicMuteKey = "mic_mute";
+    internal const string TalkKey = "push_to_talk";
     internal static string ClipKey(string clip) => "clip_" + clip;
+
+    private readonly DaemonClient _client;
+
+    internal DesktopKeys(DaemonClient client)
+    {
+        _client = client;
+        client.StateReceived += OnState;
+        client.ConnectionChanged += OnConnection;
+    }
+
+    /// <summary>
+    /// A microphone strip as its mute needs it: the channel, its name, whether
+    /// it is muted now, and the command that mutes it. <paramref name="Control"/>
+    /// is <c>mute</c> or <c>mute2</c> on a unit's input, on the primary when
+    /// <paramref name="Device"/> is null and on that additional interface
+    /// otherwise; null means a capture input's source mute.
+    /// </summary>
+    internal sealed record Microphone(string Channel, string Name, bool Muted, string? Device = null, string? Control = null);
 
     /// <summary>
     /// A soundboard clip as its key needs it: the id, the name the desktop
@@ -72,6 +93,16 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
     // The desktop reports keys coming up: known for Plasma, GNOME and
     // Hyprland, learned from the first Deactivated anywhere else.
     private int _releases = ReportsRelease() ? 1 : 0;
+    // The microphones the daemon reports on this connection, by channel id;
+    // null while it is not connected or has not sent a state yet.
+    private Dictionary<string, Microphone>? _mics;
+    // Under _pending: the last name of every microphone seen, push to talk
+    // holding the microphones open, the microphones it still has to mute
+    // again, by channel id, and those mutes on their way.
+    private readonly Dictionary<string, string> _micNames = new(StringComparer.Ordinal) { ["xlr1"] = "XLR 1", ["xlr2"] = "XLR 2" };
+    private bool _talking;
+    private readonly HashSet<string> _toClose = new(StringComparer.Ordinal);
+    private Task _closing = Task.CompletedTask;
     internal string Status { get; private set; } = Localizer.Text("DesktopKeysDisabled");
     internal event Action? Changed;
 
@@ -138,6 +169,9 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             Volatile.Write(ref _current, session);
             await BindNewAsync(session, actions);
             SetStatus(Localizer.Text("DesktopKeysActive"));
+            // Push to talk starts closed: the key is what opens the
+            // microphones, at every start of the UI as after an Apply.
+            if (settings.PushToTalk) Close(settings.Microphones);
             if (save)
             {
                 try
@@ -209,9 +243,24 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
                     var (path, id) = notification.Value;
                     if (path != session.Handle) return;
                     Volatile.Write(ref _releases, 1);
-                    lock (_pending) _down.Remove(id);
+                    bool talked;
+                    lock (_pending)
+                    {
+                        _down.Remove(id);
+                        talked = id == TalkKey && _talking;
+                        if (talked)
+                        {
+                            _talking = false;
+                            _toClose.UnionWith(Volatile.Read(ref _settings).Microphones);
+                        }
+                    }
                     if (session.Actions.TryGetValue(id, out KeyAction? action) && action.Clip is { } clip)
                         _ = InvokeAsync(ReleaseAction(action, clip), () => IsActive(session), release: true);
+                    // Behind the press in the queue, so the mute follows the
+                    // unmute; a session that ends first mutes in ReleaseHeld.
+                    else if (talked && action is not null && IsActive(session))
+                        _ = InvokeAsync(action with { Invoke = CloseAndReportAsync }, () => IsActive(session), release: true);
+                    else if (talked) _ = FlushCloseAsync();
                 }, emitOnCapturedContext: false, flags: ObserverFlags.EmitOnConnectionClosed | ObserverFlags.EmitOnReaderFailed));
             session.Observers.Add(await connection.AddMatchAsync(new MatchRule { Type = MessageType.Signal, Sender = DesktopBus.Portal,
                 Path = session.Handle, Interface = "org.freedesktop.portal.Session", Member = "Closed" },
@@ -291,7 +340,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
                 dropped.Add(clip);
             }
         }
-        foreach (string clip in dropped) _ = client.ReleaseClipAsync(clip);
+        foreach (string clip in dropped) _ = _client.ReleaseClipAsync(clip);
         session.Actions = actions;
         session.Stale = false;
     }
@@ -388,7 +437,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             }
         }
         // The daemon still counts this connection's hold; let it go.
-        foreach (string clip in ended) _ = client.ReleaseClipAsync(clip);
+        foreach (string clip in ended) _ = _client.ReleaseClipAsync(clip);
     }
 
     /// <summary>
@@ -579,17 +628,17 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
     {
         var actions = new Dictionary<string, KeyAction>(StringComparer.Ordinal);
         foreach (string channel in settings.FocusChannels)
-            actions["focus_" + channel] = new(Localizer.Format("KeyRouteFocusedApp", channel), () => client.RouteFocusedAppAsync(channel));
+            actions["focus_" + channel] = new(Localizer.Format("KeyRouteFocusedApp", channel), () => _client.RouteFocusedAppAsync(channel));
         if (settings.MonitorControls)
-            actions["monitor_mute"] = new(Localizer.Text("KeyToggleMonitoringPause"), client.ToggleMonitorMutedAsync, "XF86AudioMute");
+            actions["monitor_mute"] = new(Localizer.Text("KeyToggleMonitoringPause"), _client.ToggleMonitorMutedAsync, "XF86AudioMute");
         if (settings.OutputControls)
         {
-            actions["output_up"] = new(Localizer.Text("KeyOutputVolumeUp"), () => client.AdjustOutputVolumeAsync(settings.OutputDevice, .05));
-            actions["output_down"] = new(Localizer.Text("KeyOutputVolumeDown"), () => client.AdjustOutputVolumeAsync(settings.OutputDevice, -.05));
-            actions["output_mute"] = new(Localizer.Text("KeyToggleOutputMute"), () => client.ToggleOutputMuteAsync(settings.OutputDevice));
+            actions["output_up"] = new(Localizer.Text("KeyOutputVolumeUp"), () => _client.AdjustOutputVolumeAsync(settings.OutputDevice, .05));
+            actions["output_down"] = new(Localizer.Text("KeyOutputVolumeDown"), () => _client.AdjustOutputVolumeAsync(settings.OutputDevice, -.05));
+            actions["output_mute"] = new(Localizer.Text("KeyToggleOutputMute"), () => _client.ToggleOutputMuteAsync(settings.OutputDevice));
         }
         foreach (string output in settings.MainOutputs)
-            actions[DesktopKeySettings.MainKey(output)] = new(Localizer.Format("KeySetSystemOutput", output), () => client.SetMainOutputAsync(output));
+            actions[DesktopKeySettings.MainKey(output)] = new(Localizer.Format("KeySetSystemOutput", output), () => _client.SetMainOutputAsync(output));
         if (settings.Clips.Count > 0)
         {
             // Library order for the clips the daemon reports, then every
@@ -605,14 +654,38 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             foreach (var (id, name) in clips)
                 actions[ClipKey(id)] = new(Localizer.Format("KeyPlayClip", name), null, Clip: id);
         }
-        if (settings.ClipsStop) actions[StopClipsKey] = new(Localizer.Text("KeyStopClips"), client.StopClipsAsync);
+        if (settings.ClipsStop) actions[StopClipsKey] = new(Localizer.Text("KeyStopClips"), _client.StopClipsAsync);
+        IReadOnlyList<string> microphones = settings.Microphones;
+        if (settings.MicMute)
+            actions[MicMuteKey] = new(Localizer.Text("KeyToggleMicMute"), () => ToggleMicrophonesAsync(microphones), "XF86AudioMicMute", Quiet: true);
+        // What a press sends is built on the press, which needs the key's release.
+        if (settings.PushToTalk) actions[TalkKey] = new(Localizer.Text("KeyPushToTalk"), null, Quiet: true);
         return actions;
     }
 
     private void Dispatch(ShortcutSession session, string id, KeyAction action)
     {
         if (action.Clip is { } clip) PressClip(session, id, clip, action);
-        else _ = InvokeAsync(action, () => IsActive(session));
+        else if (id == TalkKey) PressTalk(session, action);
+        else if (id != MicMuteKey || FirstPress(id)) _ = InvokeAsync(action, () => IsActive(session));
+    }
+
+    /// <summary>
+    /// A key that toggles acts once per press: where the desktop reports keys
+    /// coming up, a repeat while it is down does nothing, until a release
+    /// that never came has been waited for as long as a clip of unknown
+    /// length is.
+    /// </summary>
+    private bool FirstPress(string id)
+    {
+        if (!DeliversRelease) return true;
+        long now = Environment.TickCount64;
+        lock (_pending)
+        {
+            if (_down.TryGetValue(id, out long since) && now - since < LongestHold.TotalMilliseconds) return false;
+            _down[id] = now;
+            return true;
+        }
     }
 
     private void PressClip(ShortcutSession session, string id, string clip, KeyAction action)
@@ -639,15 +712,15 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             : entry?.Mode == "hold" && releases ? "hold" : "overlap";
         Func<bool> isActive = () => IsActive(session);
         KeyAction press = mode == "hold" ? action with { Invoke = () => HoldAsync(clip, isActive) }
-            : entry?.Mode == "hold" ? action with { Invoke = async () => await client.PlayClipAsync(clip, mode)
+            : entry?.Mode == "hold" ? action with { Invoke = async () => await _client.PlayClipAsync(clip, mode)
                 ?? Localizer.Format("DesktopKeyClipNoRelease", entry.Name) }
-            : action with { Invoke = () => client.PlayClipAsync(clip, mode) };
+            : action with { Invoke = () => _client.PlayClipAsync(clip, mode) };
         _ = InvokeAsync(press, isActive);
     }
 
     private async Task<string?> HoldAsync(string clip, Func<bool> isActive)
     {
-        string? error = await client.PlayClipAsync(clip, "hold");
+        string? error = await _client.PlayClipAsync(clip, "hold");
         if (error is not null) return error;
         bool ended;
         lock (_pending)
@@ -657,7 +730,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
         }
         // The session ended while the press was on its way: nothing will
         // report the key coming up, so the hold ends here.
-        if (ended) await client.ReleaseClipAsync(clip);
+        if (ended) await _client.ReleaseClipAsync(clip);
         return null;
     }
 
@@ -668,7 +741,7 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
         {
             bool held;
             lock (_pending) held = _held.Remove(clip);
-            return held ? await client.ReleaseClipAsync(clip) : null;
+            return held ? await _client.ReleaseClipAsync(clip) : null;
         },
     };
 
@@ -681,8 +754,262 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
             held = [.. _held.Keys];
             _held.Clear();
             _down.Clear();
+            // Push to talk held open: no release will come for it now.
+            if (_talking) _toClose.UnionWith(Volatile.Read(ref _settings).Microphones);
+            _talking = false;
         }
-        foreach (string clip in held) _ = client.ReleaseClipAsync(clip);
+        foreach (string clip in held) _ = _client.ReleaseClipAsync(clip);
+        _ = FlushCloseAsync();
+    }
+
+    /// <summary>
+    /// The microphones a state reports, by channel id, each with its mute as
+    /// the Deck's mute keys find it: a channel that carries a driven unit's
+    /// input has that unit's <c>mute</c> or <c>mute2</c>; a capture input
+    /// whose source OpenXLR does not drive has the source's mute; and while
+    /// no channel names the primary's inputs, XLR 1 and XLR 2 on the
+    /// interface stand for them. A strip that is not present, an interface
+    /// that is not connected and a channel with no mute are left out.
+    /// </summary>
+    internal static Dictionary<string, Microphone> ReadMicrophones(JsonNode? state)
+    {
+        var found = new Dictionary<string, Microphone>(StringComparer.Ordinal);
+        if (state is not JsonObject root || root["mixer"] is not JsonObject mixer || mixer["channels"] is not JsonArray channels) return found;
+        bool named = channels.Any(c => c is JsonObject channel && UnitInputInfo.From(channel["unitInput"]) is { Primary: true });
+        foreach (JsonNode? node in channels)
+        {
+            if (node is not JsonObject c || Text(c["id"]) is not { Length: > 0 } id || Flag(c["present"]) == false) continue;
+            string name = Text(c["name"]) is { Length: > 0 } label ? label : id;
+            if (UnitInputInfo.From(c["unitInput"]) is { } input)
+            {
+                if (input.Input is not (1 or 2)) continue;
+                JsonNode? holder = input.Primary ? root : (root["waveInterfaces"] as JsonArray)?.FirstOrDefault(unit => unit is JsonObject entry
+                    && Text(entry["id"]) == input.Unit && Flag(entry["active"]) != true && Flag(entry["enabled"]) == true);
+                if (UnitMute(holder, input.Input) is bool muted)
+                    found[id] = new(id, name, muted, input.Primary ? null : input.Unit, input.Input == 2 ? "mute2" : "mute");
+            }
+            else if (c["captureGain"] is JsonObject gain && Flag(gain["muted"]) is bool captureMuted)
+                found[id] = new(id, name, captureMuted);
+            else if (!named && Flag(c["hardware"]) == true && id is "xlr1" or "xlr2"
+                && (c["binding"] is not JsonObject binding || Text(binding["kind"]) is null or "unit")
+                && UnitMute(root, id == "xlr2" ? 2 : 1) is bool stripMuted)
+                found[id] = new(id, name, stripMuted, null, id == "xlr2" ? "mute2" : "mute");
+        }
+        return found;
+    }
+
+    private static bool? UnitMute(JsonNode? holder, int input)
+    {
+        if (holder is not JsonObject unit || Flag(unit["connected"]) != true || unit["capabilities"] is not JsonObject capabilities
+            || Flag(capabilities["mute"]) != true || unit["state"] is not JsonObject state) return null;
+        int inputs = capabilities["xlrInputs"] is JsonValue count && count.TryGetValue(out int number) ? number : 1;
+        return input == 2 && inputs < 2 ? null : Flag(state[input == 2 ? "mute2" : "mute"]);
+    }
+
+    private static bool? Flag(JsonNode? node) => node is JsonValue value && value.TryGetValue(out bool flag) ? flag : null;
+    private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue(out string? text) ? text : null;
+
+    /// <summary>The microphones the daemon reports on this connection, or null before its first state.</summary>
+    internal IReadOnlyDictionary<string, Microphone>? Microphones => Volatile.Read(ref _mics);
+
+    private void OnState(JsonNode state)
+    {
+        Dictionary<string, Microphone> mics;
+        try { mics = ReadMicrophones(state); }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException) { return; }
+        lock (_pending) foreach (Microphone mic in mics.Values) _micNames[mic.Channel] = mic.Name;
+        Volatile.Write(ref _mics, mics);
+        // A microphone push to talk still has to mute may have appeared.
+        _ = FlushCloseAsync();
+    }
+
+    /// <summary>
+    /// The daemon connection dropped. Push to talk held open ends here: the
+    /// microphones are muted with the first state of the next connection.
+    /// </summary>
+    private void OnConnection(bool up)
+    {
+        if (up) return;
+        Volatile.Write(ref _mics, null);
+        bool held;
+        lock (_pending)
+        {
+            held = _talking;
+            if (held)
+            {
+                _talking = false;
+                _down.Remove(TalkKey);
+                _toClose.UnionWith(Volatile.Read(ref _settings).Microphones);
+            }
+        }
+        if (held) SetStatus(Localizer.Text("PushToTalkDaemonLost"));
+    }
+
+    /// <summary>The covered microphones the daemon reports now, and the names of the others.</summary>
+    private (List<Microphone> Found, List<string> Missing) Resolve(IReadOnlyList<string> covered)
+    {
+        Dictionary<string, Microphone> mics = Volatile.Read(ref _mics) ?? [];
+        var found = covered.Where(mics.ContainsKey).Select(id => mics[id]).ToList();
+        lock (_pending)
+            return (found, [.. covered.Where(id => !mics.ContainsKey(id)).Select(id => _micNames.GetValueOrDefault(id, id))]);
+    }
+
+    /// <summary>
+    /// Mute or unmute each microphone, every one even when one is refused,
+    /// and return the first refusal with the microphone's name, or null.
+    /// </summary>
+    private async Task<string?> SetAllAsync(IEnumerable<Microphone> mics, bool muted)
+    {
+        string? first = null;
+        foreach (Microphone mic in mics)
+        {
+            string? error;
+            try { error = await _client.SetMicrophoneMutedAsync(mic.Channel, mic.Device, mic.Control, muted); }
+            catch (Exception ex) { error = ex.Message; }
+            if (error is null) Remember(mic.Channel, muted);
+            else first ??= Localizer.Format("MicKeyRefused", mic.Name, error);
+        }
+        return first;
+    }
+
+    // The state that reports the change can come after the next press asks.
+    private void Remember(string channel, bool muted)
+    {
+        Dictionary<string, Microphone>? mics = Volatile.Read(ref _mics);
+        if (mics is null || !mics.TryGetValue(channel, out Microphone? mic) || mic.Muted == muted) return;
+        Interlocked.CompareExchange(ref _mics, new Dictionary<string, Microphone>(mics, StringComparer.Ordinal) { [channel] = mic with { Muted = muted } }, mics);
+    }
+
+    private static string Names(IEnumerable<string> names) => string.Join(", ", names);
+
+    /// <summary>
+    /// The mute key: with any covered microphone on, it mutes them all;
+    /// with every one muted, it turns them all on.
+    /// </summary>
+    private async Task<string?> ToggleMicrophonesAsync(IReadOnlyList<string> covered)
+    {
+        var (mics, missing) = Resolve(covered);
+        if (mics.Count == 0) return Localizer.Text("MicKeyNoMicrophones");
+        bool mute = mics.Any(m => !m.Muted);
+        if (await SetAllAsync(mics, mute) is { } error) return error;
+        string names = Names(mics.Select(m => m.Name));
+        string done = mute ? Localizer.Format("MicKeyMuted", names) : Localizer.Format("MicKeyUnmuted", names);
+        return missing.Count == 0 ? done : done + " " + Localizer.Format("MicKeyNotReported", Names(missing));
+    }
+
+    /// <summary>
+    /// Push to talk going down. It needs the key's release, so a desktop that
+    /// has not reported one leaves the microphones muted and says why; a
+    /// repeat while the key is down does nothing.
+    /// </summary>
+    private void PressTalk(ShortcutSession session, KeyAction action)
+    {
+        if (!DeliversRelease)
+        {
+            SetStatus(Localizer.Text("PushToTalkNoRelease"));
+            return;
+        }
+        lock (_pending)
+        {
+            // Under the lock ReleaseHeld takes, so a session that ends after
+            // this sees the hold and mutes.
+            if (!IsActive(session) || _down.ContainsKey(TalkKey)) return;
+            _down[TalkKey] = Environment.TickCount64;
+            _talking = true;
+            _toClose.Clear();
+        }
+        IReadOnlyList<string> covered = Volatile.Read(ref _settings).Microphones;
+        Func<bool> isActive = () => IsActive(session);
+        _ = InvokeAsync(action with { Invoke = () => TalkAsync(covered, isActive) }, isActive);
+    }
+
+    private async Task<string?> TalkAsync(IReadOnlyList<string> covered, Func<bool> isActive)
+    {
+        var (mics, missing) = Resolve(covered);
+        if (mics.Count == 0) return Localizer.Text("MicKeyNoMicrophones");
+        string? error = await SetAllAsync(mics, muted: false);
+        bool ended;
+        lock (_pending)
+        {
+            // The key came up, or the session or the connection ended, while
+            // the microphones were opening; whatever muted them first may have
+            // gone out before this unmute did.
+            ended = !_talking || !isActive();
+            if (ended) _toClose.UnionWith(covered);
+        }
+        if (ended)
+        {
+            _ = FlushCloseAsync();
+            return null;
+        }
+        string open = Localizer.Format("PushToTalkOpen", Names(mics.Select(m => m.Name)));
+        return error ?? (missing.Count == 0 ? open : open + " " + Localizer.Format("MicKeyNotReported", Names(missing)));
+    }
+
+    /// <summary>Push to talk has these microphones to mute: now for those the daemon reports, the others when it does.</summary>
+    private void Close(IEnumerable<string> covered)
+    {
+        lock (_pending) _toClose.UnionWith(covered);
+        _ = FlushCloseAsync();
+    }
+
+    /// <summary>
+    /// Send the mutes push to talk owes for every microphone the daemon
+    /// reports now, unless the key holds them open. A refusal is shown and
+    /// not retried; a mute lost with the connection waits for the next one.
+    /// Returns the microphones it sent mutes for and the first refusal.
+    /// </summary>
+    private Task<(List<Microphone> Muted, string? Error)> FlushCloseAsync()
+    {
+        Dictionary<string, Microphone>? mics = Volatile.Read(ref _mics);
+        if (mics is null) return Task.FromResult<(List<Microphone>, string?)>(([], null));
+        Task<(List<Microphone>, string?)> sending;
+        lock (_pending)
+        {
+            if (_talking || _toClose.Count == 0) return Task.FromResult<(List<Microphone>, string?)>(([], null));
+            List<Microphone> due = [.. _toClose.Where(mics.ContainsKey).Select(id => mics[id])];
+            if (due.Count == 0) return Task.FromResult<(List<Microphone>, string?)>(([], null));
+            foreach (Microphone mic in due) _toClose.Remove(mic.Channel);
+            sending = CloseAsync(due);
+            _closing = Task.WhenAll(_closing, sending);
+        }
+        return sending;
+    }
+
+    private async Task<(List<Microphone>, string?)> CloseAsync(List<Microphone> due)
+    {
+        string? error = await SetAllAsync(due, muted: true);
+        if (error is null) return (due, null);
+        if (Volatile.Read(ref _mics) is null)
+        {
+            // The connection went while the mutes were on their way.
+            lock (_pending) _toClose.UnionWith(due.Select(m => m.Channel));
+            return (due, error);
+        }
+        SetStatus(Localizer.Format("PushToTalkCloseFailed", error));
+        return (due, error);
+    }
+
+    /// <summary>Push to talk coming up: mute, and say so.</summary>
+    private async Task<string?> CloseAndReportAsync()
+    {
+        var (muted, error) = await FlushCloseAsync();
+        return muted.Count == 0 ? null : error is null ? Localizer.Format("PushToTalkClosed", Names(muted.Select(m => m.Name)))
+            : Localizer.Format("PushToTalkCloseFailed", error);
+    }
+
+    /// <summary>
+    /// The microphones the Desktop keys window lists: every one the mixer
+    /// shows, ticked when the keys cover it, and every covered one it does
+    /// not show now, still ticked, so an Apply meanwhile keeps it.
+    /// </summary>
+    internal List<ClipChoice> MicrophoneChoices(DesktopKeySettings saved, IEnumerable<(string Id, string Name)> shown)
+    {
+        var choices = shown.Select(m => new ClipChoice(m.Id, m.Name, saved.Microphones.Contains(m.Id))).ToList();
+        lock (_pending)
+            foreach (string id in saved.Microphones.Where(id => choices.All(c => c.Id != id)))
+                choices.Add(new(id, Localizer.Format("MicKeyUnavailable", _micNames.GetValueOrDefault(id, id)), true));
+        return choices;
     }
 
     private async Task ObserveConnectionAsync(DBusConnection connection)
@@ -748,5 +1075,25 @@ internal sealed class DesktopKeys(DaemonClient client) : IDisposable
         // A portal session is owned by this connection and closes with it.
         connection?.Dispose();
     }
-    public void Dispose() { _lifetime.Cancel(); Stop(); }
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _client.StateReceived -= OnState;
+        _client.ConnectionChanged -= OnConnection;
+        Stop();
+    }
+
+    /// <summary>
+    /// Stop, and give the mutes push to talk still owes the daemon a moment
+    /// to go out, so a UI that quits during a hold does not leave the
+    /// microphones open. The caller disposes the daemon client after this.
+    /// </summary>
+    internal async Task ShutdownAsync()
+    {
+        Dispose();
+        Task closing;
+        lock (_pending) closing = _closing;
+        try { await closing.WaitAsync(TimeSpan.FromSeconds(2)); }
+        catch (Exception) { /* sent or not, the UI is closing */ }
+    }
 }

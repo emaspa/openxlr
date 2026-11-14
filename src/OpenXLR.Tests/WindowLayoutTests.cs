@@ -467,6 +467,8 @@ public sealed class WindowLayoutTests
                 Assert.DoesNotContain(keyWindow.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.StartsWith("AudioDeviceItem {") == true);
                 Assert.Contains(keyWindow.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == Localizer.Format("KeyPlayClip", "Drum roll"));
                 Assert.Contains(keyWindow.GetVisualDescendants().OfType<CheckBox>(), b => Equals(b.Content, Localizer.Text("AddStopClipsKey")));
+                Assert.Contains(keyWindow.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == Localizer.Text("AddMicMuteKey"));
+                Assert.Contains(keyWindow.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == Localizer.Text("AddPushToTalkKey"));
                 Capture(keyWindow, "desktop-output-keys-360");
                 keyWindow.Close();
 
