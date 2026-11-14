@@ -88,7 +88,16 @@ public sealed partial class MainViewModel : ViewModelBase
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
         Inserts = new InsertsViewModel(client, "xlr1", 1, "XLR 1");
         Inserts2 = new InsertsViewModel(client, "xlr2", 1, "XLR 2");
-        _client.StateReceived += node => Dispatcher.UIThread.Post(() => Apply(node));
+        _client.StateReceived += node =>
+        {
+            // Taken on arrival: the state answers the sends made before it, not the ones the UI makes while it waits.
+            long arrived = SliderSync.Now();
+            Dispatcher.UIThread.Post(() =>
+            {
+                Apply(node);
+                SliderSync.StateArrived(arrived);
+            });
+        };
         _client.ConnectionChanged += up => Dispatcher.UIThread.Post(() =>
         {
             DaemonConnected = up;
@@ -794,7 +803,7 @@ public sealed partial class MainViewModel : ViewModelBase
             {
                 double v = value;
                 SliderSync.Touch("outvol");
-                SliderSync.Send("outvol", () => _ = _client.SetOutputVolumeAsync(v));
+                SliderSync.SendInOrder("outvol", () => _ = _client.SetOutputVolumeAsync(v));
             }
             Raise(nameof(OutputVolumeText));
         }
@@ -2064,7 +2073,7 @@ public sealed class MixViewModel : ViewModelBase, IHasId
             {
                 double v = value;
                 SliderSync.Touch($"mixvol:{Id}");
-                SliderSync.Send($"mixvol:{Id}", () => _ = _client.SetMixVolumeAsync(Id, v));
+                SliderSync.SendInOrder($"mixvol:{Id}", () => _ = _client.SetMixVolumeAsync(Id, v));
             }
             Raise(nameof(VolumeText));
         }
@@ -2519,7 +2528,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
                 double v = value;
                 string key = $"chvol:{Id}";
                 SliderSync.Touch(key);
-                SliderSync.Send(key, () => _ = _client.SetChannelVolumeAsync(Id, v));
+                SliderSync.SendInOrder(key, () => _ = _client.SetChannelVolumeAsync(Id, v));
             }
             Raise(nameof(VolumeText));
             if (_showsVolumeReadout) Raise(nameof(Readout));
@@ -2738,7 +2747,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
             double v = value;
             string key = $"capgain:{Id}";
             SliderSync.Touch(key);
-            SliderSync.Send(key, () => _ = _client.SetCaptureGainAsync(Id, v));
+            SliderSync.SendInOrder(key, () => _ = _client.SetCaptureGainAsync(Id, v));
         }
     }
 
@@ -2958,7 +2967,7 @@ public sealed class SendViewModel : ViewModelBase
                 double v = value;
                 string key = $"lvl:{_channelId}:{MixId}";
                 SliderSync.Touch(key);
-                SliderSync.Send(key, () => _ = _client.SetLevelAsync(_channelId, MixId, v));
+                SliderSync.SendInOrder(key, () => _ = _client.SetLevelAsync(_channelId, MixId, v));
             }
             Raise(nameof(LevelText));
         }
@@ -2990,20 +2999,43 @@ public sealed class SendViewModel : ViewModelBase
 /// its setter for every pixel; unthrottled, each send triggers a state push that
 /// snaps the slider to a stale value mid-drag (rubber-banding). Send() batches
 /// to a trailing edge every 80 ms, and RecentlyTouched() suppresses applying
-/// echoes to a slider for 800 ms after the user moved it. UI-thread only.
+/// echoes to a slider for 800 ms after the user moved it.
+///
+/// A mixer fader (<see cref="SendInOrder"/>) has at most one send in flight.
+/// The next one waits for a state pushed after it, or for
+/// <see cref="InFlightLimitMs"/>; the daemon pushes a state after every mixer
+/// command it takes, while other commands may answer differently, so other
+/// sliders keep the plain 80 ms trailing edge. Some commands take
+/// the daemon far longer than 80 ms: a virtual mic mix's master rewrites every
+/// channel's send into it, about half a second with ten channels. Sending at
+/// the timer's pace queued them, the daemon worked through the queue after
+/// the drag, and once the 800 ms ran out the slider replayed the old values.
+/// A key also counts as touched while its send is in flight, so the echo of
+/// a value older than the last one sent never lands. UI-thread only.
 /// </summary>
 internal static class SliderSync
 {
     private static readonly System.Collections.Generic.Dictionary<string, long> Touched = [];   // monotonic ms
     private static readonly System.Collections.Generic.Dictionary<string, Action> Pending = [];
+    // When each ordered key's last send went out, until a state pushed after it arrives.
+    private static readonly System.Collections.Generic.Dictionary<string, long> InFlight = [];
+    private static readonly System.Collections.Generic.HashSet<string> Ordered = [];
     private static DispatcherTimer? _timer;
 
-    public static void Touch(string key) => Touched[key] = Environment.TickCount64;
+    /// <summary>How long a send may wait for its state before the next one goes anyway.</summary>
+    internal const long InFlightLimitMs = 1500;
+
+    /// <summary>The clock, in milliseconds; tests replace it.</summary>
+    internal static Func<long> Now { get; set; } = () => Environment.TickCount64;
+
+    public static void Touch(string key) => Touched[key] = Now();
 
     public static void Forget(string key)
     {
         Pending.Remove(key);
         Touched.Remove(key);
+        InFlight.Remove(key);
+        Ordered.Remove(key);
     }
 
     /// <summary>Send earlier edits before a snapshot or recall on the same connection.</summary>
@@ -3014,20 +3046,77 @@ internal static class SliderSync
 
     public static void Flush(string key)
     {
-        if (Pending.Remove(key, out Action? send)) send();
+        if (!Pending.Remove(key, out Action? send)) return;
+        if (Ordered.Contains(key)) InFlight[key] = Now();
+        send();
     }
 
     /// <summary>A recalled state must replace values touched before the recall.</summary>
-    public static void ReleaseTouchGuards() => Touched.Clear();
+    public static void ReleaseTouchGuards()
+    {
+        Touched.Clear();
+        InFlight.Clear();
+    }
 
     public static bool RecentlyTouched(string key)
-        => Touched.TryGetValue(key, out long t) && Environment.TickCount64 - t < 800;
+        => Touched.TryGetValue(key, out long t) && Now() - t < 800
+            || Ordered.Contains(key) && (Pending.ContainsKey(key) || Waiting(key));
+
+    /// <summary>
+    /// A state the daemon pushed has been applied. <paramref name="receivedAt"/>
+    /// is when it arrived, on <see cref="Now"/>: it answers every send that
+    /// went out before then, so those keys may send again.
+    /// </summary>
+    public static void StateArrived(long receivedAt)
+    {
+        foreach (string key in System.Linq.Enumerable.ToList(InFlight.Keys))
+            if (InFlight[key] < receivedAt) InFlight.Remove(key);
+    }
 
     public static void Send(string key, Action send)
+    {
+        Ordered.Remove(key);
+        Queue(key, send);
+    }
+
+    /// <summary>
+    /// <see cref="Send"/> for a mixer command, which the daemon answers with a
+    /// state: the value waits while the key's previous send is unanswered.
+    /// </summary>
+    public static void SendInOrder(string key, Action send)
+    {
+        Ordered.Add(key);
+        Queue(key, send);
+    }
+
+    private static void Queue(string key, Action send)
     {
         Pending[key] = send;
         _timer ??= CreateTimer();
         if (!_timer.IsEnabled) _timer.Start();
+    }
+
+    /// <summary>Send every pending value whose key has nothing in flight; true when nothing is left pending.</summary>
+    internal static bool Tick()
+    {
+        foreach (string key in System.Linq.Enumerable.ToList(Pending.Keys)) TryFlush(key);
+        return Pending.Count == 0;
+    }
+
+    /// <summary>Send the key's pending value unless its previous send is unanswered; true when it went.</summary>
+    internal static bool TryFlush(string key)
+    {
+        if (!Pending.ContainsKey(key) || Waiting(key)) return false;
+        Flush(key);
+        return true;
+    }
+
+    private static bool Waiting(string key)
+    {
+        if (!InFlight.TryGetValue(key, out long sent)) return false;
+        if (Now() - sent < InFlightLimitMs) return true;
+        InFlight.Remove(key);
+        return false;
     }
 
     private static DispatcherTimer CreateTimer()
@@ -3035,8 +3124,7 @@ internal static class SliderSync
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
         timer.Tick += (_, _) =>
         {
-            FlushPending();
-            if (Pending.Count == 0) timer.Stop();
+            if (Tick()) timer.Stop();
         };
         return timer;
     }
