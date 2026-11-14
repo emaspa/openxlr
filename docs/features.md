@@ -639,6 +639,9 @@ devices; the hardware input channels are hidden from it.
 
 Mixer faders use one-percentage-point steps, arrow keys and ten-point page
 steps. Shift-drag reduces pointer sensitivity tenfold for short faders.
+A mixer fader sends its next value only once the daemon has answered the
+last one, so values cannot queue behind a slow write and pull the fader
+back after a drag.
 Device controls step in their displayed units; plugin parameter steps are
 unchanged.
 
