@@ -206,7 +206,7 @@ internal static partial class SkinLayoutWindowTests
             Assert.Equal(new Thickness(0, 0, 0, 8), content.Children[0].Margin);
             Assert.InRange(content.Bounds.Width, 1040 - 72, 1040 - 16);
             Assert.All(cards, card => AssertInside(card, main));
-            Assert.Equal(["ProfilesButton", "ArrangeButton", "FlowButton", "RestartDaemonButton", "HeaderVersion", "AboutButton", "HeaderOverflow"],
+            Assert.Equal(["HistoryButtons", "ProfilesButton", "ArrangeButton", "FlowButton", "RestartDaemonButton", "HeaderVersion", "AboutButton", "HeaderOverflow"],
                 main.FindControl<WrapPanel>("HeaderActions")!.Children.Select(c => c.Name));
             Assert.False(main.FindControl<DropDownButton>("HeaderOverflow")!.IsVisible);
             Assert.Empty(main.FindControl<StackPanel>("HeaderOverflowItems")!.Children);
@@ -433,7 +433,7 @@ internal static partial class SkinLayoutWindowTests
         var actions = main.FindControl<WrapPanel>("HeaderActions")!;
         var overflow = main.FindControl<DropDownButton>("HeaderOverflow")!;
         var items = main.FindControl<StackPanel>("HeaderOverflowItems")!;
-        Assert.Equal(["FlowButton", "ProfilesButton", "ArrangeButton", "HeaderVersion", "HeaderOverflow"], actions.Children.Select(c => c.Name));
+        Assert.Equal(["FlowButton", "ProfilesButton", "HistoryButtons", "ArrangeButton", "HeaderVersion", "HeaderOverflow"], actions.Children.Select(c => c.Name));
         Assert.Equal(["RestartDaemonButton", "AboutButton"], items.Children.Select(c => c.Name));
         Assert.True(overflow.IsVisible);
         Assert.Equal(Localizer.Text("MoreActions"), AutomationProperties.GetName(overflow));

@@ -72,6 +72,7 @@ public sealed class WindowLayoutTests
                 LocalizationRenderingTests.Check();
                 BrowserTabsWindowTests.Check();
                 OlderDaemonWindowTests.Check();
+                HistoryButtonsWindowTests.Check();
                 var vm = new MainViewModel(new DaemonClient());
                 main.DataContext = vm;
                 typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -93,6 +94,11 @@ public sealed class WindowLayoutTests
                     vm.ActiveApps.Add(app);
                 }
                 ApplicationIconWindowTests.Assign(vm.Apps);
+                // Both sides of the undo history, so the header's pair is shown and has to fit the row.
+                vm.History.Apply(JsonNode.Parse("""
+                    {"undo":{"step":2,"kind":"mixVolume","mix":"mix0","count":1,"label":"Monitor 0 volume"},
+                     "redo":{"step":1,"kind":"mixMute","mix":"mix1","count":1,"label":"Monitor 1 mute"},"undoSteps":1,"redoSteps":1,"note":null}
+                    """));
                 main.DataContext = null;
                 main.DataContext = vm;
                 main.Show();

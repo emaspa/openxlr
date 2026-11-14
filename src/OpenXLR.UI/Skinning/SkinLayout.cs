@@ -94,6 +94,8 @@ public static class SkinLayoutRegions
 /// </summary>
 public static class SkinHeaderActions
 {
+    /// <summary>The undo and redo pair: one id, since a skin has no reason to part them.</summary>
+    public const string History = "history";
     public const string Profiles = "profiles";
     public const string Arrange = "arrange";
     public const string Flow = "flow";
@@ -101,7 +103,7 @@ public static class SkinHeaderActions
     public const string Version = "version";
     public const string About = "about";
 
-    public static IReadOnlyList<string> All { get; } = [Profiles, Arrange, Flow, RestartDaemon, Version, About];
+    public static IReadOnlyList<string> All { get; } = [History, Profiles, Arrange, Flow, RestartDaemon, Version, About];
 
     public static bool Exists(string id) => All.Contains(id, StringComparer.Ordinal);
 }

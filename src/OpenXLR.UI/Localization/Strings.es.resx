@@ -2313,6 +2313,81 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="MoreActions" xml:space="preserve">
     <value>Más acciones</value>
   </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Deshacer</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>Rehacer</value>
+  </data>
+  <data name="UndoStep" xml:space="preserve">
+    <value>Deshacer {0} (Ctrl+Z)</value>
+  </data>
+  <data name="RedoStep" xml:space="preserve">
+    <value>Rehacer {0} (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="NothingToUndo" xml:space="preserve">
+    <value>Nada que deshacer (Ctrl+Z)</value>
+  </data>
+  <data name="NothingToRedo" xml:space="preserve">
+    <value>Nada que rehacer (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="UndidStep" xml:space="preserve">
+    <value>Deshecho: {0}</value>
+  </data>
+  <data name="RedidStep" xml:space="preserve">
+    <value>Rehecho: {0}</value>
+  </data>
+  <data name="HistorySendLevel" xml:space="preserve">
+    <value>nivel de {0} en {1}</value>
+  </data>
+  <data name="HistoryChannelVolume" xml:space="preserve">
+    <value>volumen de {0}</value>
+  </data>
+  <data name="HistoryMixVolume" xml:space="preserve">
+    <value>volumen de {0}</value>
+  </data>
+  <data name="HistorySendMute" xml:space="preserve">
+    <value>silencio de {0} en {1}</value>
+  </data>
+  <data name="HistoryMixMute" xml:space="preserve">
+    <value>silencio de {0}</value>
+  </data>
+  <data name="HistoryExclusiveGroup" xml:space="preserve">
+    <value>cambio en {0}</value>
+  </data>
+  <data name="HistoryEq" xml:space="preserve">
+    <value>EQ de {0}</value>
+  </data>
+  <data name="HistoryMixEq" xml:space="preserve">
+    <value>EQ de {0}</value>
+  </data>
+  <data name="HistoryNoiseRemoval" xml:space="preserve">
+    <value>eliminación de ruido de {0}</value>
+  </data>
+  <data name="HistoryVoiceChanger" xml:space="preserve">
+    <value>cambiador de voz de {0}</value>
+  </data>
+  <data name="HistoryCompressor" xml:space="preserve">
+    <value>compresor de {0}</value>
+  </data>
+  <data name="HistoryExpander" xml:space="preserve">
+    <value>expansor de {0}</value>
+  </data>
+  <data name="HistoryLowCut" xml:space="preserve">
+    <value>corte de graves de {0}</value>
+  </data>
+  <data name="HistoryClipGuard" xml:space="preserve">
+    <value>ClipGuard de {0}</value>
+  </data>
+  <data name="HistoryMonitorDry" xml:space="preserve">
+    <value>monitor seco en {0}</value>
+  </data>
+  <data name="HistoryDucking" xml:space="preserve">
+    <value>atenuación automática</value>
+  </data>
+  <data name="HistoryMore" xml:space="preserve">
+    <value>{0} y {1} más</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Mezcla visible en el banco {0}</value>
   </data>

@@ -2271,6 +2271,81 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="MoreActions" xml:space="preserve">
     <value>Ubang mga aksyon</value>
   </data>
+  <data name="Undo" xml:space="preserve">
+    <value>I-undo</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>I-redo</value>
+  </data>
+  <data name="UndoStep" xml:space="preserve">
+    <value>I-undo ang {0} (Ctrl+Z)</value>
+  </data>
+  <data name="RedoStep" xml:space="preserve">
+    <value>I-redo ang {0} (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="NothingToUndo" xml:space="preserve">
+    <value>Walay i-undo (Ctrl+Z)</value>
+  </data>
+  <data name="NothingToRedo" xml:space="preserve">
+    <value>Walay i-redo (Ctrl+Shift+Z)</value>
+  </data>
+  <data name="UndidStep" xml:space="preserve">
+    <value>Na-undo ang {0}</value>
+  </data>
+  <data name="RedidStep" xml:space="preserve">
+    <value>Na-redo ang {0}</value>
+  </data>
+  <data name="HistorySendLevel" xml:space="preserve">
+    <value>level sa {0} sulod sa {1}</value>
+  </data>
+  <data name="HistoryChannelVolume" xml:space="preserve">
+    <value>volume sa {0}</value>
+  </data>
+  <data name="HistoryMixVolume" xml:space="preserve">
+    <value>volume sa {0}</value>
+  </data>
+  <data name="HistorySendMute" xml:space="preserve">
+    <value>mute sa {0} sulod sa {1}</value>
+  </data>
+  <data name="HistoryMixMute" xml:space="preserve">
+    <value>mute sa {0}</value>
+  </data>
+  <data name="HistoryExclusiveGroup" xml:space="preserve">
+    <value>pag-ilis sa {0}</value>
+  </data>
+  <data name="HistoryEq" xml:space="preserve">
+    <value>EQ sa {0}</value>
+  </data>
+  <data name="HistoryMixEq" xml:space="preserve">
+    <value>EQ sa {0}</value>
+  </data>
+  <data name="HistoryNoiseRemoval" xml:space="preserve">
+    <value>pagtangtang sa kasaba sa {0}</value>
+  </data>
+  <data name="HistoryVoiceChanger" xml:space="preserve">
+    <value>tig-usab sa tingog sa {0}</value>
+  </data>
+  <data name="HistoryCompressor" xml:space="preserve">
+    <value>compressor sa {0}</value>
+  </data>
+  <data name="HistoryExpander" xml:space="preserve">
+    <value>expander sa {0}</value>
+  </data>
+  <data name="HistoryLowCut" xml:space="preserve">
+    <value>low cut sa {0}</value>
+  </data>
+  <data name="HistoryClipGuard" xml:space="preserve">
+    <value>ClipGuard sa {0}</value>
+  </data>
+  <data name="HistoryMonitorDry" xml:space="preserve">
+    <value>dry nga monitor sulod sa {0}</value>
+  </data>
+  <data name="HistoryDucking" xml:space="preserve">
+    <value>ducking</value>
+  </data>
+  <data name="HistoryMore" xml:space="preserve">
+    <value>{0} ug {1} pa</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Mix nga gipakita sa bank {0}</value>
   </data>

@@ -1435,6 +1435,7 @@ The header actions:
 
 | Action | What it is |
 |---|---|
+| `history` | the undo and redo buttons, as one pair |
 | `profiles` | Profiles and its menu |
 | `arrange` | the Arrange toggle |
 | `flow` | Flow |
@@ -1447,6 +1448,14 @@ out of both keeps its usual place after the listed ones. Options is not
 an action a skin places. It is always first in the header and always
 shown. The actions in the ⋯ menu are the same controls, with the same
 names for a screen reader; Profiles opens its own menu from there.
+
+`history` is one id for both buttons, since a skin has no reason to part
+them. They are header buttons like the others, so `Ox.Ghost.Background`
+and the skin's button appearance style them. Their arrows are drawn in the
+button's lettering colour, not taken from the skin's font, so a skin with a
+bundled font needs nothing for them. A skin that lists its actions and
+leaves `history` out gets the pair after the listed ones. The pair is hidden
+while the daemon is from a release without undo.
 
 ### Templates
 

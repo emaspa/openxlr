@@ -270,7 +270,7 @@ public sealed class SkinLayoutTests
         Assert.Equal(["flow", "profiles"], layout.Header.Actions);
         Assert.Equal(["restart-daemon", "about"], layout.Header.Overflow);
         // The row: the listed actions, then the ones named nowhere in their usual order.
-        Assert.Equal(["flow", "profiles", "arrange", "version"], layout.Header.Row);
+        Assert.Equal(["flow", "profiles", "history", "arrange", "version"], layout.Header.Row);
         Assert.True(layout.Main.SameAs(SkinLayoutDefaults.Classic.Main));
         Assert.NotEqual(SkinLayoutDefaults.Classic.Description(), layout.Description());
     }
@@ -285,7 +285,7 @@ public sealed class SkinLayoutTests
         Assert.False(Taken("""{"version":1,"regions":{"header":{"version":"row"}}}""").Header.VersionByTitle);
         SkinLayout layout = Taken("""{"version":1,"regions":{"header":{"version":"title","overflow":["about"]}}}""");
         Assert.True(layout.Header.VersionByTitle);
-        Assert.Equal(["profiles", "arrange", "flow", "restart-daemon"], layout.Header.Row);
+        Assert.Equal(["history", "profiles", "arrange", "flow", "restart-daemon"], layout.Header.Row);
         Refused("""{"version":1,"regions":{"header":{"version":"title","actions":["version"]}}}""", "layout.regions.header.version");
         Refused("""{"version":1,"regions":{"header":{"version":"title","overflow":["version"]}}}""", "layout.regions.header.version");
         Refused("""{"version":1,"regions":{"header":{"version":"beside"}}}""", "layout.regions.header.version");

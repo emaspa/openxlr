@@ -403,11 +403,19 @@ them. Plugin parameter controls keep the steps supplied by their plugin.
 ### Undo and redo
 
 Press Ctrl+Z in the UI or the separate mixer window to take back the last
-mixer change, and Ctrl+Shift+Z or Ctrl+Y to put it back. A fader drag is
-one step, however long it took, and so is a quick run of arrow keys on one
-fader: moves of the same control less than a second apart join. While the
-cursor is in a text field, such as a name box, the keys belong to the
-field and undo its typing instead.
+mixer change, and Ctrl+Shift+Z or Ctrl+Y to put it back. The two arrow
+buttons in the header do the same. Point at one and its tooltip names the
+step it would take, such as "Undo Stream volume"; a button with nothing to
+take is greyed out. After each undo or redo, a note under the arrows names
+the step for three seconds, or says what was left alone and why, so you
+can see what changed even in a folded section or another window. A skin
+can move the pair along the header or into the ⋯ menu; with the pair in
+the menu, the note points at ⋯.
+
+A fader drag is one step, however long it took, and so is a quick run of
+arrow keys on one fader: moves of the same control less than a second
+apart join. While the cursor is in a text field, such as a name box, the
+keys belong to the field and undo its typing instead.
 
 In the [terminal mixer](#terminal), `u` undoes and `U` redoes on any tab,
 and Ctrl+Z and Ctrl+Y work there too. The bottom line then names the step

@@ -70,7 +70,10 @@ public sealed partial class MainViewModel : ViewModelBase
         VoiceChanger = new VoiceChangerViewModel(client);
         HardwareMixing = new HardwareMixingViewModel(client);
         LedRing = new LedRingViewModel(client);
-        History = new HistoryViewModel(client.StepHistoryAsync);
+        History = new HistoryViewModel(client.StepHistoryAsync, new HistoryNames(
+            id => Channels.FirstOrDefault(c => c.Id == id)?.Name,
+            id => Mixes.FirstOrDefault(m => m.Id == id)?.Name,
+            id => ExclusiveGroups.FirstOrDefault(g => g.Id == id)?.Name));
         LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
@@ -1295,11 +1298,8 @@ public sealed partial class MainViewModel : ViewModelBase
     }
     public void DeleteProfile(string name) => _ = _client.DeleteProfileAsync(name);
 
-    /// <summary>Undo, or with <paramref name="redo"/> redo, the newest step; a refusal or a skipped part shows in the status line.</summary>
-    public async Task StepHistoryAsync(bool redo)
-    {
-        if (await History.RunAsync(redo) is { } sentence) Status = sentence;
-    }
+    /// <summary>Undo, or with <paramref name="redo"/> redo, the newest step; what it did shows beside the header's pair.</summary>
+    public Task StepHistoryAsync(bool redo) => History.RunAsync(redo);
 
     /// <summary>Raised after a daemon state push has been applied (UI thread).</summary>
     public event Action? StateApplied;

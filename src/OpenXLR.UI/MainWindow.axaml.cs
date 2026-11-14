@@ -65,7 +65,7 @@ public partial class MainWindow : Window
         _desktopKeys.GlitchMarked += text => Dispatcher.UIThread.Post(() => _vm.ShowGlitchNotice(text));
         _ = _desktopKeys.StartAsync();
         DataContext = _vm;
-        HistoryKeys.Attach(this, redo => _ = _vm.StepHistoryAsync(redo));
+        SetupHistory();
         _client.Start();          // connects, and keeps retrying if the daemon isn't up yet
         // Queued rather than awaited: Options calls the restart on the UI thread.
         // A daemon from before the control socket answers only on its old port.

@@ -143,6 +143,30 @@ public sealed class LocalizationTests
         Assert.Equal(keys, keys.Where(translated.ContainsKey));
     }
 
+    // The undo pair and its step names shipped in every language, each its
+    // own wording rather than the English copied over.
+    [Theory]
+    [InlineData("Strings.de.resx")]
+    [InlineData("Strings.es.resx")]
+    [InlineData("Strings.it.resx")]
+    [InlineData("Strings.tl.resx")]
+    [InlineData("Strings.ceb.resx")]
+    [InlineData("Strings.sr-Cyrl.resx")]
+    public void EveryTranslationCoversUndoAndItsStepNames(string file)
+    {
+        var english = English;
+        string[] keys = [.. english.Keys.Where(key => key.StartsWith("History", StringComparison.Ordinal)
+            || key is "Undo" or "Redo" or "UndoStep" or "RedoStep" or "NothingToUndo" or "NothingToRedo" or "UndidStep" or "RedidStep")];
+        Assert.Equal(25, keys.Length);
+        Dictionary<string, string> translated = Read(file);
+        Assert.Equal(keys, keys.Where(translated.ContainsKey));
+        // Ducking is the word German uses too.
+        Assert.All(keys.Where(key => key.StartsWith("History", StringComparison.Ordinal) && key is not "HistoryMore" and not "HistoryDucking"),
+            key => Assert.NotEqual(english[key], translated[key]));
+        foreach (string key in new[] { "UndoStep", "NothingToUndo" }) Assert.Contains("(Ctrl+Z)", translated[key], StringComparison.Ordinal);
+        foreach (string key in new[] { "RedoStep", "NothingToRedo" }) Assert.Contains("(Ctrl+Shift+Z)", translated[key], StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AMissingEntryReadsEnglishAndAnUnknownKeyReadsItself()
     {
