@@ -16,6 +16,7 @@ import { isVoiceTarget, voiceTarget, voiceMode, voicePress, voiceRelease, voiceL
 import { isEqProfileTarget, eqProfileTarget, eqProfilePress, eqProfileLabel } from "./eq-profiles.mjs";
 import { CLIP_ACTION, clipKey, clipIdOf, clipPress, clipProgress, progressBucket, clipAppearance, clipChoices } from "./soundboard.mjs";
 import { isGlitchTarget, glitchPress, glitchValue, GLITCH_LABEL } from "./glitch-marker.mjs";
+import { isHistoryTarget, historyStep, historyValue, historyPress, historyLabel } from "./history-keys.mjs";
 
 // ---------- launch arguments ----------
 const arg = (name) => {
@@ -495,6 +496,7 @@ const supported = (target) => deviceTargetSupported(daemonState?.capabilities, t
 function toggleValue(target, inst) {
   if (!target) return null;
   if (isGlitchTarget(target)) return glitchValue(daemonUp && daemonState !== null);
+  if (isHistoryTarget(target)) return daemonUp ? historyValue(daemonState, target) : null;
   if (isVoiceTarget(target)) return voiceTarget(mixer(), target)?.lit ?? null;
   // Lit while the microphone's EQ is on and holds the profile's bands.
   if (isEqProfileTarget(target)) return eqProfileTarget(daemonState, target)?.lit ?? null;
@@ -650,6 +652,7 @@ function outputVolume(name) {
 function toggleLabel(target, inst) {
   if (!target) return "OpenXLR";
   if (isGlitchTarget(target)) return GLITCH_LABEL;
+  if (isHistoryTarget(target)) return historyLabel(historyStep(daemonState, target), target);
   if (isVoiceTarget(target)) return voiceLabel(voiceTarget(mixer(), target), target);
   if (isEqProfileTarget(target)) return eqProfileLabel(eqProfileTarget(daemonState, target), target);
   if (isEqTarget(target)) {
@@ -798,10 +801,12 @@ function clearDialTurns() {
 
 // A recalled profile must follow earlier turns on this connection, and its
 // values must replace the dial's warm local value as soon as state arrives.
+// Returns how many turns it sent.
 function flushDialTurns() {
   const pending = [...dialSends.values()].filter(entry => entry.timer);
   clearDialTurns();
   for (const entry of pending) entry.send();
+  return pending.length;
 }
 
 // A capture input's own gain on a gain dial: its source's volume in dB over
@@ -997,6 +1002,17 @@ function onKeyDown(context, inst, inMultiAction = false) {
   if (isVoiceTarget(t)) { onVoiceDown(context, inst, t, inMultiAction); return; }
   // A marker on the daemon's timeline: the check mark says it was taken.
   if (isGlitchTarget(t)) { keyCommands.enqueue(context, glitchPress()); return; }
+  if (isHistoryTarget(t)) {
+    // A dial turn still waiting goes first, so the daemon records it before
+    // the undo takes the newest step back, and the dials drop their local
+    // values to show what the undo restores. The step id is the one the key
+    // shows, so a history another client changed since is refused. After a
+    // flush the key's step is already old: the turn just sent is the newest
+    // step, so the press goes without an id and takes that one.
+    const flushed = flushDialTurns() > 0;
+    keyCommands.enqueue(context, historyPress(flushed ? null : historyStep(daemonState, t), t));
+    return;
+  }
   if (isEqProfileTarget(t)) {
     // One loadEqProfile, after any EQ dial turn still waiting, so the
     // profile is what the microphone ends up with. A profile the
@@ -1286,6 +1302,11 @@ const GLYPHS = {
   eq: `<path d="M32 92 C50 92 54 50 72 50 C90 50 94 92 112 92" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
         <line x1="32" y1="106" x2="112" y2="106" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
         <circle cx="72" cy="50" r="9" fill="currentColor"/>`,
+  // a hooked arrow back for undo keys and its mirror for redo keys
+  undo: `<path d="M45 57 h32 a22 22 0 0 1 0 44 h-28" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M59 43 l-14 14 l14 14" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`,
+  redo: `<path d="M99 57 h-32 a22 22 0 0 0 0 44 h28" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M85 43 l14 14 l-14 14" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`,
   // a stack of scene cards, for profile keys
   scene: `<rect x="44" y="52" width="56" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="6"/>
         <path d="M52 44 h52 a6 6 0 0 1 6 6 v34" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
@@ -1304,6 +1325,7 @@ function glyphFor(t) {
   if (t.startsWith("monitor:") || t.startsWith("feed:") || t.startsWith("mixmute:")) return "speaker";
   if (t.startsWith("sendmute:") || t.startsWith("group:")) return "fader";
   if (isProfileTarget(t)) return "scene";
+  if (isHistoryTarget(t)) return t;
   return null;
 }
 

@@ -783,7 +783,8 @@ Ctrl+Z in the UI takes back the last change to a send level, a channel or
 mix volume, a send mute or a mix mute, and Ctrl+Shift+Z or Ctrl+Y puts it
 back. The history lives in the daemon and every client shares it, so a
 fader moved on a Deck dial or over the API is undone the same way. A fader
-drag or a dial turn is one step. Undo never touches phantom power, a lock,
+drag or a dial turn is one step. A Deck key undoes or redoes too, named
+after the step it would take. Undo never touches phantom power, a lock,
 the hardware mute or the monitoring pause, and it leaves alone a value
 something else moved since. Loading a profile, deleting a channel or mix,
 switching the mixing mode or the active interface clears the history.
@@ -1137,7 +1138,9 @@ system output, routing the focused application to a channel, the
 next member of an exclusive group, ducking on or off on any device, a
 channel as a ducking key or not, and
 loading an EQ profile on a microphone or a mix, lit while its EQ holds
-that profile. Each key
+that profile, and undo and redo. An undo or redo key names the step it
+would take, is grey while its side of the history is empty, and sends any
+pending dial turn before the undo. Each key
 can pick its icon, and a typed title replaces the built-in label. A key or
 dial on a channel or mix shows the icon and colour that channel or mix was
 given in the layout editor, unless the key has its own icon; a group key

@@ -436,6 +436,9 @@ desktop, the unit or a profile moved the control since, undo leaves it
 there and puts back the rest of the step. A step none of which can be put
 back is dropped, so the next Ctrl+Z takes the one before it.
 
+On a Stream Deck, a Toggle key set to undo or redo names the step it would
+take and does the same; see [Stream Deck](#stream-deck).
+
 <a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
 
@@ -4423,7 +4426,8 @@ the bypass of one insert or of a whole chain, a desktop output's mute, a
 default, the routing of the focused
 application, a profile to recall, an [EQ profile](#eq-profile-keys) to
 load on a microphone, the next member of an
-[exclusive group](#exclusive-groups), or a [glitch marker](#glitch-marker). A group key shows the group's name
+[exclusive group](#exclusive-groups), an [undo or a redo](#undo-and-redo),
+or a [glitch marker](#glitch-marker). A group key shows the group's name
 and the member that is heard, or None; a press unmutes the next member in
 the mixes the current one was heard in and mutes the current one. With
 every member muted the key shows an alert, because there is nothing to
@@ -4434,6 +4438,16 @@ connected interface.
 Recalling a profile from a key sends any pending dial turns first, so a
 delayed turn cannot overwrite the recalled values. The dials then show and
 step from the profile's values as soon as its state arrives.
+An undo key, under **History** in the key's settings, shows Undo over the
+first words of the change it would take back, such as XLR 1 level, and a
+redo key shows Redo over the change it would put back. They take the same
+steps as Ctrl+Z and Ctrl+Shift+Z in the UI, whoever made the change. A key
+with nothing on its side is grey and a press only shows the alert. A press
+first sends any dial turn the plugin is still holding, so an undo takes the
+whole turn back, and the dials then show the restored values. If another
+client changed the history after the key was drawn, the daemon refuses the
+press. The key shows the alert, then the new step, and the next press takes
+that one.
 Keys and dials for an interface input, such as its mute, gain, phantom
 power and processing toggles, act on the interface whatever feeds the
 strips. Their
