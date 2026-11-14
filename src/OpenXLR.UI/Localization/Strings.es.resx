@@ -3929,4 +3929,58 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="MicSetupGainLocked" xml:space="preserve">
     <value>La ganancia de entrada está bloqueada.</value>
   </data>
+  <data name="AddMicMuteKey" xml:space="preserve">
+    <value>Añadir una tecla que silencia y activa los micrófonos</value>
+  </data>
+  <data name="AddPushToTalkKey" xml:space="preserve">
+    <value>Añadir una tecla de pulsar para hablar: los micrófonos solo están activos mientras está pulsada</value>
+  </data>
+  <data name="PushToTalkNote" xml:space="preserve">
+    <value>Configurar pulsar para hablar silencia los micrófonos marcados debajo, y también cada inicio de la interfaz; la tecla los activa mientras está pulsada y los silencia al soltarla. En Plasma, soltar cualquier tecla o pulsar otro atajo los silencia antes. Si la sesión de atajos, la conexión con el daemon o la interfaz terminan mientras la tecla está pulsada, también quedan silenciados.</value>
+  </data>
+  <data name="PushToTalkUnavailableNote" xml:space="preserve">
+    <value>Pulsar para hablar necesita un escritorio que avise cuando se suelta una tecla, como hacen KDE Plasma, GNOME y Hyprland. Este escritorio aún no lo ha hecho: pulsa y suelta otra tecla de OpenXLR y vuelve a abrir esta ventana.</value>
+  </data>
+  <data name="MicKeysNote" xml:space="preserve">
+    <value>Las dos teclas de micrófono actúan sobre los micrófonos marcados aquí, o sobre XLR 1 si no hay ninguno. Una pulsación de la tecla de silencio los silencia todos mientras alguno esté activo, y los activa todos cuando todos están silenciados.</value>
+  </data>
+  <data name="MicKeyUnavailable" xml:space="preserve">
+    <value>{0} (el daemon no lo informa ahora)</value>
+  </data>
+  <data name="KeyToggleMicMute" xml:space="preserve">
+    <value>Alternar silencio del micrófono</value>
+  </data>
+  <data name="KeyPushToTalk" xml:space="preserve">
+    <value>Pulsar para hablar</value>
+  </data>
+  <data name="MicKeyNoMicrophones" xml:space="preserve">
+    <value>Ahora no se puede silenciar ninguno de los micrófonos elegidos: el daemon no los informa o su interfaz no está conectada.</value>
+  </data>
+  <data name="MicKeyMuted" xml:space="preserve">
+    <value>Micrófonos silenciados: {0}.</value>
+  </data>
+  <data name="MicKeyUnmuted" xml:space="preserve">
+    <value>Micrófonos activos: {0}.</value>
+  </data>
+  <data name="MicKeyNotReported" xml:space="preserve">
+    <value>No informados ahora: {0}.</value>
+  </data>
+  <data name="MicKeyRefused" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="PushToTalkOpen" xml:space="preserve">
+    <value>Pulsar para hablar: {0} activo mientras la tecla está pulsada.</value>
+  </data>
+  <data name="PushToTalkClosed" xml:space="preserve">
+    <value>Pulsar para hablar: {0} silenciado.</value>
+  </data>
+  <data name="PushToTalkNoRelease" xml:space="preserve">
+    <value>Pulsar para hablar dejó los micrófonos silenciados: este escritorio aún no ha avisado de que se soltó una tecla. Suelta la tecla y vuelve a pulsarla.</value>
+  </data>
+  <data name="PushToTalkCloseFailed" xml:space="preserve">
+    <value>Pulsar para hablar no pudo volver a silenciar un micrófono. {0}</value>
+  </data>
+  <data name="PushToTalkDaemonLost" xml:space="preserve">
+    <value>La conexión con el daemon se cortó durante pulsar para hablar. OpenXLR vuelve a silenciar los micrófonos en cuanto el daemon vuelve.</value>
+  </data>
 </root>

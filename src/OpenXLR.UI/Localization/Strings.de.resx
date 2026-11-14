@@ -4242,4 +4242,58 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="MicSetupGainLocked" xml:space="preserve">
     <value>Die Eingangsverstärkung ist gesperrt.</value>
   </data>
+  <data name="AddMicMuteKey" xml:space="preserve">
+    <value>Eine Taste hinzufügen, die die Mikrofone stumm- und wieder einschaltet</value>
+  </data>
+  <data name="AddPushToTalkKey" xml:space="preserve">
+    <value>Eine Push-to-Talk-Taste hinzufügen: Die Mikrofone sind nur an, solange sie gedrückt ist</value>
+  </data>
+  <data name="PushToTalkNote" xml:space="preserve">
+    <value>Das Einrichten von Push-to-Talk schaltet die unten angehakten Mikrofone stumm, ebenso jeder Start der Oberfläche; die Taste schaltet sie ein, solange sie gedrückt ist, und stumm, wenn sie losgelassen wird. Unter Plasma schaltet das Loslassen irgendeiner Taste oder ein anderes Tastenkürzel sie früher stumm. Endet das Halten mit der Tastenkürzel-Sitzung, der Verbindung zum Daemon oder der Oberfläche, werden sie ebenfalls stummgeschaltet.</value>
+  </data>
+  <data name="PushToTalkUnavailableNote" xml:space="preserve">
+    <value>Push-to-Talk braucht einen Desktop, der das Loslassen von Tasten meldet, wie KDE Plasma, GNOME und Hyprland es tun. Dieser Desktop hat es noch nicht gemeldet: Drücke eine andere OpenXLR-Taste, lass sie los und öffne dieses Fenster erneut.</value>
+  </data>
+  <data name="MicKeysNote" xml:space="preserve">
+    <value>Beide Mikrofontasten gelten für die hier angehakten Mikrofone, für XLR 1, wenn keines angehakt ist. Ein Druck auf die Stummtaste schaltet alle stumm, solange eines an ist, und schaltet alle ein, wenn jedes stumm ist.</value>
+  </data>
+  <data name="MicKeyUnavailable" xml:space="preserve">
+    <value>{0} (der Daemon meldet es gerade nicht)</value>
+  </data>
+  <data name="KeyToggleMicMute" xml:space="preserve">
+    <value>Mikrofon stumm schalten oder einschalten</value>
+  </data>
+  <data name="KeyPushToTalk" xml:space="preserve">
+    <value>Push-to-Talk</value>
+  </data>
+  <data name="MicKeyNoMicrophones" xml:space="preserve">
+    <value>Keines der gewählten Mikrofone kann gerade stummgeschaltet werden: Der Daemon meldet sie nicht, oder ihr Interface ist nicht verbunden.</value>
+  </data>
+  <data name="MicKeyMuted" xml:space="preserve">
+    <value>Mikrofone stumm: {0}.</value>
+  </data>
+  <data name="MicKeyUnmuted" xml:space="preserve">
+    <value>Mikrofone an: {0}.</value>
+  </data>
+  <data name="MicKeyNotReported" xml:space="preserve">
+    <value>Gerade nicht gemeldet: {0}.</value>
+  </data>
+  <data name="MicKeyRefused" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="PushToTalkOpen" xml:space="preserve">
+    <value>Push-to-Talk: {0} an, solange die Taste gedrückt ist.</value>
+  </data>
+  <data name="PushToTalkClosed" xml:space="preserve">
+    <value>Push-to-Talk: {0} stumm.</value>
+  </data>
+  <data name="PushToTalkNoRelease" xml:space="preserve">
+    <value>Push-to-Talk hat die Mikrofone stumm gelassen: Dieser Desktop hat das Loslassen einer Taste noch nicht gemeldet. Lass die Taste los und drücke sie erneut.</value>
+  </data>
+  <data name="PushToTalkCloseFailed" xml:space="preserve">
+    <value>Push-to-Talk konnte ein Mikrofon nicht wieder stummschalten. {0}</value>
+  </data>
+  <data name="PushToTalkDaemonLost" xml:space="preserve">
+    <value>Die Verbindung zum Daemon ist während Push-to-Talk abgebrochen. OpenXLR schaltet die Mikrofone wieder stumm, sobald der Daemon zurück ist.</value>
+  </data>
 </root>

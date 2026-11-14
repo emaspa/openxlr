@@ -33,6 +33,20 @@ internal sealed class DesktopKeysWindow : Window
             { Content = new TextBlock { Text = c.Label, TextWrapping = TextWrapping.Wrap }, IsChecked = c.Ticked })).ToList();
         var clipsStop = new CheckBox { Content = Localizer.Text("AddStopClipsKey"), IsChecked = saved.ClipsStop };
         bool showsClips = board.IsReported || clipChoices.Count > 0 || saved.ClipsStop;
+        // The microphone strips: XLR 1 and XLR 2 where the unit has them, and
+        // every capture input, an additional interface's included. A covered
+        // one the mixer does not show now stays ticked, as a clip does.
+        var micChoices = keys.MicrophoneChoices(saved, vm.Channels
+            .Where(c => c.IsHardware ? c.Id is "xlr1" or "xlr2" && c.Present : c.CaptureSource is not null)
+            .Select(c => (c.Id, c.Name))).Select(c => (c.Id, Box: new CheckBox
+            { Content = new TextBlock { Text = c.Label, TextWrapping = TextWrapping.Wrap }, IsChecked = c.Ticked })).ToList();
+        var micMute = new CheckBox { Content = new TextBlock { Text = Localizer.Text("AddMicMuteKey"), TextWrapping = TextWrapping.Wrap },
+            IsChecked = saved.MicMute };
+        // Push to talk is offered where the desktop reports keys coming up;
+        // one already set up stays, so it can be turned off.
+        bool talkOffered = keys.DeliversRelease || saved.PushToTalk;
+        var pushToTalk = new CheckBox { Content = new TextBlock { Text = Localizer.Text("AddPushToTalkKey"), TextWrapping = TextWrapping.Wrap },
+            IsChecked = saved.PushToTalk, IsEnabled = talkOffered };
         var outputControls = new CheckBox { Content = Localizer.Text("AddVolumeAndMuteKeys"), IsChecked = saved.OutputControls };
         var monitorControls = new CheckBox { Content = Localizer.Text("AddMonitoringPauseKey"), IsChecked = saved.MonitorControls };
         var outputs = vm.Outputs.Where(d => DesktopKeySettings.ValidOutput(d.Name)
@@ -67,6 +81,12 @@ internal sealed class DesktopKeysWindow : Window
             content.Children.Add(clipsStop);
             content.Children.Add(new TextBlock { Text = Localizer.Text("SoundboardKeysNote"), TextWrapping = TextWrapping.Wrap });
         }
+        content.Children.Add(micMute);
+        content.Children.Add(pushToTalk);
+        content.Children.Add(new TextBlock { Text = keys.DeliversRelease ? Localizer.Text("PushToTalkNote") : Localizer.Text("PushToTalkUnavailableNote"),
+            TextWrapping = TextWrapping.Wrap });
+        foreach (var choice in micChoices) content.Children.Add(choice.Box);
+        content.Children.Add(new TextBlock { Text = Localizer.Text("MicKeysNote"), TextWrapping = TextWrapping.Wrap });
         content.Children.Add(monitorControls);
         content.Children.Add(new TextBlock { Text = Localizer.Text("MonitoringPauseKeysNote"), TextWrapping = TextWrapping.Wrap });
         content.Children.Add(outputControls);
@@ -93,7 +113,10 @@ internal sealed class DesktopKeysWindow : Window
                     OutputDevice = outputDevice.SelectedItem is AudioDeviceItem { Name.Length: > 0 } selected ? selected.Name : null,
                     MainOutputs = mainChoices.Where(c => c.Box.IsChecked == true).Select(c => c.Name).ToList(),
                     Clips = clipChoices.Where(c => c.Box.IsChecked == true).Select(c => c.Id).ToList(),
-                    ClipsStop = clipsStop.IsChecked == true });
+                    ClipsStop = clipsStop.IsChecked == true,
+                    MicMute = micMute.IsChecked == true,
+                    PushToTalk = pushToTalk.IsChecked == true,
+                    Microphones = micChoices.Where(c => c.Box.IsChecked == true).Select(c => c.Id).ToList() });
             }
             finally { apply.IsEnabled = true; }
         };

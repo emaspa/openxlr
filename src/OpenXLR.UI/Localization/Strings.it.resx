@@ -4297,4 +4297,58 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="MicSetupGainLocked" xml:space="preserve">
     <value>Il guadagno in ingresso è bloccato.</value>
   </data>
+  <data name="AddMicMuteKey" xml:space="preserve">
+    <value>Aggiungi un tasto che mette e toglie il muto ai microfoni</value>
+  </data>
+  <data name="AddPushToTalkKey" xml:space="preserve">
+    <value>Aggiungi un tasto push-to-talk: i microfoni sono attivi solo finché è premuto</value>
+  </data>
+  <data name="PushToTalkNote" xml:space="preserve">
+    <value>Configurare il push-to-talk mette in muto i microfoni spuntati qui sotto, e lo fa anche ogni avvio dell'interfaccia; il tasto li attiva finché è premuto e li rimette in muto al rilascio. Su Plasma il rilascio di un tasto qualsiasi o la pressione di un'altra scorciatoia li mette in muto prima. Se la sessione delle scorciatoie, la connessione al daemon o l'interfaccia terminano mentre il tasto è premuto, tornano in muto comunque.</value>
+  </data>
+  <data name="PushToTalkUnavailableNote" xml:space="preserve">
+    <value>Il push-to-talk richiede un desktop che segnali il rilascio dei tasti, come fanno KDE Plasma, GNOME e Hyprland. Questo desktop non l'ha ancora segnalato: premi e rilascia un altro tasto di OpenXLR, poi riapri questa finestra.</value>
+  </data>
+  <data name="MicKeysNote" xml:space="preserve">
+    <value>Entrambi i tasti dei microfoni agiscono sui microfoni spuntati qui, o su XLR 1 se non ne è spuntato nessuno. Una pressione del tasto muto li mette tutti in muto se almeno uno è attivo, e li attiva tutti quando sono tutti in muto.</value>
+  </data>
+  <data name="MicKeyUnavailable" xml:space="preserve">
+    <value>{0} (il daemon ora non lo segnala)</value>
+  </data>
+  <data name="KeyToggleMicMute" xml:space="preserve">
+    <value>Attiva o disattiva il muto del microfono</value>
+  </data>
+  <data name="KeyPushToTalk" xml:space="preserve">
+    <value>Push-to-talk</value>
+  </data>
+  <data name="MicKeyNoMicrophones" xml:space="preserve">
+    <value>Nessuno dei microfoni scelti può essere messo in muto ora: il daemon non li segnala, oppure la loro interfaccia non è collegata.</value>
+  </data>
+  <data name="MicKeyMuted" xml:space="preserve">
+    <value>Microfoni in muto: {0}.</value>
+  </data>
+  <data name="MicKeyUnmuted" xml:space="preserve">
+    <value>Microfoni attivi: {0}.</value>
+  </data>
+  <data name="MicKeyNotReported" xml:space="preserve">
+    <value>Ora non segnalati: {0}.</value>
+  </data>
+  <data name="MicKeyRefused" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="PushToTalkOpen" xml:space="preserve">
+    <value>Push-to-talk: {0} attivo finché il tasto è premuto.</value>
+  </data>
+  <data name="PushToTalkClosed" xml:space="preserve">
+    <value>Push-to-talk: {0} in muto.</value>
+  </data>
+  <data name="PushToTalkNoRelease" xml:space="preserve">
+    <value>Il push-to-talk ha lasciato i microfoni in muto: questo desktop non ha ancora segnalato il rilascio di un tasto. Rilascia il tasto e premilo di nuovo.</value>
+  </data>
+  <data name="PushToTalkCloseFailed" xml:space="preserve">
+    <value>Il push-to-talk non è riuscito a rimettere in muto un microfono. {0}</value>
+  </data>
+  <data name="PushToTalkDaemonLost" xml:space="preserve">
+    <value>La connessione al daemon si è interrotta durante il push-to-talk. OpenXLR rimette in muto i microfoni appena il daemon torna.</value>
+  </data>
 </root>

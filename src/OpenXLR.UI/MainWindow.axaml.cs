@@ -170,7 +170,8 @@ public partial class MainWindow : Window
             VoiceChangerWindow.Current?.Close();
             _lifetime.Cancel();
             DisposeTray();
-            _desktopKeys.Dispose();
+            // Before the client goes: push to talk held open mutes on the way out.
+            await _desktopKeys.ShutdownAsync();
             if (_volumeRange is not null)
             {
                 _vm.DesktopVolumeBoostRequested -= _volumeRange.Set;

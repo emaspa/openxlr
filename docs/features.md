@@ -1427,7 +1427,14 @@ down on KDE Plasma, GNOME and Hyprland, whose portals report the key coming
 up; on Plasma any key coming up or another shortcut ends it. Elsewhere it
 plays as overlap until the desktop first reports a key coming up. A clip
 keeps its key unless the daemon is seen deleting it, so an unreadable
-library drops no binding. Focus
+library drops no binding. A key can also mute the microphones ticked
+in the list, XLR 1 by default, with each one's own mute: the unit's for an
+interface input, the source's for a capture input. While any is on a press
+mutes them all; with all muted it turns them on. A push-to-talk key keeps
+them on only while it is down, where the desktop reports the key coming up.
+Setting it up mutes them, and so does every start of the UI. A hold that
+ends without its release mutes them again: a closed or replaced shortcut
+session, a dropped daemon connection, or the UI quitting. Focus
 identity comes from KWin on KDE Plasma, `swaymsg` on Sway or `hyprctl`
 on Hyprland, `niri` on Niri or local EWMH properties through `xprop` on X11.
 GNOME Shell uses the optional [OpenXLR Focus extension](gnome-focus.md),
@@ -1438,5 +1445,6 @@ Other compositors need a focus source of their own. An
 unavailable GlobalShortcuts portal leaves the Deck focus service available;
 PC shortcuts still need that portal. See
 [Desktop keys](manual.md#desktop-keys),
-[Soundboard keys](manual.md#soundboard-keys) and
+[Soundboard keys](manual.md#soundboard-keys),
+[Microphone keys](manual.md#microphone-keys) and
 [Output keys](manual.md#output-keys).

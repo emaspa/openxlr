@@ -4221,4 +4221,58 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
   <data name="MicSetupGainLocked" xml:space="preserve">
     <value>Улазно појачање је закључано.</value>
   </data>
+  <data name="AddMicMuteKey" xml:space="preserve">
+    <value>Додај тастер који искључује и укључује звук микрофона</value>
+  </data>
+  <data name="AddPushToTalkKey" xml:space="preserve">
+    <value>Додај тастер за говор на притисак: микрофони су укључени само док је притиснут</value>
+  </data>
+  <data name="PushToTalkNote" xml:space="preserve">
+    <value>Подешавање говора на притисак искључује звук микрофона означених испод, као и сваки почетак рада корисничког интерфејса; тастер их укључује док је притиснут и искључује када се отпусти. На Plasma-и их раније искључује отпуштање било ког тастера или притисак друге пречице. Ако се држање заврши са сесијом пречица, везом са демоном или корисничким интерфејсом, звук им се такође искључује.</value>
+  </data>
+  <data name="PushToTalkUnavailableNote" xml:space="preserve">
+    <value>Говор на притисак захтева радну површину која јавља отпуштање тастера, као што то раде KDE Plasma, GNOME и Hyprland. Ова радна површина то још није јавила: притисни и отпусти неки други OpenXLR тастер, па поново отвори овај прозор.</value>
+  </data>
+  <data name="MicKeysNote" xml:space="preserve">
+    <value>Оба тастера за микрофон делују на микрофоне означене овде, или на XLR 1 ако ниједан није означен. Притисак тастера за искључивање звука искључује све док је бар један укључен, а укључује све када је сваки искључен.</value>
+  </data>
+  <data name="MicKeyUnavailable" xml:space="preserve">
+    <value>{0} (демон га сада не пријављује)</value>
+  </data>
+  <data name="KeyToggleMicMute" xml:space="preserve">
+    <value>Укључи или искључи звук микрофона</value>
+  </data>
+  <data name="KeyPushToTalk" xml:space="preserve">
+    <value>Говор на притисак</value>
+  </data>
+  <data name="MicKeyNoMicrophones" xml:space="preserve">
+    <value>Ниједном од изабраних микрофона сада не може да се искључи звук: демон их не пријављује или њихов интерфејс није повезан.</value>
+  </data>
+  <data name="MicKeyMuted" xml:space="preserve">
+    <value>Микрофони без звука: {0}.</value>
+  </data>
+  <data name="MicKeyUnmuted" xml:space="preserve">
+    <value>Микрофони укључени: {0}.</value>
+  </data>
+  <data name="MicKeyNotReported" xml:space="preserve">
+    <value>Сада се не пријављују: {0}.</value>
+  </data>
+  <data name="MicKeyRefused" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="PushToTalkOpen" xml:space="preserve">
+    <value>Говор на притисак: {0} укључен док је тастер притиснут.</value>
+  </data>
+  <data name="PushToTalkClosed" xml:space="preserve">
+    <value>Говор на притисак: {0} без звука.</value>
+  </data>
+  <data name="PushToTalkNoRelease" xml:space="preserve">
+    <value>Говор на притисак је оставио микрофоне без звука: ова радна површина још није јавила отпуштање тастера. Отпусти тастер и притисни га поново.</value>
+  </data>
+  <data name="PushToTalkCloseFailed" xml:space="preserve">
+    <value>Говор на притисак није могао поново да искључи звук микрофона. {0}</value>
+  </data>
+  <data name="PushToTalkDaemonLost" xml:space="preserve">
+    <value>Веза са демоном је прекинута током говора на притисак. OpenXLR поново искључује звук микрофона чим се демон врати.</value>
+  </data>
 </root>
