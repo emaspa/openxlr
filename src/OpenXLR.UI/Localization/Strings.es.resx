@@ -2373,6 +2373,18 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="HistoryExpander" xml:space="preserve">
     <value>expansor de {0}</value>
   </data>
+  <data name="HistoryInsertParam" xml:space="preserve">
+    <value>ajustes de {0} en {1}</value>
+  </data>
+  <data name="HistoryInsertBypass" xml:space="preserve">
+    <value>bypass de {0} en {1}</value>
+  </data>
+  <data name="HistoryInsertName" xml:space="preserve">
+    <value>nombre de {0} en {1}</value>
+  </data>
+  <data name="HistoryInsertChain" xml:space="preserve">
+    <value>inserciones de {0}</value>
+  </data>
   <data name="HistoryLowCut" xml:space="preserve">
     <value>corte de graves de {0}</value>
   </data>

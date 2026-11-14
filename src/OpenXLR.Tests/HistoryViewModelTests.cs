@@ -15,10 +15,14 @@ public sealed class HistoryViewModelTests
     private static readonly HistoryNames Names = new(
         id => id switch { "xlr1" => "XLR 1", "music" => "Music", _ => null },
         id => id switch { "monitor" => "Monitor A", "stream" => "Stream", _ => null },
-        id => id == "sources" ? "Sources" : null);
+        id => id == "sources" ? "Sources" : null)
+    {
+        Insert = (chain, id) => (chain, id) switch { ("xlr1", "comp") => "Comp", ("mix:stream", "wide") => "Widener", _ => null },
+    };
 
-    private static HistoryStepItem Step(string kind, string? channel = null, string? mix = null, string? group = null, int count = 1)
-        => new(1, kind, "English label", channel, mix, group, count);
+    private static HistoryStepItem Step(string kind, string? channel = null, string? mix = null, string? group = null, int count = 1,
+        string? insert = null)
+        => new(1, kind, "English label", channel, mix, group, count, insert);
 
     [Fact]
     public void EveryKindIsNamedInTheUisLanguageWithTheNamesItShows()
@@ -41,11 +45,18 @@ public sealed class HistoryViewModelTests
         Assert.Equal(Localizer.Format("HistoryClipGuard", "XLR 1"), model.Name(Step("clipGuard", "xlr1")));
         Assert.Equal(Localizer.Format("HistoryMonitorDry", "Monitor A"), model.Name(Step("monitorDry", mix: "monitor")));
         Assert.Equal(Localizer.Text("HistoryDucking"), model.Name(Step("ducking")));
+        // The insert kinds name the insert in its channel's or mix's chain.
+        Assert.Equal(Localizer.Format("HistoryInsertParam", "Comp", "XLR 1"), model.Name(Step("insertParam", "xlr1", insert: "comp")));
+        Assert.Equal(Localizer.Format("HistoryInsertBypass", "Widener", "Stream"), model.Name(Step("insertBypass", mix: "stream", insert: "wide")));
+        Assert.Equal(Localizer.Format("HistoryInsertName", "Comp", "XLR 1"), model.Name(Step("insertName", "xlr1", insert: "comp")));
+        Assert.Equal(Localizer.Format("HistoryInsertChain", "Stream"), model.Name(Step("insertChain", mix: "stream")));
+        // An insert the chain no longer holds: the daemon's label.
+        Assert.Equal("English label", model.Name(Step("insertParam", "xlr1", insert: "gone")));
         // A burst of five: the first and how many more.
         Assert.Equal(Localizer.Format("HistoryMore", Localizer.Format("HistorySendLevel", "Music", "Monitor A"), 4),
             model.Name(Step("sendLevel", "music", "monitor", count: 5)));
         // A kind from a later daemon, an id the UI cannot name, or no names at all: the daemon's label.
-        Assert.Equal("English label", model.Name(Step("insertParam", "xlr1")));
+        Assert.Equal("English label", model.Name(Step("laterKind", "xlr1")));
         Assert.Equal("English label", model.Name(Step("sendLevel", "gone", "monitor")));
         Assert.Equal("English label", new HistoryViewModel(null).Name(Step("mixVolume", mix: "stream")));
     }
@@ -72,6 +83,12 @@ public sealed class HistoryViewModelTests
             """));
         Assert.Equal(new HistoryStepItem(8, "sendMute", "Music mute in Monitor A and 2 more", "music", "monitor", null, 3), model.Undo);
         Assert.Equal(Localizer.Format("RedoStep", Localizer.Format("HistoryExclusiveGroup", "Sources")), model.RedoTip);
+        model.Apply(JsonNode.Parse("""
+            {"undo":{"step":9,"kind":"insertBypass","channel":"xlr1","insert":"comp","count":1,"label":"Comp bypass on XLR 1"},
+             "redo":null,"undoSteps":2,"redoSteps":0,"note":null}
+            """));
+        Assert.Equal(new HistoryStepItem(9, "insertBypass", "Comp bypass on XLR 1", "xlr1", Insert: "comp"), model.Undo);
+        Assert.Equal(Localizer.Format("UndoStep", Localizer.Format("HistoryInsertBypass", "Comp", "XLR 1")), model.UndoTip);
 
         model.Reset();
         Assert.False(model.IsReported || model.CanUndo || model.CanRedo);

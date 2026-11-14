@@ -2421,6 +2421,18 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="HistoryExpander" xml:space="preserve">
     <value>Expander von {0}</value>
   </data>
+  <data name="HistoryInsertParam" xml:space="preserve">
+    <value>Einstellungen von {0} in {1}</value>
+  </data>
+  <data name="HistoryInsertBypass" xml:space="preserve">
+    <value>Bypass von {0} in {1}</value>
+  </data>
+  <data name="HistoryInsertName" xml:space="preserve">
+    <value>Name von {0} in {1}</value>
+  </data>
+  <data name="HistoryInsertChain" xml:space="preserve">
+    <value>Effekte von {0}</value>
+  </data>
   <data name="HistoryLowCut" xml:space="preserve">
     <value>Hochpass von {0}</value>
   </data>

@@ -9,13 +9,17 @@ namespace OpenXLR.UI;
 /// <summary>
 /// One end of the daemon's undo history: the step's id for the guard, its
 /// kind, its English label, the ids it names and how many things a burst
-/// joined.
+/// joined. An insert step names the insert in its channel's or mix's chain.
 /// </summary>
 public sealed record HistoryStepItem(long Step, string Kind, string Label,
-    string? Channel = null, string? Mix = null, string? Group = null, int Count = 1);
+    string? Channel = null, string? Mix = null, string? Group = null, int Count = 1, string? Insert = null);
 
 /// <summary>The names the UI shows for the ids a step names; null for an id it does not know.</summary>
-internal sealed record HistoryNames(Func<string, string?> Channel, Func<string, string?> Mix, Func<string, string?> Group);
+internal sealed record HistoryNames(Func<string, string?> Channel, Func<string, string?> Mix, Func<string, string?> Group)
+{
+    /// <summary>An insert's name by its chain key (a channel id or <c>mix:&lt;id&gt;</c>) and its id.</summary>
+    public Func<string, string, string?>? Insert { get; init; }
+}
 
 /// <summary>
 /// The daemon's undo history as the UI sees it: the step Ctrl+Z would undo
@@ -143,6 +147,9 @@ public sealed class HistoryViewModel : ViewModelBase
         string? channel = step.Channel is { } c ? _names?.Channel(c) : null;
         string? mix = step.Mix is { } m ? _names?.Mix(m) : null;
         string? group = step.Group is { } g ? _names?.Group(g) : null;
+        string? chain = step.Mix is not null ? mix : channel;
+        string? insert = step.Insert is { } i && (step.Mix is { } key ? $"mix:{key}" : step.Channel) is { } chainKey
+            ? _names?.Insert?.Invoke(chainKey, i) : null;
         string? phrase = step.Kind switch
         {
             "sendLevel" when channel is not null && mix is not null => Localizer.Format("HistorySendLevel", channel, mix),
@@ -157,6 +164,10 @@ public sealed class HistoryViewModel : ViewModelBase
             "voiceChanger" when channel is not null => Localizer.Format("HistoryVoiceChanger", channel),
             "compressor" when channel is not null => Localizer.Format("HistoryCompressor", channel),
             "expander" when channel is not null => Localizer.Format("HistoryExpander", channel),
+            "insertParam" when insert is not null && chain is not null => Localizer.Format("HistoryInsertParam", insert, chain),
+            "insertBypass" when insert is not null && chain is not null => Localizer.Format("HistoryInsertBypass", insert, chain),
+            "insertName" when insert is not null && chain is not null => Localizer.Format("HistoryInsertName", insert, chain),
+            "insertChain" when chain is not null => Localizer.Format("HistoryInsertChain", chain),
             "lowCut" when channel is not null => Localizer.Format("HistoryLowCut", channel),
             "clipGuard" when channel is not null => Localizer.Format("HistoryClipGuard", channel),
             "monitorDry" when mix is not null => Localizer.Format("HistoryMonitorDry", mix),
@@ -186,7 +197,8 @@ public sealed class HistoryViewModel : ViewModelBase
            && node["kind"] is JsonValue kind && kind.TryGetValue(out string? kindText)
            ? new(step, kindText, node["label"] is JsonValue label && label.TryGetValue(out string? text) ? text : kindText,
                Text(node["channel"]), Text(node["mix"]), Text(node["group"]),
-               node["count"] is JsonValue count && count.TryGetValue(out int joined) && joined > 1 ? joined : 1)
+               node["count"] is JsonValue count && count.TryGetValue(out int joined) && joined > 1 ? joined : 1,
+               Text(node["insert"]))
            : null;
 
     private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue(out string? text) && text.Length > 0 ? text : null;

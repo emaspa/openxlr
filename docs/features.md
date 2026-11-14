@@ -782,14 +782,16 @@ See [Exclusive groups](manual.md#exclusive-groups).
 Ctrl+Z in the UI takes back the last change to a send level, a channel or
 mix volume, a send mute or a mix mute, a microphone's or a mix's EQ, noise
 removal, the voice changer, the compressor and expander, the software low
-cut and ClipGuard, the dry monitor or the ducking setup, and Ctrl+Shift+Z
-or Ctrl+Y puts it back. Two arrow buttons in the header do the same. Their
+cut and ClipGuard, the dry monitor, the ducking setup, or a plugin chain
+(a control, a bypass, a name, a plugin added, removed or moved), and
+Ctrl+Shift+Z or Ctrl+Y puts it back. Two arrow buttons in the header do the same. Their
 tooltips name the step, and after each one a note under them says what
 changed or what was left alone. The history lives in the daemon and every
 client shares it, so a fader moved on a Deck dial or over the API is
 undone the same way. A fader drag, a dial turn or a drag of EQ bands is
 one step, and an EQ that runs on the interface is written back to the
-interface. A Deck key undoes or redoes too, named after the step it would
+interface. A plugin that comes back gets its saved controls and name, not
+its internal state or a preset picked in its own editor. A Deck key undoes or redoes too, named after the step it would
 take. Undo never touches phantom power, a lock, the hardware mute or the
 monitoring pause, and it leaves alone a value something else moved since.
 Loading a profile, deleting a channel or mix, switching the mixing mode or

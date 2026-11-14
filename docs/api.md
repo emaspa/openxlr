@@ -1482,7 +1482,7 @@ in the UI, on a Deck key or over HTTP is a step in the same history, in the
 order the daemon received it, and the next `undo` takes it back whoever
 sent it.
 
-This version records two groups of commands. The first is send levels,
+This version records three groups of commands. The first is send levels,
 channel volumes, mix volumes, send mutes and mix mutes: `setLevel`,
 `setChannelVolume`, `setMixVolume`, `setChannelMuted`, `setMixMuted` and
 `cycleExclusiveGroup`. The second is the processing of microphones and
@@ -1496,9 +1496,13 @@ when it opened a monitor during a monitoring pause. A processing value is
 the whole setting: one channel's EQ with its switch and every band, one
 channel's noise removal, voice changer, compressor or expander, one mix's
 EQ or dry monitor switch, the low cut, ClipGuard, or the ducking setup
-without where it runs. The history does not record where processing runs
-(`setEqProcessing`, `setDynamicsProcessing`, `setDuckingProcessing`) or the
-maximizer (`setMixMaximizer`). Every other command leaves the history alone, with these exceptions, which
+without where it runs. The third is insert chains: `setInsertParam`,
+`setInsertBypass`, `setInserts` and `renameInsert`. Their value is the whole
+chain of one input or mix: each insert in order with its plugin, name,
+bypass, host and control values. The history does not record where
+processing runs (`setEqProcessing`, `setDynamicsProcessing`,
+`setDuckingProcessing`), whether an insert runs on its own block
+(`setInsertOwnBlock`) or the maximizer (`setMixMaximizer`). Every other command leaves the history alone, with these exceptions, which
 empty it once they succeed: `loadProfile`, a profile recalled on connect,
 `deleteChannel`, `deleteMix` (and `setWaveInterfaceEnabled` when it removes
 a unit's capture channels), `setMixing`, `setActiveDevice` and
@@ -1512,9 +1516,10 @@ the step is named in `history.undo` before it runs.
 Commands join steps by time. A recorded command joins the newest step from
 the same connection when it changes a value that step already holds and
 comes within one second of the step's last command, so a fader drag, a dial
-turn, a held key or a drag of EQ bands is one step. It also joins that step, whatever it
-changes, when it comes within 50 ms, so a Deck key that sends one command
-per mix is one step. HTTP requests count as one connection. A joined step
+turn, a held key, a drag of EQ bands or a drag of a plugin control is one
+step. It also joins that step, whatever it changes, when it comes within
+50 ms, so a Deck key that sends one command per mix, or a chain key that
+sends one `setInsertBypass` per insert, is one step. HTTP requests count as one connection. A joined step
 keeps the first value before and the last value after, and a step whose
 values end where they began is removed. `undo` and `redo` close the newest
 step, so the next command starts a new one. A new step empties the redo
@@ -1529,7 +1534,19 @@ was moved since, by the desktop, the unit or a profile recall, and is left
 alone. A value whose channel or mix is gone is left out. A processing value
 goes back through the same path as its command: an EQ that runs on the unit
 is posted to the unit, a compressor or expander that runs on the unit is
-written there, and a running stage takes the value live. Undo also leaves
+written there, and a running stage takes the value live. An insert chain
+compares whole. The changes a plugin's own editor makes are not steps, so a
+control the editor moved since makes that chain's older steps stale. A
+chain that keeps its structure (the same plugins in the same order, each
+with the same bypass and host) keeps its running plugins: a control goes
+back into them live and a name changes nothing that runs. A bypass, an
+added, removed or reordered plugin, or a change of host builds that chain
+again, as `setInsertBypass` and `setInserts` do, with a short gap on that
+input or mix. A plugin that comes back starts from its saved control values
+and its name. Nothing else of the plugin comes back: OpenXLR does not save a
+plugin's internal state, a preset or sample file chosen in its editor, or
+values the plugin changed without reporting them. An insert keeps the own
+block choice it has now; one that comes back takes the one it had. Undo also leaves
 out a value the mixer refuses, such as ClipGuard without its plugin or a
 mix's EQ while hardware mixing builds that mix. When something was
 skipped and the rest went through, the command succeeds, the step moves to
@@ -1562,7 +1579,8 @@ The state's `history`:
 | `note` | one sentence about the last `undo` or `redo` when it skipped something, null otherwise; the next change to the history clears it |
 
 A step carries `step`, its id for the `step` guard, `kind`, the ids it
-names, `count` and `label`. `count` is the number of things a burst joined
+names, `count` and `label`. An insert step names its chain by `channel`
+(an input) or `mix`, and the insert by `insert`, its id in that chain. `count` is the number of things a burst joined
 (the label then ends in "and 4 more"). `label` is one English phrase, built
 from the names at the time of the step. The kinds:
 
@@ -1584,6 +1602,10 @@ from the names at the time of the step. The kinds:
 | `clipGuard` | `channel` (`xlr1`) | `setSoftClipGuard` |
 | `monitorDry` | `mix` | `setMonitorDry` |
 | `ducking` | none | `setDucking` |
+| `insertParam` | `channel` or `mix`, `insert` | `setInsertParam` |
+| `insertBypass` | `channel` or `mix`, `insert` | `setInsertBypass` |
+| `insertName` | `channel` or `mix`, `insert` | `renameInsert` |
+| `insertChain` | `channel` or `mix` | `setInserts` |
 
 A client that shows a step sends its id as `step`, so a change from another
 client that got there first is refused rather than undone unseen. A script
