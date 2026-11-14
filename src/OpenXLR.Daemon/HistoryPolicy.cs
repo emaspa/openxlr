@@ -24,9 +24,13 @@ internal sealed record HistoryTarget(string Kind, string? Channel, string? Mix, 
 {
     /// <summary>The insert a step names in its chain, which is the channel's or the mix's.</summary>
     public string? Insert { get; init; }
+    /// <summary>A hardware step's control, by the name <c>set</c> takes.</summary>
+    public string? Control { get; init; }
+    /// <summary>The instance id of the additional interface a hardware step changed; null on the primary.</summary>
+    public string? Unit { get; init; }
 
     /// <summary>One string per thing a step changes, so a burst can say how many it joined.</summary>
-    public string Identity => $"{Kind}|{Channel}|{Mix}|{Group}|{Insert}";
+    public string Identity => $"{Kind}|{Channel}|{Mix}|{Group}|{Insert}|{Control}|{Unit}";
 }
 
 /// <summary>
@@ -53,6 +57,8 @@ internal static class HistoryPolicy
         "setNoiseRemoval", "setVoiceChanger", "setCompressor", "setExpander",
         "setLowCutHz", "setSoftClipGuard", "setMonitorDry", "setDucking",
         "setInsertBypass", "setInsertParam", "setInserts", "renameInsert",
+        // A control on DeviceHistory's list; phantom power, the mute and the locks are not.
+        "set", "setWaveControl",
     ];
 
     private static readonly string[] Barriers =
@@ -60,13 +66,14 @@ internal static class HistoryPolicy
         "loadProfile", "deleteChannel", "deleteMix", "setMixing", "setActiveDevice", "resetDevice",
     ];
 
-    // Everything else. Phantom power, the locks and the live switches
-    // (hardware mute, capture mute, the monitoring pause) stay here for good,
-    // and so does where processing runs (setEqProcessing,
-    // setDynamicsProcessing, setDuckingProcessing, and an insert's own
-    // block, setInsertOwnBlock), which is machine wiring;
-    // the hardware and layout commands until their milestones. The
-    // maximizer is a hardware mixing value and goes with the hardware. setWaveInterfaceEnabled is a barrier only through the
+    // Everything else. The locks and the live switches (capture mute, the
+    // monitoring pause) stay here for good, and so does where processing runs
+    // (setEqProcessing, setDynamicsProcessing, setDuckingProcessing, and an
+    // insert's own block, setInsertOwnBlock), which is machine wiring;
+    // phantom power, the hardware mute and the unit's locks reach set, which
+    // records only DeviceHistory's controls. The layout commands wait for
+    // their milestones. The maximizer belongs to hardware mixing, which the
+    // history leaves alone. setWaveInterfaceEnabled is a barrier only through the
     // deleteChannel it sends for a unit's capture channels.
     private static readonly string[] Ignored =
     [
@@ -77,7 +84,7 @@ internal static class HistoryPolicy
         "setPluginWineTrace", "installPlugin", "addWindowsPluginFolder", "removeWindowsPluginFolder", "getWindowsPluginFiles",
         "removeWindowsPluginInserts", "setWindowsPluginEnabled", "deleteWindowsPlugin", "syncWindowsPlugins",
         "addPluginSearchPath", "removePluginSearchPath", "rescanPlugins",
-        "setInputBinding", "setCaptureSource", "set",
+        "setInputBinding", "setCaptureSource",
         "createCaptureChannel", "createChannel", "renameChannel", "createMix", "renameMix", "setLayoutOrder",
         "setExclusiveGroup", "deleteExclusiveGroup", "setLayoutAppearance",
         "setCaptureGain", "setCaptureMuted", "setCaptureOwnClock", "toggleCaptureMuted",
@@ -92,7 +99,7 @@ internal static class HistoryPolicy
         "setEqProcessing", "setMixMaximizer", "setDynamicsProcessing", "watchDynamics", "setDuckingProcessing",
         "setSoundboard", "updateClip", "renameClipPage", "deleteClip", "setClipOrder", "playClip", "releaseClip",
         "stopClip", "stopClips", "auditionClip", "stopAudition",
-        "setWaveInterfaceEnabled", "setWaveControl",
+        "setWaveInterfaceEnabled",
         "listEqProfiles", "saveEqProfile", "renameEqProfile", "deleteEqProfile",
         "saveProfile", "deleteProfile", "setRecallOnConnect", "setLed", "recoverCapture",
         "setAudioClock", "restartAudioServices", "restartDaemon",
@@ -112,7 +119,7 @@ internal static class HistoryPolicy
     internal static readonly IReadOnlyList<string> Kinds =
         ["sendLevel", "channelVolume", "mixVolume", "sendMute", "mixMute", "exclusiveGroup",
             "eq", "mixEq", "noiseRemoval", "voiceChanger", "compressor", "expander", "lowCut", "clipGuard", "monitorDry", "ducking",
-            "insertParam", "insertBypass", "insertName", "insertChain"];
+            "insertParam", "insertBypass", "insertName", "insertChain", .. DeviceHistory.Kinds];
 
     /// <summary>
     /// What a recorded command changes, or null when it does not name its
@@ -219,7 +226,7 @@ internal static class HistoryPolicy
             "insertBypass" => $"{Insert()} bypass on {ChainName()}",
             "insertName" => $"{Insert()} name on {ChainName()}",
             "insertChain" => $"{ChainName()} inserts",
-            _ => target.Kind,
+            _ => DeviceHistory.LabelOf(target, layout) ?? target.Kind,
         };
     }
 

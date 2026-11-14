@@ -16,6 +16,8 @@ internal sealed class HistoryStep
     public string? Mix { get; init; }
     public string? Group { get; init; }
     public string? Insert { get; init; }
+    public string? Control { get; init; }
+    public string? Unit { get; init; }
     public required string Label { get; init; }
     /// <summary>The connection the step came from; HTTP requests count as one.</summary>
     public required string Client { get; init; }
@@ -24,13 +26,15 @@ internal sealed class HistoryStep
     /// <summary>The distinct things the step changed, for a burst's count.</summary>
     public HashSet<string> Targets { get; } = new(StringComparer.Ordinal);
     public List<SceneChange> Changes { get; set; } = [];
+    /// <summary>The hardware values the step changed, each bound to its unit.</summary>
+    public List<DeviceChange> DeviceChanges { get; set; } = [];
     /// <summary>The serialized size of <see cref="Changes"/>, counted against <see cref="MixHistory.MaxBytes"/>.</summary>
     public long Bytes { get; set; }
 
     public HistoryStepInfo Info()
     {
         string label = Targets.Count > 1 ? $"{Label} and {Targets.Count - 1} more" : Label;
-        return new(Id, Kind, Channel, Mix, Group, Math.Max(1, Targets.Count), label) { Insert = Insert };
+        return new(Id, Kind, Channel, Mix, Group, Math.Max(1, Targets.Count), label, Control, Unit) { Insert = Insert };
     }
 }
 
@@ -66,22 +70,27 @@ internal sealed class MixHistory
     internal Func<long> Clock { get; set; } = () => Environment.TickCount64;
 
     /// <summary>
-    /// Record what a command changed. Returns true when the history changed,
-    /// so the caller sends the state.
+    /// Record what a command changed: mixer values, and with
+    /// <paramref name="device"/> hardware values. Returns true when the
+    /// history changed, so the caller sends the state.
     /// </summary>
-    public bool Record(string client, HistoryTarget target, string label, IReadOnlyList<SceneChange> changes)
+    public bool Record(string client, HistoryTarget target, string label, IReadOnlyList<SceneChange> changes,
+        IReadOnlyList<DeviceChange>? device = null)
     {
-        if (changes.Count == 0) return false;
+        device ??= [];
+        if (changes.Count == 0 && device.Count == 0) return false;
         lock (_gate)
         {
             long now = Clock();
             _note = null;
             if (_open is { } open && _undo.Count > 0 && ReferenceEquals(_undo[^1], open) && open.Client == client
                 && (now - open.Last <= (long)JoinBurst.TotalMilliseconds
-                    || now - open.Last <= (long)JoinSameValue.TotalMilliseconds && changes.Any(c => open.Changes.Any(o => o.Key == c.Key))))
+                    || now - open.Last <= (long)JoinSameValue.TotalMilliseconds
+                    && (changes.Any(c => open.Changes.Any(o => o.Key == c.Key))
+                        || device.Any(d => open.DeviceChanges.Any(o => SameControl(o, d))))))
             {
-                Join(open, target, changes, now);
-                if (open.Changes.Count == 0)
+                Join(open, target, changes, device, now);
+                if (open.Changes.Count == 0 && open.DeviceChanges.Count == 0)
                 {
                     _undo.RemoveAt(_undo.Count - 1);
                     _open = null;
@@ -97,13 +106,16 @@ internal sealed class MixHistory
                 Mix = target.Mix,
                 Group = target.Group,
                 Insert = target.Insert,
+                Control = target.Control,
+                Unit = target.Unit,
                 Label = label,
                 Client = client,
                 Last = now,
                 Changes = [.. changes],
+                DeviceChanges = [.. device],
             };
             step.Targets.Add(target.Identity);
-            step.Bytes = SizeOf(step.Changes);
+            step.Bytes = SizeOf(step.Changes, step.DeviceChanges);
             _redo.Clear();
             _undo.Add(step);
             _open = step;
@@ -140,23 +152,32 @@ internal sealed class MixHistory
         }
     }
 
-    /// <summary>
-    /// An undo or redo of <paramref name="step"/> wrote <paramref name="done"/>:
-    /// the step moves to the other side holding only those values. With none,
-    /// the step is dropped. <paramref name="note"/> is the sentence the state
-    /// carries about what was skipped, or null. A step a barrier removed
-    /// meanwhile stays gone.
-    /// </summary>
-    public void Complete(HistoryStep step, bool redo, IReadOnlyList<SceneChange> done, string? note)
+    /// <summary>A copy of the hardware values a step <see cref="Begin"/> handed out holds.</summary>
+    public DeviceChange[] DeviceChangesOf(HistoryStep step)
     {
+        lock (_gate) return [.. step.DeviceChanges];
+    }
+
+    /// <summary>
+    /// An undo or redo of <paramref name="step"/> wrote <paramref name="done"/>
+    /// and <paramref name="doneDevice"/>: the step moves to the other side
+    /// holding only those values. With none, the step is dropped.
+    /// <paramref name="note"/> is the sentence the state carries about what
+    /// was skipped, or null. A step a barrier removed meanwhile stays gone.
+    /// </summary>
+    public void Complete(HistoryStep step, bool redo, IReadOnlyList<SceneChange> done, string? note,
+        IReadOnlyList<DeviceChange>? doneDevice = null)
+    {
+        doneDevice ??= [];
         lock (_gate)
         {
             _open = null;
             _note = note;
             List<HistoryStep> from = redo ? _redo : _undo;
-            if (!from.Remove(step) || done.Count == 0) return;
+            if (!from.Remove(step) || done.Count == 0 && doneDevice.Count == 0) return;
             step.Changes = [.. done];
-            step.Bytes = SizeOf(step.Changes);
+            step.DeviceChanges = [.. doneDevice];
+            step.Bytes = SizeOf(step.Changes, step.DeviceChanges);
             (redo ? _undo : _redo).Add(step);
             Trim();
         }
@@ -190,7 +211,8 @@ internal sealed class MixHistory
         get { lock (_gate) return _undo.Sum(s => s.Bytes) + _redo.Sum(s => s.Bytes); }
     }
 
-    private static void Join(HistoryStep step, HistoryTarget target, IReadOnlyList<SceneChange> changes, long now)
+    private static void Join(HistoryStep step, HistoryTarget target, IReadOnlyList<SceneChange> changes,
+        IReadOnlyList<DeviceChange> device, long now)
     {
         step.Last = now;
         step.Targets.Add(target.Identity);
@@ -201,8 +223,17 @@ internal sealed class MixHistory
             else step.Changes[index] = step.Changes[index] with { After = change.After };
         }
         step.Changes.RemoveAll(c => SceneValues.Same(c.Before, c.After));
-        step.Bytes = SizeOf(step.Changes);
+        foreach (DeviceChange change in device)
+        {
+            int index = step.DeviceChanges.FindIndex(c => SameControl(c, change));
+            if (index < 0) step.DeviceChanges.Add(change);
+            else step.DeviceChanges[index] = step.DeviceChanges[index] with { After = change.After };
+        }
+        step.DeviceChanges.RemoveAll(c => Equals(c.Before, c.After));
+        step.Bytes = SizeOf(step.Changes, step.DeviceChanges);
     }
+
+    private static bool SameControl(DeviceChange a, DeviceChange b) => a.Unit == b.Unit && a.Control == b.Control;
 
     // Oldest first. A new step clears redo, so the undo side is where the
     // old steps are; the newest step stays even when it alone is over the
@@ -220,9 +251,12 @@ internal sealed class MixHistory
         }
     }
 
-    private static long SizeOf(IReadOnlyList<SceneChange> changes)
+    private static long SizeOf(IReadOnlyList<SceneChange> changes, IReadOnlyList<DeviceChange> device)
     {
         long bytes = 0;
+        foreach (DeviceChange change in device)
+            bytes += Encoding.UTF8.GetByteCount(change.Unit) + Encoding.UTF8.GetByteCount(change.UnitName)
+                + Encoding.UTF8.GetByteCount(change.Control) + 32;
         foreach (SceneChange change in changes)
             bytes += Encoding.UTF8.GetByteCount(change.Key.Key) + 16
                 + JsonSerializer.SerializeToUtf8Bytes(change.Before).Length

@@ -2349,6 +2349,30 @@
   <data name="HistoryClipGuard" xml:space="preserve">
     <value>ClipGuard за {0}</value>
   </data>
+  <data name="HistoryUnitGain" xml:space="preserve">
+    <value>појачање за {0}</value>
+  </data>
+  <data name="HistoryVoiceTune" xml:space="preserve">
+    <value>Voice Tune за {0}</value>
+  </data>
+  <data name="HistoryHeadphones" xml:space="preserve">
+    <value>јачина слушалица</value>
+  </data>
+  <data name="HistoryHeadphones2" xml:space="preserve">
+    <value>јачина слушалица 2</value>
+  </data>
+  <data name="HistoryCrossfade" xml:space="preserve">
+    <value>мешавина мик/PC</value>
+  </data>
+  <data name="HistoryLowImpedance" xml:space="preserve">
+    <value>импеданса слушалица</value>
+  </data>
+  <data name="HistoryAuxLevel" xml:space="preserve">
+    <value>ниво за USB Aux</value>
+  </data>
+  <data name="HistoryLineInGain" xml:space="preserve">
+    <value>појачање за Line In</value>
+  </data>
   <data name="HistoryMonitorDry" xml:space="preserve">
     <value>суви монитор у {0}</value>
   </data>

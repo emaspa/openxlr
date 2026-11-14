@@ -260,7 +260,7 @@ that final acknowledgement (or an `error` without a request id):
 | Command | Fields | Purpose |
 |---|---|---|
 | `getState` | none | request a state push |
-| `set` | `control`, `value` | hardware control (`gain`, `mute`, `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `phantom`, `clipGuard`, `compressor`, their `…2` variants for XLR 2, `hpVolumeDb`, `hp2VolumeDb`, `lowImpedance`, `crossfade`, `auxLevelDb`, `auxLevelLock`, `lineInGain`, `lineInLevelLock`, `outHp1`, `outHp2`, `outUsbAux`, `outLineOut`), the software `gainLock`, and `rawCapture`, `rawCapture2` and `lineInRawCapture`, booleans the daemon holds per unit (see [raw capture](#raw-capture)). On a model with `hardwareGainLock`, `gainLock` also sets or clears the unit's own lock first, and an error writing it leaves both locks as they were. `lineInLevelLock` is a boolean, and a saved state from before it existed leaves the lock as it is. `lineInGain` is the Line In's gain, an integer in dB held to 0 to `lineInGainMaxDb`, as is a saved state's gain on recall; the gain lock does not cover it, and the daemon logs each write with the value the unit reads back. A control the active device's capabilities do not advertise is refused with an error, as is an XLR Dock control the card lacks while the USB handle is closed. While the mixer runs a unit's [compressor and expander](#where-the-compressor-and-expander-run), `compressor`, `expander` and their `2` variants are left out of its capabilities and refused: they are the microphone's, set through `setCompressor` and `setExpander`. A recalled profile's values for them are skipped then |
+| `set` | `control`, `value` | hardware control (`gain`, `mute`, `lowCut`, `expander`, `voiceTune`, `voiceTuneStrength`, `phantom`, `clipGuard`, `compressor`, their `…2` variants for XLR 2, `hpVolumeDb`, `hp2VolumeDb`, `lowImpedance`, `crossfade`, `auxLevelDb`, `auxLevelLock`, `lineInGain`, `lineInLevelLock`, `outHp1`, `outHp2`, `outUsbAux`, `outLineOut`), the software `gainLock`, and `rawCapture`, `rawCapture2` and `lineInRawCapture`, booleans the daemon holds per unit (see [raw capture](#raw-capture)). On a model with `hardwareGainLock`, `gainLock` also sets or clears the unit's own lock first, and an error writing it leaves both locks as they were. `lineInLevelLock` is a boolean, and a saved state from before it existed leaves the lock as it is. `lineInGain` is the Line In's gain, an integer in dB held to 0 to `lineInGainMaxDb`, as is a saved state's gain on recall; the gain lock does not cover it, and the daemon logs each write with the value the unit reads back. A control the active device's capabilities do not advertise is refused with an error, as is an XLR Dock control the card lacks while the USB handle is closed. While the mixer runs a unit's [compressor and expander](#where-the-compressor-and-expander-run), `compressor`, `expander` and their `2` variants are left out of its capabilities and refused: they are the microphone's, set through `setCompressor` and `setExpander`. A recalled profile's values for them are skipped then. A control on the [undo list](#the-units-own-controls) that the unit reads back changed becomes an undo step; phantom power, the mutes, the locks, the output selectors and raw capture never do |
 | `setLowCutHz` | `value` | software low cut: 0, 80, or 120 |
 | `setSoftClipGuard` | `value` | software ClipGuard (post-ADC limiter at -3 dB); enabling is rejected if `swh-plugins` is unavailable, without replacing or disconnecting the live microphone route |
 | `setMixLatencyCompensation` | `value` | boolean; delay the other mixes to line up with the mix whose inserts take longest (see [plugin latency](#plugin-latency)). Off by default. Either way every insert chain is rebuilt, which briefly interrupts audio |
@@ -379,7 +379,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setEnforcedDefaults` | `sink`, `source` | system defaults to hold; `sink: "@monitor"` follows the first selected monitor output |
 | `setActiveDevice` | `device` | switch to another attached interface: one unit by its instance id from `detected`, or the first unit of a model by `vvvv:pppp`. The one command that moves the primary; it wins over `OPENXLR_DEVICE`. The daemon keeps the chosen unit's id in `~/.config/openxlr/active-device.json` and drives that unit again after a restart, waiting up to 10 seconds for it to enumerate before another unit stands in. A stand-in, the model `OPENXLR_DEVICE` names or else the first attached unit, hands the role back once the chosen unit is attached |
 | `setWaveInterfaceEnabled` | `device`, `value`, optional `keepChannels` | drive an attached unit, by its instance id from `waveInterfaces`, as an additional interface (`true`) or stop driving it (`false`); at most four. Refused for a unit that is not attached, and for a Wave XLR Pro whose capture node name another attached unit shares. Enabling creates no mixer channel; disabling deletes the unit's capture channels and their chains as `deleteChannel` does, unless `keepChannels` is true. Absent or false keeps deletion; any other type is refused. Channels are found by their saved `captureUnit`, even while unplugged, or by `captureHint` and `captureModelHint` for older entries without a unit. Shared model fragments alone never select another unit's channels. Kept channels retain their binding, sends and chains, and stay silent while the source is missing. Neither value changes the primary, and a unit enabled here is never driven as the primary in place of an absent one; only `setActiveDevice` makes it the primary. See [additional interface state](#additional-interface-state) |
-| `setWaveControl` | `device`, `control`, `value` | the `set` command for one unit by instance id: an additional interface, or the primary when `device` is the primary's id. Same control names, capabilities, gain lock and phantom settling as `set`; an error for a unit that is not driven |
+| `setWaveControl` | `device`, `control`, `value` | the `set` command for one unit by instance id: an additional interface, or the primary when `device` is the primary's id. Same control names, capabilities, gain lock, phantom settling and undo steps as `set`, each step bound to that unit; an error for a unit that is not driven |
 | `saveProfile` / `loadProfile` / `deleteProfile` | `name` | named scenes, scoped to the connected interface, or to `generic` while none is connected (see below); loading restores saved gain even while locked and leaves the lock enabled |
 | `setRecallOnConnect` | `name` | the profile recalled whenever the active device connects fresh (daemon start, replug, switch to it); empty clears it. With none chosen, a device whose capabilities say `retainsSettings: false` gets the last settings the daemon saw on it instead. Refused while no interface is connected |
 | `setDucking` | `value` | change the [ducking](#ducking) setup: an object with any of `enabled`, `keys` (or `key`, one key, as older clients send it), `channels`, `mixes`, `sensitivity`, `amount`, `speed`; the fields it leaves out keep their values and an unknown one is refused. Saved in `mixer.json` before it applies. Needs the software mixer, on any device or none |
@@ -1482,7 +1482,8 @@ in the UI, on a Deck key or over HTTP is a step in the same history, in the
 order the daemon received it, and the next `undo` takes it back whoever
 sent it.
 
-This version records three groups of commands. The first is send levels,
+This version records three groups of mixer commands, and the unit's own
+controls described [below](#the-units-own-controls). The first is send levels,
 channel volumes, mix volumes, send mutes and mix mutes: `setLevel`,
 `setChannelVolume`, `setMixVolume`, `setChannelMuted`, `setMixMuted` and
 `cycleExclusiveGroup`. The second is the processing of microphones and
@@ -1558,6 +1559,69 @@ audio server, keeps the step and answers with its sentence. Other answers
 are `undo: nothing to undo` and, when `step` names another step than the
 newest, `undo: the history changed` (`redo:` for `redo`). Undo and redo send
 the state after a refusal, as the mixer commands do.
+
+#### The unit's own controls
+
+`set` and `setWaveControl` record a step for these controls: `gain`,
+`lowCut`, `clipGuard`, `expander`, `compressor`, `voiceTune` and
+`voiceTuneStrength` with their `2` variants for XLR 2, `hpVolumeDb`,
+`hp2VolumeDb`, `crossfade`, `lowImpedance`, `auxLevelDb` and `lineInGain`.
+A step holds the one control the command named, as the daemon last read it
+before the write and as the unit reads it back after, so a value the unit
+rounds is held as the unit has it. Moves of one control join under the
+rules above, so a gain slider dragged in the UI or a Deck dial turned on
+the headphone level is one step. The history never records any other control:
+`phantom` and `phantom2`, `mute` and `mute2`, `gainLock`, `auxLevelLock`,
+`lineInLevelLock`, the Pro's output selectors and raw capture.
+
+A change made on the unit itself, with its dial or buttons, is not a step.
+The daemon sees it only as a difference in its next poll and cannot tell a
+hand on the dial from the firmware, which on the Wave XLR Pro mutes an
+input by itself around a phantom power change. Such a change still makes
+an older step on that control stale: before writing, undo reads the unit
+and leaves alone a value other than the one the step left.
+
+The rules for a hardware step:
+
+- Phantom power is never written. The recorder drops `phantom` and
+  `phantom2`, and the daemon writes a step's hardware values only for the
+  controls listed above, so a step naming any other control writes nothing.
+- A locked gain does not move. The daemon leaves `gain` and `gain2` alone
+  while the gain lock is on, and while the unit reads its own gain lock on
+  (`unitGainLock`).
+- The level locks hold. The daemon leaves `auxLevelDb` alone while
+  `auxLevelLock` is on, and `lineInGain` while `lineInLevelLock` is on,
+  although `set` writes both under their locks.
+- No step changes a lock.
+- A step is bound to its unit by instance id. The daemon writes its values
+  only while it drives that unit, as the primary or as an additional
+  interface, and it checks the unit and writes under that unit's device
+  lock, so a unit switched or replugged meanwhile cannot get another unit's
+  values. With the unit absent, or another unit in its place, the daemon
+  drops the step and the answer names the unit, such as `undo: XLR 1 gain
+  was skipped: Elgato Wave XLR Pro is not connected`. The same unit plugged
+  back with the values the step left takes the step.
+
+The reasons a hardware value is skipped are `it is locked` and
+`<unit> is not connected`, beside `it changed since` and `it could not be
+written`. A hardware step carries `control`, the name `set` takes. On the
+primary interface, a control of one XLR input also names its channel,
+`xlr1` or `xlr2`; on an additional interface the step names the unit in
+`unit`, its instance id, and its label starts with the unit's name.
+
+| kind | ids | controls |
+|---|---|---|
+| `unitGain` | `control`, `channel` or `unit` | `gain`, `gain2` |
+| `unitLowCut` | `control`, `channel` or `unit` | `lowCut`, `lowCut2` |
+| `unitClipGuard` | `control`, `channel` or `unit` | `clipGuard`, `clipGuard2` |
+| `unitExpander` | `control`, `channel` or `unit` | `expander`, `expander2` |
+| `unitCompressor` | `control`, `channel` or `unit` | `compressor`, `compressor2` |
+| `unitVoiceTune` | `control`, `channel` or `unit` | `voiceTune`, `voiceTuneStrength` and their `2` variants |
+| `unitHeadphones` | `control`, `unit` on an additional interface | `hpVolumeDb`, `hp2VolumeDb` |
+| `unitCrossfade` | `control`, `unit` on an additional interface | `crossfade` |
+| `unitLowImpedance` | `control`, `unit` on an additional interface | `lowImpedance` |
+| `unitAuxLevel` | `control`, `unit` on an additional interface | `auxLevelDb` |
+| `unitLineInGain` | `control`, `unit` on an additional interface | `lineInGain` |
 
 The state's `history`:
 

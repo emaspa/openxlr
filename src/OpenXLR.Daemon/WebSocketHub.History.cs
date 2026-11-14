@@ -3,8 +3,8 @@ using OpenXLR.Core.Mixing;
 namespace OpenXLR.Daemon;
 
 /// <summary>
-/// The undo history's side of the hub: recording around the mixer commands,
-/// the barriers, and <c>undo</c> and <c>redo</c>. A failure while recording
+/// The undo history's side of the hub: recording around the mixer commands
+/// and the hardware controls, the barriers, and <c>undo</c> and <c>redo</c>. A failure while recording
 /// is logged and never fails the command it wraps.
 /// </summary>
 public sealed partial class WebSocketHub
@@ -69,11 +69,38 @@ public sealed partial class WebSocketHub
     }
 
     /// <summary>
+    /// Run a <c>set</c> or <c>setWaveControl</c> through the device manager's
+    /// recording write. A control on <see cref="DeviceHistory"/>'s list that
+    /// the unit reads back changed becomes a step bound to that unit; any
+    /// other control, phantom power, the mute and the locks among them, costs
+    /// nothing more. <paramref name="client"/> is the WebSocket the command
+    /// came on, null over HTTP.
+    /// </summary>
+    private string? ApplyDevice(string control, Guid? client, Func<DeviceWrite> write)
+    {
+        DeviceWrite done = write();
+        if (done.Error is not null) return done.Error;
+        try
+        {
+            if (DeviceHistory.ChangeOf(done, control) is { } change)
+            {
+                HistoryTarget target = DeviceHistory.TargetOf(change, done.Additional);
+                string label = DeviceHistory.LabelOf(target, _mixer.LayoutConfig, done.Additional ? change.UnitName : null) ?? target.Kind;
+                if (History.Record(client?.ToString("N") ?? "http", target, label, [], [change])) _stateBroadcasts.Signal();
+            }
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "history: could not record set {control}", control); }
+        return null;
+    }
+
+    /// <summary>
     /// <c>undo</c> or <c>redo</c>, after <see cref="CommandValidation.CheckHistory"/>
     /// and under the install gate. Each value is written only where it is
     /// still what the step left; one moved since is skipped and named in
-    /// <c>history.note</c>. A step that wrote nothing is dropped with an
-    /// error. Only a mixer that cannot act at all keeps the step. Null on
+    /// <c>history.note</c>. A hardware value goes only to the unit it was
+    /// taken from, and not at all while that unit is absent or a lock holds
+    /// it. A step that wrote nothing is dropped with an error. Only a mixer
+    /// that cannot act at all keeps a step that holds mixer values. Null on
     /// success.
     /// </summary>
     private string? ApplyHistory(Command cmd)
@@ -83,14 +110,21 @@ public sealed partial class WebSocketHub
         if (History.Begin(redo) is not { } begun) return $"{verb}: nothing to {verb}";
         (HistoryStep step, SceneChange[] changes, string label) = begun;
         if (CommandValidation.HistoryStep(cmd) is long id && id != step.Id) return $"{verb}: the history changed";
+        DeviceChange[] device = History.DeviceChangesOf(step);
 
-        ScenePatchEntry[] entries = [.. changes.Select(c => redo
-            ? new ScenePatchEntry(c.Key, c.Before, c.After)
-            : new ScenePatchEntry(c.Key, c.After, c.Before))];
-        if (_mixer.ApplyScenePatch(entries) is not { } outcomes) return $"{verb}: {_mixer.NotBuiltError}";
+        IReadOnlyList<ScenePatchOutcome> outcomes = [];
+        if (changes.Length > 0)
+        {
+            ScenePatchEntry[] entries = [.. changes.Select(c => redo
+                ? new ScenePatchEntry(c.Key, c.Before, c.After)
+                : new ScenePatchEntry(c.Key, c.After, c.Before))];
+            if (_mixer.ApplyScenePatch(entries) is not { } written) return $"{verb}: {_mixer.NotBuiltError}";
+            outcomes = written;
+        }
 
         var done = new List<SceneChange>();
-        int changed = 0, gone = 0, failed = 0;
+        int changed = 0, gone = 0, failed = 0, locked = 0;
+        string? absent = null;
         for (int i = 0; i < outcomes.Count; i++)
         {
             switch (outcomes[i])
@@ -101,12 +135,51 @@ public sealed partial class WebSocketHub
                 default: failed++; break;
             }
         }
+        var doneDevice = new List<DeviceChange>();
+        IReadOnlyList<DevicePatchOutcome> deviceOutcomes = ApplyDevicePatch(device, redo);
+        for (int i = 0; i < device.Length; i++)
+        {
+            switch (deviceOutcomes[i])
+            {
+                case DevicePatchOutcome.Applied or DevicePatchOutcome.AlreadyThere: doneDevice.Add(device[i]); break;
+                case DevicePatchOutcome.Changed: changed++; break;
+                case DevicePatchOutcome.Locked: locked++; break;
+                case DevicePatchOutcome.Gone: absent ??= device[i].UnitName; break;
+                default: failed++; break;
+            }
+        }
         string? reason = changed > 0 ? "it changed since"
+            : locked > 0 ? "it is locked"
+            : absent is not null ? $"{absent} is not connected"
             : gone > 0 ? "its channel or mix no longer exists"
             : failed > 0 ? "it could not be written" : null;
+        bool any = done.Count > 0 || doneDevice.Count > 0;
         string? note = reason is null ? null : $"{char.ToUpperInvariant(verb[0])}{verb[1..]} skipped part of {label}: {reason}.";
-        History.Complete(step, redo, done, done.Count > 0 ? note : null);
+        History.Complete(step, redo, done, any ? note : null, doneDevice);
         _stateBroadcasts.Signal();
-        return done.Count > 0 ? null : $"{verb}: {label} was skipped: {reason}";
+        return any ? null : $"{verb}: {label} was skipped: {reason}";
+    }
+
+    /// <summary>
+    /// Write a step's hardware values, each group to the manager that drives
+    /// its unit now: the primary's, or an additional interface's. A unit no
+    /// manager drives gets nothing, and the manager checks again under its
+    /// own lock, so a unit switched or replugged meanwhile cannot receive
+    /// another unit's values.
+    /// </summary>
+    private DevicePatchOutcome[] ApplyDevicePatch(DeviceChange[] changes, bool redo)
+    {
+        var outcomes = new DevicePatchOutcome[changes.Length];
+        foreach (IGrouping<string, int> unit in Enumerable.Range(0, changes.Length).GroupBy(i => changes[i].Unit, StringComparer.Ordinal))
+        {
+            int[] indices = [.. unit];
+            DevicePatchEntry[] entries = [.. indices.Select(i => redo
+                ? new DevicePatchEntry(changes[i].Control, changes[i].Before, changes[i].After)
+                : new DevicePatchEntry(changes[i].Control, changes[i].After, changes[i].Before))];
+            DeviceManager? manager = _devices.ActiveInfo?.InstanceId == unit.Key ? _devices : _waveInterfaces?.Session(unit.Key);
+            IReadOnlyList<DevicePatchOutcome>? written = manager?.ApplyPatch(unit.Key, entries);
+            for (int j = 0; j < indices.Length; j++) outcomes[indices[j]] = written?[j] ?? DevicePatchOutcome.Gone;
+        }
+        return outcomes;
     }
 }

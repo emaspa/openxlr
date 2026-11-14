@@ -259,15 +259,18 @@ public sealed class WaveInterfaces : BackgroundService
             && (c.Binding.Unit is { } id ? id == unit : fragments.Any(f => source.Contains(f, StringComparison.OrdinalIgnoreCase))))
             .Select(c => c.Id)];
 
-    public string? Apply(string id, string control, JsonElement value)
+    public string? Apply(string id, string control, JsonElement value) => ApplyRecorded(id, control, value).Error;
+
+    /// <summary><see cref="Apply"/> for the undo history: what the unit's manager wrote, or the error.</summary>
+    internal DeviceWrite ApplyRecorded(string id, string control, JsonElement value)
     {
-        if (!ValidId(id)) return "setWaveControl: not an instance id";
+        if (!ValidId(id)) return new("setWaveControl: not an instance id");
         // The primary reserves its unit before opening it. A late command for
         // the unit's additional role must not reopen it or reach another unit.
         if (id == Volatile.Read(ref _reserved)) return _primary.ActiveInfo?.InstanceId == id
-            ? _primary.Apply(control, value) : "setWaveControl: the primary interface is reconnecting";
-        if (!_sessions.TryGetValue(id, out var session)) return "setWaveControl: enable this attached interface first";
-        return session.Apply(control, value);
+            ? _primary.ApplyRecorded(control, value) : new("setWaveControl: the primary interface is reconnecting");
+        if (!_sessions.TryGetValue(id, out var session)) return new("setWaveControl: enable this attached interface first");
+        return session.ApplyRecorded(control, value);
     }
 
     public Dictionary<string, DeviceState> CaptureProfile()

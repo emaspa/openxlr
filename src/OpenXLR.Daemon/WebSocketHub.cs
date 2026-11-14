@@ -441,7 +441,9 @@ public sealed partial class WebSocketHub
                 if (error is null) await reply(new MixingPlanMessage(_mixer.DryRunMixing(cmd.Value.GetString()!)));
                 break;
             case "set":
-                error = cmd.Control is null ? "set: missing 'control'" : _devices.Apply(cmd.Control, cmd.Value);  // broadcasts on success
+                // Broadcasts on success; a control on DeviceHistory's list records an undo step.
+                error = cmd.Control is null ? "set: missing 'control'"
+                    : ApplyDevice(cmd.Control, browserOwner, () => _devices.ApplyRecorded(cmd.Control, cmd.Value));
                 break;
             case "createCaptureChannel":
             case "createChannel":
@@ -555,7 +557,8 @@ public sealed partial class WebSocketHub
             }
             case "setWaveControl":
                 error = CommandValidation.CheckWave(cmd)
-                    ?? (_waveInterfaces is null ? "additional interfaces are not available" : _waveInterfaces.Apply(cmd.Device!, cmd.Control!, cmd.Value));
+                    ?? (_waveInterfaces is null ? "additional interfaces are not available"
+                        : ApplyDevice(cmd.Control!, browserOwner, () => _waveInterfaces.ApplyRecorded(cmd.Device!, cmd.Control!, cmd.Value)));
                 break;
             case "listEqProfiles":
             {

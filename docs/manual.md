@@ -428,6 +428,11 @@ Undo covers these changes for now:
 - a send level, a channel volume and a mix volume;
 - a send mute and a mix mute, including the sends an exclusive group closed
   when you opened another member, which come back with the undo;
+- the interface's own controls when you set them in OpenXLR: the gain, the
+  headphone levels, the Mic ↔ PC blend, low cut, ClipGuard, the expander and
+  compressor, Voice Tune, Low Imp., the USB Aux level and the Line In gain,
+  on the primary interface and on an additional one (see
+  [Undo on the interface](#undo-on-the-interface));
 - a microphone's or a capture input's EQ, a mix's EQ, and an EQ profile you
   loaded onto either;
 - a microphone's noise removal, voice changer, compressor and expander;
@@ -467,8 +472,8 @@ daemon starts.
 
 Some things are never undone. Phantom power, the gain and level locks, the
 microphone mute on the unit or a Deck key, a capture input's mute and the
-monitoring pause stay as they are however far back you go. Hardware
-controls, routing and layout edits are not covered yet.
+monitoring pause stay as they are however far back you go. Routing and
+layout edits are not covered yet.
 Loading a profile, a profile recalled when the interface connects,
 deleting a channel or a mix, switching between software and hardware
 mixing, and switching to another interface empty the history: nothing
@@ -481,6 +486,31 @@ back is dropped, so the next Ctrl+Z takes the one before it.
 
 On a Stream Deck, a Toggle key set to undo or redo names the step it would
 take and does the same; see [Stream Deck](#stream-deck).
+
+<a name="undo-on-the-interface"></a>
+#### Undo on the interface
+
+Undo on the interface's own controls follows these rules, so it cannot
+catch you out on a live microphone:
+
+- Undo never switches phantom power on or off. Switching it is not a step,
+  and no step can write it.
+- Undo never moves a locked gain. While the gain lock is on, in OpenXLR or
+  on the unit itself, undo leaves a gain step alone and the note says the
+  gain is locked. Undo never unlocks anything.
+- The level locks work the same way. With the USB Aux level lock or the
+  Line In level lock on, undo leaves that level alone.
+- A step belongs to the interface you made it on. If that interface is
+  unplugged, or OpenXLR drives another interface in its place, undo drops
+  the step and the note names the interface. Plug the same interface back
+  in with its values as you left them and the step works again.
+- Turning a knob or pressing a button on the interface is not a step.
+  Turn the gain dial after changing the gain in OpenXLR, and undo leaves
+  the dial's value alone.
+- The microphone mute on the unit stays out of the history.
+
+A gain slider dragged in the UI or a headphone level turned on a Deck dial
+is one step, like a fader drag.
 
 <a name="mic-to-call"></a>
 ### 3.1 Send your microphone to a call or a recording
