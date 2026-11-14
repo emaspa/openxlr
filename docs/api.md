@@ -1482,13 +1482,23 @@ in the UI, on a Deck key or over HTTP is a step in the same history, in the
 order the daemon received it, and the next `undo` takes it back whoever
 sent it.
 
-This version records send levels, channel volumes, mix volumes, send mutes
-and mix mutes: `setLevel`, `setChannelVolume`, `setMixVolume`,
-`setChannelMuted`, `setMixMuted` and `cycleExclusiveGroup`. A step holds
-each value the command changed, before and after, including the sends an
-exclusive group closed when a member opened, and the other monitor mixes a
-`setMixMuted` muted when it opened a monitor during a monitoring pause.
-Every other command leaves the history alone, with these exceptions, which
+This version records two groups of commands. The first is send levels,
+channel volumes, mix volumes, send mutes and mix mutes: `setLevel`,
+`setChannelVolume`, `setMixVolume`, `setChannelMuted`, `setMixMuted` and
+`cycleExclusiveGroup`. The second is the processing of microphones and
+mixes: `setEq`, `setEqEnabled`, `setEqBand` and `loadEqProfile` on a
+microphone, a capture input or a mix, `setNoiseRemoval`, `setVoiceChanger`,
+`setCompressor`, `setExpander`, `setLowCutHz`, `setSoftClipGuard`,
+`setMonitorDry` and `setDucking`. A step holds each value the command
+changed, before and after, including the sends an exclusive group closed
+when a member opened, and the other monitor mixes a `setMixMuted` muted
+when it opened a monitor during a monitoring pause. A processing value is
+the whole setting: one channel's EQ with its switch and every band, one
+channel's noise removal, voice changer, compressor or expander, one mix's
+EQ or dry monitor switch, the low cut, ClipGuard, or the ducking setup
+without where it runs. The history does not record where processing runs
+(`setEqProcessing`, `setDynamicsProcessing`, `setDuckingProcessing`) or the
+maximizer (`setMixMaximizer`). Every other command leaves the history alone, with these exceptions, which
 empty it once they succeed: `loadProfile`, a profile recalled on connect,
 `deleteChannel`, `deleteMix` (and `setWaveInterfaceEnabled` when it removes
 a unit's capture channels), `setMixing`, `setActiveDevice` and
@@ -1502,7 +1512,7 @@ the step is named in `history.undo` before it runs.
 Commands join steps by time. A recorded command joins the newest step from
 the same connection when it changes a value that step already holds and
 comes within one second of the step's last command, so a fader drag, a dial
-turn or a held key is one step. It also joins that step, whatever it
+turn, a held key or a drag of EQ bands is one step. It also joins that step, whatever it
 changes, when it comes within 50 ms, so a Deck key that sends one command
 per mix is one step. HTTP requests count as one connection. A joined step
 keeps the first value before and the last value after, and a step whose
@@ -1516,7 +1526,12 @@ compares what the mixer has now with what the step left: the value after
 for `undo`, before for `redo`. A value that matches is written. A value
 already at the target counts as done and is not written. Any other value
 was moved since, by the desktop, the unit or a profile recall, and is left
-alone. A value whose channel or mix is gone is left out. When something was
+alone. A value whose channel or mix is gone is left out. A processing value
+goes back through the same path as its command: an EQ that runs on the unit
+is posted to the unit, a compressor or expander that runs on the unit is
+written there, and a running stage takes the value live. Undo also leaves
+out a value the mixer refuses, such as ClipGuard without its plugin or a
+mix's EQ while hardware mixing builds that mix. When something was
 skipped and the rest went through, the command succeeds, the step moves to
 the other side holding only what was done, and `history.note` says what was
 skipped in one sentence. When nothing went through, the step is dropped and
@@ -1559,6 +1574,16 @@ from the names at the time of the step. The kinds:
 | `sendMute` | `channel`, `mix` | `setChannelMuted` |
 | `mixMute` | `mix` | `setMixMuted` |
 | `exclusiveGroup` | `group` | `cycleExclusiveGroup` |
+| `eq` | `channel` | `setEq`, `setEqEnabled`, `setEqBand` and `loadEqProfile` on a microphone or capture input |
+| `mixEq` | `mix` | `setEq`, `setEqEnabled`, `setEqBand` and `loadEqProfile` with `mix` |
+| `noiseRemoval` | `channel` | `setNoiseRemoval` |
+| `voiceChanger` | `channel` | `setVoiceChanger` |
+| `compressor` | `channel` | `setCompressor` |
+| `expander` | `channel` | `setExpander` |
+| `lowCut` | `channel` (`xlr1`) | `setLowCutHz` |
+| `clipGuard` | `channel` (`xlr1`) | `setSoftClipGuard` |
+| `monitorDry` | `mix` | `setMonitorDry` |
+| `ducking` | none | `setDucking` |
 
 A client that shows a step sends its id as `step`, so a change from another
 client that got there first is refused rather than undone unseen. A script

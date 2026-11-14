@@ -419,7 +419,19 @@ Undo covers these changes for now:
 
 - a send level, a channel volume and a mix volume;
 - a send mute and a mix mute, including the sends an exclusive group closed
-  when you opened another member, which come back with the undo.
+  when you opened another member, which come back with the undo;
+- a microphone's or a capture input's EQ, a mix's EQ, and an EQ profile you
+  loaded onto either;
+- a microphone's noise removal, voice changer, compressor and expander;
+- the software low cut and ClipGuard on XLR 1, a monitor mix's dry
+  monitor switch, and the ducking setup.
+
+Undo puts back an EQ, an effect or the ducking setup whole. Undoing a
+change to one band puts back the EQ as it was before, every band and the
+on switch with it. A drag across several bands or a turn of a compressor
+knob is one step, like a fader drag. An EQ or a compressor that runs on
+the interface goes back to the interface. Undo leaves alone where each one
+runs, on the interface or on this computer, and the Pro's maximizer.
 
 The history belongs to the daemon, not to the UI. A move on a Deck dial,
 in the terminal mixer or over the API is a step in the same history, so
@@ -430,8 +442,8 @@ daemon starts.
 
 Some things are never undone. Phantom power, the gain and level locks, the
 microphone mute on the unit or a Deck key, a capture input's mute and the
-monitoring pause stay as they are however far back you go. EQ, effects,
-inserts, hardware controls, routing and layout edits are not covered yet.
+monitoring pause stay as they are however far back you go. Inserts,
+hardware controls, routing and layout edits are not covered yet.
 Loading a profile, a profile recalled when the interface connects,
 deleting a channel or a mix, switching between software and hardware
 mixing, and switching to another interface empty the history: nothing

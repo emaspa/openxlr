@@ -1,10 +1,11 @@
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>
-/// The mixer values an undo step can carry. The first version covers sends,
-/// volumes and mutes; a later field is added here, read in
-/// <see cref="Mixer.ReadSceneValues"/> and written in
-/// <see cref="Mixer.ApplyScenePatch"/>.
+/// The mixer values an undo step can carry: sends, volumes and mutes, and
+/// the processing of microphones and mixes. A later field is added here,
+/// read in <see cref="Mixer.ReadSceneValues"/> and written in
+/// <see cref="Mixer.ApplyScenePatch"/>. A processing field holds a whole
+/// setting, so one EQ is one value however many bands a drag moved.
 /// </summary>
 public enum SceneField
 {
@@ -18,6 +19,36 @@ public enum SceneField
     ChannelMuted,
     /// <summary>A mix mute, keyed by mix id; a boolean.</summary>
     MixMuted,
+    /// <summary>The EQ of a microphone or capture input, keyed by channel id; a <see cref="MicEq"/>.</summary>
+    Eq,
+    /// <summary>A mix's output EQ, keyed by mix id; a <see cref="MicEq"/>.</summary>
+    MixEq,
+    /// <summary>A microphone's noise removal, keyed by channel id; a <see cref="MicNoise"/>.</summary>
+    NoiseRemoval,
+    /// <summary>A microphone's voice changer, keyed by channel id; a <see cref="MicVoice"/>.</summary>
+    VoiceChanger,
+    /// <summary>A microphone's compressor, keyed by channel id; a <see cref="MicCompressor"/>.</summary>
+    Compressor,
+    /// <summary>A microphone's expander, keyed by channel id; a <see cref="MicExpander"/>.</summary>
+    Expander,
+    /// <summary>The software low cut, keyed by <see cref="SceneKeys.FirstMicrophone"/>; an int, 0, 80 or 120.</summary>
+    LowCut,
+    /// <summary>The software ClipGuard, keyed by <see cref="SceneKeys.FirstMicrophone"/>; a boolean.</summary>
+    SoftClipGuard,
+    /// <summary>Whether a monitor mix hears the microphones dry, keyed by mix id; a boolean.</summary>
+    MonitorDry,
+    /// <summary>The ducking setup without where it runs, keyed by <see cref="SceneKeys.Ducking"/>; a <see cref="DuckingScene"/>.</summary>
+    Ducking,
+}
+
+/// <summary>The keys of the scene values that are not a channel's, a cell's or a mix's.</summary>
+public static class SceneKeys
+{
+    /// <summary>The software low cut and ClipGuard work on XLR 1 alone.</summary>
+    public const string FirstMicrophone = "xlr1";
+
+    /// <summary>The one ducking setup.</summary>
+    public const string Ducking = "ducking";
 }
 
 /// <summary>One value of the scene: which field, and which channel, cell or mix.</summary>
@@ -41,7 +72,11 @@ public enum ScenePatchOutcome
     Changed,
     /// <summary>The channel, cell or mix no longer exists.</summary>
     Gone,
-    /// <summary>The write was refused, as the audio server refusing a mute.</summary>
+    /// <summary>
+    /// The write was refused: the audio server refusing a mute, a ClipGuard
+    /// whose plugin is missing, an output EQ the unit holds while it builds
+    /// the mix.
+    /// </summary>
     Failed,
 }
 
@@ -56,10 +91,23 @@ public static class SceneValues
     public const double Tolerance = 0.006;
 
     /// <summary>The same value within <see cref="Tolerance"/>, for the check before a step is applied.</summary>
-    public static bool Near(object a, object b) => a is double x && b is double y ? Math.Abs(x - y) <= Tolerance : Equals(a, b);
+    public static bool Near(object a, object b) => a is double x && b is double y ? Math.Abs(x - y) <= Tolerance : Same(a, b);
 
-    /// <summary>Exactly the same value, for telling whether a command changed anything.</summary>
-    public static bool Same(object a, object b) => Equals(a, b);
+    /// <summary>
+    /// Exactly the same value, for telling whether a command changed
+    /// anything. The settings are records compared field by field; a ducking
+    /// setup's lists are compared by their contents.
+    /// </summary>
+    public static bool Same(object a, object b)
+        => a is DuckingScene x && b is DuckingScene y ? SameDucking(x, y) : Equals(a, b);
+
+    private static bool SameDucking(DuckingScene a, DuckingScene b)
+        => a.Enabled == b.Enabled && Sequence(DuckingScene.KeysOf(a), DuckingScene.KeysOf(b))
+            && Sequence(a.Channels, b.Channels) && Sequence(a.Mixes, b.Mixes)
+            && Equals(a.Sensitivity, b.Sensitivity) && Equals(a.Amount, b.Amount) && Equals(a.Speed, b.Speed);
+
+    private static bool Sequence(IReadOnlyList<string>? a, IReadOnlyList<string>? b)
+        => a is null ? b is null : b is not null && a.SequenceEqual(b, StringComparer.Ordinal);
 }
 
 public sealed partial class Mixer
@@ -104,7 +152,8 @@ public sealed partial class Mixer
     /// alone. Volumes and levels go first, then the mutes that close, then
     /// those that open, so unmuting a member of an exclusive group closes
     /// its peers as a command would: the group never has two members heard.
-    /// Only the sends the patch touches are written to the audio server.
+    /// Only the sends the patch touches are written to the audio server. A
+    /// processing setting is written through its command's setter.
     /// The caller pushes the hardware paths, the state and the save.
     /// </summary>
     public IReadOnlyList<ScenePatchOutcome> ApplyScenePatch(IReadOnlyList<ScenePatchEntry> entries)
@@ -140,8 +189,8 @@ public sealed partial class Mixer
                     WriteLocked(entry.Key, entry.Target, cells, channels);
                     outcomes[i] = ScenePatchOutcome.Applied;
                 }
-                // A refused master write leaves that value where it was, as
-                // the command would; the rest of the patch still goes on.
+                // A refused master write or setting leaves that value where it
+                // was, as the command would; the rest of the patch still goes on.
                 catch (Exception) { outcomes[i] = ScenePatchOutcome.Failed; }
             }
             foreach (string channel in channels.Distinct(StringComparer.Ordinal))
@@ -159,7 +208,13 @@ public sealed partial class Mixer
     {
         SceneField.Level or SceneField.ChannelMuted => _cells.Select(cell => new SceneKey(field, cell)),
         SceneField.ChannelVolume => _config.Channels.Select(c => new SceneKey(field, c.Id)),
-        SceneField.MixVolume or SceneField.MixMuted => _config.Mixes.Select(m => new SceneKey(field, m.Id)),
+        SceneField.MixVolume or SceneField.MixMuted or SceneField.MixEq => _config.Mixes.Select(m => new SceneKey(field, m.Id)),
+        SceneField.Eq => _config.Channels.Where(CarriesEq).Select(c => new SceneKey(field, c.Id)),
+        SceneField.NoiseRemoval or SceneField.VoiceChanger or SceneField.Compressor or SceneField.Expander
+            => _config.Channels.Where(CarriesMicrophoneStage).Select(c => new SceneKey(field, c.Id)),
+        SceneField.MonitorDry => _config.Mixes.Where(m => m.Kind == MixKind.Monitor).Select(m => new SceneKey(field, m.Id)),
+        SceneField.LowCut or SceneField.SoftClipGuard => [new SceneKey(field, SceneKeys.FirstMicrophone)],
+        SceneField.Ducking => [new SceneKey(field, SceneKeys.Ducking)],
         _ => [],
     };
 
@@ -171,13 +226,27 @@ public sealed partial class Mixer
         SceneField.ChannelVolume => HasChannelVolumeLocked(key.Key) ? ChannelVolumeLocked(key.Key) : null,
         SceneField.MixVolume => _config.Mixes.Any(m => m.Id == key.Key) && _mixVolume.TryGetValue(key.Key, out double volume) ? volume : null,
         SceneField.MixMuted => _config.Mixes.Any(m => m.Id == key.Key) ? _mixMuted.Contains(key.Key) : null,
+        SceneField.Eq => CarriesEqLocked(key.Key) ? EqLocked(key.Key) : null,
+        SceneField.MixEq => _config.Mixes.Any(m => m.Id == key.Key) ? MixEqLocked(key.Key) : null,
+        SceneField.NoiseRemoval => CarriesMicrophoneStageLocked(key.Key) ? NoiseLocked(key.Key) : null,
+        SceneField.VoiceChanger => CarriesMicrophoneStageLocked(key.Key) ? VoiceLocked(key.Key) : null,
+        SceneField.Compressor => CarriesMicrophoneStageLocked(key.Key) ? CompressorLocked(key.Key) : null,
+        SceneField.Expander => CarriesMicrophoneStageLocked(key.Key) ? ExpanderLocked(key.Key) : null,
+        SceneField.LowCut => key.Key == SceneKeys.FirstMicrophone ? _lowCutHz : null,
+        SceneField.SoftClipGuard => key.Key == SceneKeys.FirstMicrophone ? _softClipGuard : null,
+        SceneField.MonitorDry => MonitorMixLocked(key.Key) is not null ? _dryMonitors.Contains(key.Key) : null,
+        SceneField.Ducking => key.Key == SceneKeys.Ducking ? DuckingSetupLocked().ToScene() : null,
         _ => null,
     };
 
     /// <summary>
     /// Store one value. A send or a channel volume only collects what has to
     /// be written; the masters go through their setters, which write the
-    /// mix's sink or its sends themselves.
+    /// mix's sink or its sends themselves. A processing setting goes through
+    /// the setter its command uses, whole, so it reaches a running stage
+    /// live, starts or stops the stage as the command would, and an EQ or a
+    /// compressor that runs on the unit is posted to the unit. A setter that
+    /// refuses throws, and the value is left as it is.
     /// </summary>
     private void WriteLocked(SceneKey key, object value, List<string> cells, List<string> channels)
     {
@@ -206,6 +275,63 @@ public sealed partial class Mixer
                 }
                 cells.Add(key.Key);
                 break;
+            case SceneField.Eq:
+                SetEq(key.Key, (MicEq)value);
+                break;
+            case SceneField.MixEq:
+                SetMixEq(key.Key, (MicEq)value);
+                break;
+            case SceneField.NoiseRemoval:
+            {
+                var noise = (MicNoise)value;
+                SetNoiseRemoval(key.Key, new MicNoiseChange(noise.Enabled, noise.Engine, noise.Strength));
+                break;
+            }
+            case SceneField.VoiceChanger:
+            {
+                var voice = (MicVoice)value;
+                SetVoiceChanger(key.Key, new MicVoiceChange(voice.Enabled, voice.Voice, voice.Pitch, voice.Formant));
+                break;
+            }
+            case SceneField.Compressor:
+            {
+                var c = (MicCompressor)value;
+                SetCompressor(key.Key, new MicCompressorChange(c.Enabled, c.Threshold, c.Ratio, c.Attack, c.Release, c.Knee, c.Makeup));
+                break;
+            }
+            case SceneField.Expander:
+            {
+                var e = (MicExpander)value;
+                SetExpander(key.Key, new MicExpanderChange(e.Enabled, e.Threshold, e.Ratio, e.Range, e.Attack, e.Release, e.Hold));
+                break;
+            }
+            case SceneField.LowCut:
+                SetLowCutHz((int)value);
+                break;
+            case SceneField.SoftClipGuard:
+                SetSoftClipGuard((bool)value);
+                break;
+            case SceneField.MonitorDry:
+                SetMonitorDry(key.Key, (bool)value);
+                break;
+            case SceneField.Ducking:
+                RestoreDuckingLocked((DuckingScene)value);
+                break;
         }
+    }
+
+    /// <summary>
+    /// Put a ducking setup back as a profile recall does: where it runs stays
+    /// this machine's choice, and a key, channel or mix the layout no longer
+    /// has is dropped. The debounced save keeps it, as after a recall.
+    /// </summary>
+    private void RestoreDuckingLocked(DuckingScene scene)
+    {
+        DuckingSetup previous = DuckingSetupLocked();
+        DuckingSetup next = DuckingSetup.Prune(DuckingSetup.FromScene(scene, previous.Processing), _config).Copy();
+        if (DuckingSetup.Validate(next, this) is { } error) throw new ArgumentException($"setDucking: {error}");
+        _duckingSetup = next;
+        if (next.Enabled && !previous.Enabled) _duckingFailed.Clear();
+        SyncDuckingLocked();
     }
 }

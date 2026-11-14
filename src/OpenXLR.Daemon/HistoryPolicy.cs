@@ -35,13 +35,20 @@ internal sealed record HistoryTarget(string Kind, string? Channel, string? Mix, 
 /// <see cref="HistoryClass.Recorded"/> with a target in
 /// <see cref="TargetOf"/> and a field in <see cref="SceneField"/>, and the
 /// channel and mix deletes and profile loads stop being barriers once they
-/// can be undone.
+/// can be undone. The second version adds the processing of microphones and
+/// mixes: the EQs, noise removal, the voice changer, the compressor and
+/// expander, the software low cut and ClipGuard, the dry monitor and the
+/// ducking setup. Where each of them runs (the processing switches) is
+/// machine wiring and stays out.
 /// </summary>
 internal static class HistoryPolicy
 {
     private static readonly string[] Recorded =
     [
         "setLevel", "setChannelVolume", "setMixVolume", "setChannelMuted", "setMixMuted", "cycleExclusiveGroup",
+        "setEq", "setEqEnabled", "setEqBand", "loadEqProfile",
+        "setNoiseRemoval", "setVoiceChanger", "setCompressor", "setExpander",
+        "setLowCutHz", "setSoftClipGuard", "setMonitorDry", "setDucking",
     ];
 
     private static readonly string[] Barriers =
@@ -50,9 +57,11 @@ internal static class HistoryPolicy
     ];
 
     // Everything else. Phantom power, the locks and the live switches
-    // (hardware mute, capture mute, the monitoring pause) stay here for good;
-    // the processing, hardware, insert and layout commands until their
-    // milestones. setWaveInterfaceEnabled is a barrier only through the
+    // (hardware mute, capture mute, the monitoring pause) stay here for good,
+    // and so does where processing runs (setEqProcessing,
+    // setDynamicsProcessing, setDuckingProcessing), which is machine wiring;
+    // the hardware, insert and layout commands until their milestones. The
+    // maximizer is a hardware mixing value and goes with the hardware. setWaveInterfaceEnabled is a barrier only through the
     // deleteChannel it sends for a unit's capture channels.
     private static readonly string[] Ignored =
     [
@@ -72,12 +81,10 @@ internal static class HistoryPolicy
         "setBlockSize", "setPreserveBrowserOutputs", "forgetApp",
         "setMonitorOutput", "setMonitorOutputs", "setMonitorMuted", "setMonitorMuteMicrophones", "toggleMonitorMuted",
         "setMonitorFeed", "setOutputVolume", "setOutputVolumeLock", "setEnforcedDefaults", "setAuxPortEnabled",
-        "setLowCutHz", "setSoftClipGuard", "setMixLatencyCompensation",
+        "setMixLatencyCompensation",
         "soundCheck", "setSoundCheckRaw", "setSoundCheckHearMyself", "watchInputMeter",
         "setInsertBypass", "setInsertOwnBlock", "setInsertParam", "renameInsert", "showInsertUi",
-        "setEq", "setEqEnabled", "setEqBand", "setEqProcessing", "loadEqProfile",
-        "setNoiseRemoval", "setVoiceChanger", "setCompressor", "setExpander", "setMonitorDry", "setMixMaximizer",
-        "setDynamicsProcessing", "watchDynamics", "setDucking", "setDuckingProcessing",
+        "setEqProcessing", "setMixMaximizer", "setDynamicsProcessing", "watchDynamics", "setDuckingProcessing",
         "setSoundboard", "updateClip", "renameClipPage", "deleteClip", "setClipOrder", "playClip", "releaseClip",
         "stopClip", "stopClips", "auditionClip", "stopAudition",
         "setWaveInterfaceEnabled", "setWaveControl",
@@ -98,7 +105,8 @@ internal static class HistoryPolicy
 
     /// <summary>The kinds a step can have, one per recorded category, as the state names them.</summary>
     internal static readonly IReadOnlyList<string> Kinds =
-        ["sendLevel", "channelVolume", "mixVolume", "sendMute", "mixMute", "exclusiveGroup"];
+        ["sendLevel", "channelVolume", "mixVolume", "sendMute", "mixMute", "exclusiveGroup",
+            "eq", "mixEq", "noiseRemoval", "voiceChanger", "compressor", "expander", "lowCut", "clipGuard", "monitorDry", "ducking"];
 
     /// <summary>
     /// What a recorded command changes, or null when it does not name its
@@ -134,6 +142,29 @@ internal static class HistoryPolicy
                 var members = new HashSet<string>(membersOf(group), StringComparer.Ordinal);
                 return new("exclusiveGroup", null, null, group, [SceneField.ChannelMuted], key => members.Contains(ChannelOf(key.Key)));
             }
+            // An EQ command on a mix is its output EQ, as the mixer reads it;
+            // loadEqProfile becomes one setEq. The whole EQ is one value, so a
+            // drag across bands is one step.
+            case "setEq" or "setEqEnabled" or "setEqBand" or "loadEqProfile" when cmd.Mix is { } mix:
+                return new("mixEq", null, mix, null, [SceneField.MixEq], key => key.Key == mix);
+            case "setEq" or "setEqEnabled" or "setEqBand" or "loadEqProfile" when cmd.Channel is { } channel:
+                return new("eq", channel, null, null, [SceneField.Eq], key => key.Key == channel);
+            case "setNoiseRemoval" when cmd.Channel is { } channel:
+                return new("noiseRemoval", channel, null, null, [SceneField.NoiseRemoval], key => key.Key == channel);
+            case "setVoiceChanger" when cmd.Channel is { } channel:
+                return new("voiceChanger", channel, null, null, [SceneField.VoiceChanger], key => key.Key == channel);
+            case "setCompressor" when cmd.Channel is { } channel:
+                return new("compressor", channel, null, null, [SceneField.Compressor], key => key.Key == channel);
+            case "setExpander" when cmd.Channel is { } channel:
+                return new("expander", channel, null, null, [SceneField.Expander], key => key.Key == channel);
+            case "setLowCutHz":
+                return new("lowCut", SceneKeys.FirstMicrophone, null, null, [SceneField.LowCut], _ => true);
+            case "setSoftClipGuard":
+                return new("clipGuard", SceneKeys.FirstMicrophone, null, null, [SceneField.SoftClipGuard], _ => true);
+            case "setMonitorDry" when cmd.Mix is { } mix:
+                return new("monitorDry", null, mix, null, [SceneField.MonitorDry], key => key.Key == mix);
+            case "setDucking":
+                return new("ducking", null, null, null, [SceneField.Ducking], _ => true);
             default:
                 return null;
         }
@@ -153,6 +184,16 @@ internal static class HistoryPolicy
             "sendMute" => $"{Channel()} mute in {Mix()}",
             "mixMute" => $"{Mix()} mute",
             "exclusiveGroup" => $"{Group()} switch",
+            "eq" => $"{Channel()} EQ",
+            "mixEq" => $"{Mix()} EQ",
+            "noiseRemoval" => $"{Channel()} noise removal",
+            "voiceChanger" => $"{Channel()} voice changer",
+            "compressor" => $"{Channel()} compressor",
+            "expander" => $"{Channel()} expander",
+            "lowCut" => $"{Channel()} low cut",
+            "clipGuard" => $"{Channel()} ClipGuard",
+            "monitorDry" => $"Dry monitor in {Mix()}",
+            "ducking" => "Ducking",
             _ => target.Kind,
         };
     }
