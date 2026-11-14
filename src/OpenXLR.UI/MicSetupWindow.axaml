@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterOwner" Background="{DynamicResource Ox.Window.Background}">
   <!-- Mic setup for one microphone, one step at a time: where the microphone
        goes, the level before any processing, a take heard raw and processed,
-       then the EQ, filters, plugins and presets that shape it. Every colour,
+       then the noise removal, expander, EQ, filters, plugins and presets that shape it. Every colour,
        size and radius is an Ox.* token or a control theme; the waveform and
        the embedded EQ graph draw with the EQ editor's colours. The window
        sizes itself to the step shown, up to the screen's height; see the
@@ -192,6 +192,54 @@
                          IsVisible="{Binding SuggestBlocked, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
           </Border>
+
+          <!-- Measure room noise, for the expander that comes after noise removal and before the EQ: its
+               switch and threshold are the expander window's own model, and the room heard quiet for five
+               seconds at the expander's input gives a threshold just above it, written only when applied -->
+          <Border Classes="tile" Padding="12" Name="MicSetupExpanderTile">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock Text="{loc:Text Key=Expander}" Classes="h" VerticalAlignment="Center"/>
+                <WrapPanel Grid.Column="1" Name="MicSetupExpanderActions" ItemSpacing="6" LineSpacing="4" IsVisible="{Binding HasExpander}">
+                  <ToggleButton Name="MicSetupExpanderSwitch" Content="{loc:Text Key=DynamicsSwitch}"
+                                IsChecked="{Binding Expander.Enabled, Mode=TwoWay, FallbackValue=False}"
+                                IsEnabled="{Binding Expander.Available, FallbackValue=False}"
+                                AutomationProperties.Name="{Binding Expander.SwitchName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsSwitchTip}"/>
+                  <Button Name="MicSetupExpanderWindow" Content="{loc:Text Key=DynamicsOpen}" Click="OnExpanderWindow"
+                          AutomationProperties.Name="{Binding Expander.OpenName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsOpenTip}"/>
+                </WrapPanel>
+              </Grid>
+              <StackPanel Spacing="8" IsVisible="{Binding HasExpander}">
+                <TextBlock Text="{loc:Text Key=MicSetupExpanderHint}" Classes="hint" TextWrapping="Wrap"/>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" IsEnabled="{Binding Expander.Available, FallbackValue=False}">
+                  <TextBlock Text="{loc:Text Key=DynamicsThreshold}" Classes="body" VerticalAlignment="Center"/>
+                  <Slider Grid.Column="1" Name="MicSetupExpanderThreshold"
+                          Minimum="{Binding Expander.Threshold.Minimum, FallbackValue=-80}" Maximum="{Binding Expander.Threshold.Maximum, FallbackValue=0}"
+                          SmallChange="{Binding Expander.Threshold.Step, FallbackValue=1}" LargeChange="{Binding Expander.Threshold.Step, FallbackValue=1}"
+                          vm:FaderInput.Step="{Binding Expander.Threshold.Step, FallbackValue=1}"
+                          Value="{Binding Expander.Threshold.Value, Mode=TwoWay, FallbackValue=-50}"
+                          AutomationProperties.Name="{loc:Text Key=DynamicsThreshold}" ToolTip.Tip="{Binding Expander.Threshold.Tip, FallbackValue=''}"/>
+                  <skin:LitText Grid.Column="2" Name="MicSetupExpanderThresholdText" Text="{Binding Expander.Threshold.Text, FallbackValue=''}"
+                                Classes="val" VerticalAlignment="Center"/>
+                </Grid>
+                <TextBlock Name="MicSetupExpanderError" Text="{Binding Expander.Status, FallbackValue=''}" Classes="warn" TextWrapping="Wrap"
+                           IsVisible="{Binding Expander.HasError, FallbackValue=False}"/>
+                <TextBlock Text="{loc:Text Key=MicSetupRoomHint}" Classes="hint" TextWrapping="Wrap"/>
+                <WrapPanel ItemSpacing="8" LineSpacing="8">
+                  <Button Name="MicSetupMeasureRoom" Content="{loc:Text Key=MicSetupMeasureRoom}" IsEnabled="{Binding CanMeasureRoom}" Click="OnMeasureRoom"/>
+                  <Button Name="MicSetupApplyRoom" Content="{loc:Text Key=MicSetupApplyRoom}" IsVisible="{Binding CanApplyRoom}" Click="OnApplyRoom"/>
+                  <Button Name="MicSetupDiscardRoom" Content="{loc:Text Key=MicSetupDiscardGain}" IsVisible="{Binding CanDiscardRoom}" Click="OnDiscardRoom"/>
+                </WrapPanel>
+                <TextBlock Name="MicSetupRoomMeasured" Text="{Binding RoomMeasured}" Classes="body" TextWrapping="Wrap"
+                           IsVisible="{Binding RoomMeasured, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <TextBlock Name="MicSetupRoomAdvice" Text="{Binding RoomAdvice}" Classes="body" TextWrapping="Wrap"
+                           IsVisible="{Binding RoomAdvice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <TextBlock Name="MicSetupRoomBlocked" Text="{Binding RoomBlocked}" Classes="warn" TextWrapping="Wrap"
+                           IsVisible="{Binding RoomBlocked, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              </StackPanel>
+              <TextBlock Name="MicSetupNoExpander" Text="{loc:Text Key=MicSetupNoExpander}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding NoExpander}"/>
+            </StackPanel>
+          </Border>
         </StackPanel>
 
         <!-- Listen: a take, its waveform, raw and processed, and hearing yourself -->
@@ -239,7 +287,7 @@
           </Border>
         </StackPanel>
 
-        <!-- Shape: presets, the EQ curve, low cut and ClipGuard, and the plugins, all heard live -->
+        <!-- Shape: presets, noise removal, the expander, the EQ curve, low cut and ClipGuard, and the plugins, all heard live -->
         <StackPanel Name="MicSetupShape" Spacing="12" IsVisible="{Binding ShowsShape}">
           <TextBlock Text="{loc:Text Key=MicSetupShapeHint}" Classes="hint" TextWrapping="Wrap"/>
 
@@ -279,6 +327,38 @@
                 <TextBlock Text="{loc:Text Key=NoiseRemoval}" Classes="h"/>
                 <TextBlock Name="MicSetupNoNoise" Text="{loc:Text Key=MicSetupNoNoise}" Classes="hint" TextWrapping="Wrap"/>
               </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- the expander: after noise removal and before the EQ, heard on the loop. Its switch and
+               threshold are the expander window's own model; Measure room noise on Level sets them -->
+          <Border Classes="tile" Padding="12" Name="MicSetupShapeExpanderTile">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBlock Text="{loc:Text Key=Expander}" Classes="h" VerticalAlignment="Center"/>
+                <WrapPanel Grid.Column="1" Name="MicSetupShapeExpanderActions" ItemSpacing="6" LineSpacing="4" IsVisible="{Binding HasExpander}">
+                  <ToggleButton Name="MicSetupShapeExpanderSwitch" Content="{loc:Text Key=DynamicsSwitch}"
+                                IsChecked="{Binding Expander.Enabled, Mode=TwoWay, FallbackValue=False}"
+                                IsEnabled="{Binding Expander.Available, FallbackValue=False}"
+                                AutomationProperties.Name="{Binding Expander.SwitchName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsSwitchTip}"/>
+                  <Button Name="MicSetupShapeExpanderWindow" Content="{loc:Text Key=DynamicsOpen}" Click="OnExpanderWindow"
+                          AutomationProperties.Name="{Binding Expander.OpenName, FallbackValue=''}" ToolTip.Tip="{loc:Text Key=DynamicsOpenTip}"/>
+                </WrapPanel>
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" IsVisible="{Binding HasExpander}"
+                    IsEnabled="{Binding Expander.Available, FallbackValue=False}">
+                <TextBlock Text="{loc:Text Key=DynamicsThreshold}" Classes="body" VerticalAlignment="Center"/>
+                <Slider Grid.Column="1" Name="MicSetupShapeExpanderThreshold"
+                        Minimum="{Binding Expander.Threshold.Minimum, FallbackValue=-80}" Maximum="{Binding Expander.Threshold.Maximum, FallbackValue=0}"
+                        SmallChange="{Binding Expander.Threshold.Step, FallbackValue=1}" LargeChange="{Binding Expander.Threshold.Step, FallbackValue=1}"
+                        vm:FaderInput.Step="{Binding Expander.Threshold.Step, FallbackValue=1}"
+                        Value="{Binding Expander.Threshold.Value, Mode=TwoWay, FallbackValue=-50}"
+                        AutomationProperties.Name="{loc:Text Key=DynamicsThreshold}" ToolTip.Tip="{Binding Expander.Threshold.Tip, FallbackValue=''}"/>
+                <skin:LitText Grid.Column="2" Text="{Binding Expander.Threshold.Text, FallbackValue=''}" Classes="val" VerticalAlignment="Center"/>
+              </Grid>
+              <TextBlock Name="MicSetupShapeExpanderHint" Text="{loc:Text Key=MicSetupShapeExpanderHint}" Classes="hint" TextWrapping="Wrap"
+                         IsVisible="{Binding HasExpander}"/>
+              <TextBlock Text="{loc:Text Key=MicSetupNoExpander}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding NoExpander}"/>
             </StackPanel>
           </Border>
 

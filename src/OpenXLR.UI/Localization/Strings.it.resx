@@ -4351,4 +4351,73 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
   <data name="PushToTalkDaemonLost" xml:space="preserve">
     <value>La connessione al daemon si è interrotta durante il push-to-talk. OpenXLR rimette in muto i microfoni appena il daemon torna.</value>
   </data>
+  <data name="MicSetupExpanderHint" xml:space="preserve">
+    <value>Abbassa il microfono mentre non parli, così la stanza sparisce tra una parola e l'altra. Viene dopo la riduzione del rumore e prima dell'EQ.</value>
+  </data>
+  <data name="MicSetupRoomHint" xml:space="preserve">
+    <value>Prima imposta il guadagno qui sopra e la riduzione del rumore nel passo Suono. Poi premi Misura il rumore della stanza e resta in silenzio per cinque secondi, con la stanza come sarà in onda: ventole, computer e finestre come al solito. OpenXLR legge il livello che sente l'expander e suggerisce una soglia appena sopra. Non cambia nulla finché non la applichi, e una modifica successiva al guadagno o alla riduzione del rumore richiede una nuova misura.</value>
+  </data>
+  <data name="MicSetupMeasureRoom" xml:space="preserve">
+    <value>Misura il rumore della stanza</value>
+  </data>
+  <data name="MicSetupApplyRoom" xml:space="preserve">
+    <value>Applica soglia</value>
+  </data>
+  <data name="MicSetupNoExpander" xml:space="preserve">
+    <value>Il daemon non segnala alcun expander per questo microfono.</value>
+  </data>
+  <data name="MicSetupRoomListening" xml:space="preserve">
+    <value>Ascolto della stanza. Resta in silenzio, mancano {0:0} s.</value>
+  </data>
+  <data name="MicSetupRoomMeasured" xml:space="preserve">
+    <value>Il rumore della stanza ha raggiunto {0:0} dBFS nei suoi momenti più forti, dove ascolta l'expander.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredRaw" xml:space="preserve">
+    <value>Il rumore della stanza ha raggiunto {0:0} dBFS nei suoi momenti più forti, prima della riduzione del rumore, quindi l'expander lo sente più basso.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredFloor" xml:space="preserve">
+    <value>La stanza è rimasta sotto {0:0} dBFS, il fondo dell'indicatore.</value>
+  </data>
+  <data name="MicSetupRoomNotHeard" xml:space="preserve">
+    <value>Non si è sentito nulla. Controlla che il microfono sia collegato, non silenziato e che sia quello registrato da questo canale, poi misura di nuovo.</value>
+  </data>
+  <data name="MicSetupRoomFloor" xml:space="preserve">
+    <value>Nulla ha raggiunto l'indicatore, che parte da -60 dBFS. La stanza può essere molto silenziosa, oppure il microfono non si sente. Misura prima la tua voce con Suggerisci guadagno nel passo Livello, poi misura di nuovo la stanza.</value>
+  </data>
+  <data name="MicSetupRoomTalking" xml:space="preserve">
+    <value>Il livello si è mosso troppo per una stanza silenziosa: qualcuno ha parlato o c'è stato un rumore forte. Una soglia ricavata da qui potrebbe tagliare la tua voce, quindi resta in silenzio e misura di nuovo.</value>
+  </data>
+  <data name="MicSetupRoomSet" xml:space="preserve">
+    <value>Soglia suggerita: {0} dB, appena sopra il rumore della stanza.</value>
+  </data>
+  <data name="MicSetupRoomQuiet" xml:space="preserve">
+    <value>La stanza è molto silenziosa, quindi l'expander ha poco da togliere. Soglia suggerita: {0} dB.</value>
+  </data>
+  <data name="MicSetupRoomLoud" xml:space="preserve">
+    <value>La stanza è forte quasi quanto la tua voce. {0} dB è la soglia più alta che lascia ancora passare le parole più deboli, quindi l'expander può togliere solo parte del rumore. Avvicinati al microfono e abbassa il guadagno di conseguenza, oppure prova la riduzione del rumore, poi misura di nuovo.</value>
+  </data>
+  <data name="MicSetupRoomVoiceTooQuiet" xml:space="preserve">
+    <value>Con questo guadagno la tua voce è troppo bassa perché l'expander la distingua dalla stanza. Alza il guadagno nel passo Livello, poi misura di nuovo.</value>
+  </data>
+  <data name="MicSetupRoomNoVoice" xml:space="preserve">
+    <value>Nel passo Livello non è stata misurata alcuna voce, quindi la soglia resta solo sotto il livello a cui mira Suggerisci guadagno. Usa Suggerisci guadagno per verificarla sulla tua voce.</value>
+  </data>
+  <data name="MicSetupRoomApplied" xml:space="preserve">
+    <value>Expander attivo, soglia {0} dB. Se cambi il guadagno o la riduzione del rumore, misura di nuovo la stanza.</value>
+  </data>
+  <data name="MicSetupRoomStale" xml:space="preserve">
+    <value>Il guadagno, la riduzione del rumore o il microfono sono cambiati da quando è stata misurata la stanza. Misura di nuovo.</value>
+  </data>
+  <data name="MicSetupRoomSession" xml:space="preserve">
+    <value>È in corso una sessione di Configurazione microfono. Fermala prima nel passo Ascolto: una ripresa o la tua voce nelle cuffie non sono la stanza.</value>
+  </data>
+  <data name="MicSetupRoomGated" xml:space="preserve">
+    <value>L'expander su {0} è attivo e l'indicatore di questo microfono legge dopo di lui. Spegni l'expander, misura, poi applica la soglia.</value>
+  </data>
+  <data name="MicSetupRoomInterrupted" xml:space="preserve">
+    <value>È iniziata una sessione di Configurazione microfono, quindi la misura si è fermata. Misura di nuovo quando finisce.</value>
+  </data>
+  <data name="MicSetupShapeExpanderHint" xml:space="preserve">
+    <value>Misura il rumore della stanza, nel passo Livello, mette la soglia appena sopra la tua stanza.</value>
+  </data>
 </root>

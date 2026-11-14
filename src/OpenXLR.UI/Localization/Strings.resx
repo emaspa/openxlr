@@ -4746,4 +4746,73 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="PushToTalkDaemonLost" xml:space="preserve">
     <value>The daemon connection dropped during push to talk. OpenXLR mutes the microphones again as soon as the daemon is back.</value>
   </data>
+  <data name="MicSetupExpanderHint" xml:space="preserve">
+    <value>Turns the microphone down while you are not speaking, so the room drops away between your words. It comes after noise removal and before the EQ.</value>
+  </data>
+  <data name="MicSetupRoomHint" xml:space="preserve">
+    <value>Set the gain above and noise removal on the Shape step first. Then press Measure room noise and stay quiet for five seconds, with the room as it is on air: fans, computer and windows as usual. OpenXLR reads the level the expander hears and suggests a threshold just above it. Nothing changes until you apply it, and a later change to the gain or noise removal means measuring again.</value>
+  </data>
+  <data name="MicSetupMeasureRoom" xml:space="preserve">
+    <value>Measure room noise</value>
+  </data>
+  <data name="MicSetupApplyRoom" xml:space="preserve">
+    <value>Apply threshold</value>
+  </data>
+  <data name="MicSetupNoExpander" xml:space="preserve">
+    <value>The daemon reports no expander for this microphone.</value>
+  </data>
+  <data name="MicSetupRoomListening" xml:space="preserve">
+    <value>Listening to the room. Stay quiet, {0:0} s left.</value>
+  </data>
+  <data name="MicSetupRoomMeasured" xml:space="preserve">
+    <value>The room's noise reached {0:0} dBFS at its loud end, where the expander listens.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredRaw" xml:space="preserve">
+    <value>The room's noise reached {0:0} dBFS at its loud end, before noise removal, so the expander hears it quieter than this.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredFloor" xml:space="preserve">
+    <value>The room stayed under {0:0} dBFS, the bottom of the meter.</value>
+  </data>
+  <data name="MicSetupRoomNotHeard" xml:space="preserve">
+    <value>Heard nothing at all. Check that the microphone is connected, not muted and the one this channel records, then measure again.</value>
+  </data>
+  <data name="MicSetupRoomFloor" xml:space="preserve">
+    <value>Nothing reached the meter, which starts at -60 dBFS. The room may be very quiet, or the microphone is not heard. Measure your voice with Suggest gain on the Level step first, then measure the room again.</value>
+  </data>
+  <data name="MicSetupRoomTalking" xml:space="preserve">
+    <value>The level moved too much for a quiet room: someone talked or something loud happened. A threshold from this could cut your voice, so stay quiet and measure again.</value>
+  </data>
+  <data name="MicSetupRoomSet" xml:space="preserve">
+    <value>Suggested threshold: {0} dB, just above the room's noise.</value>
+  </data>
+  <data name="MicSetupRoomQuiet" xml:space="preserve">
+    <value>The room is very quiet, so the expander has little to take away. Suggested threshold: {0} dB.</value>
+  </data>
+  <data name="MicSetupRoomLoud" xml:space="preserve">
+    <value>The room is nearly as loud as your voice. {0} dB is the highest threshold that still lets your quieter words through, so the expander can take away only part of the noise. Move closer to the microphone and lower the gain to match, or try noise removal, then measure again.</value>
+  </data>
+  <data name="MicSetupRoomVoiceTooQuiet" xml:space="preserve">
+    <value>At this gain your voice is too quiet for the expander to tell it from the room. Raise the gain on the Level step, then measure again.</value>
+  </data>
+  <data name="MicSetupRoomNoVoice" xml:space="preserve">
+    <value>No voice was measured on the Level step, so the threshold is only kept under the level Suggest gain aims for. Run Suggest gain to check it against your own voice.</value>
+  </data>
+  <data name="MicSetupRoomApplied" xml:space="preserve">
+    <value>Expander on, threshold {0} dB. If you change the gain or noise removal, measure the room again.</value>
+  </data>
+  <data name="MicSetupRoomStale" xml:space="preserve">
+    <value>The gain, noise removal or microphone changed since the room was measured. Measure again.</value>
+  </data>
+  <data name="MicSetupRoomSession" xml:space="preserve">
+    <value>A Mic setup session is running. Stop it on the Listen step first: a take or your voice in the monitors is not the room.</value>
+  </data>
+  <data name="MicSetupRoomGated" xml:space="preserve">
+    <value>The expander on {0} is on, and this microphone's meter reads after it. Switch the expander off, measure, then apply the threshold.</value>
+  </data>
+  <data name="MicSetupRoomInterrupted" xml:space="preserve">
+    <value>A Mic setup session started, so the measurement stopped. Measure again once it ends.</value>
+  </data>
+  <data name="MicSetupShapeExpanderHint" xml:space="preserve">
+    <value>Measure room noise on the Level step sets the threshold just above your room.</value>
+  </data>
 </root>

@@ -383,8 +383,10 @@ internal static class MicSetupWindowTests
         Assert.True(window.FindControl<TextBlock>("MicSetupNoEffects")!.IsEffectivelyVisible);
     }
 
+    /// <summary>Press the button with this caption that is not hidden itself; one hidden for now may share it.</summary>
     private static void Click(Window window, string key)
-        => window.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, Localizer.Text(key)) && b is not ToggleButton)
+        => window.GetVisualDescendants().OfType<Button>()
+            .Single(b => Equals(b.Content, Localizer.Text(key)) && b is not ToggleButton && b.IsVisible)
             .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
     private static ToggleButton Preset(Window window, string key)
@@ -406,7 +408,7 @@ internal static class MicSetupWindowTests
     /// standard and touch sizing: nothing scrolls, nothing reaches past the
     /// window's edges, and the window stays inside the screen. The steps
     /// carry everything they can show at once: the picker, the unit's gain
-    /// with a gain suggestion, a session with a take and an error, the EQ,
+    /// with a gain suggestion, a room measurement, a session with a take and an error, the EQ,
     /// both kinds of filter and a plugin. A size the user chose then stays
     /// on a shorter step, and a window the user shrank grows again for the
     /// next step.
@@ -438,6 +440,16 @@ internal static class MicSetupWindowTests
         var main = new MainViewModel(client);
         JsonNode state = CaptureInputWindowTests.State();
         state["mixer"]!["channels"]![0]!["eq"] = CaptureInputWindowTests.CaptureEq(enabled: true);
+        state["mixer"]!["channels"]![0]!["compressor"] = new JsonObject
+        {
+            ["enabled"] = false, ["threshold"] = -18, ["ratio"] = 3, ["attack"] = 5, ["release"] = 150, ["knee"] = 6, ["makeup"] = 0,
+            ["available"] = true, ["backend"] = "software", ["processing"] = "software",
+        };
+        state["mixer"]!["channels"]![0]!["expander"] = new JsonObject
+        {
+            ["enabled"] = false, ["threshold"] = -50, ["ratio"] = 3, ["range"] = 24, ["attack"] = 1, ["release"] = 150, ["hold"] = 50,
+            ["available"] = true, ["backend"] = "software", ["processing"] = "software",
+        };
         state["mixer"]!["softLowCutApplicable"] = true;
         state["mixer"]!["softClipGuardApplicable"] = true;
         state["capabilities"]!["gainMaxDb"] = 80;
@@ -445,12 +457,23 @@ internal static class MicSetupWindowTests
         CaptureInputWindowTests.Apply(main, state);
         WindowLayoutTests.AddInsert(main.Inserts);
         MicSetupViewModel setup = main.Inserts.MicSetup;
-        Assert.True(setup.ShowsPicker && setup.CarriesUnit && setup.HasEq && setup.HasUnitFilters && setup.HasSoftwareFilters);
-        setup.Apply(JsonNode.Parse("""{"channel":"xlr1","mode":"looping","seconds":1.5,"error":"The session could not start because the capture port went away.","take":1,"monitorLatencyMs":42}"""));
-        setup.ApplyTake(JsonNode.Parse("""{"type":"soundCheckTake","channel":"xlr1","take":1,"seconds":1.5,"peaks":[0.1,0.5,0.9,0.3]}"""));
-        // A suggestion with every line of it showing: what was measured, a clip, and the change.
+        Assert.True(setup.ShowsPicker && setup.CarriesUnit && setup.HasEq && setup.HasUnitFilters && setup.HasSoftwareFilters && setup.HasExpander);
+        // A room measurement with every line of it showing, taken before the
+        // session starts: what was measured, a loud room with no voice to check
+        // against, and the session that then blocks another one.
         var time = new ManualTime();
         setup.Time = time;
+        setup.StartRoomMeasure();
+        for (int i = 0; i < 100 && setup.MeasuringRoom; i++)
+        {
+            time.Advance(TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 15 + 1));
+            setup.ApplyInputLevel(new JsonArray(.1, .4, 0));
+        }
+        Assert.True(setup.CanApplyRoom && setup.RoomMeasured is not null && setup.RoomSuggestion is { Outcome: RoomOutcome.LoudRoom }, suffix);
+        setup.Apply(JsonNode.Parse("""{"channel":"xlr1","mode":"looping","seconds":1.5,"error":"The session could not start because the capture port went away.","take":1,"monitorLatencyMs":42}"""));
+        setup.ApplyTake(JsonNode.Parse("""{"type":"soundCheckTake","channel":"xlr1","take":1,"seconds":1.5,"peaks":[0.1,0.5,0.9,0.3]}"""));
+        Assert.NotNull(setup.RoomBlocked);
+        // A suggestion with every line of it showing: what was measured, a clip, and the change.
         setup.StartGainMeasure();
         for (int i = 0; i < 100 && setup.Measuring; i++)
         {
@@ -469,6 +492,9 @@ internal static class MicSetupWindowTests
                 setup.Step = step;
                 WindowLayoutTests.Settle(window, $"on {step}, {suffix}");
                 AssertFits(window, $"{step}, {suffix}");
+                if (step == MicSetupStep.Level)
+                    Assert.All(new[] { "MicSetupRoomMeasured", "MicSetupRoomAdvice", "MicSetupRoomBlocked", "MicSetupApplyRoom" },
+                        name => Assert.True(window.FindControl<Control>(name)!.IsEffectivelyVisible, $"{name}, {suffix}"));
                 WindowLayoutTests.Capture(window, $"mic-setup-fit-{step.ToString().ToLowerInvariant()}-{suffix}");
             }
 

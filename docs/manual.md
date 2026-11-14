@@ -1527,8 +1527,9 @@ Removing the microphone shown closes its Mic setup window, even when the
 UI opened it. Late actions from that window cannot affect an input
 created in its place.
 
-A gain measurement ends as soon as you close the window. Reopening Mic
-setup can start a fresh measurement without the old window cancelling it.
+A gain or room measurement ends as soon as you close the window or move it
+to another microphone. Reopening Mic setup can start a fresh measurement
+without the old window cancelling it.
 
 The window takes the height its step needs, up to the screen's height, so
 nothing is cut off or needs scrolling until the screen is too short. If
@@ -1624,6 +1625,57 @@ it.
   you to measure again. Returning the gain or source to its old setting
   does not restore the old measurement. Renaming the channel leaves it valid.
 
+**Measure room noise**, under Suggest gain, sets the threshold of the
+microphone's [expander](#compressor-and-expander), which comes after
+noise removal and before the EQ. Its **On** switch, **Open** and
+**Threshold** are the same as on Shape. Set the gain above and noise
+removal on Shape first, press it and stay quiet for five seconds
+with the room as it is on air. OpenXLR reads the level at the
+expander's input. While the microphone's processing runs on this
+computer that is the expander's own meter, after noise removal. When
+it does not run, the meter before the chain reads the same signal.
+OpenXLR takes the level the room's peaks stay under for 95 percent of
+the five seconds and suggests a threshold 4 dB above it, in whole dB
+inside the expander's range. It reads peaks and not the average because
+the expander opens on each sample's peak. Nothing changes until you
+press **Apply threshold**, which sets the threshold and then switches
+the expander on, on this computer or on the unit. **Discard** forgets
+the measurement.
+
+- When the room's loud end is more than 10 dB over its quiet end,
+  someone talked or something loud happened. The window asks you to
+  measure again rather than suggest a threshold that could cut your
+  voice.
+- The threshold stays at least 15 dB under your voice as **Suggest gain**
+  measured it, moved by any gain change since, so quieter words still
+  open the expander. When the room is closer to your voice than that,
+  the window offers the highest threshold that keeps that distance and
+  says the expander can take away only part of the noise. Move closer
+  and lower the gain to match, or try noise removal. With no voice
+  measured, the threshold stays 15 dB under -20 dBFS, the level Suggest
+  gain aims for, and the window says so. If even the expander's lowest
+  threshold is that close to your voice, it offers none and asks for
+  more gain.
+- When nothing reaches the meter, the window asks you to check the
+  microphone. The meter before the chain stops at -60 dBFS, so a room
+  quieter than that reads the same as no microphone at all. Once Level
+  has measured your voice, the microphone is known to work, and the
+  window treats the reading as a very quiet room and suggests -56 dB.
+- Changing the gain, noise removal, where the expander runs or the
+  microphone makes the measurement out of date, before or after you
+  apply it. The window then asks you to measure again.
+- It cannot start while a session runs on any microphone, because a take
+  or your voice in the monitors is not the room. A session that starts
+  stops it. Suggest gain and the room measurement never listen at once.
+- The Wave:3 MK.2, the XLR Dock MK.2 and the Wave XLR Pro report no
+  level of their own, so while one of them runs the expander the meter
+  reads the microphone after the unit's expander and compressor. Switch
+  the expander off before you measure. The window says so while it is
+  on, and OpenXLR takes the compressor's make-up gain back out of the
+  reading. A Wave XLR MK.2 from firmware 1.0.15 reports its expander's
+  own input, and OpenXLR reads that instead. The measurement on a unit
+  has not been checked on hardware yet.
+
 **Listen** records a take and plays it back through the chain:
 
 - **Record** and speak; recording stops by itself after ten seconds.
@@ -1699,6 +1751,11 @@ take or on the live microphone:
   noise may be turned down. The line under it says which engine is heard
   and the delay it adds, or why it does not run. See
   [noise removal](#noise-removal).
+- **Expander** comes next, before the EQ. **On** switches it, **Open**
+  opens its window with the levels, the graph and the other settings, and
+  **Threshold** sets the level under which it turns the microphone down.
+  **Measure room noise** on Level sets that threshold for you. See
+  [compressor and expander](#compressor-and-expander).
 - **EQ** is the graph the [microphone EQ](#microphone-eq) editor draws,
   edited the same way: drag a handle, use the wheel for Q, double click to
   switch a band, right click for its type. **EQ on** beside it switches
@@ -1873,7 +1930,8 @@ The settings button shows the rest:
 
 To set the expander, watch the line while you stay quiet: put the
 threshold a few decibels above the room's level and below your quietest
-words. To set the compressor, speak at your loudest and put the threshold
+words. **Measure room noise** in [Mic setup](#mic-setup)'s Level step
+does this for you. To set the compressor, speak at your loudest and put the threshold
 where **Gain reduction** shows a few decibels, then raise **Make-up gain**
 until **Output** peaks where it did before.
 

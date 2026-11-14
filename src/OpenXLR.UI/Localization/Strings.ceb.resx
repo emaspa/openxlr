@@ -4275,4 +4275,73 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
   <data name="PushToTalkDaemonLost" xml:space="preserve">
     <value>Naputol ang koneksyon sa daemon samtang push to talk. I-mute pag-usab sa OpenXLR ang mga microphone dayon nga mobalik ang daemon.</value>
   </data>
+  <data name="MicSetupExpanderHint" xml:space="preserve">
+    <value>Pahinayon ang mikropono samtang wala ka nagsulti, aron mawala ang tingog sa kwarto taliwala sa imong mga pulong. Moabot kini human sa pagtangtang sa kasaba ug sa wala pa ang EQ.</value>
+  </data>
+  <data name="MicSetupRoomHint" xml:space="preserve">
+    <value>Ibutang una ang gain sa ibabaw ug ang pagtangtang sa kasaba sa lakang nga Hulma. Dayon pislita ang Sukda ang kasaba sa kwarto ug paghilom sulod sa lima ka segundo, nga ang kwarto sama sa on air: mga bentilador, computer ug bintana sama sa naandan. Basahon sa OpenXLR ang lebel nga madungog sa expander ug isugyot ang threshold nga gamay ra ang taas niini. Walay mausab hangtod imo kining ibutang, ug kon usbon nimo unya ang gain o ang pagtangtang sa kasaba, kinahanglan sukdon pag-usab.</value>
+  </data>
+  <data name="MicSetupMeasureRoom" xml:space="preserve">
+    <value>Sukda ang kasaba sa kwarto</value>
+  </data>
+  <data name="MicSetupApplyRoom" xml:space="preserve">
+    <value>Ibutang ang threshold</value>
+  </data>
+  <data name="MicSetupNoExpander" xml:space="preserve">
+    <value>Walay gitaho nga expander ang daemon alang niining mikropono.</value>
+  </data>
+  <data name="MicSetupRoomListening" xml:space="preserve">
+    <value>Naminaw sa kwarto. Paghilom, {0:0} s pa ang nahibilin.</value>
+  </data>
+  <data name="MicSetupRoomMeasured" xml:space="preserve">
+    <value>Miabot sa {0:0} dBFS ang kasaba sa kwarto sa labing kusog niini, diin naminaw ang expander.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredRaw" xml:space="preserve">
+    <value>Miabot sa {0:0} dBFS ang kasaba sa kwarto sa labing kusog niini, sa wala pa ang pagtangtang sa kasaba, busa mas hinay kini nga madungog sa expander.</value>
+  </data>
+  <data name="MicSetupRoomMeasuredFloor" xml:space="preserve">
+    <value>Nagpabilin ang kwarto ubos sa {0:0} dBFS, ang pinakaubos sa meter.</value>
+  </data>
+  <data name="MicSetupRoomNotHeard" xml:space="preserve">
+    <value>Walay nadungog. Susiha nga konektado ang mikropono, dili naka-mute ug kini ang gi-record niining channel, dayon sukda pag-usab.</value>
+  </data>
+  <data name="MicSetupRoomFloor" xml:space="preserve">
+    <value>Walay miabot sa meter, nga magsugod sa -60 dBFS. Basin hilom kaayo ang kwarto, o wala madungog ang mikropono. Sukda una ang imong tingog gamit ang Isugyot ang gain sa lakang nga Level, dayon sukda pag-usab ang kwarto.</value>
+  </data>
+  <data name="MicSetupRoomTalking" xml:space="preserve">
+    <value>Sobra ang paglihok sa lebel alang sa hilom nga kwarto: adunay nagsulti o adunay kusog nga tingog. Ang threshold gikan niini mahimong moputol sa imong tingog, busa paghilom ug sukda pag-usab.</value>
+  </data>
+  <data name="MicSetupRoomSet" xml:space="preserve">
+    <value>Gisugyot nga threshold: {0} dB, gamay ra ang taas sa kasaba sa kwarto.</value>
+  </data>
+  <data name="MicSetupRoomQuiet" xml:space="preserve">
+    <value>Hilom kaayo ang kwarto, busa gamay ra ang tangtangon sa expander. Gisugyot nga threshold: {0} dB.</value>
+  </data>
+  <data name="MicSetupRoomLoud" xml:space="preserve">
+    <value>Halos sama ka kusog sa imong tingog ang kwarto. Ang {0} dB mao ang labing taas nga threshold nga mopalusot pa sa imong mas hinay nga mga pulong, busa bahin ra sa kasaba ang matangtang sa expander. Duol sa mikropono ug ipaubos ang gain sa ingon, o sulayi ang pagtangtang sa kasaba, dayon sukda pag-usab.</value>
+  </data>
+  <data name="MicSetupRoomVoiceTooQuiet" xml:space="preserve">
+    <value>Niini nga gain, hinay kaayo ang imong tingog aron mailhan kini sa expander gikan sa kwarto. Ipataas ang gain sa lakang nga Level, dayon sukda pag-usab.</value>
+  </data>
+  <data name="MicSetupRoomNoVoice" xml:space="preserve">
+    <value>Walay tingog nga nasukod sa lakang nga Level, busa gipabilin ra ang threshold ubos sa lebel nga gitumong sa Isugyot ang gain. Gamita ang Isugyot ang gain aron susihon kini batok sa imong kaugalingong tingog.</value>
+  </data>
+  <data name="MicSetupRoomApplied" xml:space="preserve">
+    <value>Naka-on ang expander, threshold {0} dB. Kon usbon nimo ang gain o ang pagtangtang sa kasaba, sukda pag-usab ang kwarto.</value>
+  </data>
+  <data name="MicSetupRoomStale" xml:space="preserve">
+    <value>Nausab ang gain, ang pagtangtang sa kasaba o ang mikropono sukad gisukod ang kwarto. Sukda pag-usab.</value>
+  </data>
+  <data name="MicSetupRoomSession" xml:space="preserve">
+    <value>Adunay nagdagan nga session sa Setup sa mic. Hunonga una kini sa lakang nga Paminaw: dili ang kwarto ang usa ka take o ang imong tingog sa mga monitor.</value>
+  </data>
+  <data name="MicSetupRoomGated" xml:space="preserve">
+    <value>Naka-on ang expander sa {0}, ug human niini mobasa ang meter niining mikropono. I-off ang expander, sukda, dayon ibutang ang threshold.</value>
+  </data>
+  <data name="MicSetupRoomInterrupted" xml:space="preserve">
+    <value>Nagsugod ang usa ka session sa Setup sa mic, busa mihunong ang pagsukod. Sukda pag-usab kon mahuman na kini.</value>
+  </data>
+  <data name="MicSetupShapeExpanderHint" xml:space="preserve">
+    <value>Ang Sukda ang kasaba sa kwarto sa lakang nga Level mobutang sa threshold nga gamay ra ang taas sa imong kwarto.</value>
+  </data>
 </root>
