@@ -902,7 +902,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
         // Before the build, so the meters start with the force.
         _mixer.SetBlockSize(saved?.BlockSize);
         UpdateInputDeviceHint();
-        _mixer.Build(MixerConfig.FromSettings(saved), output);
+        // The saved masters go into the build, so a recorded mix saved muted
+        // never plays between its sink appearing and the settings below.
+        _mixer.Build(MixerConfig.FromSettings(saved).WithSavedMasters(saved), output);
         // Units run their microphone's EQ only while the submixer runs: in
         // hardware-control mode no channel carries an input and nothing is
         // written to any unit.

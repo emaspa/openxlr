@@ -125,4 +125,22 @@ public sealed class MixerLayoutSettingsTests
         }
         finally { Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void TheBuildGetsTheSavedMastersOfEveryMixButTheMonitors()
+    {
+        var settings = new MixerSettings
+        {
+            MixVolumes = new() { ["stream"] = .5, ["chat"] = 1, ["monitor"] = .4, ["auxout"] = double.NaN },
+            MixMuted = ["stream", "monitor"],
+        };
+        var config = MixerConfig.FromSettings(settings).WithSavedMasters(settings);
+        (double, bool) Master(string id) => config.Mixes.Single(m => m.Id == id) is var mix ? (mix.Volume, mix.Muted) : default;
+        Assert.Equal((.5, true), Master("stream"));
+        Assert.Equal((1.0, false), Master("chat"));
+        // A monitor mix's master is its sink's desktop volume; the settings restore it.
+        Assert.Equal((1.0, false), Master("monitor"));
+        Assert.Equal((1.0, false), Master("auxout"));
+        Assert.Same(config, config.WithSavedMasters(null));
+    }
 }

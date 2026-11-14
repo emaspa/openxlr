@@ -215,8 +215,18 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             foreach (MixDefinition mix in config.Mixes)
             {
                 _mixModules[mix.Id] = _pw.CreateNullSink(mix.SinkName, $"OpenXLR {mix.Name}", restoreState: RestoresMixSinkState(mix.Kind));
-                _mixVolume[mix.Id] = Math.Clamp(mix.Volume, 0, MixVolumeMaximumLocked(mix.Id));
+                double volume = _mixVolume[mix.Id] = Math.Clamp(mix.Volume, 0, MixVolumeMaximumLocked(mix.Id));
                 if (mix.Muted) _mixMuted.Add(mix.Id);
+                // A recorded mix's sink carries its master and mute, and the
+                // channels link into it the moment their combines load. It
+                // opens at both before any does, so a mix saved muted is
+                // silent from its first moment. A new sink is at full volume
+                // and unmuted, which needs no write.
+                if (mix.Kind != MixKind.Monitor)
+                {
+                    if (PipeWireAdapter.SinkInputPercent(volume) != 100) _pw.SetSinkVolume(mix.SinkName, volume);
+                    if (mix.Muted) _pw.SetSinkMuted(mix.SinkName, true);
+                }
             }
 
             // One combine per channel, feeding every mix. Its internal streams

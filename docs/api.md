@@ -501,7 +501,9 @@ microphone, the Aux port and every output following the mix hear it. An
 application that plays straight into the mix's playback device follows
 it too. The daemon creates these sinks with `state.restore-props=false`,
 so the session manager never restores a remembered level on them after a
-rebuild.
+rebuild. At startup the daemon sets each one to its saved master and mute
+before any channel links into it, so a mix saved muted makes no sound
+during a restart.
 
 The selected physical sinks mirror monitoring: the global pause mutes them,
 and resuming restores their previous native mute flags. A selected sink whose
