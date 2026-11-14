@@ -1,6 +1,7 @@
 using OpenXLR.UI.Localization;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
@@ -16,6 +17,9 @@ internal sealed class DesktopKeys : IDisposable
     internal const string StopClipsKey = "clips_stop";
     internal const string MicMuteKey = "mic_mute";
     internal const string TalkKey = "push_to_talk";
+    internal const string GlitchKey = "glitch_mark";
+    /// <summary>Where a glitch marked by its key was marked from, on the daemon's timeline and in its journal.</summary>
+    internal const string GlitchLabel = "Desktop key";
     internal static string ClipKey(string clip) => "clip_" + clip;
 
     private readonly DaemonClient _client;
@@ -105,6 +109,8 @@ internal sealed class DesktopKeys : IDisposable
     private Task _closing = Task.CompletedTask;
     internal string Status { get; private set; } = Localizer.Text("DesktopKeysDisabled");
     internal event Action? Changed;
+    /// <summary>The glitch key marked a glitch, or could not: the sentence that says so, for the main window's notice. Raised off the UI thread.</summary>
+    internal event Action<string>? GlitchMarked;
 
     /// <summary>How long a bind waits for the desktop's answer, which may be a dialog the user has to answer.</summary>
     internal TimeSpan BindTimeout { get; init; } = TimeSpan.FromMinutes(2);
@@ -660,21 +666,38 @@ internal sealed class DesktopKeys : IDisposable
             actions[MicMuteKey] = new(Localizer.Text("KeyToggleMicMute"), () => ToggleMicrophonesAsync(microphones), "XF86AudioMicMute", Quiet: true);
         // What a press sends is built on the press, which needs the key's release.
         if (settings.PushToTalk) actions[TalkKey] = new(Localizer.Text("KeyPushToTalk"), null, Quiet: true);
+        // No suggested key: no keyboard has a glitch key, and a suggested
+        // combination would be taken from every application that uses it.
+        if (settings.GlitchMark) actions[GlitchKey] = new(Localizer.Text("KeyMarkGlitch"), MarkGlitchAsync, Quiet: true);
         return actions;
+    }
+
+    /// <summary>
+    /// Mark a glitch as Ctrl+G does, labelled as a desktop key's. The sentence
+    /// the UI shows for Ctrl+G, with the time, goes to the status line and to
+    /// the main window.
+    /// </summary>
+    private async Task<string?> MarkGlitchAsync()
+    {
+        string at = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        string? error = await _client.MarkGlitchAsync(GlitchLabel);
+        string text = error is null ? Localizer.Format("GlitchMarkedAt", at) : Localizer.Format("GlitchNotMarked", error);
+        GlitchMarked?.Invoke(text);
+        return text;
     }
 
     private void Dispatch(ShortcutSession session, string id, KeyAction action)
     {
         if (action.Clip is { } clip) PressClip(session, id, clip, action);
         else if (id == TalkKey) PressTalk(session, action);
-        else if (id != MicMuteKey || FirstPress(id)) _ = InvokeAsync(action, () => IsActive(session));
+        else if (id is not (MicMuteKey or GlitchKey) || FirstPress(id)) _ = InvokeAsync(action, () => IsActive(session));
     }
 
     /// <summary>
-    /// A key that toggles acts once per press: where the desktop reports keys
-    /// coming up, a repeat while it is down does nothing, until a release
-    /// that never came has been waited for as long as a clip of unknown
-    /// length is.
+    /// A key that toggles, or marks a glitch, acts once per press: where the
+    /// desktop reports keys coming up, a repeat while it is down does
+    /// nothing, until a release that never came has been waited for as long
+    /// as a clip of unknown length is.
     /// </summary>
     private bool FirstPress(string id)
     {

@@ -1412,10 +1412,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   build identities, state
   receive time and connection status distinguish source rebuilds and
   retained state from an earlier connection
-- Glitch marker: Ctrl+G in the UI or the terminal mixer, a button in
-  Options, SUPPORT, or a Deck key marks the moment a crackle or dropout was
-  heard. The daemon keeps a ten minute record, in memory, of what changed
-  around the audio (devices on the bus, USB faults, card profiles, capture
+- Glitch marker: Ctrl+G in the UI or the terminal mixer, a desktop key, a
+  button in Options, SUPPORT, or a Deck key marks the moment a crackle or
+  dropout was heard. The daemon keeps a ten minute record, in memory, of
+  what changed around the audio (devices on the bus, USB faults, card profiles, capture
   stalls, the graph, plugin hosts, the clock and block size, own clock
   underruns, application streams on channels), without polling for it, and
   the diagnostics archive's `timeline.txt` lists each marker with the 30
@@ -1463,7 +1463,9 @@ mutes them all; with all muted it turns them on. A push-to-talk key keeps
 them on only while it is down, where the desktop reports the key coming up.
 Setting it up mutes them, and so does every start of the UI. A hold that
 ends without its release mutes them again: a closed or replaced shortcut
-session, a dropped daemon connection, or the UI quitting. Focus
+session, a dropped daemon connection, or the UI quitting. Another key marks
+a glitch for the diagnostics archive, as Ctrl+G does in the UI, from any
+application and with the UI in the tray. Focus
 identity comes from KWin on KDE Plasma, `swaymsg` on Sway or `hyprctl`
 on Hyprland, `niri` on Niri or local EWMH properties through `xprop` on X11.
 GNOME Shell uses the optional [OpenXLR Focus extension](gnome-focus.md),
@@ -1475,5 +1477,6 @@ unavailable GlobalShortcuts portal leaves the Deck focus service available;
 PC shortcuts still need that portal. See
 [Desktop keys](manual.md#desktop-keys),
 [Soundboard keys](manual.md#soundboard-keys),
-[Microphone keys](manual.md#microphone-keys) and
+[Microphone keys](manual.md#microphone-keys),
+[Glitch key](manual.md#glitch-key) and
 [Output keys](manual.md#output-keys).

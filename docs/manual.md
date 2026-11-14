@@ -5137,7 +5137,9 @@ instead, as soon as you hear it, and collect diagnostics afterwards:
   SUPPORT;
 - on the Stream Deck, press a Toggle key set to **Mark a glitch for the
   diagnostics archive**, under **Diagnostics** in the key's settings;
-- in the terminal mixer, press **Ctrl+G** on any tab.
+- in the terminal mixer, press **Ctrl+G** on any tab;
+- from any application, press the [glitch key](#glitch-key) set up in
+  Desktop keys.
 
 The UI shows "Glitch marked at" and the time for a few seconds, above the
 mixer and beside the button in Options; the terminal mixer says the same on
@@ -5954,6 +5956,27 @@ Desktop keys.
 Push to talk lives in the UI, not in the daemon. A UI that is killed rather
 than closed sends no mute, and its next start mutes the microphones. The
 unit's own mute and the strip's **Mute** keep working alongside the keys.
+
+<a name="glitch-key"></a>
+### Glitch key
+
+In **Desktop keys**, select **Add a key that marks a glitch for the
+diagnostics archive**, then choose **Apply and configure keys**. The desktop
+lists the key as **Mark a glitch for the diagnostics archive**. A press
+[marks a glitch](#glitch-marker) as Ctrl+G does in the UI. It works while a
+game or a call has the focus and while the UI sits in the tray, which Ctrl+G
+cannot.
+
+Desktop keys shows "Glitch marked at" and the time, and the UI shows the
+same line above the mixer for a few seconds. When the daemon refuses, both
+show "Not marked:" and its reason. In `timeline.txt` and in the daemon's
+journal line the marker says it came from `Desktop key`, where one marked in
+the UI says `UI`. Where the desktop reports keys coming up, holding the key
+down marks one glitch, however often the desktop repeats it.
+
+The key suggests no shortcut to the desktop. No keyboard has a glitch key,
+and a suggested combination such as Ctrl+Shift+G would stop reaching every
+application that uses it. Choose one in the desktop's shortcut dialog.
 
 <a name="output-keys"></a>
 ### Output volume, mute and system output keys

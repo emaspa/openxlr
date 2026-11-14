@@ -31,6 +31,8 @@ internal sealed record DesktopKeySettings
     /// never the only one that can mute it.
     /// </summary>
     public List<string> Microphones { get; init; } = [DefaultMicrophone];
+    /// <summary>A key that marks a glitch on the daemon's timeline, as Ctrl+G does in the UI.</summary>
+    public bool GlitchMark { get; init; }
     internal const string DefaultMicrophone = "xlr1";
     internal static string MainKey(string device) => "main_" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(device)))[..24].ToLowerInvariant();
     internal static bool ValidOutput(string? name) => name is { Length: > 0 and <= 256 } && !name.Any(char.IsControl)

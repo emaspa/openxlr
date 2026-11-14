@@ -4827,4 +4827,13 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="MicSetupShapeExpanderHint" xml:space="preserve">
     <value>Measure room noise on the Level step sets the threshold just above your room.</value>
   </data>
+  <data name="AddGlitchKey" xml:space="preserve">
+    <value>Add a key that marks a glitch for the diagnostics archive</value>
+  </data>
+  <data name="KeyMarkGlitch" xml:space="preserve">
+    <value>Mark a glitch for the diagnostics archive</value>
+  </data>
+  <data name="GlitchKeyNote" xml:space="preserve">
+    <value>The glitch key marks the moment as Ctrl+G does, also while the UI is hidden in the tray. Collect diagnostics afterwards: timeline.txt in the archive shows what changed in the 30 seconds before each mark.</value>
+  </data>
 </root>

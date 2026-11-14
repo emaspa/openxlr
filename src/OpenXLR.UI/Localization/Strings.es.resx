@@ -4064,4 +4064,13 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="MicSetupShapeExpanderHint" xml:space="preserve">
     <value>Medir el ruido de la sala, en el paso Level, pone el umbral justo por encima de tu sala.</value>
   </data>
+  <data name="AddGlitchKey" xml:space="preserve">
+    <value>Añadir una tecla que marca un fallo para el archivo de diagnóstico</value>
+  </data>
+  <data name="KeyMarkGlitch" xml:space="preserve">
+    <value>Marcar un fallo para el archivo de diagnóstico</value>
+  </data>
+  <data name="GlitchKeyNote" xml:space="preserve">
+    <value>La tecla de fallo marca el momento como Ctrl+G, también con la interfaz oculta en la bandeja. Después recopila el diagnóstico: timeline.txt en el archivo muestra lo que cambió en los 30 segundos anteriores a cada marca.</value>
+  </data>
 </root>

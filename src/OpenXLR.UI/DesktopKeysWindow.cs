@@ -47,6 +47,8 @@ internal sealed class DesktopKeysWindow : Window
         bool talkOffered = keys.DeliversRelease || saved.PushToTalk;
         var pushToTalk = new CheckBox { Content = new TextBlock { Text = Localizer.Text("AddPushToTalkKey"), TextWrapping = TextWrapping.Wrap },
             IsChecked = saved.PushToTalk, IsEnabled = talkOffered };
+        var glitchMark = new CheckBox { Content = new TextBlock { Text = Localizer.Text("AddGlitchKey"), TextWrapping = TextWrapping.Wrap },
+            IsChecked = saved.GlitchMark };
         var outputControls = new CheckBox { Content = Localizer.Text("AddVolumeAndMuteKeys"), IsChecked = saved.OutputControls };
         var monitorControls = new CheckBox { Content = Localizer.Text("AddMonitoringPauseKey"), IsChecked = saved.MonitorControls };
         var outputs = vm.Outputs.Where(d => DesktopKeySettings.ValidOutput(d.Name)
@@ -87,6 +89,8 @@ internal sealed class DesktopKeysWindow : Window
             TextWrapping = TextWrapping.Wrap });
         foreach (var choice in micChoices) content.Children.Add(choice.Box);
         content.Children.Add(new TextBlock { Text = Localizer.Text("MicKeysNote"), TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(glitchMark);
+        content.Children.Add(new TextBlock { Text = Localizer.Text("GlitchKeyNote"), TextWrapping = TextWrapping.Wrap });
         content.Children.Add(monitorControls);
         content.Children.Add(new TextBlock { Text = Localizer.Text("MonitoringPauseKeysNote"), TextWrapping = TextWrapping.Wrap });
         content.Children.Add(outputControls);
@@ -116,7 +120,8 @@ internal sealed class DesktopKeysWindow : Window
                     ClipsStop = clipsStop.IsChecked == true,
                     MicMute = micMute.IsChecked == true,
                     PushToTalk = pushToTalk.IsChecked == true,
-                    Microphones = micChoices.Where(c => c.Box.IsChecked == true).Select(c => c.Id).ToList() });
+                    Microphones = micChoices.Where(c => c.Box.IsChecked == true).Select(c => c.Id).ToList(),
+                    GlitchMark = glitchMark.IsChecked == true });
             }
             finally { apply.IsEnabled = true; }
         };

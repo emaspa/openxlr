@@ -190,10 +190,16 @@ public sealed partial class MainViewModel : ViewModelBase
         string at = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
         string? error = await _client.MarkGlitchAsync();
         string text = error is null ? Localizer.Format("GlitchMarkedAt", at) : Localizer.Format("GlitchNotMarked", error);
+        ShowGlitchNotice(text);
+        return text;
+    }
+
+    /// <summary>Show a glitch sentence above the mixer for <see cref="GlitchNoticeHold"/>: Ctrl+G's, or a desktop key's. On the UI thread.</summary>
+    public void ShowGlitchNotice(string text)
+    {
         _glitchNoticeHold?.Dispose();
         GlitchNotice = text;
         _glitchNoticeHold = StartGlitchNoticeHold(GlitchNoticeHold, () => GlitchNotice = null);
-        return text;
     }
 
     // --- hardware controls ---
