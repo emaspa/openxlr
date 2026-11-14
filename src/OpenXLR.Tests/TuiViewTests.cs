@@ -1121,6 +1121,39 @@ public sealed class TuiViewTests
         Assert.Equal("stream", Text(command, "mix"));
     }
 
+    [Fact]
+    public void TheIdleReleaseKeyTogglesASelectedBluetoothOutputOnly()
+    {
+        (App app, List<string> sent) = Ready(tab: 3);
+        var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
+        state["devices"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject
+        { ["name"] = "bluez_output.AA_BB.1", ["description"] = "Buds", ["kind"] = 0 });
+        state["mixer"]!["monitorOutputs"]!.AsArray().Add("bluez_output.AA_BB.1");
+        app.Link.Receive(state.ToJsonString());
+
+        // A wired output has no stream that stops.
+        SelectOutputRow(app, "Arctis Nova Elite");
+        app.Handle(new KeyPress(Key.Char, 'i'));
+        Assert.Empty(sent);
+
+        SelectOutputRow(app, "Buds");
+        app.Handle(new KeyPress(Key.Char, 'i'));
+        JsonElement command = Command(sent);
+        Assert.Equal("setMonitorIdleRelease", Text(command, "cmd"));
+        Assert.Equal("bluez_output.AA_BB.1", Text(command, "device"));
+        Assert.True(command.GetProperty("enabled").GetBoolean());
+
+        // Once the daemon reports it on, the row says so and the key turns it off.
+        sent.Clear();
+        state["mixer"]!["monitorIdleRelease"] = new System.Text.Json.Nodes.JsonArray("bluez_output.AA_BB.1");
+        app.Link.Receive(state.ToJsonString());
+        var screen = new Screen(140, 36);
+        app.Draw(screen);
+        Assert.Contains("released when silent", Frame(screen), StringComparison.Ordinal);
+        app.Handle(new KeyPress(Key.Char, 'i'));
+        Assert.False(Command(sent).GetProperty("enabled").GetBoolean());
+    }
+
     [Theory]
     [InlineData("", "Monitor A", "stream")]
     [InlineData("removed", "Monitor A", "stream")]

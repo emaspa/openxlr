@@ -215,6 +215,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `monitorOutputs` | the selected outputs, in order; the first one is what `@monitor` resolves to |
 | `monitorOutput` | the older single selection, read only when `monitorOutputs` is empty |
 | `monitorFeeds` | output to feed, see [Output feeds](#output-feeds) |
+| `monitorIdleRelease` | the selected Bluetooth outputs whose link comes down while their feed is silent, see [api.md](api.md) `setMonitorIdleRelease`. Empty when absent; a name that is not a `bluez_output.*` sink or not in `monitorOutputs` is dropped. A profile carries it too |
 | `monitorOutputLabels` | selected output name to the description it last had in the device list, reported as the mixer state's `monitorOutputLabels` so a client can name an output that is away. Empty when absent; null entries are dropped, and so is the entry of an output that is not selected. Saved here only, never in profiles |
 | `monitorMuted` | pause every selected monitor output without changing mix or channel mutes, levels or feeds; false when absent. Saved here only, and unchanged by profile recall |
 | `monitorMuteMicrophones` | false when absent; also pause XLR 1, XLR 2 and mono capture channels in all mixes while `monitorMuted` is true. Raw send mutes stay unchanged. Saved here only, never in profiles; [API behaviour and limits](api.md#monitoring-and-microphones) |

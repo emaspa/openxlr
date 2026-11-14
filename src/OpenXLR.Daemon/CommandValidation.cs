@@ -390,6 +390,14 @@ public static class CommandValidation
                 if (cmd.Mix is null || !layout.IsMonitorFeed(cmd.Mix)) return $"setMonitorFeed: '{Short(cmd.Mix ?? "")}' is not a mix or a sum of distinct mixes";
                 if (cmd.Device is null || !layout.IsMonitorOutput(cmd.Device)) return $"setMonitorFeed: '{Short(cmd.Device ?? "")}' is not a selected monitor output";
                 return null;
+            case "setMonitorIdleRelease":
+                if (cmd.Device is null) return "setMonitorIdleRelease: need 'device'";
+                if (TooLong(cmd.Device, MaxText)) return "setMonitorIdleRelease: device name too long";
+                if (cmd.Enabled is null) return "setMonitorIdleRelease: need 'enabled', a boolean";
+                // A wired output has no stream that stops, so only Bluetooth takes it.
+                if (!Mixer.IsBluetoothOutputName(cmd.Device)) return $"setMonitorIdleRelease: '{Short(cmd.Device)}' is not a Bluetooth output";
+                if (!layout.IsMonitorOutput(cmd.Device)) return $"setMonitorIdleRelease: '{Short(cmd.Device)}' is not a selected monitor output";
+                return null;
             case "setEnforcedDefaults":
                 if (TooLong(cmd.Sink, MaxText) || TooLong(cmd.Source, MaxText)) return "setEnforcedDefaults: device name too long";
                 return null;

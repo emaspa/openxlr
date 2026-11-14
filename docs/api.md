@@ -188,7 +188,9 @@ output), `monitorOutputs`, `monitorFeeds`, `monitorOutputLabels` (selected
 output name to the description it last had in `devices`, so a client can
 name an output that is away; an output not seen since it was selected has
 no entry, and an entry goes when its output is deselected; an older daemon
-does not send it), `outputVolume`, `outputVolumeLock` (null when off, otherwise
+does not send it), `monitorIdleRelease` (the selected Bluetooth outputs set
+with `setMonitorIdleRelease` to release their link while their feed is
+silent; empty when none is, and an older daemon does not send it), `outputVolume`, `outputVolumeLock` (null when off, otherwise
 `{device, volume}`, with the exact PipeWire sink name and a desktop level
 from 0 to 1.5, plus `channelVolumes` when the levels differ by channel),
 `outputVolumeLockSuspended` (hardware mixing holds the locked sink's jacks,
@@ -290,6 +292,7 @@ that final acknowledgement (or an `error` without a request id):
 | `setMonitorOutputs` | `devices[]` | every sink the monitor mixes feed, at most 16; a newly listed output is fed by `defaultMonitorMix`. A missing sink stays selected and saved, and is linked when it appears. A client that lists outputs for the user keeps the missing ones in the list it sends |
 | `setMonitorOutput` | `device` | a single monitor sink; `null` disconnects the route |
 | `setMonitorFeed` | `device`, `mix` | what feeds one selected output, independently of other outputs: any existing mix id, including `stream`, `chat`, `auxout` and user mixes of either kind, or distinct ids joined with `+` to sum them at unity. One mix can appear in several outputs' feeds. An empty feed is rejected; remove an output from `setMonitorOutputs` to disconnect it. Each of the Wave XLR Pro's jacks (`<sink>#hp1`, `#hp2`, `#lineout`) takes its own feed, and a `device` that ends at `#` sets every selected jack of that unit. Each distinct feed the jacks play has a mix of its own on the unit, in the order Headphones 1, Headphones 2, Line Out: the first streams on USB playback pair 1 into section 0 of block 0x0001, as all jacks did before, the second on pair 2 into section 18 and the third on pair 3 into section 54. Jacks that play the same feed share it. Sections 18 and 54 are kept in `mixer.json` as they were before their first use and put back once no jack plays them (see [mixer-layout.md](mixer-layout.md)). The state's `monitorFeeds` lists exceptions from `defaultMonitorMix` (`monitor` when present, otherwise the lowest monitor id), independent of layout order. Unknown or repeated mix ids and unselected outputs are rejected. Deleting the last included mix returns that output to `defaultMonitorMix` |
+| `setMonitorIdleRelease` | `device`, `enabled` | whether a selected Bluetooth output (a `bluez_output.*` sink) releases its link while its feed is silent. Off by default. On, the mixer removes the output's links once every mix of its feed has stayed below -80 dBFS on its meter for 10 seconds, so the Bluetooth stream stops and multipoint headphones can switch to another device. It links the output again as soon as a mix of the feed has sound, and the start of that sound can be cut while the headphones reconnect. Turned on after the feed has already been silent for 10 seconds, the output is unlinked at once; turned off while the output is unlinked, it is linked again at once. Refused for an output that is not Bluetooth, the Wave XLR Pro's jacks included, and for one that is not selected. Saved in `mixer.json` and in profiles with the output, kept while the output is away, and dropped when the output is removed from `setMonitorOutputs`. The state's `monitorIdleRelease` lists the outputs that have it on |
 | `setAuxPortEnabled` | `value` | send the Aux mix to the USB Aux port |
 | `setMixing` | `value`, optional `check` | experimental: where the mixes the Wave XLR Pro's outputs play are built, `software` (the default) or `hardware`, switched live; see [hardware mixing](#hardware-mixing). With `check` true nothing changes and the answer is a `mixingPlan` message. `hardware` is refused while the layout has more channels than USB pairs |
 | `setOutputVolume` | `value` | volume of the selected monitor devices, 0 to 1.5; the range the devices themselves take, so a desktop level above unity can be held and written back unchanged. Values outside it are clamped, and the state reports what reached the devices. While the first selected output is locked (`monitorVolumeLocked`) the command is refused with the error `output volume is locked in Options, Audio`, the same one `adjustOutputVolume` and `setOutputDeviceVolume` give for a locked device, and nothing moves. A locked output further down the selection is skipped and the others take the value. A profile recall is never refused for the lock: it leaves a locked output at its level. With no output selected the command succeeds and changes nothing |
@@ -424,6 +427,11 @@ before the recall: deleting it, or adding a monitor whose id sorts first once
 `monitor` is gone. A recall replaces the feed table with the profile's. An
 output whose saved mixes are all gone, or that an older profile left without
 an entry, follows the default at the time of the recall.
+
+`saveProfile` also writes `mixer.monitorIdleRelease`, the selected Bluetooth
+outputs that release their link while silent. A recall replaces the list
+with the profile's, for the outputs the recalled selection keeps. A profile
+saved before the option has no list and leaves the current choice.
 
 Profile files have an 8 MiB save and load limit. The recall marker is at
 most 1 KiB and contains a profile name, not a path. Special files are refused
@@ -1823,7 +1831,8 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   (`mixMaximizer`, by mix id, 1 to 100, never in a profile), the
   [ducking](#ducking) setup (`ducking`), the
   per-channel volumes (`channelVolumes`), the exclusive groups
-  (`exclusiveGroups`), the monitor feeds (`monitorFeeds`),
+  (`exclusiveGroups`), the monitor feeds (`monitorFeeds`), the Bluetooth
+  outputs that release their link while silent (`monitorIdleRelease`),
   `compensateMixLatency`, and `inputBindings`, the hardware strips bound to
   a source. The bindings are machine wiring and never part of a profile. A
   file written before `inputBindings` existed carries XLR 1's source as

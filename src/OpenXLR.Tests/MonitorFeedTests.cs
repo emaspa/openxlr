@@ -207,6 +207,44 @@ public sealed class MonitorFeedTests
         Assert.Equal(["disk full"], errors);
     }
 
+    [Fact]
+    public async Task TheIdleReleaseIsOfferedForBluetoothAndSentOnlyForASelectedOne()
+    {
+        var sent = new List<(string Device, bool Enabled)>();
+        var reply = new TaskCompletionSource<string?>();
+        var errors = new List<string>();
+        var wired = new MonitorOutputItem("alsa_output.headset", "Headset", () => { }, (_, _) => Task.FromResult<string?>(null),
+            idleReleaseChanged: (device, on) => { sent.Add((device, on)); return Task.FromResult<string?>(null); });
+        var headphones = new MonitorOutputItem("bluez_output.AA_BB.1", "Buds", () => { }, (_, _) => Task.FromResult<string?>(null),
+            reportError: errors.Add, idleReleaseChanged: (device, on) => { sent.Add((device, on)); return reply.Task; });
+        Assert.False(wired.IsBluetooth);
+        Assert.True(headphones.IsBluetooth);
+
+        // The daemon's value arrives without echoing a command.
+        headphones.SyncIdleRelease(true);
+        Assert.True(headphones.IdleRelease);
+        headphones.SyncIdleRelease(false);
+        Assert.Empty(sent);
+
+        // Not selected, or not Bluetooth: nothing is sent.
+        headphones.IdleRelease = true;
+        wired.Sync(true);
+        wired.IdleRelease = true;
+        Assert.Empty(sent);
+
+        // A refusal puts back what the daemon last reported and says why.
+        headphones.SyncIdleRelease(false);
+        headphones.Sync(true);
+        headphones.IdleRelease = true;
+        Assert.Equal([("bluez_output.AA_BB.1", true)], sent);
+        headphones.SyncIdleRelease(false);
+        Assert.True(headphones.IdleRelease);   // the edit still waits for its answer
+        reply.SetResult("refused");
+        await Task.Yield();
+        Assert.False(headphones.IdleRelease);
+        Assert.Equal(["refused"], errors);
+    }
+
     [Theory]
     [InlineData(null, "studio")]
     [InlineData("desk", "desk")]

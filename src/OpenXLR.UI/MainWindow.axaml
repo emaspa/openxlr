@@ -1033,18 +1033,27 @@
                           </DropDownButton.ContentTemplate>
                           <DropDownButton.Flyout>
                             <Flyout Placement="RightEdgeAlignedTop">
-                              <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
-                                <ItemsControl ItemsSource="{Binding FeedMixes}" Width="240">
-                                  <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:MonitorMixChoice">
-                                      <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding CanToggle}"
-                                                HorizontalAlignment="Stretch" Padding="8,4" ToolTip.Tip="{Binding Name}">
-                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
-                                      </CheckBox>
-                                    </DataTemplate>
-                                  </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                              </ScrollViewer>
+                              <StackPanel Width="240">
+                                <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
+                                  <ItemsControl ItemsSource="{Binding FeedMixes}" Width="240">
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="vm:MonitorMixChoice">
+                                        <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding CanToggle}"
+                                                  HorizontalAlignment="Stretch" Padding="8,4" ToolTip.Tip="{Binding Name}">
+                                          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                        </CheckBox>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                </ScrollViewer>
+                                <!-- Bluetooth only: a wired output has no stream that stops -->
+                                <CheckBox IsChecked="{Binding IdleRelease, Mode=TwoWay}" IsVisible="{Binding IsBluetooth}"
+                                          HorizontalAlignment="Stretch" Padding="8,4" Margin="0,4,0,0"
+                                          AutomationProperties.Name="{loc:Text Key=MonitorIdleRelease}"
+                                          ToolTip.Tip="{loc:Text Key=MonitorIdleReleaseTip}">
+                                  <TextBlock Text="{loc:Text Key=MonitorIdleRelease}" TextWrapping="Wrap"/>
+                                </CheckBox>
+                              </StackPanel>
                             </Flyout>
                           </DropDownButton.Flyout>
                         </DropDownButton>

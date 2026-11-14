@@ -93,6 +93,13 @@ public sealed record MixerSettings
     /// </summary>
     public Dictionary<string, string> MonitorOutputLabels { get; init; } = [];
 
+    /// <summary>
+    /// Selected Bluetooth outputs whose link comes down while their feed is
+    /// silent. Empty when absent; a name that is not a selected Bluetooth
+    /// output is dropped.
+    /// </summary>
+    public List<string> MonitorIdleRelease { get; init; } = [];
+
     /// <summary>Application identity to channel id, from manual assignments.</summary>
     public Dictionary<string, string> AppOverrides { get; init; } = [];
 

@@ -605,10 +605,11 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   headset with a game sink and a chat sink hears two selections, and
   one pair of headphones can hear the desktop from A with a separately
   processed mic from B; a blend at other levels is a mix of its own
-- A Bluetooth output is unlinked after 10 seconds of silence on its feed,
-  so its stream stops and multipoint headphones can switch to another
-  device, and linked again as soon as the feed has sound. See
-  [Give a second headset its own mix](manual.md#second-monitor-output)
+- An option per Bluetooth output, off by default, unlinks it after 10
+  seconds of silence on its feed, so its stream stops and multipoint
+  headphones can switch to another device. It is linked again as soon as
+  the feed has sound, and the start of that sound can be cut. See
+  [Let a Bluetooth headset switch devices](manual.md#bluetooth-idle-release)
 - Level meters throughout, dB-scaled, pushed at 15 Hz
 
 Each channel is a combine sink with one internal stream per mix; that

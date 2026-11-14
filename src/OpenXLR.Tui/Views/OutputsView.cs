@@ -171,7 +171,7 @@ internal sealed class OutputsView : View
     // A mix's output EQ, open over the list until Esc.
     private EqEditor? _eqEditor;
 
-    public override string Keys => _eqEditor?.Keys ?? "Space select  Left/Right feed  Enter main output  -/+ volume  m mute";
+    public override string Keys => _eqEditor?.Keys ?? "Space select  Left/Right feed  Enter main output  -/+ volume  m mute  i idle release";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
@@ -285,7 +285,8 @@ internal sealed class OutputsView : View
     /// <summary>
     /// One sink: selected or not, what feeds it, and its own volume. Space
     /// selects it, the arrows walk the mixes that can feed it (a summed feed
-    /// only after a second press), and enter makes it the system default.
+    /// only after a second press), enter makes it the system default, and i
+    /// lets a selected Bluetooth output's link go while its feed is silent.
     /// </summary>
     private sealed class OutputRow(
         DeviceEntry sink, bool selected, string feed, Snapshot state, DaemonLink link, App app, Action toggle, Action<int> cycleFeed)
@@ -294,7 +295,7 @@ internal sealed class OutputsView : View
         public override void DrawValue(Screen screen, int x, int y, int width, Theme theme, Rgb back, bool focused)
         {
             Widgets.Lamp(screen, x, y, selected, theme, back);
-            string label = selected ? Feeds() : "not selected";
+            string label = !selected ? "not selected" : IdleRelease ? Feeds() + ", released when silent" : Feeds();
             bool locked = state.Mixer.HoldsVolumeOf(sink.Name);
             screen.Text(x + 2, y, label, selected ? theme.TextDetail : theme.TextMuted, back,
                 bold: focused, maxWidth: Math.Max(4, width - (locked ? 17 : 12)));
@@ -307,6 +308,9 @@ internal sealed class OutputsView : View
             if (state.Mixer.EnforcedDefaultSink == sink.Name)
                 screen.Text(x + Math.Max(6, width - 3), y, "def", theme.Accent, back);
         }
+
+        private bool Bluetooth => sink.Name.StartsWith("bluez_output.", StringComparison.Ordinal);
+        private bool IdleRelease => Bluetooth && state.Mixer.MonitorIdleRelease.Contains(sink.Name);
 
         private string Feeds()
         {
@@ -348,6 +352,23 @@ internal sealed class OutputsView : View
 
                 case Key.Char when key.Char == 'm':
                     link.Send("toggleOutputMute", body => body["device"] = sink.Name);
+                    return true;
+
+                case Key.Char when key.Char == 'i':
+                    // A wired output has no stream that stops, so the daemon takes Bluetooth only.
+                    if (!selected || !Bluetooth)
+                    {
+                        app.Say(selected ? "Only a Bluetooth output can be released when silent" : $"Select {Describe(sink)} first");
+                        return true;
+                    }
+                    bool enable = !IdleRelease;
+                    link.Send("setMonitorIdleRelease", body =>
+                    {
+                        body["device"] = sink.Name;
+                        body["enabled"] = enable;
+                    });
+                    app.Say(enable ? $"{Describe(sink)} is released after 10 s of silence; the start of the next sound can be cut"
+                        : $"{Describe(sink)} stays linked");
                     return true;
 
                 default: return false;

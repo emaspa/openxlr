@@ -2193,6 +2193,12 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="ChooseOutputMixes" xml:space="preserve">
     <value>Pagpili og usa o daghang mix alang niining output.</value>
   </data>
+  <data name="MonitorIdleRelease" xml:space="preserve">
+    <value>Tugoti nga mobalhin sa laing device kung hilom</value>
+  </data>
+  <data name="MonitorIdleReleaseTip" xml:space="preserve">
+    <value>Human sa 10 ka segundo nga kahilom sa mga mix niining output, tangtangon sa OpenXLR ang link niini, busa mohunong ang stream sa headphones ug makabalhin ang multipoint headphones sa laing device, sama sa telepono. Mobalik ang link dayon kung adunay tingog ang usa ka mix, ug mahimong maputol ang unang higayon sa maong tingog samtang mokonekta pag-usab ang headphones. Ang mix nga nagdala sa imong mikropono dili gayud mahilom, mao nga magpabilin nga naka-link ang output.</value>
+  </data>
   <data name="WINDOW" xml:space="preserve">
     <value>WINDOW</value>
   </data>

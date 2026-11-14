@@ -2283,6 +2283,12 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="ChooseOutputMixes" xml:space="preserve">
     <value>Wähle einen oder mehrere Mixe für diesen Ausgang.</value>
   </data>
+  <data name="MonitorIdleRelease" xml:space="preserve">
+    <value>Bei Stille zu einem anderen Gerät wechseln lassen</value>
+  </data>
+  <data name="MonitorIdleReleaseTip" xml:space="preserve">
+    <value>Nach 10 Sekunden Stille in den Mixen dieses Ausgangs entfernt OpenXLR seine Verbindung. Dann stoppt der Stream der Kopfhörer, und Multipoint-Kopfhörer können zu einem anderen Gerät wechseln, etwa zu einem Telefon. Die Verbindung kommt zurück, sobald ein Mix Ton hat, und der erste Moment dieses Tons kann fehlen, während sich die Kopfhörer wieder verbinden. Ein Mix mit deinem Mikrofon wird nie still, daher bleibt der Ausgang verbunden.</value>
+  </data>
   <data name="WINDOW" xml:space="preserve">
     <value>FENSTER</value>
   </data>

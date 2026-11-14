@@ -2251,6 +2251,12 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="ChooseOutputMixes" xml:space="preserve">
     <value>Scegli uno o più mix per questa uscita.</value>
   </data>
+  <data name="MonitorIdleRelease" xml:space="preserve">
+    <value>Lascia che passi a un altro dispositivo nel silenzio</value>
+  </data>
+  <data name="MonitorIdleReleaseTip" xml:space="preserve">
+    <value>Dopo 10 secondi di silenzio nei mix di questa uscita, OpenXLR rimuove il suo collegamento, così il flusso delle cuffie si ferma e le cuffie multipoint possono passare a un altro dispositivo, come un telefono. Il collegamento torna appena un mix ha suono, e il primo istante di quel suono può andare perso mentre le cuffie si ricollegano. Un mix che porta il tuo microfono non è mai in silenzio, quindi l'uscita resta collegata.</value>
+  </data>
   <data name="WINDOW" xml:space="preserve">
     <value>FINESTRA</value>
   </data>

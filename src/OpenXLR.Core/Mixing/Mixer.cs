@@ -52,6 +52,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // list, so clients can still name an output that is away. Only selected
     // outputs keep an entry.
     private readonly Dictionary<string, string> _monitorOutputLabels = new(StringComparer.Ordinal);
+    // Selected Bluetooth outputs whose link comes down while their feed is
+    // silent (see IdleRelease). Off for every output not listed here.
+    private readonly HashSet<string> _monitorIdleRelease = new(StringComparer.Ordinal);
     // The device list the labels were last read against; a new list or a
     // new selection reads them again.
     private string? _labelledDeviceList;
@@ -1678,6 +1681,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorOutputMutes = new Dictionary<string, bool>(_monitorOutputMutes),
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 MonitorOutputLabels = new Dictionary<string, string>(_monitorOutputLabels, StringComparer.Ordinal),
+                MonitorIdleRelease = [.. _monitorIdleRelease.Order(StringComparer.Ordinal)],
                 AppOverrides = new Dictionary<string, string>(Matcher.Overrides),
                 AppVolumes = new Dictionary<string, double>(_appVolumes, StringComparer.OrdinalIgnoreCase),
                 RouteAppsByDefault = Matcher.RouteByDefault,
@@ -1853,6 +1857,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             _monitorOutputLabels.Clear();
             foreach ((string output, string label) in s.MonitorOutputLabels ?? [])
                 if (!string.IsNullOrWhiteSpace(label)) _monitorOutputLabels[output] = label;
+            // Selecting the saved outputs below drops the flag of any other.
+            SetIdleReleaseListLocked(s.MonitorIdleRelease);
             HashSet<string> selectedHardware = savedOutputs.Select(StripMarker).ToHashSet(StringComparer.Ordinal);
             var savedOwners = (s.MonitorOutputMutes ?? []).Where(pair => IsExactOutputName(pair.Key)
                 && !pair.Key.StartsWith("OpenXLR_", StringComparison.Ordinal)).ToArray();
@@ -1950,6 +1956,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 ChannelMuted = [.. _muted],
                 MonitorOutputs = [.. _monitorOutputs],
                 MonitorFeeds = SceneMonitorFeedsLocked(),
+                MonitorIdleRelease = [.. _monitorIdleRelease.Order(StringComparer.Ordinal)],
                 AuxPortEnabled = _auxPortEnabled,
                 OutputVolume = _outputVolume,
                 LowCutHz = _lowCutHz,
@@ -2040,10 +2047,12 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 _monitorFeeds.Clear();
                 foreach ((string output, string mixId) in s.MonitorFeeds) _monitorFeeds[output] = mixId;
             }
+            // Null belongs to a profile saved before the flag: keep the current one.
+            if (s.MonitorIdleRelease is not null) SetIdleReleaseListLocked(s.MonitorIdleRelease);
             if (s.MonitorOutputs is not null)
                 SetMonitorOutputsLocked(s.MonitorOutputs);
-            else if (s.MonitorFeeds is not null)
-                SetMonitorOutputsLocked([.. _monitorOutputs]);   // relink with the recalled feeds
+            else if (s.MonitorFeeds is not null || s.MonitorIdleRelease is not null)
+                SetMonitorOutputsLocked([.. _monitorOutputs]);   // relink with the recalled feeds and flags
             _auxPortEnabled = s.AuxPortEnabled;
             WireAuxRouteLocked();
 
@@ -2497,6 +2506,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 try
                 {
                     RemovePausedMonitorRoutesLocked();
+                    // Paused outputs are not idle: nothing for the meter timer to wake.
+                    PublishIdleFeedsLocked();
                     SyncMonitorHardwareMutesLocked(explicitChange: true);
                 }
                 finally
@@ -2794,6 +2805,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         foreach (string stale in _monitorOutputLabels.Keys.Where(o => !_monitorOutputs.Contains(o)).ToList())
             _monitorOutputLabels.Remove(stale);
         _monitorOutputLabelsDue = true;
+        // So is the idle release: ticking the output again starts with it off.
+        _monitorIdleRelease.IntersectWith(_monitorOutputs);
         _incompleteMonitorRoutes.Clear();
         foreach (string? channel in _hardwareMicChannels) RefreshHardwareMicCellsLocked(channel);
         if (!_monitorMuted)
@@ -2837,6 +2850,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // silent, and, for the wake check outside the lock, each one's feed meters.
     private readonly HashSet<string> _idleRoutes = [];
     private volatile string[][] _idleFeeds = [];
+    /// <summary>How many idle outputs the meter-rate wake check watches; tests read it.</summary>
+    internal int WaitingToWake => _idleFeeds.Length;
 
     private static string MixMeter(MixDefinition mix) => $"mix:{mix.Id}";
 
@@ -2844,10 +2859,47 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private bool Sounding(string meter)
         => LastSound(meter) is not long last || Clock() - last < (long)IdleRelease.TotalMilliseconds;
 
-    /// <summary>A Bluetooth output whose every feeding mix has been silent for <see cref="IdleRelease"/>.</summary>
+    /// <summary>
+    /// A Bluetooth output set to release its link (<see cref="SetMonitorIdleRelease"/>)
+    /// whose every feeding mix has been silent for <see cref="IdleRelease"/>.
+    /// </summary>
     private bool IdleLocked(string target, List<MixDefinition> mixes)
-        => target.StartsWith("bluez_output.", StringComparison.Ordinal) && mixes.Count > 0
+        => IsBluetoothOutputName(target) && _monitorIdleRelease.Contains(target) && mixes.Count > 0
             && !mixes.Any(mix => Sounding(MixMeter(mix)));
+
+    /// <summary>A Bluetooth output: the only kind whose stream stops once nothing is linked into it.</summary>
+    public static bool IsBluetoothOutputName(string name) => name.StartsWith("bluez_output.", StringComparison.Ordinal);
+
+    /// <summary>The saved or recalled flags, Bluetooth outputs only; the selection then drops the unselected ones.</summary>
+    private void SetIdleReleaseListLocked(IEnumerable<string>? outputs)
+    {
+        _monitorIdleRelease.Clear();
+        foreach (string output in outputs ?? [])
+            if (IsBluetoothOutputName(output)) _monitorIdleRelease.Add(output);
+    }
+
+    /// <summary>
+    /// Let a selected Bluetooth output's link come down while its feed is
+    /// silent, or keep it linked at all times (the default). Turned on, an
+    /// output whose feed the meters already read as silent for
+    /// <see cref="IdleRelease"/> is unlinked at once; turned off, an output
+    /// left unlinked is linked again at once. Null on success, else why
+    /// nothing changed.
+    /// </summary>
+    public string? SetMonitorIdleRelease(string output, bool enabled)
+    {
+        lock (_gate)
+        {
+            if (!_built) return "mixer not built";
+            if (!IsBluetoothOutputName(output)) return $"'{output}' is not a Bluetooth output";
+            if (!_monitorOutputs.Contains(output)) return $"'{output}' is not a selected monitor output";
+            if (enabled ? !_monitorIdleRelease.Add(output) : !_monitorIdleRelease.Remove(output)) return null;
+            // The sweep unlinks the output if it is idle now, and links it
+            // again if it was idle and the flag is off.
+            EnsureMonitorRoutes();
+            return null;
+        }
+    }
 
     /// <summary>Drop idle keys of outputs no longer routed and publish the feeds the wake check reads.</summary>
     private void PublishIdleFeedsLocked()
@@ -3782,6 +3834,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MonitorVolumeLocked = _monitorOutputs.FirstOrDefault() is { } output && IsOutputVolumeLocked(StripMarker(output)),
                 MonitorFeeds = new Dictionary<string, string>(_monitorFeeds),
                 MonitorOutputLabels = new Dictionary<string, string>(_monitorOutputLabels, StringComparer.Ordinal),
+                MonitorIdleRelease = [.. _monitorIdleRelease.Order(StringComparer.Ordinal)],
                 OutputVolume = _outputVolume,
                 LowCutHz = _lowCutHz,
                 SoftClipGuard = _softClipGuard,
@@ -4078,6 +4131,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _monitorOutputs.Clear();
         _monitorFeeds.Clear();
         _monitorOutputLabels.Clear();
+        _monitorIdleRelease.Clear();
+        // Without this the wake check would take the lock at every meter
+        // tick until the next build: a missing meter counts as sound.
+        _idleRoutes.Clear();
+        _idleFeeds = [];
         _incompleteMonitorRoutes.Clear();
         if (_auxRoute is not null) { _pw.Unlink(_auxRoute); _auxRoute = null; }
         foreach (PortLink feed in _inputFeeds.Values) _pw.Unlink(feed);

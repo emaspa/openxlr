@@ -76,6 +76,7 @@ public sealed record Command
     /// <summary>
     /// "setMonitorOutput": PipeWire node.name (null disconnects);
     /// "setMonitorFeed": the selected output whose feed changes (with "mix");
+    /// "setMonitorIdleRelease": the selected Bluetooth output (with "enabled");
     /// "setActiveDevice": the interface's instance id or vvvv:pppp model id; or
     /// "setWaveInterfaceEnabled" / "setWaveControl": an instance id from waveInterfaces.
     /// </summary>
@@ -135,7 +136,7 @@ public sealed record Command
     /// <summary>"setEqBand": which existing band, 1 to 16.</summary>
     [JsonPropertyName("band")] public int? Band { get; init; }
 
-    /// <summary>"setEqBand", "setNoiseRemoval", "setVoiceChanger", "setCompressor" and "setExpander": the fields that change; an absent one is kept.</summary>
+    /// <summary>"setEqBand", "setNoiseRemoval", "setVoiceChanger", "setCompressor" and "setExpander": the fields that change; an absent one is kept. "setMonitorIdleRelease": required.</summary>
     [JsonPropertyName("enabled")] public bool? Enabled { get; init; }
     /// <summary>"setNoiseRemoval": <c>rnnoise</c> or <c>deepfilternet</c>.</summary>
     [JsonPropertyName("engine")] public string? Engine { get; init; }

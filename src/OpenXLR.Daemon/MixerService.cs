@@ -1714,6 +1714,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     if (_mixer.SetMonitorFeed(cmd.Device, cmd.Mix) is string feedErr) return $"setMonitorFeed: {feedErr}";
                     SyncOutputSelectors();   // the jacks may now follow another mix's XLR 1 send
                     break;
+                case "setMonitorIdleRelease":
+                    if (cmd.Device is null || cmd.Enabled is not bool idle) return "setMonitorIdleRelease: need 'device' and 'enabled'";
+                    if (_mixer.SetMonitorIdleRelease(cmd.Device, idle) is string idleErr) return $"setMonitorIdleRelease: {idleErr}";
+                    break;
                 case "setOutputVolume":
                     _mixer.SetSharedOutputVolume(cmd.Value.GetDouble());
                     SyncOutputSelectors();   // the Pro's microphone paths follow the output volume on the jacks
