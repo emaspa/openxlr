@@ -267,8 +267,7 @@ public sealed partial class Mixer
         {
             int index = legs[mix.SinkName];
             _dryLegIndex[Cell(channel.Id, mix.Id)] = index;
-            _pw.SetSinkInputVolume(index, 0);
-            _pw.SetSinkInputMuted(index, true);
+            WriteLegLocked(index, (0, true));
         }
         route.Ready = true;
         LinkDryFeedLocked(channel, route);

@@ -194,12 +194,67 @@ public sealed class DuckingPlanTests
         f.Mixer.SetDuckingPlan(Plan("xlr1", "music|monitor"));
         f.FailDirectMute = true;
         f.Clear();
+        // A leg the mixer has no record of writing, so its close is tried.
+        f.Field<System.Collections.IDictionary>("_legWritten").Clear();
         f.Mixer.SetLevel("music", "monitor", .4);
         Assert.DoesNotContain(f.CellWrites, s => s.StartsWith("set-sink-input-volume 32", StringComparison.Ordinal));
         Assert.Contains("music|monitor", f.Field<HashSet<string>>("_pendingCells"));
         f.FailDirectMute = false;
         f.Mixer.EnsureCellLevels();
         Assert.Contains("set-sink-input-volume 32 40%", f.CellWrites);
+    }
+
+    [Fact]
+    public void ASendWritesOnlyTheLevelOrMuteThatChanged()
+    {
+        using var f = new Sends();
+        f.Mixer.SetMixVolume("stream", 1);   // every send into Stream written once
+        f.Clear();
+        f.Mixer.SetLevel("music", "stream", .5);
+        Assert.Equal(["set-sink-input-volume 31 50%"], f.CellWrites);
+        f.Clear();
+        f.Mixer.SetLevel("music", "stream", .5);
+        f.Mixer.SetLevel("music", "stream", .501);   // the same whole percent
+        Assert.Empty(f.CellWrites);
+        f.Mixer.SetLevel("music", "stream", .6);
+        Assert.Equal(["set-sink-input-volume 31 60%"], f.CellWrites);
+        f.Clear();
+        f.Mixer.SetChannelMuted("music", "stream", true);
+        Assert.Equal(["set-sink-input-mute 31 1"], f.CellWrites);
+        f.Clear();
+        // A master move on a recorded mix writes each send's level and no mute.
+        f.Mixer.SetMixVolume("stream", .5);
+        Assert.Equal(["set-sink-input-volume 11 50%", "set-sink-input-volume 21 50%", "set-sink-input-volume 31 30%",
+            "set-sink-input-volume 41 50%"], f.CellWrites);
+    }
+
+    [Fact]
+    public void ALegIsWrittenInFullAfterItsLegsAreFoundAgainOrAWriteFailed()
+    {
+        using var f = new Sends();
+        f.Mixer.SetLevel("music", "monitor", .4);
+        f.Clear();
+        // Finding the legs again forgets what was written to them.
+        f.Call("DiscoverLegsLocked");
+        f.Mixer.SetLevel("music", "monitor", .4);
+        Assert.Equal(["set-sink-input-volume 30 40%", "set-sink-input-mute 30 0"], f.CellWrites);
+        // A refused write forgets the leg: the next push writes its level too.
+        f.Mixer.SetChannelMuted("music", "monitor", true);
+        f.FailDirectMute = true;
+        f.Field<System.Collections.IDictionary>("_legWritten").Remove(30);
+        f.Mixer.SetChannelMuted("music", "monitor", true);
+        f.FailDirectMute = false;
+        f.Clear();
+        f.Mixer.SetChannelMuted("music", "monitor", true);
+        Assert.Equal(["set-sink-input-volume 30 40%", "set-sink-input-mute 30 1"], f.CellWrites);
+        f.Clear();
+        // The sweep found the leg moved from outside: every value goes again.
+        f.Call("ForgetLegWritesLocked", "music|monitor");
+        f.Call("ApplyCellLocked", "music", "monitor");
+        Assert.Equal(["set-sink-input-volume 30 40%", "set-sink-input-mute 30 1"], f.CellWrites);
+        f.Clear();
+        f.Mixer.ForgetGraph();
+        Assert.Empty(f.Field<System.Collections.IDictionary>("_legWritten"));
     }
 
     [Fact]
@@ -297,7 +352,7 @@ public sealed class DuckingPlanTests
         public int KeyMask => (int)Call("DuckKeyOpenLocked")!;
         public ((double Level, bool Muted) Direct, (double Level, bool Muted) Bus) Targets(string channel, string mix)
             => (((double, bool), (double, bool)))Call("CellLegTargetsLocked", channel, mix, false)!;
-        private object? Call(string name, params object[] args)
+        public object? Call(string name, params object[] args)
             => typeof(Mixer).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(Mixer, args);
 
         public Sends()
