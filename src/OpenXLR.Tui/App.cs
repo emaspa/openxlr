@@ -47,6 +47,11 @@ internal sealed class App
 
     private long _importSeen;
 
+    private Task<string?>? _historyRequest;
+    private bool _historyRedo;
+    private string? _historyLine;
+    private bool _historyFailed;
+
     private Theme _chosenTheme;
     private bool _skinOverride;
     private int _systemScheme;
@@ -74,6 +79,13 @@ internal sealed class App
     internal TimeProvider Time { get; }
     internal long KeyRevision { get; private set; }
 
+    /// <summary>
+    /// Changes each time this client sends <c>undo</c> or <c>redo</c>, so an
+    /// editor that holds its own recent edits over older reports lets them go
+    /// and shows what the step put back.
+    /// </summary>
+    internal long HistoryRevision { get; private set; }
+
     /// <summary>The palette being drawn with: the chosen skin, or Material's light palette in its place.</summary>
     public Theme Theme { get; private set; }
 
@@ -99,6 +111,7 @@ internal sealed class App
     /// <summary>A sentence on the bottom line for a few seconds.</summary>
     public void Say(string message)
     {
+        _historyLine = null;
         _message = message;
         _messageAt = Time.GetTimestamp();
     }
@@ -155,6 +168,7 @@ internal sealed class App
         // Global keys do not reach the current view, but withdraw its confirmations too.
         KeyRevision++;
         Link.ClearError();
+        _historyLine = null;
 
         if (key.Ctrl && key.Is('c')) { Stop(); return; }
         // Ctrl+G marks a glitch wherever the keys are, a prompt included.
@@ -184,6 +198,18 @@ internal sealed class App
             if (index < _views.Count) { Tab = index; return; }
         }
 
+        // u and U belong to no section, so a view never sees them; a prompt
+        // and a filter that takes text keep them as letters. Ctrl+Z, Ctrl+Y
+        // and Ctrl+Shift+Z are the UI's keys: the terminal hands Ctrl+Z over
+        // as a key, since Ctrl+C is taken as input. Most terminals send
+        // Ctrl+Shift+Z as Ctrl+Z, so Ctrl+Y is the redo chord to document.
+        if (!typing && key.Key == Key.Char
+            && (!key.Ctrl && key.Char is 'u' or 'U' || key.Ctrl && key.Char is 'z' or 'y' or 'Z'))
+        {
+            History(redo: key.Char is 'U' or 'y' or 'Z');
+            return;
+        }
+
         if (Current.Handle(key, this)) return;
 
         if (key.Is('q')) { Stop(); return; }
@@ -200,6 +226,53 @@ internal sealed class App
         if (!Link.Connected) { Say("Not marked: the daemon is not connected"); return; }
         Link.Send("markGlitch", body => body["label"] = "terminal mixer");
         Say($"Glitch marked at {Time.GetLocalNow().ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)}");
+    }
+
+    /// <summary>
+    /// u and U: undo or redo the newest step of the daemon's history, which
+    /// every client shares. The keys send each fader move at once and the
+    /// link writes commands in order, so no move of ours is still on its way
+    /// when the undo goes out. The command carries no step id: the history
+    /// is not named before the press, and a move sent a moment earlier may
+    /// not be in the state yet. The answer reaches the bottom line in
+    /// <see cref="Draw"/>.
+    /// </summary>
+    private void History(bool redo)
+    {
+        if (!Link.Connected)
+        {
+            Say($"Not {(redo ? "redone" : "undone")}: the daemon is not connected");
+            return;
+        }
+        // A daemon from before the history leaves the field out.
+        if (Link.State?.History is null)
+        {
+            Say("Undo needs a newer daemon");
+            return;
+        }
+        HistoryRevision++;
+        _historyRedo = redo;
+        _historyRequest = Link.Request(redo ? "redo" : "undo", _ => { });
+    }
+
+    /// <summary>
+    /// The answer to the last undo or redo, once it came: the state sent
+    /// before it names the step that moved to the other side, or says what
+    /// was skipped. It stays on the bottom line until the next key.
+    /// </summary>
+    private void HistoryAnswer()
+    {
+        if (_historyRequest is not { IsCompleted: true } answered) return;
+        _historyRequest = null;
+        string? error = answered.IsCompletedSuccessfully ? answered.Result : "The daemon did not answer";
+        _historyFailed = error is not null;
+        if (error is not null) { _historyLine = error; return; }
+        HistoryEntry? history = Link.State?.History;
+        // The step undone is the one redo would take now, and the other way round.
+        string? label = (_historyRedo ? history?.Undo : history?.Redo)?.Label;
+        string done = _historyRedo ? "Redone" : "Undone";
+        _historyLine = history?.Note is { Length: > 0 } note ? note
+            : label is { Length: > 0 } ? $"{done}: {label}" : done;
     }
 
     private void Typing(KeyPress key)
@@ -237,6 +310,7 @@ internal sealed class App
             _importSeen = outcome.Serial;
             Say(outcome.Message);
         }
+        HistoryAnswer();
 
         Header(screen);
         if (screen.Width < 80 || screen.Height < 24)
@@ -398,6 +472,13 @@ internal sealed class App
             return;
         }
 
+        if (_historyLine is { Length: > 0 } answer)
+        {
+            screen.TextPad(0, y, $" {answer}", screen.Width,
+                _historyFailed ? theme.DangerFore : theme.TextPrimary, _historyFailed ? theme.DangerBack : theme.Card);
+            return;
+        }
+
         if (_messageAt is long at && Time.GetElapsedTime(at) < TimeSpan.FromSeconds(4))
         {
             screen.TextPad(0, y, $" {_message}", screen.Width, theme.TextPrimary, theme.Card);
@@ -427,6 +508,7 @@ internal sealed class App
             "Sections  1-9 or Tab / Shift+Tab. F1 or ? opens this table.",
             "Quit      q or Ctrl+C. In a text prompt use Ctrl+C to quit.",
             "Glitch    Ctrl+G marks a glitch for the diagnostics archive.",
+            "Undo      u or Ctrl+Z undoes the last mixer change; U or Ctrl+Y redoes.",
             "Mixer     Up/Down channel; Home masters; End last channel.",
             "          Left/Right mix; PgUp/PgDn jump ten channels.",
             "          Space mute; -/+ five points; [/] one point.",

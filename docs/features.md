@@ -788,6 +788,8 @@ after the step it would take. Undo never touches phantom power, a lock,
 the hardware mute or the monitoring pause, and it leaves alone a value
 something else moved since. Loading a profile, deleting a channel or mix,
 switching the mixing mode or the active interface clears the history.
+In the terminal mixer `u` undoes and `U` redoes, and the bottom line
+names the step.
 See [Undo and redo](manual.md#undo-and-redo).
 
 ### Soundboard

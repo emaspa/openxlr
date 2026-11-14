@@ -993,7 +993,8 @@ public sealed class TuiSoundsTests
         Session session = new(width: 80, height: 24);
         session.Key('?');
         string frame = session.Frame();
-        for (int i = 0; i < 13; i++) session.Key(Key.Down);
+        // To the end of the table, wherever it ends.
+        for (int i = 0; i < 40; i++) session.Key(Key.Down);
         frame += session.Frame();
         foreach (string text in new[] { "a hold clip plays until pressed again", "S stop all", "i import a file", "R restore the starter sounds", "SFX volume",
                      "a audition in the monitor mixes, not the stream", "G rename the page shown" })
