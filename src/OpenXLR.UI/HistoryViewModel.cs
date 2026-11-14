@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -7,15 +9,17 @@ using OpenXLR.UI.Localization;
 namespace OpenXLR.UI;
 
 /// <summary>
-/// One end of the daemon's undo history: the step's id for the guard, its
+/// One step of the daemon's undo history: the step's id for the guard, its
 /// kind, its English label, the ids it names and how many things a burst
 /// joined. An insert step names the insert in its channel's or mix's chain.
 /// A hardware step names its control, and the additional interface it
-/// changed in <see cref="Unit"/>.
+/// changed in <see cref="Unit"/>. A step of one number or switch carries
+/// the value taking it moves from and the one it writes, a double or a
+/// bool, in <see cref="From"/> and <see cref="To"/>.
 /// </summary>
 public sealed record HistoryStepItem(long Step, string Kind, string Label,
     string? Channel = null, string? Mix = null, string? Group = null, int Count = 1, string? Insert = null,
-    string? Control = null, string? Unit = null);
+    string? Control = null, string? Unit = null, object? From = null, object? To = null);
 
 /// <summary>The names the UI shows for the ids a step names; null for an id it does not know.</summary>
 internal sealed record HistoryNames(Func<string, string?> Channel, Func<string, string?> Mix, Func<string, string?> Group)
@@ -66,15 +70,25 @@ public sealed class HistoryViewModel : ViewModelBase
     private HistoryStepItem? _redo;
     public HistoryStepItem? Redo { get => _redo; private set { if (Set(ref _redo, value)) Raise(nameof(CanRedo)); } }
 
+    /// <summary>The few undo steps after <see cref="Undo"/>, newest first; empty from a daemon that does not name them.</summary>
+    public IReadOnlyList<HistoryStepItem> UndoNext { get; private set; } = [];
+
+    /// <summary>The few redo steps after <see cref="Redo"/>, in the order redo takes them.</summary>
+    public IReadOnlyList<HistoryStepItem> RedoNext { get; private set; } = [];
+
     public bool CanUndo => Undo is not null;
     public bool CanRedo => Redo is not null;
 
     private string _undoTip = Localizer.Text("NothingToUndo");
-    /// <summary>The undo button's tooltip: the step it takes back and the key, or that there is none.</summary>
+    /// <summary>
+    /// The undo button's tooltip: the step it takes back with the value it
+    /// goes back to and the key, then the next steps on a second line; or
+    /// that there is none.
+    /// </summary>
     public string UndoTip { get => _undoTip; private set => Set(ref _undoTip, value); }
 
     private string _redoTip = Localizer.Text("NothingToRedo");
-    /// <summary>The redo button's tooltip: the step it puts back and the key, or that there is none.</summary>
+    /// <summary>The redo button's tooltip, built as <see cref="UndoTip"/> is.</summary>
     public string RedoTip { get => _redoTip; private set => Set(ref _redoTip, value); }
 
     private string? _note;
@@ -95,9 +109,11 @@ public sealed class HistoryViewModel : ViewModelBase
         IsReported = history is JsonObject;
         Undo = Step(history?["undo"]);
         Redo = Step(history?["redo"]);
+        UndoNext = Steps(history?["undoNext"]);
+        RedoNext = Steps(history?["redoNext"]);
         Note = history?["note"] is JsonValue note && note.TryGetValue(out string? text) && text.Length > 0 ? text : null;
-        UndoTip = Undo is { } undo ? Localizer.Format("UndoStep", Name(undo)) : Localizer.Text("NothingToUndo");
-        RedoTip = Redo is { } redo ? Localizer.Format("RedoStep", Name(redo)) : Localizer.Text("NothingToRedo");
+        UndoTip = Undo is { } undo ? Tip(undo, UndoNext, Count(history?["undoSteps"]), redo: false) : Localizer.Text("NothingToUndo");
+        RedoTip = Redo is { } redo ? Tip(redo, RedoNext, Count(history?["redoSteps"]), redo: true) : Localizer.Text("NothingToRedo");
         // The reply to undo comes before the state that carries its note, so
         // the note replaces the notice once the state shows the step moved.
         if (_awaited is { } awaited && Moved(awaited))
@@ -140,12 +156,50 @@ public sealed class HistoryViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// A step in the UI's language: its kind's phrase with the names the UI
-    /// shows for its ids, and how many more a burst joined. A kind this
-    /// version does not know, or an id it cannot name, reads the daemon's
-    /// English label.
+    /// A button's tooltip for a step: its name with the values it moves
+    /// between when it carries them, and the key; then, when more steps
+    /// follow, a line naming up to three of them and how many more the side
+    /// holds beyond those.
     /// </summary>
-    internal string Name(HistoryStepItem step)
+    private string Tip(HistoryStepItem step, IReadOnlyList<HistoryStepItem> next, int steps, bool redo)
+    {
+        string name = Name(step);
+        if (step.Count == 1 && step.From is { } from && step.To is { } to
+            && Value(step, from) is { } was && Value(step, to) is { } now)
+            name = redo ? Localizer.Format("HistoryRedoValues", name, was, now) : Localizer.Format("HistoryUndoValues", name, was, now);
+        string line = redo ? Localizer.Format("RedoStep", name) : Localizer.Format("UndoStep", name);
+        if (next.Count == 0) return line;
+        string names = string.Join(", ", next.Select(s => Name(s, joined: false)));
+        int more = steps - 1 - next.Count;
+        return line + "\n" + (more > 0 ? Localizer.Format("HistoryThenMore", names, more) : Localizer.Format("HistoryThen", names));
+    }
+
+    /// <summary>
+    /// One value a step moves, as the UI shows it elsewhere: volumes and
+    /// levels as the faders' percentages, the headphone level as its
+    /// slider's percentage, gains in dB, the blend as its readout and the
+    /// switches as on or off. Null for a kind or a value it has no readout for.
+    /// </summary>
+    internal static string? Value(HistoryStepItem step, object value) => (step.Kind, value) switch
+    {
+        ("sendLevel" or "channelVolume" or "mixVolume", double level) => $"{level * 100:0}%",
+        ("sendMute" or "mixMute" or "clipGuard" or "monitorDry" or "unitLowCut" or "unitClipGuard" or "unitExpander"
+            or "unitCompressor" or "unitLowImpedance" or "unitVoiceTune", bool on) => on ? Localizer.Text("ParamOn") : Localizer.Text("ParamOff"),
+        ("lowCut", double hz) => hz <= 0 ? Localizer.Text("ParamOff") : $"{hz:0} Hz",
+        ("unitGain" or "unitAuxLevel" or "unitLineInGain", double db) => $"{db:0.#} dB",
+        ("unitHeadphones", double db) => $"{MainViewModel.HeadphonePercent(db):0}%",
+        ("unitCrossfade", double blend) => MainViewModel.CrossfadeLabel((int)Math.Round(blend)),
+        ("unitVoiceTune", double strength) => $"{strength:0}%",
+        _ => null,
+    };
+
+    /// <summary>
+    /// A step in the UI's language: its kind's phrase with the names the UI
+    /// shows for its ids, and with <paramref name="joined"/> how many more a
+    /// burst joined. A kind this version does not know, or an id it cannot
+    /// name, reads the daemon's English label.
+    /// </summary>
+    internal string Name(HistoryStepItem step, bool joined = true)
     {
         string? channel = step.Channel is { } c ? _names?.Channel(c) : null;
         string? mix = step.Mix is { } m ? _names?.Mix(m) : null;
@@ -192,7 +246,7 @@ public sealed class HistoryViewModel : ViewModelBase
             _ => null,
         };
         if (phrase is null) return step.Label;
-        return step.Count > 1 ? Localizer.Format("HistoryMore", phrase, step.Count - 1) : phrase;
+        return joined && step.Count > 1 ? Localizer.Format("HistoryMore", phrase, step.Count - 1) : phrase;
     }
 
     private static string Done(bool redo, string name)
@@ -215,8 +269,20 @@ public sealed class HistoryViewModel : ViewModelBase
            ? new(step, kindText, node["label"] is JsonValue label && label.TryGetValue(out string? text) ? text : kindText,
                Text(node["channel"]), Text(node["mix"]), Text(node["group"]),
                node["count"] is JsonValue count && count.TryGetValue(out int joined) && joined > 1 ? joined : 1,
-               Text(node["insert"]), Text(node["control"]), Text(node["unit"]))
+               Text(node["insert"]), Text(node["control"]), Text(node["unit"]), Plain(node["from"]), Plain(node["to"]))
            : null;
+
+    private static HistoryStepItem[] Steps(JsonNode? node)
+        => node is JsonArray steps ? [.. steps.Select(Step).OfType<HistoryStepItem>()] : [];
+
+    private static int Count(JsonNode? node) => node is JsonValue value && value.TryGetValue(out int count) ? count : 0;
+
+    /// <summary>A step's value as a bool or a double; null for anything else.</summary>
+    private static object? Plain(JsonNode? node)
+        => node is not JsonValue value ? null
+            : value.TryGetValue(out bool on) ? on
+            : value.TryGetValue(out double number) ? number
+            : null;
 
     private static string? Text(JsonNode? node) => node is JsonValue value && value.TryGetValue(out string? text) && text.Length > 0 ? text : null;
 }

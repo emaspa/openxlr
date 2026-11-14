@@ -419,14 +419,25 @@ public sealed record StateMessage
 /// The undo history as clients see it: the step <c>undo</c> and the step
 /// <c>redo</c> would take, each null when there is none, how many steps each
 /// side holds, and one sentence about the last undo or redo when it skipped
-/// something, null otherwise.
+/// something, null otherwise. <see cref="UndoNext"/> and
+/// <see cref="RedoNext"/> name the few steps after those, in the order they
+/// would be taken.
 /// </summary>
 public sealed record HistoryState(
     [property: JsonPropertyName("undo"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] HistoryStepInfo? Undo,
     [property: JsonPropertyName("redo"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] HistoryStepInfo? Redo,
     [property: JsonPropertyName("undoSteps")] int UndoSteps,
     [property: JsonPropertyName("redoSteps")] int RedoSteps,
-    [property: JsonPropertyName("note"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Note);
+    [property: JsonPropertyName("note"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Note)
+{
+    /// <summary>Up to <see cref="MixHistory.NextSteps"/> undo steps after <see cref="Undo"/>, newest first; null when there are none.</summary>
+    [JsonPropertyName("undoNext")]
+    public IReadOnlyList<HistoryStepInfo>? UndoNext { get; init; }
+
+    /// <summary>Up to <see cref="MixHistory.NextSteps"/> redo steps after <see cref="Redo"/>, in the order redo takes them; null when there are none.</summary>
+    [JsonPropertyName("redoNext")]
+    public IReadOnlyList<HistoryStepInfo>? RedoNext { get; init; }
+}
 
 /// <summary>
 /// One step: its id for the <c>step</c> guard, its kind with the ids it
@@ -448,6 +459,19 @@ public sealed record HistoryStepInfo(
     /// <summary>The insert an insert step names, in the chain of its <see cref="Channel"/> or <see cref="Mix"/>.</summary>
     [JsonPropertyName("insert")]
     public string? Insert { get; init; }
+
+    /// <summary>
+    /// The value the step's one change holds now, when the step changes
+    /// exactly one thing and that value is a number or a boolean; null
+    /// otherwise. On the undo side it is the value the step left, on the
+    /// redo side the value undo put back.
+    /// </summary>
+    [JsonPropertyName("from")]
+    public object? From { get; init; }
+
+    /// <summary>The value taking the step writes, under the same rule as <see cref="From"/>.</summary>
+    [JsonPropertyName("to")]
+    public object? To { get; init; }
 }
 
 /// <summary>

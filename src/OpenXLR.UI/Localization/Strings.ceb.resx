@@ -2388,6 +2388,18 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="HistoryMore" xml:space="preserve">
     <value>{0} ug {1} pa</value>
   </data>
+  <data name="HistoryUndoValues" xml:space="preserve">
+    <value>{0}: gikan {1} balik sa {2}</value>
+  </data>
+  <data name="HistoryRedoValues" xml:space="preserve">
+    <value>{0}: gikan {1} ngadto sa {2}</value>
+  </data>
+  <data name="HistoryThen" xml:space="preserve">
+    <value>Human: {0}</value>
+  </data>
+  <data name="HistoryThenMore" xml:space="preserve">
+    <value>Human: {0} ug {1} pa</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Mix nga gipakita sa bank {0}</value>
   </data>

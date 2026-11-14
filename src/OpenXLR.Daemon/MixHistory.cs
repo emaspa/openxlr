@@ -31,11 +31,37 @@ internal sealed class HistoryStep
     /// <summary>The serialized size of <see cref="Changes"/>, counted against <see cref="MixHistory.MaxBytes"/>.</summary>
     public long Bytes { get; set; }
 
-    public HistoryStepInfo Info()
+    /// <summary>The step as the state names it, with <paramref name="redo"/> true when it is on the redo side.</summary>
+    public HistoryStepInfo Info(bool redo = false)
     {
         string label = Targets.Count > 1 ? $"{Label} and {Targets.Count - 1} more" : Label;
-        return new(Id, Kind, Channel, Mix, Group, Math.Max(1, Targets.Count), label, Control, Unit) { Insert = Insert };
+        (object? from, object? to) = Values(redo);
+        return new(Id, Kind, Channel, Mix, Group, Math.Max(1, Targets.Count), label, Control, Unit)
+        {
+            Insert = Insert,
+            From = from,
+            To = to,
+        };
     }
+
+    /// <summary>
+    /// The value taking the step moves from and the one it writes, when the
+    /// step changes one thing and that value is a plain number or switch.
+    /// Undo goes from the after value back to the before value, redo the
+    /// other way. A burst over several things, several changes or a whole
+    /// setting such as an EQ gives none.
+    /// </summary>
+    private (object? From, object? To) Values(bool redo)
+    {
+        if (Targets.Count > 1) return (null, null);
+        (object Before, object After)? only = Changes.Count == 1 && DeviceChanges.Count == 0 ? (Changes[0].Before, Changes[0].After)
+            : Changes.Count == 0 && DeviceChanges.Count == 1 ? (DeviceChanges[0].Before, DeviceChanges[0].After)
+            : null;
+        if (only is not { } value || !Plain(value.Before) || !Plain(value.After)) return (null, null);
+        return redo ? (value.Before, value.After) : (value.After, value.Before);
+    }
+
+    private static bool Plain(object value) => value is bool or int or double;
 }
 
 /// <summary>
@@ -53,6 +79,8 @@ internal sealed class MixHistory
 {
     public const int MaxSteps = 50;
     public const long MaxBytes = 2 * 1024 * 1024;
+    /// <summary>How many steps beyond each end the state names, for a client's preview.</summary>
+    public const int NextSteps = 3;
     public static readonly TimeSpan JoinSameValue = TimeSpan.FromSeconds(1);
     public static readonly TimeSpan JoinBurst = TimeSpan.FromMilliseconds(50);
 
@@ -197,13 +225,24 @@ internal sealed class MixHistory
         }
     }
 
-    /// <summary>The two ends of the history, for the state.</summary>
+    /// <summary>The two ends of the history and the few steps after each, for the state.</summary>
     public HistoryState State()
     {
         lock (_gate)
-            return new(_undo.Count > 0 ? _undo[^1].Info() : null, _redo.Count > 0 ? _redo[^1].Info() : null,
-                _undo.Count, _redo.Count, _note);
+            return new(_undo.Count > 0 ? _undo[^1].Info() : null, _redo.Count > 0 ? _redo[^1].Info(redo: true) : null,
+                _undo.Count, _redo.Count, _note)
+            {
+                UndoNext = Next(_undo, redo: false),
+                RedoNext = Next(_redo, redo: true),
+            };
     }
+
+    // The steps after a side's end, newest first, which is the order undo
+    // (or redo) takes them; null when the end is the only one.
+    private static HistoryStepInfo[]? Next(List<HistoryStep> side, bool redo)
+        => side.Count > 1
+            ? [.. Enumerable.Range(2, Math.Min(NextSteps, side.Count - 1)).Select(i => side[^i].Info(redo))]
+            : null;
 
     /// <summary>The serialized size of every step held, for the bound.</summary>
     internal long Bytes

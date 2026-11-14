@@ -791,8 +791,9 @@ cut and ClipGuard, the dry monitor, the ducking setup, a plugin chain
 (a control, a bypass, a name, a plugin added, removed or moved) or a
 control on the interface itself, such as its gain or headphone level, and
 Ctrl+Shift+Z or Ctrl+Y puts it back. Two arrow buttons in the header do the same. Their
-tooltips name the step, and after each one a note under them says what
-changed or what was left alone. The history lives in the daemon and every
+tooltips name the step, the value it goes back to when it moved one
+volume, level, gain or switch, and the next three steps; after each one a
+note under them says what changed or what was left alone. The history lives in the daemon and every
 client shares it, so a fader moved on a Deck dial or over the API is
 undone the same way. A fader drag, a dial turn or a drag of EQ bands is
 one step, and an EQ that runs on the interface is written back to the

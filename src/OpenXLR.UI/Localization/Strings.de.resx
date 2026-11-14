@@ -2478,6 +2478,18 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="HistoryMore" xml:space="preserve">
     <value>{0} und {1} weitere</value>
   </data>
+  <data name="HistoryUndoValues" xml:space="preserve">
+    <value>{0} von {1} zurück auf {2}</value>
+  </data>
+  <data name="HistoryRedoValues" xml:space="preserve">
+    <value>{0} von {1} auf {2}</value>
+  </data>
+  <data name="HistoryThen" xml:space="preserve">
+    <value>Danach: {0}</value>
+  </data>
+  <data name="HistoryThenMore" xml:space="preserve">
+    <value>Danach: {0} und {1} weitere</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>In Bank {0} angezeigter Mix</value>
   </data>

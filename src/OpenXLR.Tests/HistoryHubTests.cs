@@ -21,11 +21,14 @@ public sealed partial class HistoryHubTests
         await f.Ok("""{"cmd":"setLevel","channel":"xlr1","mix":"monitor","value":0.5}""");
         HistoryStepInfo step = f.State().History!.Undo!;
         Assert.Equal(("sendLevel", "xlr1", "monitor", "Mic 1 level in Monitor"), (step.Kind, step.Channel, step.Mix, step.Label));
+        // Undo goes from the level the fader left back to the one before.
+        Assert.Equal((0.5, 1.0), ((double)step.From!, (double)step.To!));
 
         await f.Ok("""{"cmd":"undo"}""");
         Assert.Equal(1.0, f.Level("xlr1|monitor"));
         Assert.Null(f.State().History!.Undo);
         Assert.Equal(step.Step, f.State().History!.Redo!.Step);
+        Assert.Equal((1.0, 0.5), ((double)f.State().History!.Redo!.From!, (double)f.State().History!.Redo!.To!));
 
         await f.Ok("""{"cmd":"redo"}""");
         Assert.Equal(.5, f.Level("xlr1|monitor"));
@@ -45,6 +48,9 @@ public sealed partial class HistoryHubTests
         f.Now += 2000;
         await f.Ok("""{"cmd":"setChannelVolume","channel":"xlr1","value":0.4}""");
         Assert.Equal(2, f.State().History!.UndoSteps);
+        // The drag is the step after the newest, with the first value it moved from.
+        HistoryStepInfo drag = Assert.Single(f.State().History!.UndoNext!);
+        Assert.Equal(("sendLevel", 0.7, 1.0), (drag.Kind, (double)drag.From!, (double)drag.To!));
 
         await f.Ok("""{"cmd":"undo"}""");
         Assert.Equal(1.0, f.Value(SceneField.ChannelVolume, "xlr1"));

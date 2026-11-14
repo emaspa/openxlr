@@ -194,6 +194,94 @@ public sealed class HistoryViewModelTests
         Assert.Equal(Localizer.Format("UndoStep", Localizer.Text("HistoryHeadphones2")), model.UndoTip);
     }
 
+    [Fact]
+    public void ATooltipNamesTheValuesAStepOfOneValueMovesBetween()
+    {
+        var model = new HistoryViewModel(null, Names);
+        string stream = Localizer.Format("HistoryMixVolume", "Stream");
+        model.Apply(JsonNode.Parse("""
+            {"undo":{"step":7,"kind":"mixVolume","mix":"stream","count":1,"label":"Stream volume","from":1.0,"to":0.75},
+             "redo":{"step":8,"kind":"mixMute","mix":"stream","count":1,"label":"Stream mute","from":false,"to":true},
+             "undoSteps":1,"redoSteps":1,"note":null}
+            """));
+        Assert.Equal(new HistoryStepItem(7, "mixVolume", "Stream volume", Mix: "stream", From: 1.0, To: 0.75), model.Undo);
+        Assert.Equal(Localizer.Format("UndoStep", Localizer.Format("HistoryUndoValues", stream, "100%", "75%")), model.UndoTip);
+        Assert.Equal(Localizer.Format("RedoStep", Localizer.Format("HistoryRedoValues", Localizer.Format("HistoryMixMute", "Stream"),
+            Localizer.Text("ParamOff"), Localizer.Text("ParamOn"))), model.RedoTip);
+        Assert.DoesNotContain('\n', model.UndoTip);
+
+        // The hardware values read as the UI shows them: the gain in dB, the headphones as their slider's percentage.
+        model.Apply(JsonNode.Parse("""
+            {"undo":{"step":9,"kind":"unitGain","channel":"xlr1","control":"gain","count":1,"label":"XLR 1 gain","from":32,"to":28},
+             "redo":{"step":10,"kind":"unitHeadphones","control":"hpVolumeDb","count":1,"label":"Headphone volume","from":-30,"to":0},
+             "undoSteps":1,"redoSteps":1,"note":null}
+            """));
+        Assert.Equal(Localizer.Format("UndoStep", Localizer.Format("HistoryUndoValues", Localizer.Format("HistoryUnitGain", "XLR 1"), "32 dB", "28 dB")),
+            model.UndoTip);
+        Assert.Equal(Localizer.Format("RedoStep", Localizer.Format("HistoryRedoValues", Localizer.Text("HistoryHeadphones"), "50%", "100%")),
+            model.RedoTip);
+        HistoryStepItem Of(string kind, string? control = null) => new(1, kind, "x", Control: control);
+        Assert.Equal(Localizer.Format("CrossfadeMic", 20), HistoryViewModel.Value(Of("unitCrossfade"), 80.0));
+        Assert.Equal(Localizer.Text("CrossfadeCentre"), HistoryViewModel.Value(Of("unitCrossfade"), 100.0));
+        Assert.Equal("80 Hz", HistoryViewModel.Value(Of("lowCut"), 80.0));
+        Assert.Equal(Localizer.Text("ParamOff"), HistoryViewModel.Value(Of("lowCut"), 0.0));
+        Assert.Equal("40%", HistoryViewModel.Value(Of("unitVoiceTune", "voiceTuneStrength"), 40.0));
+        Assert.Equal(Localizer.Text("ParamOn"), HistoryViewModel.Value(Of("unitVoiceTune", "voiceTune"), true));
+        // A kind with no readout of its own, such as an EQ, or a value of the wrong shape: none.
+        Assert.Null(HistoryViewModel.Value(Of("eq"), 1.0));
+        Assert.Null(HistoryViewModel.Value(Of("mixMute"), 1.0));
+    }
+
+    [Fact]
+    public void AStepOfSeveralValuesKeepsItsPlainNameAndNoValues()
+    {
+        var model = new HistoryViewModel(null, Names);
+        // A burst carries no values from the daemon; one that did would still read only its name and count.
+        model.Apply(JsonNode.Parse("""
+            {"undo":{"step":8,"kind":"sendMute","channel":"music","mix":"monitor","count":3,"label":"Music mute in Monitor A and 2 more","from":true,"to":false},
+             "redo":{"step":7,"kind":"exclusiveGroup","group":"sources","count":1,"label":"Sources switch"},"undoSteps":1,"redoSteps":1,"note":null}
+            """));
+        Assert.Equal(Localizer.Format("UndoStep", Localizer.Format("HistoryMore", Localizer.Format("HistorySendMute", "Music", "Monitor A"), 2)),
+            model.UndoTip);
+        Assert.Equal(Localizer.Format("RedoStep", Localizer.Format("HistoryExclusiveGroup", "Sources")), model.RedoTip);
+    }
+
+    [Fact]
+    public void ASecondLineNamesTheNextThreeStepsAndHowManyMoreFollow()
+    {
+        var model = new HistoryViewModel(null, Names);
+        model.Apply(JsonNode.Parse("""
+            {"undo":{"step":9,"kind":"mixVolume","mix":"stream","count":1,"label":"Stream volume"},
+             "undoNext":[{"step":8,"kind":"sendMute","channel":"music","mix":"stream","count":2,"label":"Music mute in Stream and 1 more"},
+                         {"step":7,"kind":"mixMute","mix":"monitor","count":1,"label":"Monitor A mute","from":true,"to":false},
+                         {"step":6,"kind":"laterKind","count":1,"label":"Something later"}],
+             "redo":{"step":10,"kind":"mixMute","mix":"stream","count":1,"label":"Stream mute"},
+             "redoNext":[{"step":11,"kind":"eq","channel":"xlr1","count":1,"label":"XLR 1 EQ"}],
+             "undoSteps":7,"redoSteps":2,"note":null}
+            """));
+        Assert.Equal([8L, 7L, 6L], model.UndoNext.Select(s => s.Step));
+        // The next steps go by name alone, without a burst's count or their values.
+        string names = string.Join(", ", Localizer.Format("HistorySendMute", "Music", "Stream"), Localizer.Format("HistoryMixMute", "Monitor A"),
+            "Something later");
+        Assert.Equal(Localizer.Format("UndoStep", Localizer.Format("HistoryMixVolume", "Stream")) + "\n" + Localizer.Format("HistoryThenMore", names, 3),
+            model.UndoTip);
+        Assert.Equal(Localizer.Format("RedoStep", Localizer.Format("HistoryMixMute", "Stream")) + "\n" + Localizer.Format("HistoryThen",
+            Localizer.Format("HistoryEq", "XLR 1")), model.RedoTip);
+        Assert.Equal("Then: Music mute in Stream, Monitor A mute, Something later, and 3 more",
+            Localizer.Format("HistoryThenMore", names, 3));
+
+        // Nothing on a side still says so, and a daemon that names no next steps gives one line.
+        model.Apply(JsonNode.Parse("""
+            {"undo":{"step":9,"kind":"mixVolume","mix":"stream","count":1,"label":"Stream volume"},
+             "redo":null,"undoSteps":4,"redoSteps":0,"note":null}
+            """));
+        Assert.Empty(model.UndoNext);
+        Assert.Equal(Localizer.Format("UndoStep", Localizer.Format("HistoryMixVolume", "Stream")), model.UndoTip);
+        Assert.Equal(Localizer.Text("NothingToRedo"), model.RedoTip);
+        model.Apply(JsonNode.Parse("""{"undo":null,"redo":null,"undoSteps":0,"redoSteps":0,"note":null}"""));
+        Assert.Equal(Localizer.Text("NothingToUndo"), model.UndoTip);
+    }
+
     private sealed class Hold : IDisposable
     {
         public void Dispose() { }

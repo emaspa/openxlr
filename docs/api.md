@@ -1635,7 +1635,12 @@ The state's `history`:
 
 ```json
 "history": {
-  "undo": {"step": 41, "kind": "sendLevel", "channel": "xlr1", "mix": "monitor", "count": 1, "label": "XLR 1 level in Monitor A"},
+  "undo": {"step": 41, "kind": "sendLevel", "channel": "xlr1", "mix": "monitor", "count": 1, "label": "XLR 1 level in Monitor A", "from": 0.5, "to": 0.8},
+  "undoNext": [
+    {"step": 40, "kind": "mixMute", "mix": "stream", "count": 1, "label": "Stream mute", "from": true, "to": false},
+    {"step": 39, "kind": "eq", "channel": "xlr1", "count": 1, "label": "XLR 1 EQ"},
+    {"step": 38, "kind": "unitGain", "channel": "xlr1", "control": "gain", "count": 1, "label": "XLR 1 gain", "from": 32, "to": 28}
+  ],
   "redo": null,
   "undoSteps": 7,
   "redoSteps": 0,
@@ -1647,6 +1652,7 @@ The state's `history`:
 |---|---|
 | `undo` | the step `undo` would take, or null |
 | `redo` | the step `redo` would take, or null |
+| `undoNext`, `redoNext` | up to three steps after `undo` (or `redo`), in the order the next commands would take them, so `undoNext` is newest first; absent when that side holds one step or none, and from an older daemon |
 | `undoSteps`, `redoSteps` | how many steps each side holds |
 | `note` | one sentence about the last `undo` or `redo` when it skipped something, null otherwise; the next change to the history clears it |
 
@@ -1654,7 +1660,14 @@ A step carries `step`, its id for the `step` guard, `kind`, the ids it
 names, `count` and `label`. An insert step names its chain by `channel`
 (an input) or `mix`, and the insert by `insert`, its id in that chain. `count` is the number of things a burst joined
 (the label then ends in "and 4 more"). `label` is one English phrase, built
-from the names at the time of the step. The kinds:
+from the names at the time of the step. When the step changes exactly one
+value and that value is a number or a boolean, such as a fader, a mute or
+the unit's gain, it also carries `from` and `to`: `from` is the value now
+and `to` the value taking the step writes. On the undo side that is the
+value the step left, then the one before it; on the redo side the other
+way round. Numbers are in the units the command takes (a level from 0 to
+1, a gain in dB). A burst over several things, a step of several values
+and a whole setting such as an EQ carry neither. The kinds:
 
 | kind | ids | from |
 |---|---|---|
