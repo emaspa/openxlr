@@ -149,6 +149,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// <summary>Every channel combine feeds every mix sink, present or future.</summary>
     private const string MixSinkPattern = "~" + MixDefinition.SinkPrefix;
     private readonly Dictionary<string, int> _legIndex = [];
+    // What this mixer last wrote to each leg, by sink-input index, so a send
+    // whose level or mute did not change is not written again. Cleared with
+    // the leg map; the sweep drops a leg's entry when the registry shows it
+    // moved from outside, so the write after it is never skipped.
+    private readonly Dictionary<int, (int? Percent, bool? Muted)> _legWritten = [];
     // Cells whose combine leg was not there when their fader was last pushed.
     // A leg that turns up afterwards carries whatever the session manager
     // restores onto a new stream, full level and unmuted when it remembers
@@ -165,6 +170,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     private void DiscoverLegsLocked()
     {
         _legIndex.Clear();
+        _legWritten.Clear();
         _duckLegIndex.Clear();
         foreach ((string chId, uint module) in _combineModules)
         {
@@ -3948,11 +3954,44 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             if (waiting) MarkCellPendingLocked(cell); else _pendingCells.Remove(cell);
         }
 
-        void Leg(int index, (double Level, bool Muted) target)
+        void Leg(int index, (double Level, bool Muted) target) => WriteLegLocked(index, target);
+    }
+
+    /// <summary>
+    /// Write a leg's level and mute, each only when it differs from what this
+    /// mixer last wrote there. A failed write forgets the leg, so the next
+    /// one writes both.
+    /// </summary>
+    private void WriteLegLocked(int index, (double Level, bool Muted) target)
+    {
+        int percent = PipeWireAdapter.SinkInputPercent(target.Level);
+        _legWritten.TryGetValue(index, out var written);
+        try
         {
-            _pw.SetSinkInputVolume(index, target.Level);
-            _pw.SetSinkInputMuted(index, target.Muted);
+            if (written.Percent != percent)
+            {
+                _pw.SetSinkInputVolume(index, target.Level);
+                _legWritten[index] = written = written with { Percent = percent };
+            }
+            if (written.Muted != target.Muted)
+            {
+                _pw.SetSinkInputMuted(index, target.Muted);
+                _legWritten[index] = written with { Muted = target.Muted };
+            }
         }
+        catch
+        {
+            _legWritten.Remove(index);
+            throw;
+        }
+    }
+
+    /// <summary>Forget what was written to a send's legs, so the next push writes all of them.</summary>
+    private void ForgetLegWritesLocked(string cell)
+    {
+        if (_legIndex.TryGetValue(cell, out int direct)) _legWritten.Remove(direct);
+        if (_duckLegIndex.TryGetValue(cell, out int bus)) _legWritten.Remove(bus);
+        if (_dryLegIndex.TryGetValue(cell, out int dry)) _legWritten.Remove(dry);
     }
 
     /// <summary>A cell that could not be pushed, and a fresh round of tries for it.</summary>
@@ -4086,6 +4125,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             bool dryHeld = !_dryLegIndex.TryGetValue(cell, out int dryIndex) || !legs.TryGetValue(dryIndex, out var dryLeg)
                 || Matches(dryLeg, DryLegTargetLocked(channel, mix));
             if (directHeld && busHeld && dryHeld) continue;
+            // The leg moved from outside, or never took our write: what the
+            // mixer remembers writing no longer holds, so write it all.
+            ForgetLegWritesLocked(cell);
             ApplyCellLocked(channel, mix);
             held.Add(cell);
         }
@@ -4167,6 +4209,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         _virtualMicModules.Clear();
         _renamedSinceBuild = false;
         _legIndex.Clear();
+        _legWritten.Clear();
         _pendingCells.Clear();
         _cellRounds = _cellWait = 0;
         _streams.Clear();

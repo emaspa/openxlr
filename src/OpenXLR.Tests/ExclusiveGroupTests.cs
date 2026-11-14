@@ -211,10 +211,11 @@ public sealed class ExclusiveGroupTests
     {
         using var f = new Sends();
         f.Mixer.SetChannelMuted("xlr1", "monitor", false);
-        Assert.True(f.Mixer.SetHardwareMicMonitor(true));
         f.Clear();
+        Assert.True(f.Mixer.SetHardwareMicMonitor(true));
         f.Mixer.SetLevel("xlr1", "monitor", 1);
         Assert.Contains("set-sink-input-mute 10 1", f.Mutes);   // the hardware path carries it
+        Assert.DoesNotContain("set-sink-input-mute 10 0", f.Mutes);
 
         f.Clear();
         f.Mixer.SetExclusiveGroup(null, "Microphones", ["xlr1", "xlr2"], _ => null);
