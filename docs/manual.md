@@ -409,6 +409,12 @@ fader: moves of the same control less than a second apart join. While the
 cursor is in a text field, such as a name box, the keys belong to the
 field and undo its typing instead.
 
+In the [terminal mixer](#terminal), `u` undoes and `U` redoes on any tab,
+and Ctrl+Z and Ctrl+Y work there too. The bottom line then names the step
+that was undone or redone, or says what was skipped, until the next key. In
+a text prompt or the plugin picker's filter, `u` and `U` type letters
+instead.
+
 Undo covers these changes for now:
 
 - a send level, a channel volume and a mix volume;
@@ -6262,6 +6268,8 @@ Controls below the visible hardware cards appear as the selection moves.
 | Everywhere | `F1`, `?` | show help |
 | Everywhere | `q`, Ctrl+C | quit; in a text prompt `q` is text and Ctrl+C quits |
 | Everywhere | Ctrl+G | mark a [glitch](#glitch-marker) for the diagnostics archive, in a text prompt too |
+| Everywhere | `u`, Ctrl+Z | [undo](#undo-and-redo) the last mixer change and name it on the bottom line; in a text prompt or the plugin picker `u` is text |
+| Everywhere | `U`, Ctrl+Y | redo the step undone last and name it on the bottom line |
 | Mixer | Up/Down, PageUp/PageDown | choose a channel, or jump ten channels |
 | Mixer | Left/Right | choose the mix the sends feed |
 | Mixer | Home, End | choose the masters or the last channel |

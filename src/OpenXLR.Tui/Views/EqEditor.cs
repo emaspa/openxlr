@@ -18,6 +18,7 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
     private readonly Dictionary<(int Band, string Field), (object Value, long Since)> _edits = [];
     private long _session = session;
     private long _channelRevision;
+    private long _historyRevision;
     private int _bandCount;
 
     internal string Keys => "Esc back  Up/Down control  -/+ value  [/] fine  Enter exact value  Home/End limits";
@@ -64,6 +65,12 @@ internal sealed class EqEditor(string channel, long session, TimeProvider? time 
             _edits.Clear();
         }
         if (app.Link.LastError is not null) _edits.Clear();
+        // An undo or redo from here puts values back that the held edits would hide.
+        if (_historyRevision != app.HistoryRevision)
+        {
+            _historyRevision = app.HistoryRevision;
+            _edits.Clear();
+        }
         long revision = app.Link.ChannelRevision(Key);
         if (_channelRevision != revision)
         {

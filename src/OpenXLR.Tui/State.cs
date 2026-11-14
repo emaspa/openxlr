@@ -760,6 +760,33 @@ internal sealed record SoundboardEntry
         : [.. Clips.Select(clip => clip.Page).Distinct(StringComparer.Ordinal).OrderBy(page => page.Length == 0 ? 0 : 1)];
 }
 
+/// <summary>
+/// The daemon's undo history as the state carries it: the step <c>undo</c>
+/// would take and the step <c>redo</c> would take, each null when there is
+/// none, how many each side holds, and the sentence about the last undo or
+/// redo when it skipped something.
+/// </summary>
+internal sealed record HistoryEntry
+{
+    public HistoryStepEntry? Undo { get; init; }
+    public HistoryStepEntry? Redo { get; init; }
+    public int UndoSteps { get; init; }
+    public int RedoSteps { get; init; }
+    public string? Note { get; init; }
+}
+
+/// <summary>One step at an end of the history, with the daemon's English label.</summary>
+internal sealed record HistoryStepEntry
+{
+    public long Step { get; init; }
+    public string Kind { get; init; } = string.Empty;
+    public string? Channel { get; init; }
+    public string? Mix { get; init; }
+    public string? Group { get; init; }
+    public int Count { get; init; }
+    public string Label { get; init; } = string.Empty;
+}
+
 /// <summary>One clip of the soundboard's library.</summary>
 internal sealed record ClipEntry
 {
@@ -814,6 +841,9 @@ internal sealed record Snapshot
 
     /// <summary>The ducking setup and where it runs, present whenever the daemon runs; null from one that predates it.</summary>
     public DuckingEntry? Ducking { get; init; }
+
+    /// <summary>The two ends of the daemon's undo history; null from a daemon that predates it.</summary>
+    public HistoryEntry? History { get; init; }
 
     public static JsonSerializerOptions Options { get; } = new()
     {
