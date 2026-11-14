@@ -308,7 +308,7 @@ public sealed partial class Mixer
                 .Select(output => (Output: output, Feed: FeedOfLocked(output))).ToArray();
             try
             {
-                _mixModules[id] = _pw.CreateNullSink(mix.SinkName, $"OpenXLR {name}");
+                _mixModules[id] = _pw.CreateNullSink(mix.SinkName, $"OpenXLR {name}", restoreState: RestoresMixSinkState(kind));
                 _config = next;   // leg discovery and the cell faders go by the mix list
                 // A new default or a revived stale id must not change existing outputs.
                 foreach (var (output, feed) in preservedFeeds)

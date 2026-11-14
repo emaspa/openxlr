@@ -5088,6 +5088,13 @@ own; on every other OpenXLR sink the volume is not a control, so turning
 it down only cuts audio. The daemon puts those other sinks back to full
 volume on its sweep and logs when it had to.
 
+WirePlumber remembers a level set on a sink and, from version 0.5, puts it
+back when the sink is created again. The Stream, Chat and Aux sinks opt
+out of that with `state.restore-props=false`, so a daemon restart or a
+rebuilt graph never opens them at a remembered level or mute. On
+WirePlumber 0.4 the opt-out works through the rule the `.deb` installs
+(`54-openxlr-owned-state.lua`).
+
 The internal effect stages, such as OpenXLR Mic Filter and a mix's
 inserts, show up in desktop volume panels as applications playing and
 recording. Their volume is not a control either. The sweep puts them back

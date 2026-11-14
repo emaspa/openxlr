@@ -266,7 +266,12 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>Load a null sink; returns its module id for later unload.</summary>
-    public uint CreateNullSink(string nodeName, string description, bool visible = true)
+    /// <param name="restoreState">
+    /// Whether the session manager may put a saved volume and mute back on
+    /// the sink when it is created. A sink whose level the mixer alone sets
+    /// turns this off, so a rebuild never opens it at a remembered level.
+    /// </param>
+    public uint CreateNullSink(string nodeName, string description, bool visible = true, bool restoreState = true)
     {
         // suspend-on-idle must be off: an idle channel sink would otherwise be
         // suspended by PipeWire and drop the first moment of audio (or all of it)
@@ -282,7 +287,8 @@ public sealed class PipeWireAdapter
             // and these are devices the user assigns applications to.
             "sink_properties=" + PropList($"node.description={PropValue(description)}" +
             " node.suspend-on-idle=false " + (visible ? "priority.session=100 node.virtual=false" :
-                "priority.session=0 node.virtual=true node.hidden=true")));
+                "priority.session=0 node.virtual=true node.hidden=true")
+            + (restoreState ? "" : " state.restore-props=false")));
         uint id = uint.Parse(outp.Trim());
         _modules.Add(id);
         return id;

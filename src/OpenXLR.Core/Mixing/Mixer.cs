@@ -214,7 +214,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // Mixes first: the cells attach to them as masters.
             foreach (MixDefinition mix in config.Mixes)
             {
-                _mixModules[mix.Id] = _pw.CreateNullSink(mix.SinkName, $"OpenXLR {mix.Name}");
+                _mixModules[mix.Id] = _pw.CreateNullSink(mix.SinkName, $"OpenXLR {mix.Name}", restoreState: RestoresMixSinkState(mix.Kind));
                 _mixVolume[mix.Id] = Math.Clamp(mix.Volume, 0, MixVolumeMaximumLocked(mix.Id));
                 if (mix.Muted) _mixMuted.Add(mix.Id);
             }
@@ -4136,6 +4136,15 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         static bool Matches((int Percent, bool Muted) leg, (double Level, bool Muted) target)
             => leg.Percent == PipeWireAdapter.SinkInputPercent(target.Level) && leg.Muted == target.Muted;
     }
+
+    /// <summary>
+    /// Whether the session manager may restore a saved level onto a mix's
+    /// sink: only a monitor mix's, whose volume is a desktop master. Stream,
+    /// Chat and Aux are recorded or played to another device at a level the
+    /// mixer alone sets, and a remembered mute restored after a rebuild
+    /// would silence them until the next sweep.
+    /// </summary>
+    internal static bool RestoresMixSinkState(MixKind kind) => kind == MixKind.Monitor;
 
     private MixDefinition? MonitorMixLocked(string mixId)
         => _config.Mixes.FirstOrDefault(m => m.Id == mixId && m.Kind == MixKind.Monitor);
