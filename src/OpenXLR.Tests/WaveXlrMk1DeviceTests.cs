@@ -1,6 +1,9 @@
 using System.Buffers.Binary;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using OpenXLR.Core;
 using OpenXLR.Core.Devices;
+using OpenXLR.Daemon;
 
 namespace OpenXLR.Tests;
 
@@ -8,7 +11,9 @@ namespace OpenXLR.Tests;
 /// The original Wave XLR's ALSA mirror against a fake transport and a fake
 /// card. The card's ranges are the XLR Dock's (the same protocol); no MK.1
 /// amixer dump is public, which is why the backend reads them from the card.
+/// The restore tests redirect the configuration directory.
 /// </summary>
+[Collection("xdg-config")]
 public sealed class WaveXlrMk1DeviceTests
 {
     /// <summary>A 34-byte config block behind the transport: reads serve it, writes replace it.</summary>
@@ -335,5 +340,119 @@ public sealed class WaveXlrMk1DeviceTests
         Assert.Equal(48, dev.ReadState().GainDb);
         Assert.Null(dev.ConnectionNote);
         Assert.Equal("not mirrored", dev.DumpBlocks()["alsa"]);
+    }
+
+    /// <summary>A unit's block at power-on, as wavexlr-linux records it: 75 dB, -23.5 dB, 48V and ClipGuard on, the mix all computer.</summary>
+    private static byte[] PowerOn() => Convert.FromHexString(
+        "004B00EC000101000080E800000001FF0000FFFFFFFFFFFFFFFFFF0100FF37000100");
+
+    [Fact]
+    public void ClipGuardAndTheMonitorMixAreReadFromTheBlock()
+    {
+        var usb = new FakeUsb { Config = PowerOn() };
+        var dev = new WaveXlrMk1Device(usb, null, null);
+        dev.Connect();
+
+        DeviceState s = dev.ReadState();
+
+        Assert.True(dev.Capabilities.ClipGuard && dev.Capabilities.Crossfade);
+        Assert.Equal((75, -23.5, true, true), (s.GainDb, s.HpVolumeDb, s.Phantom, s.ClipGuard));
+        Assert.Equal(200, s.Crossfade);   // 0 percent: the computer alone
+        Assert.True(s.ClipGuardAndMixRead);
+
+        usb.Config[5] = 0;
+        usb.Config[12] = 0x00; usb.Config[13] = 0x50;   // 80 percent microphone
+        s = dev.ReadState();
+        Assert.False(s.ClipGuard);
+        Assert.Equal(40, s.Crossfade);
+        usb.Config[12] = 0xFF; usb.Config[13] = 0xFF;   // above 100 percent reads as the microphone alone
+        Assert.Equal(0, dev.ReadState().Crossfade);
+    }
+
+    [Fact]
+    public void ClipGuardAndTheMixWriteOnlyTheirBytes()
+    {
+        var usb = new FakeUsb { Config = PowerOn() };
+        var dev = new WaveXlrMk1Device(usb, null, null);
+        dev.Connect();
+        byte[] before = PowerOn();
+
+        dev.SetClipGuard(false);
+        Assert.Equal([5], Changed(before, usb.Writes[^1]));
+        dev.SetClipGuard(true);
+        Assert.Empty(Changed(before, usb.Writes[^1]));
+
+        dev.SetCrossfade(40);
+        Assert.Equal([13], Changed(before, usb.Writes[^1]));
+        Assert.Equal([0x00, 0x50], usb.Writes[^1][12..14]);
+        dev.SetCrossfade(0);
+        Assert.Equal([0x00, 0x64], usb.Writes[^1][12..14]);
+        dev.SetCrossfade(135);
+        Assert.Equal([0x80, 0x20], usb.Writes[^1][12..14]);   // 32.5 percent
+        Assert.Equal(135, dev.ReadState().Crossfade);
+    }
+
+    private static int[] Changed(byte[] a, byte[] b) => [.. Enumerable.Range(0, a.Length).Where(i => a[i] != b[i])];
+
+    [Fact]
+    public void ASnapshotSavedBeforeTheMixWasReadLeavesClipGuardAndTheMixAlone()
+    {
+        WithConfigDir(() =>
+        {
+            // What an MK.1 saved before: ClipGuard off and the centre are placeholders.
+            DeviceStateStore.SaveLast("0fd9:007d", new DeviceState { GainDb = 40, HpVolumeDb = -30, Crossfade = 100 });
+            var usb = new FakeUsb { Config = PowerOn() };
+            using DeviceManager manager = Connected(usb);
+
+            Assert.NotNull(manager.RestoreLastState());
+
+            DeviceState s = manager.Snapshot().State!;
+            Assert.Equal((40, -30.0), (s.GainDb, s.HpVolumeDb));
+            Assert.Equal((true, 200), (s.ClipGuard, s.Crossfade));
+            Assert.Equal(0x01, usb.Config[5]);
+            Assert.Equal([0, 0], usb.Config[12..14]);
+        });
+    }
+
+    [Fact]
+    public void ASnapshotWithTheMixReadRestoresThem()
+    {
+        WithConfigDir(() =>
+        {
+            DeviceStateStore.SaveLast("0fd9:007d", new DeviceState
+            {
+                GainDb = 40, HpVolumeDb = -30, ClipGuard = false, Crossfade = 40, ClipGuardAndMixRead = true,
+            });
+            var usb = new FakeUsb { Config = PowerOn() };
+            using DeviceManager manager = Connected(usb);
+
+            Assert.NotNull(manager.RestoreLastState());
+
+            Assert.Equal(0, usb.Config[5]);
+            Assert.Equal([0x00, 0x50], usb.Config[12..14]);
+            DeviceState s = manager.Snapshot().State!;
+            Assert.Equal((false, 40), (s.ClipGuard, s.Crossfade));
+        });
+    }
+
+    private static DeviceManager Connected(FakeUsb usb)
+    {
+        var dev = new WaveXlrMk1Device(usb, null, null);
+        var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [dev]);
+        manager.SweepOnce();
+        return manager;
+    }
+
+    private static void WithConfigDir(Action body)
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-test-").FullName;
+        string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+        try { body(); }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
     }
 }

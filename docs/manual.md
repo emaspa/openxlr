@@ -353,8 +353,8 @@ shortened name to read it in full.
 chain on each XLR input, a mono or stereo chain on each capture input,
 a stereo chain on each mix. On an interface whose
 backend exposes no hardware low cut or ClipGuard, OpenXLR offers the
-missing one in software on XLR 1: both on the first XLR Dock and the
-original Wave XLR, the low cut on the Wave:3 and Wave:1.
+missing one in software on XLR 1: both on the first XLR Dock, the low cut
+on the original Wave XLR, the Wave:3 and Wave:1.
 Intermediate DSP and mix-delay nodes are hidden from desktop device pickers
 and ignore saved desktop volume and mute. Use the channel sends, mix
 masters and physical output controls for level and mute changes. Rebuilding a chain starts these
@@ -785,7 +785,8 @@ that was the default.
    line-output switches still follow the monitor feed.
 6. The HEADPHONES card holds the interface's own headphone volume,
    low-impedance mode, and, on every interface with a direct monitor (the
-   MK.2 family, the Wave:3, the Wave:3 MK.2 and the Wave:1), the Mic ↔ PC
+   original Wave XLR, the MK.2 family, the Wave:3, the Wave:3 MK.2 and the
+   Wave:1), the Mic ↔ PC
    crossfade, which is the zero-latency direct monitor inside the device:
    left is only your microphone, right is only computer audio. The Wave XLR
    Pro has no crossfade: its zero-latency path follows the microphone's

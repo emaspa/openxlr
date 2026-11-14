@@ -249,14 +249,20 @@ its `alsa` line.
 | Headphone volume, low impedance | verified | community tester |
 | Phantom 48V | verified | config byte 6, found by [openwave PR #8](https://github.com/rikkichy/openwave/pull/8) against the MK.1's own 48V LED; the same byte is verified on the XLR Dock. Confirmed by a community tester on a MK.1 after the first run |
 | Desktop volume controls | coded | the card's three controls kept in step with the config block, as on the Wave:3; see above. Not yet checked on an MK.1 |
-| Hardware low cut, ClipGuard, mic/PC crossfade | unmapped | Wave Link exposes these controls; their OpenXLR offsets are unknown. Software low cut and limiting are available in the submixer |
+| ClipGuard | coded | config byte 5, 0x01 on, which a unit reads at power-on. From [wavexlr-linux](https://github.com/paulherter/wavexlr-linux), whose author tested it on an MK.1; not yet checked with OpenXLR. Taken as hardware, so the submixer's limiter is not offered |
+| Mic/PC crossfade | coded | config bytes 12 and 13, a Q8.8 percent word for the microphone's share of the headphones, 0 (the computer alone) at power-on, from the same project. Mapped to the crossfade as on the Wave:3, half a percent per crossfade unit. Not yet checked with OpenXLR. A last-settings snapshot or profile saved before OpenXLR read these two bytes leaves them as the unit has them |
+| Hardware low cut | unmapped | Wave Link exposes it; its offset is unknown. The submixer's low cut is offered instead |
 | Save settings to hardware, LED colours | unmapped | OpenXLR restores its last observed settings on connect instead of issuing Wave Link's hardware-save operation |
 
 Elgato's [Wave XLR settings guide](https://help.elgato.com/hc/en-us/articles/4404228579853-Elgato-Wave-XLR-Wave-Link-Settings-Overview)
 documents a separate hardware-save action. OpenXLR's `retainsSettings: false`
 capability describes its restoration policy, not an absence of device memory.
-Hardware low cut or ClipGuard configured in Wave Link may remain active;
-OpenXLR cannot currently read or disable those settings.
+A hardware low cut configured in Wave Link may remain active; OpenXLR
+cannot currently read or disable it. The same project reads byte 28 as a
+gain lock flag the firmware only stores; OpenXLR's gain lock is its own
+and leaves that byte as read. The XLR Dock shares this block's layout but
+has no ClipGuard or direct monitor in hardware, so it cannot confirm
+bytes 5 and 12.
 
 ## Wave XLR MK.2 (0fd9:00b6) and XLR Dock MK.2 (0fd9:00c7), verified
 

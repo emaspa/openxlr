@@ -113,6 +113,15 @@ public sealed record DeviceState
     public bool? LineInLevelLock { get; init; }
 
     /// <summary>
+    /// True when ClipGuard and the crossfade were read from the original
+    /// Wave XLR's config block (bytes 5 and 12). Null on every other model
+    /// and in an MK.1 snapshot or profile saved before OpenXLR read them,
+    /// whose two values are placeholders (ClipGuard off, the crossfade at the
+    /// centre), so a recall of one leaves the unit's as they are.
+    /// </summary>
+    public bool? ClipGuardAndMixRead { get; init; }
+
+    /// <summary>
     /// The unit's own gain lock as the unit reads it back, block 0x0004
     /// byte 2 bit 0x04 on a unit with
     /// <see cref="DeviceCapabilities.HardwareGainLock"/>: while it is on the

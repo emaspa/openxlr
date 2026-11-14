@@ -14,10 +14,11 @@ namespace OpenXLR.Core.Devices;
 ///
 /// wIndex 0x3303 (not 0x3300) bypasses the snd-usb-audio ownership check; the
 /// firmware only validates the 0x33 prefix. Block 0 is a 34-byte config:
-/// gain u16le at 0, mute at 4, headphone volume as int16 Q8.8 dB at 9, the
-/// dial-mode selector at 14, low impedance at 33. Block 1 carries input
-/// meters, block 0x0A a 51-byte device info record. Protocol from the
-/// openwave project (MIT), verified on MK.1 hardware by its users.
+/// gain u16le at 0, mute at 4, ClipGuard at 5, headphone volume as int16
+/// Q8.8 dB at 9, the mic and PC monitor mix at 12, the dial-mode selector at
+/// 14, low impedance at 33. Block 1 carries input meters, block 0x0A a
+/// 51-byte device info record. Protocol from the openwave project (MIT),
+/// verified on MK.1 hardware by its users.
 ///
 /// The gain field's scale is Q8.8 dB: openwave PR #8 measured exactly 256
 /// raw units per dB at four points against the ALSA capture control (on the
@@ -25,9 +26,18 @@ namespace OpenXLR.Core.Devices;
 /// maximum, clamped to 75 dB here while openwave's profile says 0x5000 = 80;
 /// the device's own gain display settles it.
 ///
-/// Crossfade, low cut, and the voice DSP exist on the hardware but their
-/// config offsets are not yet mapped, so the capabilities exclude them; a
-/// Wave Link capture from an MK.1 is the way to add them.
+/// ClipGuard (byte 5, 0x01 on, which a unit reads at power-on) and the
+/// monitor mix (a Q8.8 percent word at 12, the share of the microphone in
+/// the headphones, 0 at power-on) are documented by wavexlr-linux (MIT),
+/// whose author tested them on an MK.1; neither is checked on an MK.1 here.
+/// The mix word runs as on the Wave:3, 0 percent the computer alone, so it
+/// is mapped to the crossfade the same way (see
+/// <see cref="Wave3Device.CrossfadeToWord"/>). The XLR Dock, which shares
+/// the layout, has neither in hardware and is no test for them. Low cut and
+/// the voice DSP exist on the hardware but their config offsets are not
+/// mapped, so the capabilities exclude them; a Wave Link capture from an
+/// MK.1 is the way to add them. Byte 28 is a gain lock flag the firmware
+/// only stores, by the same source; the daemon's own lock needs no byte.
 ///
 /// The kernel's ALSA card carries 'Mic Capture Volume', 'Mic Capture Switch'
 /// and 'PCM Playback Volume', and the desktop's volume controls and
@@ -60,8 +70,10 @@ public abstract class Mk1ClassProtocolDevice : IAudioDevice
 
     private const int OffGain = 0;
     private const int OffMute = 4;
+    private const int OffClipGuard = 5;
     private const int OffPhantom = 6;   // 48V, 0x01 on; openwave PR #8, found against the MK.1's own LED
     private const int OffHpVol = 9;
+    private const int OffMonitorMix = 12;
     private const int OffLowZ = 33;
 
     /// <summary>Config block length: 34 on the MK.1, 64 on the XLR Dock.</summary>
@@ -226,8 +238,14 @@ public abstract class Mk1ClassProtocolDevice : IAudioDevice
         Phantom = c[OffPhantom] != 0,
         HpVolumeDb = Math.Max(-60.0, BinaryPrimitives.ReadInt16LittleEndian(c.AsSpan(OffHpVol)) / 256.0),
         LowImpedance = HasLowZ && c[OffLowZ] != 0,
-        Crossfade = 100,   // not mapped in this protocol; keep the neutral centre
+        ClipGuard = Capabilities.ClipGuard && c[OffClipGuard] != 0,
+        Crossfade = Capabilities.Crossfade ? MixToCrossfade(c) : 100,
+        ClipGuardAndMixRead = Capabilities.ClipGuard ? true : null,
     };
+
+    /// <summary>The monitor mix word as the crossfade; a word above 100 percent reads as the microphone alone.</summary>
+    internal static int MixToCrossfade(ReadOnlySpan<byte> c)
+        => Wave3Device.CrossfadeFromWord((short)Math.Min(BinaryPrimitives.ReadUInt16LittleEndian(c[OffMonitorMix..]), (ushort)0x6400));
 
     private static double GainDb(ReadOnlySpan<byte> c)
         => Math.Clamp(BinaryPrimitives.ReadUInt16LittleEndian(c[OffGain..]) / 256.0, 0, GainMaxDb);
@@ -376,13 +394,22 @@ public abstract class Mk1ClassProtocolDevice : IAudioDevice
 
     public void SetPhantom(bool on) => Modify(c => c[OffPhantom] = on ? (byte)1 : (byte)0);
 
+    public void SetClipGuard(bool on)
+    {
+        if (Capabilities.ClipGuard) Modify(c => c[OffClipGuard] = on ? (byte)1 : (byte)0);
+    }
+
+    public void SetCrossfade(int value)
+    {
+        if (Capabilities.Crossfade)
+            Modify(c => BinaryPrimitives.WriteInt16LittleEndian(c.AsSpan(OffMonitorMix), Wave3Device.CrossfadeToWord(value)));
+    }
+
     // Present on the hardware but not yet mapped in this protocol.
     public void SetLowCut(bool on) { }
     public void SetExpander(bool on) { }
     public void SetVoiceTune(bool on) { }
     public void SetVoiceTuneStrength(int value) { }
-    public void SetCrossfade(int value) { }
-    public void SetClipGuard(bool on) { }
     public void SetCompressor(bool on) { }
 
     public IReadOnlyDictionary<string, string> DumpBlocks()
@@ -406,7 +433,8 @@ public abstract class Mk1ClassProtocolDevice : IAudioDevice
 
 /// <summary>The original Wave XLR (MK.1, 0fd9:007d). Protocol from the
 /// openwave project; gain, mute, headphone volume, low impedance and phantom
-/// verified on two units by community testers (issues #6 and earlier).
+/// verified on two units by community testers (issues #6 and earlier),
+/// ClipGuard and the monitor mix coded from wavexlr-linux and not yet checked.
 /// Mic capture needs 52-openxlr-mk1-capture-hold.conf (packaging/): without
 /// it, a playback stream opening before capture starts silences the mic for
 /// that capture stream's whole life; see the file for why.</summary>
@@ -433,6 +461,8 @@ public sealed class WaveXlrMk1Device : Mk1ClassProtocolDevice
         HpVolume = true,
         LowImpedance = true,
         Phantom = true,
+        ClipGuard = true,
+        Crossfade = true,
         XlrInputs = 1,
         HpOutputs = 1,
         GainMaxDb = 75,
