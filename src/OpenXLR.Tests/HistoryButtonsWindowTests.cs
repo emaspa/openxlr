@@ -46,7 +46,8 @@ internal static class HistoryButtonsWindowTests
             var undo = window.FindControl<Button>("UndoButton")!;
             var redo = window.FindControl<Button>("RedoButton")!;
             var actions = window.FindControl<WrapPanel>("HeaderActions")!;
-            Assert.Same(pair, actions.Children[0]);
+            Assert.Same(window.FindControl<Control>("ProfilesButton"), actions.Children[0]);
+            Assert.Same(pair, actions.Children[1]);
             // A daemon from before undo reports no history: no pair.
             Assert.False(pair.IsEffectivelyVisible);
 

@@ -216,7 +216,7 @@ public sealed class SkinPackageTests : IDisposable
         Assert.Equal(SkinMixerPlacement.Docked, layout.PopOut);
         Assert.Equal(SkinRegionVisibility.Visible, layout.OptionsFor(SkinLayoutRegions.Headphones).Visibility);
         Assert.Equal(SkinRegionVisibility.Visible, layout.OptionsFor(SkinLayoutRegions.Applications).Visibility);
-        Assert.Equal(["profiles", "flow", "arrange", "restart-daemon", "version", "about", "history"], layout.Header.Row);
+        Assert.Equal(["profiles", "history", "flow", "arrange", "restart-daemon", "version", "about"], layout.Header.Row);
         Assert.Empty(layout.Header.Overflow);
 
         Assert.Equal("console", skin.Package.Controls["fader"]);

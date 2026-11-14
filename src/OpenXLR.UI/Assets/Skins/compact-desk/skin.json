@@ -194,6 +194,7 @@
       "header": {
         "actions": [
           "profiles",
+          "history",
           "flow",
           "arrange"
         ],

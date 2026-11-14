@@ -1435,8 +1435,8 @@ The header actions:
 
 | Action | What it is |
 |---|---|
-| `history` | the undo and redo buttons, as one pair |
 | `profiles` | Profiles and its menu |
+| `history` | the undo and redo buttons, as one pair |
 | `arrange` | the Arrange toggle |
 | `flow` | Flow |
 | `restart-daemon` | Restart daemon |
