@@ -405,8 +405,12 @@ them. Plugin parameter controls keep the steps supplied by their plugin.
 Press Ctrl+Z in the UI or the separate mixer window to take back the last
 mixer change, and Ctrl+Shift+Z or Ctrl+Y to put it back. The two arrow
 buttons in the header do the same. Point at one and its tooltip names the
-step it would take, such as "Undo Stream volume"; a button with nothing to
-take is greyed out. After each undo or redo, a note under the arrows names
+step it would take; a button with nothing to take is greyed out. When the
+step changes one volume, level, gain or switch, the tooltip also gives the
+value now and the value it goes back to, such as "Undo Stream volume: 100%
+back to 75%". A second line names the next three steps and how many more
+follow, such as "Then: Game mute in Stream, XLR 1 gain, and 3 more".
+After each undo or redo, a note under the arrows names
 the step for three seconds, or says what was left alone and why, so you
 can see what changed even in a folded section or another window. A skin
 can move the pair along the header or into the ⋯ menu; with the pair in

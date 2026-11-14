@@ -2492,6 +2492,18 @@ Select the interface OpenXLR drives</value>
   <data name="HistoryMore" xml:space="preserve">
     <value>{0} and {1} more</value>
   </data>
+  <data name="HistoryUndoValues" xml:space="preserve">
+    <value>{0}: {1} back to {2}</value>
+  </data>
+  <data name="HistoryRedoValues" xml:space="preserve">
+    <value>{0}: {1} to {2}</value>
+  </data>
+  <data name="HistoryThen" xml:space="preserve">
+    <value>Then: {0}</value>
+  </data>
+  <data name="HistoryThenMore" xml:space="preserve">
+    <value>Then: {0}, and {1} more</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Mix shown in bank {0}</value>
   </data>

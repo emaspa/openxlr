@@ -27,7 +27,100 @@ public sealed class MixHistoryTests
         Assert.Equal(1, state.UndoSteps);
         Assert.Equal(0, state.RedoSteps);
         Assert.Null(state.Redo);
-        Assert.Equal(new HistoryStepInfo(1, "sendLevel", "xlr1", "monitor", null, 1, "Mic level in Monitor"), state.Undo);
+        Assert.Equal(new HistoryStepInfo(1, "sendLevel", "xlr1", "monitor", null, 1, "Mic level in Monitor") { From = .5, To = 1.0 },
+            state.Undo);
+        Assert.Null(state.UndoNext);
+        Assert.Null(state.RedoNext);
+    }
+
+    [Fact]
+    public void TheStateNamesUpToThreeStepsAfterEachEndInTheOrderTheyWouldBeTaken()
+    {
+        MixHistory history = History();
+        for (int i = 1; i <= 6; i++)
+        {
+            history.Record("a", Send($"ch{i}", "monitor"), $"Step {i}", [Level($"ch{i}|monitor", 1, .5)]);
+            _now += 2000;
+        }
+        HistoryState state = history.State();
+        Assert.Equal(6, state.Undo!.Step);
+        Assert.Equal([5L, 4L, 3L], state.UndoNext!.Select(s => s.Step));
+        Assert.Equal(MixHistory.NextSteps, state.UndoNext!.Count);
+        Assert.Null(state.RedoNext);
+
+        // Two undone: redo takes 5 first, then 6.
+        for (int i = 0; i < 2; i++)
+        {
+            var (step, changes, _) = history.Begin(redo: false)!.Value;
+            history.Complete(step, redo: false, changes, null);
+        }
+        state = history.State();
+        Assert.Equal(5, state.Redo!.Step);
+        Assert.Equal([6L], state.RedoNext!.Select(s => s.Step));
+        Assert.Equal(4, state.Undo!.Step);
+        Assert.Equal([3L, 2L, 1L], state.UndoNext!.Select(s => s.Step));
+        // The steps after the ends carry their values in the direction they would be taken.
+        Assert.Equal((.5, 1.0), ((double)state.UndoNext![0].From!, (double)state.UndoNext[0].To!));
+        Assert.Equal((1.0, .5), ((double)state.RedoNext![0].From!, (double)state.RedoNext[0].To!));
+    }
+
+    [Fact]
+    public void AStepOfOneNumberOrSwitchNamesTheValuesUndoAndRedoMoveBetween()
+    {
+        MixHistory history = History();
+        history.Record("a", new HistoryTarget("mixMute", null, "stream", null, [SceneField.MixMuted], _ => true), "Stream mute",
+            [new SceneChange(new(SceneField.MixMuted, "stream"), false, true)]);
+        HistoryStepInfo undo = history.State().Undo!;
+        Assert.Equal(true, undo.From);
+        Assert.Equal(false, undo.To);
+
+        var (step, changes, _) = history.Begin(redo: false)!.Value;
+        history.Complete(step, redo: false, changes, null);
+        HistoryStepInfo redo = history.State().Redo!;
+        Assert.Equal(false, redo.From);
+        Assert.Equal(true, redo.To);
+
+        // A hardware value: the gain, an int in dB.
+        _now += 2000;
+        history.Record("a", new HistoryTarget("unitGain", "xlr1", null, null, [], _ => false) { Control = "gain" }, "XLR 1 gain", [],
+            [new DeviceChange("unit-1", "Wave XLR", "gain", 28, 32)]);
+        undo = history.State().Undo!;
+        Assert.Equal(32, undo.From);
+        Assert.Equal(28, undo.To);
+
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        };
+        string json = System.Text.Json.JsonSerializer.Serialize(undo, options);
+        Assert.Contains("\"from\":32,\"to\":28", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AStepOfSeveralValuesOrOfAWholeSettingNamesNoValues()
+    {
+        MixHistory history = History();
+        // A burst over two sends.
+        history.Record("deck", Send("xlr1", "monitor"), "Mic level in Monitor", [Level("xlr1|monitor", 1, .5)]);
+        _now += 30;
+        history.Record("deck", Send("xlr1", "stream"), "Mic level in Stream", [Level("xlr1|stream", 1, .5)]);
+        HistoryStepInfo burst = history.State().Undo!;
+        Assert.Equal(2, burst.Count);
+        Assert.Null(burst.From);
+        Assert.Null(burst.To);
+
+        // One command that changed two values, as an exclusive group does.
+        _now += 2000;
+        history.Record("a", new HistoryTarget("exclusiveGroup", null, null, "sources", [SceneField.ChannelMuted], _ => true), "Sources switch",
+            [new SceneChange(new(SceneField.ChannelMuted, "a|stream"), true, false), new SceneChange(new(SceneField.ChannelMuted, "b|stream"), false, true)]);
+        Assert.Null(history.State().Undo!.From);
+
+        // A whole setting is not a plain value.
+        _now += 2000;
+        history.Record("a", new HistoryTarget("eq", "xlr1", null, null, [SceneField.Eq], _ => true), "XLR 1 EQ",
+            [new SceneChange(new(SceneField.Eq, "xlr1"), new MicEq(), new MicEq { Enabled = true })]);
+        Assert.Null(history.State().Undo!.From);
+        Assert.Null(history.State().Undo!.To);
     }
 
     [Fact]

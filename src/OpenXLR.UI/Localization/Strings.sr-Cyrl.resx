@@ -2388,6 +2388,18 @@
   <data name="HistoryMore" xml:space="preserve">
     <value>{0} и још {1}</value>
   </data>
+  <data name="HistoryUndoValues" xml:space="preserve">
+    <value>{0}: са {1} назад на {2}</value>
+  </data>
+  <data name="HistoryRedoValues" xml:space="preserve">
+    <value>{0}: са {1} на {2}</value>
+  </data>
+  <data name="HistoryThen" xml:space="preserve">
+    <value>Затим: {0}</value>
+  </data>
+  <data name="HistoryThenMore" xml:space="preserve">
+    <value>Затим: {0} и још {1}</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Микс приказан у банци {0}</value>
   </data>

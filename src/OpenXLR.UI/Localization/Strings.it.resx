@@ -2446,6 +2446,18 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="HistoryMore" xml:space="preserve">
     <value>{0} e altri {1}</value>
   </data>
+  <data name="HistoryUndoValues" xml:space="preserve">
+    <value>{0}: da {1} torna a {2}</value>
+  </data>
+  <data name="HistoryRedoValues" xml:space="preserve">
+    <value>{0}: da {1} a {2}</value>
+  </data>
+  <data name="HistoryThen" xml:space="preserve">
+    <value>Poi: {0}</value>
+  </data>
+  <data name="HistoryThenMore" xml:space="preserve">
+    <value>Poi: {0} e altri {1}</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Mix mostrato nel banco {0}</value>
   </data>

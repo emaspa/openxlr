@@ -466,8 +466,11 @@ public sealed partial class MainViewModel : ViewModelBase
             Raise(nameof(CrossfadeText));
         }
     }
-    public string CrossfadeText => _crossfade == 100 ? Localizer.Text("CrossfadeCentre")
-        : _crossfade < 100 ? Localizer.Format("CrossfadeMic", 100 - _crossfade) : Localizer.Format("CrossfadePc", _crossfade - 100);
+    public string CrossfadeText => CrossfadeLabel(_crossfade);
+
+    /// <summary>The blend's readout: centre, or how far it leans to the mic or the PC side.</summary>
+    internal static string CrossfadeLabel(int crossfade) => crossfade == 100 ? Localizer.Text("CrossfadeCentre")
+        : crossfade < 100 ? Localizer.Format("CrossfadeMic", 100 - crossfade) : Localizer.Format("CrossfadePc", crossfade - 100);
 
     private bool _lowImpedance;
     public bool LowImpedance { get => _lowImpedance; set { if (Set(ref _lowImpedance, value) && !_applying) _ = _client.SetControlAsync("lowImpedance", value); } }
@@ -497,7 +500,7 @@ public sealed partial class MainViewModel : ViewModelBase
     /// </summary>
     public double HpPercent
     {
-        get => (60.0 + _hpVolumeDb) / 60.0 * 100.0;
+        get => HeadphonePercent(_hpVolumeDb);
         set => HpVolumeDb = -60.0 + Math.Clamp(value, 0, 100) * 0.6;
     }
 
@@ -519,9 +522,12 @@ public sealed partial class MainViewModel : ViewModelBase
     }
     public string Hp2Text => $"{Hp2Percent:0}%";
 
+    /// <summary>A headphone level in dB as the slider shows it, 0 to 100% linear in dB.</summary>
+    internal static double HeadphonePercent(double db) => (60.0 + db) / 60.0 * 100.0;
+
     public double Hp2Percent
     {
-        get => (60.0 + _hp2VolumeDb) / 60.0 * 100.0;
+        get => HeadphonePercent(_hp2VolumeDb);
         set => Hp2VolumeDb = -60.0 + Math.Clamp(value, 0, 100) * 0.6;
     }
 

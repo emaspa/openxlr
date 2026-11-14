@@ -2430,6 +2430,18 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="HistoryMore" xml:space="preserve">
     <value>{0} y {1} más</value>
   </data>
+  <data name="HistoryUndoValues" xml:space="preserve">
+    <value>{0}: de {1} de vuelta a {2}</value>
+  </data>
+  <data name="HistoryRedoValues" xml:space="preserve">
+    <value>{0}: de {1} a {2}</value>
+  </data>
+  <data name="HistoryThen" xml:space="preserve">
+    <value>Después: {0}</value>
+  </data>
+  <data name="HistoryThenMore" xml:space="preserve">
+    <value>Después: {0} y {1} más</value>
+  </data>
   <data name="BankPickerName" xml:space="preserve">
     <value>Mezcla visible en el banco {0}</value>
   </data>
