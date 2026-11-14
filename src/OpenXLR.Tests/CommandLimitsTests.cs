@@ -11,7 +11,7 @@ public sealed class CommandLimitsTests
         public bool HasChannel(string id) => id is "system" or "xlr1";
         public bool HasMix(string id) => id is "monitor" or "monitor2" or "stream";
         public bool IsMonitorFeed(string feed) => feed is "monitor" or "monitor2" or "monitor+monitor2";
-        public bool IsMonitorOutput(string device) => device is "alsa_output.headset" or "alsa_output.katana" or "alsa_output.pro#";
+        public bool IsMonitorOutput(string device) => device is "alsa_output.headset" or "alsa_output.katana" or "alsa_output.pro#" or "bluez_output.AA_BB.1";
         public bool IsInsertKey(string key) => key is "xlr1" or "mix:monitor";
         public InsertDefinition? InsertInChain(string key, string id)
             => key is "xlr1" && id is "comp" ? new InsertDefinition { Id = "comp", Kind = "lv2", Plugin = "urn:test:comp" } : null;
@@ -52,6 +52,13 @@ public sealed class CommandLimitsTests
     [InlineData("""{"cmd":"setOutputDeviceVolume","device":"","value":1}""", "invalid output name")]
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.headset","mix":"monitor2"}""", null)]
     [InlineData("""{"cmd":"setMonitorFeed","device":"alsa_output.headset","mix":"nope"}""", "not a mix")]
+    [InlineData("""{"cmd":"setMonitorIdleRelease","device":"bluez_output.AA_BB.1","enabled":true}""", null)]
+    [InlineData("""{"cmd":"setMonitorIdleRelease","device":"bluez_output.AA_BB.1","enabled":false}""", null)]
+    [InlineData("""{"cmd":"setMonitorIdleRelease","enabled":true}""", "need 'device'")]
+    [InlineData("""{"cmd":"setMonitorIdleRelease","device":"bluez_output.AA_BB.1"}""", "need 'enabled'")]
+    [InlineData("""{"cmd":"setMonitorIdleRelease","device":"alsa_output.headset","enabled":true}""", "not a Bluetooth output")]
+    [InlineData("""{"cmd":"setMonitorIdleRelease","device":"alsa_output.pro#","enabled":true}""", "not a Bluetooth output")]
+    [InlineData("""{"cmd":"setMonitorIdleRelease","device":"bluez_output.CC_DD.1","enabled":true}""", "not a selected monitor output")]
     [InlineData("""{"cmd":"setLevel","channel":"nope","mix":"monitor","value":0.5}""", "unknown channel")]
     [InlineData("""{"cmd":"setLevel","channel":"system","mix":"nope","value":0.5}""", "unknown mix")]
     [InlineData("""{"cmd":"setLevel","channel":"system","mix":"monitor","value":"loud"}""", "finite number")]

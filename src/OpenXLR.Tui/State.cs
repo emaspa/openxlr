@@ -673,6 +673,8 @@ internal sealed record MixerSnapshot
     public List<MixEntry> Masters => _masters ??= [.. Mixes.Where(mix => !mix.Appearance.Hidden)];
     public List<string> MonitorOutputs { get; init; } = [];
     public Dictionary<string, string> MonitorFeeds { get; init; } = [];
+    /// <summary>The selected Bluetooth outputs whose link comes down while their feed is silent; empty from an older daemon.</summary>
+    public List<string> MonitorIdleRelease { get; init; } = [];
     public string? DefaultMonitorMix { get; init; }
     public double? OutputVolume { get; init; }
     public bool MonitorMuted { get; init; }

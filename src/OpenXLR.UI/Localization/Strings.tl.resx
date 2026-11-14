@@ -2193,6 +2193,12 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
   <data name="ChooseOutputMixes" xml:space="preserve">
     <value>Pumili ng isa o higit pang mix para sa output na ito.</value>
   </data>
+  <data name="MonitorIdleRelease" xml:space="preserve">
+    <value>Hayaang lumipat sa ibang device kapag tahimik</value>
+  </data>
+  <data name="MonitorIdleReleaseTip" xml:space="preserve">
+    <value>Pagkalipas ng 10 segundong katahimikan sa mga mix ng output na ito, aalisin ng OpenXLR ang link nito, kaya hihinto ang stream ng headphones at makalilipat ang multipoint headphones sa ibang device, gaya ng telepono. Babalik ang link sa sandaling may tunog ang isang mix, at maaaring maputol ang unang sandali ng tunog na iyon habang muling kumokonekta ang headphones. Hindi kailanman tumatahimik ang mix na may dala ng iyong mikropono, kaya nananatiling naka-link ang output.</value>
+  </data>
   <data name="WINDOW" xml:space="preserve">
     <value>WINDOW</value>
   </data>

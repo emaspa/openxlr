@@ -92,7 +92,7 @@ internal static class HistoryPolicy
         "assignStream", "assignApp", "assignBrowserTab", "setAppVolume", "setBrowserTabVolume", "setRouteAppsByDefault",
         "setBlockSize", "setPreserveBrowserOutputs", "forgetApp",
         "setMonitorOutput", "setMonitorOutputs", "setMonitorMuted", "setMonitorMuteMicrophones", "toggleMonitorMuted",
-        "setMonitorFeed", "setOutputVolume", "setOutputVolumeLock", "setEnforcedDefaults", "setAuxPortEnabled",
+        "setMonitorFeed", "setMonitorIdleRelease", "setOutputVolume", "setOutputVolumeLock", "setEnforcedDefaults", "setAuxPortEnabled",
         "setMixLatencyCompensation",
         "soundCheck", "setSoundCheckRaw", "setSoundCheckHearMyself", "watchInputMeter",
         "setInsertOwnBlock", "showInsertUi",

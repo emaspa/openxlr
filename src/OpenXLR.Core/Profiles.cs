@@ -33,6 +33,12 @@ public sealed record MixerScene
     public List<string>? MonitorOutputs { get; init; }
     /// <summary>Output name to the monitor mix feeding it; null in profiles saved before Monitor B.</summary>
     public Dictionary<string, string>? MonitorFeeds { get; init; }
+    /// <summary>
+    /// The selected Bluetooth outputs whose link comes down while their feed
+    /// is silent; null in profiles saved before the option, which keep the
+    /// current choice.
+    /// </summary>
+    public List<string>? MonitorIdleRelease { get; init; }
 
     public bool AuxPortEnabled { get; init; }
     public double? OutputVolume { get; init; }

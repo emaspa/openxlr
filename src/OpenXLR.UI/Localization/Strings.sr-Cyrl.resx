@@ -2193,6 +2193,12 @@
   <data name="ChooseOutputMixes" xml:space="preserve">
     <value>Изабери један или више миксева за овај излаз.</value>
   </data>
+  <data name="MonitorIdleRelease" xml:space="preserve">
+    <value>Дозволи прелазак на други уређај у тишини</value>
+  </data>
+  <data name="MonitorIdleReleaseTip" xml:space="preserve">
+    <value>После 10 секунди тишине у миксевима овог излаза, OpenXLR уклања његову везу, па се ток слушалица зауставља и multipoint слушалице могу да пређу на други уређај, на пример телефон. Веза се враћа чим неки микс има звук, а први тренутак тог звука може да се изгуби док се слушалице поново повезују. Микс који носи твој микрофон никад није тих, па излаз остаје повезан.</value>
+  </data>
   <data name="WINDOW" xml:space="preserve">
     <value>ПРОЗОР</value>
   </data>

@@ -964,6 +964,27 @@ feed. A new mix starts silent until you open its sends.
 If the headset disconnects, leave it ticked. It shows as **(not
 connected)** and gets its feed back when it returns.
 
+<a name="bluetooth-idle-release"></a>
+A Bluetooth headset stays linked to its feed all the time, so it never
+stops its stream, even in silence. Headphones that are also connected to
+a phone then never switch to the phone. To let them switch, open the feed
+picker beside the headset and tick **Let it switch to another device when
+silent**. The option appears only for Bluetooth outputs and is off until
+you tick it.
+
+With the option on, OpenXLR removes the headset's links after every mix
+of its feed has been silent, below -80 dBFS, for 10 seconds. PipeWire
+then stops the headset's stream, and the headphones can switch to the
+phone. The links come back as soon as a mix of the feed has sound, but the
+headset misses the start of that sound while its stream starts again. A
+notification sound can lose its first moment, and in a call with pauses
+longer than 10 seconds the first word after a pause is cut, so leave the
+option off for a headset you use for calls.
+
+A mix that carries your own microphone never counts as silent, because
+room noise alone is above -80 dBFS. A headset whose feed includes your
+microphone stays linked with the option on.
+
 <a name="ducking"></a>
 #### Lower what you hear while you speak
 

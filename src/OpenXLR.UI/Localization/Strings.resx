@@ -2299,6 +2299,12 @@ Select the interface OpenXLR drives</value>
   <data name="ChooseOutputMixes" xml:space="preserve">
     <value>Choose one or more mixes for this output.</value>
   </data>
+  <data name="MonitorIdleRelease" xml:space="preserve">
+    <value>Let it switch to another device when silent</value>
+  </data>
+  <data name="MonitorIdleReleaseTip" xml:space="preserve">
+    <value>After 10 seconds of silence on this output's mixes, OpenXLR removes its link, so the headphones' stream stops and multipoint headphones can switch to another device, such as a phone. The link comes back as soon as a mix has sound, and the first moment of that sound can be cut while the headphones reconnect. A mix that carries your microphone never goes silent, so the output stays linked.</value>
+  </data>
   <data name="WINDOW" xml:space="preserve">
     <value>WINDOW</value>
   </data>

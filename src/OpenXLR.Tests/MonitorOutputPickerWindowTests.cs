@@ -135,7 +135,8 @@ internal static class MonitorOutputPickerWindowTests
                     DropDownButton feedButton = list.GetVisualDescendants().OfType<DropDownButton>()
                         .Single(button => ((MonitorOutputItem)button.DataContext!).Name == Headset);
                     feedButton.Flyout!.ShowAt(feedButton);
-                    var scroll = (ScrollViewer)((Flyout)feedButton.Flyout).Content!;
+                    // the mix list scrolls above the Bluetooth option
+                    var scroll = ((StackPanel)((Flyout)feedButton.Flyout).Content!).Children.OfType<ScrollViewer>().Single();
                     var mixList = (ItemsControl)scroll.Content!;
                     await Until(() => mixList.GetVisualDescendants().OfType<CheckBox>().Count() == 20);
                     window.UpdateLayout();
@@ -161,7 +162,7 @@ internal static class MonitorOutputPickerWindowTests
             var chooseMix = list.GetVisualDescendants().OfType<DropDownButton>()
                 .Single(button => ((MonitorOutputItem)button.DataContext!).Name == Headset);
             chooseMix.Flyout!.ShowAt(chooseMix);
-            var chooseList = (ItemsControl)((ScrollViewer)((Flyout)chooseMix.Flyout).Content!).Content!;
+            var chooseList = (ItemsControl)((StackPanel)((Flyout)chooseMix.Flyout).Content!).Children.OfType<ScrollViewer>().Single().Content!;
             await Until(() => chooseList.GetVisualDescendants().OfType<CheckBox>().Count() == 20);
             var second = chooseList.GetVisualDescendants().OfType<CheckBox>().ElementAt(1);
             using (var pointer = new XPointer())

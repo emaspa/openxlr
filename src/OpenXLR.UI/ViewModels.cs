@@ -1376,7 +1376,7 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             var items = wanted.Select(w => MonitorOutputs.FirstOrDefault(output => output.Name == w.Name)
                 ?? new MonitorOutputItem(w.Name, w.Label, OnMonitorSelectionChanged, OnMonitorFeedChanged,
-                    w.Present, error => Status = error)).ToList();
+                    w.Present, error => Status = error, OnMonitorIdleReleaseChanged)).ToList();
             // Adding or losing another device must not cancel this output's
             // pending feed edit or replace its open picker rows.
             foreach (MonitorOutputItem output in MonitorOutputs.Where(output => !items.Contains(output))) output.CancelFeedEdit();
@@ -1412,9 +1412,13 @@ public sealed partial class MainViewModel : ViewModelBase
         if (!monitors.Contains(primaryMonitor ?? ""))
             primaryMonitor = monitors.FirstOrDefault(); // Older daemons use layout order for the implicit feed.
         var feeds = mixer?["monitorFeeds"] as JsonObject;
+        // An older daemon sends no list: every output stays linked there.
+        HashSet<string> idleRelease = [.. (mixer?["monitorIdleRelease"] as JsonArray ?? [])
+            .Select(n => n is JsonValue v && v.TryGetValue(out string? name) ? name : null).OfType<string>()];
         DefaultMonitorMix = primaryMonitor ?? "monitor";
         foreach (MonitorOutputItem item in MonitorOutputs)
         {
+            item.SyncIdleRelease(idleRelease.Contains(item.Name));
             var included = (feeds?[item.Name]?.GetValue<string>()?.Split('+',
                 StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? []).ToHashSet(StringComparer.Ordinal);
             string feed = string.Join('+', mixOptions.Where(m => included.Contains(m.Id)).Select(m => m.Id));
@@ -1438,6 +1442,9 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private Task<string?> OnMonitorFeedChanged(string output, string mixId)
         => _applying ? Task.FromResult<string?>(null) : _client.SetMonitorFeedAsync(output, mixId);
+
+    private Task<string?> OnMonitorIdleReleaseChanged(string output, bool enabled)
+        => _applying ? Task.FromResult<string?>(null) : _client.SetMonitorIdleReleaseAsync(output, enabled);
 
     /// <summary>AudioNodeKind arrives as the enum's number (0 = Sink) or name.</summary>
     private static bool IsSink(JsonNode? kind) => kind switch

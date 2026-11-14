@@ -737,6 +737,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
         // once, not at the next sweep, so a key lights and goes dark with it.
         try { if (_mixer.SoundboardActivityChanged()) Changed?.Invoke(); }
         catch (Exception ex) { _log.LogDebug("soundboard activity: {msg}", ex.Message); }
+        // A Bluetooth output left unlinked while its feed was silent is linked
+        // as soon as the feed has sound, not at the next sweep.
+        try { if (_mixer.WakeIdleOutputs()) Changed?.Invoke(); }
+        catch (Exception ex) { _log.LogDebug("idle output wake: {msg}", ex.Message); }
     }
 
     /// <summary>Raised at the meter refresh rate so the hub can push levels.</summary>
@@ -1709,6 +1713,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     if (cmd.Device is null || cmd.Mix is null) return "setMonitorFeed: need 'device' and 'mix'";
                     if (_mixer.SetMonitorFeed(cmd.Device, cmd.Mix) is string feedErr) return $"setMonitorFeed: {feedErr}";
                     SyncOutputSelectors();   // the jacks may now follow another mix's XLR 1 send
+                    break;
+                case "setMonitorIdleRelease":
+                    if (cmd.Device is null || cmd.Enabled is not bool idle) return "setMonitorIdleRelease: need 'device' and 'enabled'";
+                    if (_mixer.SetMonitorIdleRelease(cmd.Device, idle) is string idleErr) return $"setMonitorIdleRelease: {idleErr}";
                     break;
                 case "setOutputVolume":
                     _mixer.SetSharedOutputVolume(cmd.Value.GetDouble());

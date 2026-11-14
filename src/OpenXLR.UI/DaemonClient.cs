@@ -793,6 +793,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task<string?> SetMonitorFeedAsync(string device, string mix)
         => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "setMonitorFeed", ["device"] = device, ["mix"] = mix });
 
+    /// <summary>Whether a selected Bluetooth output lets its link go while its feed is silent.</summary>
+    public Task<string?> SetMonitorIdleReleaseAsync(string device, bool enabled)
+        => EditLayoutAsync(new Dictionary<string, object> { ["cmd"] = "setMonitorIdleRelease", ["device"] = device, ["enabled"] = enabled });
+
     /// <summary>Volume of the selected output device (0..1.5).</summary>
     public Task SetOutputVolumeAsync(double value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setOutputVolume", ["value"] = value });

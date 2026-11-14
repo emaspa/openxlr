@@ -2237,6 +2237,12 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="ChooseOutputMixes" xml:space="preserve">
     <value>Elige una o varias mezclas para esta salida.</value>
   </data>
+  <data name="MonitorIdleRelease" xml:space="preserve">
+    <value>Dejar que cambie a otro dispositivo en silencio</value>
+  </data>
+  <data name="MonitorIdleReleaseTip" xml:space="preserve">
+    <value>Tras 10 segundos de silencio en las mezclas de esta salida, OpenXLR quita su conexión, así que el flujo de los auriculares se detiene y los auriculares multipunto pueden cambiar a otro dispositivo, como un teléfono. La conexión vuelve en cuanto una mezcla tiene sonido, y el primer instante de ese sonido puede cortarse mientras los auriculares se reconectan. Una mezcla que lleva tu micrófono nunca queda en silencio, así que la salida sigue conectada.</value>
+  </data>
   <data name="WINDOW" xml:space="preserve">
     <value>VENTANA</value>
   </data>

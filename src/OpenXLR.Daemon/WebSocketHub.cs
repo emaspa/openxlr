@@ -486,6 +486,7 @@ public sealed partial class WebSocketHub
             case "setMonitorMuteMicrophones":
             case "toggleMonitorMuted":
             case "setMonitorFeed":
+            case "setMonitorIdleRelease":
             case "setOutputVolume":
             case "setOutputVolumeLock":
             case "setEnforcedDefaults":

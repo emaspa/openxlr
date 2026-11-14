@@ -39,6 +39,7 @@ public sealed class MonitorOutputItem : ViewModelBase
     private readonly Action _changed;
     private readonly Func<string, string, Task<string?>> _feedChanged;
     private readonly Action<string>? _reportError;
+    private readonly Func<string, bool, Task<string?>>? _idleReleaseChanged;
     private MixOption? _feed;
     private string _label;
     private bool _isPresent;
@@ -46,9 +47,13 @@ public sealed class MonitorOutputItem : ViewModelBase
     private string? _pendingFeed;
     private string? _reportedFeed;
     private long _editVersion;
+    private bool _idleRelease;
+    private bool _reportedIdleRelease;
+    private bool? _pendingIdleRelease;
+    private long _idleVersion;
 
     public MonitorOutputItem(string name, string label, Action changed, Func<string, string, Task<string?>> feedChanged,
-        bool isPresent = true, Action<string>? reportError = null)
+        bool isPresent = true, Action<string>? reportError = null, Func<string, bool, Task<string?>>? idleReleaseChanged = null)
     {
         Name = name;
         _label = label;
@@ -56,6 +61,7 @@ public sealed class MonitorOutputItem : ViewModelBase
         _changed = changed;
         _feedChanged = feedChanged;
         _reportError = reportError;
+        _idleReleaseChanged = idleReleaseChanged;
     }
 
     public string Name { get; }
@@ -79,15 +85,53 @@ public sealed class MonitorOutputItem : ViewModelBase
         set
         {
             if (!Set(ref _isSelected, value)) return;
-            if (!value) CancelFeedEdit();
+            if (!value) { CancelFeedEdit(); CancelIdleReleaseEdit(); }
             _changed();
         }
     }
 
     public void Sync(bool selected)
     {
-        if (!selected) CancelFeedEdit();
+        if (!selected) { CancelFeedEdit(); CancelIdleReleaseEdit(); }
         Set(ref _isSelected, selected, nameof(IsSelected));
+    }
+
+    /// <summary>A Bluetooth output, the only kind offered the idle release.</summary>
+    public bool IsBluetooth => Name.StartsWith("bluez_output.", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The output's link comes down while its feed is silent, so multipoint
+    /// headphones can switch to another device. The daemon refuses it for
+    /// anything but a selected Bluetooth output.
+    /// </summary>
+    public bool IdleRelease
+    {
+        get => _idleRelease;
+        set
+        {
+            if (!Set(ref _idleRelease, value) || _idleReleaseChanged is null || !IsSelected || !IsBluetooth) return;
+            _pendingIdleRelease = value;
+            _ = SubmitIdleReleaseAsync(value, ++_idleVersion);
+        }
+    }
+
+    /// <summary>Apply the daemon's value unless an edit is still waiting for its answer.</summary>
+    internal void SyncIdleRelease(bool enabled)
+    {
+        _reportedIdleRelease = enabled;
+        Set(ref _idleRelease, _pendingIdleRelease ?? enabled, nameof(IdleRelease));
+    }
+
+    private void CancelIdleReleaseEdit() { _idleVersion++; _pendingIdleRelease = null; }
+
+    private async Task SubmitIdleReleaseAsync(bool enabled, long version)
+    {
+        string? error = await _idleReleaseChanged!(Name, enabled);
+        if (version != _idleVersion) return;
+        _pendingIdleRelease = null;
+        if (error is null) return;
+        Set(ref _idleRelease, _reportedIdleRelease, nameof(IdleRelease));
+        _reportError?.Invoke(error);
     }
 
     internal void CancelFeedEdit() { _editVersion++; _pendingFeed = null; }

@@ -47,6 +47,7 @@ internal static class SavedMixerValidation
             OutputVolumeLock = OutputLock(settings.OutputVolumeLock, notes),
             MonitorFeeds = Mapping(settings.MonitorFeeds, "monitorFeeds", notes),
             MonitorOutputLabels = Mapping(settings.MonitorOutputLabels, "monitorOutputLabels", notes),
+            MonitorIdleRelease = Entries(settings.MonitorIdleRelease, "monitorIdleRelease", notes),
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
             BrowserSiteChannels = BrowserSites(settings.BrowserSiteChannels, notes),
             AppVolumes = AppVolumes(settings.AppVolumes, notes),
@@ -109,6 +110,7 @@ internal static class SavedMixerValidation
         Names(scene.ChannelMuted, "channelMuted");
         if (scene.MonitorOutputs is not null) Names(scene.MonitorOutputs, "monitorOutputs");
         if (scene.MonitorFeeds is not null) Mapping(scene.MonitorFeeds, "monitorFeeds");
+        if (scene.MonitorIdleRelease is not null) Names(scene.MonitorIdleRelease, "monitorIdleRelease");
         if (scene.Inserts is not null) Inserts(scene.Inserts);
         if (scene.Eq is not null) Eq(scene.Eq);
         if (scene.MixEq is not null) Eq(scene.MixEq, "mixEq");

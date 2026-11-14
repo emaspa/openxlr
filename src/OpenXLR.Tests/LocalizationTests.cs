@@ -143,6 +143,24 @@ public sealed class LocalizationTests
         Assert.Equal(keys, keys.Where(translated.ContainsKey));
     }
 
+    // The Bluetooth idle release shipped in every language.
+    [Theory]
+    [InlineData("Strings.de.resx")]
+    [InlineData("Strings.es.resx")]
+    [InlineData("Strings.it.resx")]
+    [InlineData("Strings.tl.resx")]
+    [InlineData("Strings.ceb.resx")]
+    [InlineData("Strings.sr-Cyrl.resx")]
+    public void EveryTranslationCoversTheBluetoothIdleRelease(string file)
+    {
+        var english = English;
+        string[] keys = [.. english.Keys.Where(key => key.StartsWith("MonitorIdleRelease", StringComparison.Ordinal))];
+        Assert.Equal(2, keys.Length);
+        Dictionary<string, string> translated = Read(file);
+        Assert.Equal(keys, keys.Where(translated.ContainsKey));
+        Assert.All(keys, key => Assert.NotEqual(english[key], translated[key]));
+    }
+
     // The undo pair and its step names shipped in every language, each its
     // own wording rather than the English copied over.
     [Theory]

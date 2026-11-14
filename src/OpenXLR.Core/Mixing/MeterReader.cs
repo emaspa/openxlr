@@ -16,6 +16,8 @@ public sealed class MeterReader : IDisposable
     private const int SampleRate = 8000;
     private const double FloorDb = -60.0;
     private const double Release = 0.75;
+    // Mean square of a -80 dBFS signal. A read below it is silence for LastSound.
+    private const double SoundFloor = 1e-8;
 
     private readonly Dictionary<string, Meter> _meters = [];
     private readonly object _gate = new();
@@ -38,6 +40,7 @@ public sealed class MeterReader : IDisposable
         public long Count;
         public double DispL, DispR;  // smoothed display values
         public int EmptyPolls;       // polls since data last arrived
+        public long LastSound;       // Environment.TickCount64 of the last read above SoundFloor
     }
 
     /// <summary>Begin metering a sink by monitoring its output.</summary>
@@ -178,7 +181,7 @@ public sealed class MeterReader : IDisposable
         catch (Exception) { return; }
         if (p is null) return;
 
-        var meter = new Meter { Process = p, SinkName = sinkName };
+        var meter = new Meter { Process = p, SinkName = sinkName, LastSound = Environment.TickCount64 };
         _meters[id] = meter;
         // Take both streams here, while the gate still holds the process:
         // Remove and Dispose can retire the meter before either thread is
@@ -263,8 +266,27 @@ public sealed class MeterReader : IDisposable
                 meter.SumL += sumL;
                 meter.SumR += sumR;
                 meter.Count += frames;
+                if (IsSound(sumL, sumR, frames)) meter.LastSound = Environment.TickCount64;
             }
         }
+    }
+
+    /// <summary>
+    /// Whether a read with these sums of squares over <paramref name="frames"/>
+    /// stereo frames is sound, above -80 dBFS. A running mix delivers frames
+    /// of zeros too, so frames alone are not sound.
+    /// </summary>
+    internal static bool IsSound(double sumL, double sumR, int frames) => sumL + sumR > SoundFloor * 2 * frames;
+
+    /// <summary>
+    /// When a meter last read sound above -80 dBFS, in
+    /// <see cref="Environment.TickCount64"/> milliseconds, or the time it
+    /// started until it first does. Null without that meter. Read() does not
+    /// consume it, so it holds whether or not a client takes the levels.
+    /// </summary>
+    public long? LastSound(string id)
+    {
+        lock (_gate) return _meters.TryGetValue(id, out Meter? meter) ? meter.LastSound : null;
     }
 
     /// <summary>

@@ -233,6 +233,13 @@ public sealed partial record MixerState
     /// </summary>
     public IReadOnlyDictionary<string, string> MonitorOutputLabels { get; init; } = new Dictionary<string, string>();
 
+    /// <summary>
+    /// The selected Bluetooth outputs whose link comes down after their feed
+    /// has been silent for 10 seconds, so the headphones can switch to
+    /// another device. Every other output stays linked.
+    /// </summary>
+    public IReadOnlyList<string> MonitorIdleRelease { get; init; } = [];
+
     /// <summary>Volume of the selected output device (0..1.5), or null.</summary>
     public double? OutputVolume { get; init; }
 
