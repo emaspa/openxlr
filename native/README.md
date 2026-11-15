@@ -46,9 +46,11 @@ desktop testing.
 `make -C native test-audio` checks the audio thread's safety rules
 without a graph: a cycle the fixed buffers cannot carry is refused before
 anything is written, a plugin stuck inside one process call is told apart
-from a node that has no work, and invalid output is silenced, counting
-toward a restart only on sound and only after half a second of it. The
-same target runs `tests/own-block`, which drives the
+from a node that has no work, and invalid input reaches the plugin as
+silence and never stops the host. That holds for three seconds of it on an
+in-place node and for single samples into the duck stage. Invalid output
+is silenced, and counts toward a restart only on sound and only after half
+a second of it. The same target runs `tests/own-block`, which drives the
 [own block](#own-block) without a graph: the output is the input delayed
 by exactly the reported delay, sample for sample; a block answered within
 its time is never late and one answered later costs only its own late
@@ -575,12 +577,18 @@ unknown backend.
 A NaN or an infinity that reaches a filter's state stays there. Every later
 sample comes out NaN, even with the EQ off, because its crossfade still
 multiplies the cascade's output, and the host silences the stage until it
-restarts. The host exits at once on non-finite input to a plugin, which
-costs a chain restart; the microphone stage instead tells the host it
-guards its own input (`guards_input` in `Backend`) and keeps running. It
-replaces a non-finite input sample with 0 before noise removal, the EQ or
-the voice changer hears it, on a copy of the block, never in the host's
-buffer. If a state turns non-finite anyway, the part that holds it clears
+restarts. So the host replaces every non-finite input sample with 0 before
+a plugin or a built-in stage hears it, on a copy of the block, and never
+in PipeWire's buffer, which other nodes may read. It never stops for
+them, however long they keep coming. They come from upstream, and a new
+process would hear the same ones. The host counts them, and the main loop
+writes `trace: N non-finite input samples replaced with silence` to stderr
+when the count first moves and at most once every 10 seconds after that.
+The microphone stage instead tells the host it guards its own input
+(`guards_input` in `Backend`), and the host hands it the block as it came.
+The stage replaces a non-finite input sample with 0 before noise removal,
+the EQ or the voice changer hears it, on a copy of the block, never in the
+host's buffer. If a state turns non-finite anyway, the part that holds it clears
 it: the EQ resets every band's filter and plays that one sample dry, and
 noise removal and the voice changer start their engines over as described
 below. The host still checks the stage's output as it checks a plugin's.

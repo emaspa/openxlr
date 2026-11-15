@@ -12,8 +12,14 @@ public sealed partial class DspAudioIntegrationTests
     [DspPipeWireFact]
     public void StereoCaptureGainScalesBothPortsIndependently() => CaptureGain(2);
 
+    /// <summary>
+    /// One NaN from an application reaches a native insert as silence: the
+    /// helper keeps running, the chain keeps its nodes, nothing is rebuilt
+    /// and the restart budget is untouched. The helper's trace line, which
+    /// counts the samples it replaced, reaches the journal.
+    /// </summary>
     [DspPipeWireFact]
-    public void InvalidCaptureAudioRestartsOnlyItsNativeChainAndThenRecovers()
+    public void InvalidCaptureAudioIsSilencedWithoutRestartingItsNativeChain()
     {
         var notes = new System.Collections.Concurrent.ConcurrentQueue<string>();
         var pw = new PipeWireAdapter(() => { }, notes.Enqueue);
@@ -44,18 +50,12 @@ public sealed partial class DspAudioIntegrationTests
             subprocess.run(args, input=signal, check=True, timeout=10)
             """], TimeSpan.FromSeconds(15));
         Assert.True(result.Ok, result.Stderr);
-        // Observe the host's failure before healing: its ports can disappear
-        // before the process exits, which also permits an ordinary link repair.
-        CaptureChainFixture.Wait(() => !Assert.Single(mixer.Snapshot().Inserts["capture"]).NativeHostRunning);
-        CaptureChainFixture.Wait(() =>
-        {
-            mixer.EnsureInputFeeds();
-            mixer.EnsureFilterRoutes();
-            string[] after = CaptureChainFixture.Nodes(pw, "capture");
-            return after.Length > 0 && !before.Intersect(after).Any();
-        });
-        Assert.Contains(notes, line => line.Contains("non-finite audio at the plugin input", StringComparison.Ordinal));
+        CaptureChainFixture.Wait(() => notes.Any(line =>
+            line.Contains("non-finite input samples replaced with silence", StringComparison.Ordinal)),
+            () => string.Join("\n", notes));
         Assert.True(Assert.Single(mixer.Snapshot().Inserts["capture"]).NativeHostRunning);
+        Assert.Null(Assert.Single(mixer.Snapshot().Inserts["capture"]).Error);
+        Assert.Equal(before, CaptureChainFixture.Nodes(pw, "capture"));
         Assert.Equal(unaffected, pw.FindNodeId("OpenXLR_ins_monitor_in_stage_0"));
         AssertCaptureDc(2, 1);
     }

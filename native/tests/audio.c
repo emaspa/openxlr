@@ -39,7 +39,7 @@ static void check_failed_monitor(void) {
     Host h = {0};
     atomic_store(&h.audio_error, failed != 0);
     if (failed == 1) atomic_store(&h.process_failed, true);
-    if (failed == 2) atomic_store(&h.invalid_audio, AUDIO_INVALID_INPUT);
+    if (failed == 2) atomic_store(&h.invalid_audio, AUDIO_INVALID_OUTPUT);
     if (failed == 3) atomic_store(&h.failure_explained, true);
     test_monitor_host = &h;
     test_heartbeats = 0;
@@ -207,13 +207,41 @@ static void check_invalid_audio(void) {
             for (unsigned c = 0; c < channels; c++)
               for (uint32_t n = 0; n < sizes[size]; n++)
                 assert(test_buffers[MAX_CHANNELS + c][n] == 1.5f);
-            // Invalid input stops the host at once. Invalid output on sound
-            // does after half a second of it in a row, each block silenced.
-            unsigned blocks = 1;
-            if (output) {
-              fixture.invalid_output = true;
-              blocks = (h.rate / 2 + sizes[size] - 1) / sizes[size];
-            } else test_buffers[channel][sizes[size] - 1] = invalid[kind];
+            if (!output) {
+              // Invalid input reaches the plugin as silence at that sample
+              // only, the host keeps running however long it lasts, and the
+              // input buffer itself is left as it came.
+              test_buffers[channel][sizes[size] - 1] = invalid[kind];
+              const unsigned second = (h.rate + sizes[size] - 1) / sizes[size];
+              for (unsigned b = 0; b < second; b++) {
+                process_audio(&h, &position);
+                assert(!atomic_load(&h.audio_error) && !atomic_load(&h.invalid_audio));
+                for (unsigned c = 0; c < channels; c++)
+                  for (uint32_t n = 0; n < sizes[size]; n++)
+                    assert(test_buffers[MAX_CHANNELS + c][n] ==
+                           (c == channel && n == sizes[size] - 1 ? 0 : 1.5f));
+                assert(!isfinite(test_buffers[channel][sizes[size] - 1]));
+              }
+              assert(fixture.calls == 1 + second);
+              assert(atomic_load(&h.nonfinite_input) == second);
+              test_buffers[channel][sizes[size] - 1] = .75f;
+              process_audio(&h, &position);
+              assert(fixture.calls == 2 + second && !atomic_load(&h.audio_error));
+              assert(atomic_load(&h.nonfinite_input) == second);
+              for (unsigned c = 0; c < channels; c++)
+                for (uint32_t n = 0; n < sizes[size]; n++)
+                  assert(test_buffers[MAX_CHANNELS + c][n] == 1.5f);
+              for (unsigned i = 0; i < MAX_CHANNELS * 2; i++) {
+                assert_canary(test_buffers[i]);
+                for (uint32_t n = sizes[size]; n < MAX_FRAMES; n++)
+                  assert(test_buffers[i][n] == -1);
+              }
+              continue;
+            }
+            // Invalid output on sound stops the host after half a second of
+            // it in a row, each block silenced.
+            fixture.invalid_output = true;
+            unsigned blocks = (h.rate / 2 + sizes[size] - 1) / sizes[size];
             for (unsigned b = 0; b < blocks; b++) {
               for (unsigned c = 0; c < channels; c++)
                 test_buffers[MAX_CHANNELS + c][0] = -1;
@@ -224,14 +252,12 @@ static void check_invalid_audio(void) {
                 for (uint32_t n = 0; n < sizes[size]; n++)
                   assert(test_buffers[MAX_CHANNELS + c][n] == 0);
             }
-            assert(atomic_load(&h.invalid_audio) ==
-                   (output ? AUDIO_INVALID_OUTPUT : AUDIO_INVALID_INPUT));
-            assert(fixture.calls == (output ? 1u + blocks : 1u));
+            assert(atomic_load(&h.invalid_audio) == AUDIO_INVALID_OUTPUT);
+            assert(fixture.calls == 1u + blocks);
             // Until the main-loop tick exits, do not feed the poisoned
-            // instance again, even if the next input is ordinary audio.
-            test_buffers[channel][sizes[size] - 1] = .75f;
+            // instance again.
             process_audio(&h, &position);
-            assert(fixture.calls == (output ? 1u + blocks : 1u));
+            assert(fixture.calls == 1u + blocks);
             for (unsigned i = 0; i < MAX_CHANNELS * 2; i++) {
               assert_canary(test_buffers[i]);
               for (uint32_t n = sizes[size]; n < MAX_FRAMES; n++)
@@ -242,7 +268,100 @@ static void check_invalid_audio(void) {
     free(test_buffers[i]);
     test_buffers[i] = NULL;
   }
-  puts("PASS: invalid input never reaches a plugin; invalid output silences the block, and half a second of it on sound retires the instance");
+  puts("PASS: invalid input reaches a plugin as silence and never stops the host; invalid output silences the block, and half a second of it on sound retires the instance");
+}
+
+// An application that keeps sending NaN into a duck stage or an insert,
+// here for three seconds of whole blocks on an in-place node: the plugin is
+// called on every block and hears silence, nothing it writes is lost, the
+// tick neither fails nor exits, and the trace says how many samples were
+// replaced, once, not once a tick.
+static void check_sustained_invalid_input(void) {
+  const Backend gain = {.process = gain_audio};
+  AudioFixture fixture = {0};
+  Host h = {.backend = &gain, .rate = 48000, .channels = 2, .impl = &fixture};
+  for (unsigned c = 0; c < h.channels; c++) {
+    test_buffers[c] = guarded();
+    h.in_ports[c] = h.out_ports[c] = &test_buffers[c];
+  }
+  struct spa_io_position position = {0};
+  position.clock.duration = 256;
+  position.clock.rate.denom = h.rate;
+  const unsigned blocks = 3 * h.rate / 256;
+  for (unsigned b = 0; b < blocks; b++) {
+    for (unsigned c = 0; c < h.channels; c++)
+      for (unsigned n = 0; n < 256; n++) test_buffers[c][n] = (b + n) & 1 ? NAN : -INFINITY;
+    process_audio(&h, &position);
+    for (unsigned c = 0; c < h.channels; c++)
+      for (unsigned n = 0; n < 256; n++) assert(test_buffers[c][n] == 0);
+    if (b % 30 == 0) {
+      tick(&h, 1);
+      assert(h.exit_code == 0);
+    }
+  }
+  assert(fixture.calls == blocks && !atomic_load(&h.audio_error));
+  assert(!atomic_load(&h.invalid_audio));
+  assert(atomic_load(&h.nonfinite_input) == (uint64_t)blocks * 256 * h.channels);
+  // The first block was traced at once; the rest wait for ten seconds.
+  assert(h.traced_nonfinite == 256 * h.channels);
+  assert(!trace_nonfinite_input(&h));
+  h.traced_at.tv_sec -= 10;
+  assert(trace_nonfinite_input(&h) && h.traced_nonfinite == atomic_load(&h.nonfinite_input));
+  assert(!trace_nonfinite_input(&h));
+  // Ordinary audio afterwards plays as it would have.
+  for (unsigned c = 0; c < h.channels; c++)
+    for (unsigned n = 0; n < 256; n++) test_buffers[c][n] = .25f;
+  process_audio(&h, &position);
+  for (unsigned c = 0; c < h.channels; c++) {
+    for (unsigned n = 0; n < 256; n++) assert(test_buffers[c][n] == .5f);
+    assert_canary(test_buffers[c]);
+    free(test_buffers[c]);
+    test_buffers[c] = NULL;
+  }
+  puts("PASS: three seconds of non-finite input play as silence, and the host keeps running and traces the count");
+}
+
+// The duck stage on a mix, the stage that used to end its helper on one NaN
+// an application sent. It hears silence in its place, ducking or not, and
+// goes on with the same gain it had.
+static void check_duck_invalid_input(void) {
+  assert(&duck_backend && !duck_backend.guards_input);
+  Host h = {.backend = &duck_backend, .rate = 48000, .channels = 2};
+  h.silence = guarded();
+  assert(duck_backend.load(&h, NULL) && duck_backend.activate(&h));
+  for (unsigned c = 0; c < h.channels; c++) {
+    test_buffers[c] = guarded();
+    test_buffers[MAX_CHANNELS + c] = guarded();
+    h.in_ports[c] = &test_buffers[c];
+    h.out_ports[c] = &test_buffers[MAX_CHANNELS + c];
+  }
+  struct spa_io_position position = {0};
+  position.clock.duration = 256;
+  position.clock.rate.denom = h.rate;
+  const float invalid[] = {NAN, INFINITY, -INFINITY};
+  for (unsigned b = 0; b < h.rate / 256; b++) {
+    for (unsigned c = 0; c < h.channels; c++)
+      for (unsigned n = 0; n < 256; n++) test_buffers[c][n] = c ? -.5f : .5f;
+    test_buffers[b & 1][b % 256] = invalid[b % 3];
+    process_audio(&h, &position);
+    assert(!atomic_load(&h.audio_error));
+    for (unsigned c = 0; c < h.channels; c++)
+      for (unsigned n = 0; n < 256; n++)
+        assert(test_buffers[MAX_CHANNELS + c][n] ==
+               (c == (b & 1) && n == b % 256 ? 0 : c ? -.5f : .5f));
+  }
+  tick(&h, 1);
+  assert(h.exit_code == 0 && atomic_load(&h.nonfinite_input) == h.rate / 256);
+  duck_backend.deactivate(&h);
+  duck_backend.unload(&h);
+  for (unsigned i = 0; i < MAX_CHANNELS * 2; i++) {
+    assert_canary(test_buffers[i]);
+    free(test_buffers[i]);
+    test_buffers[i] = NULL;
+  }
+  assert_canary(h.silence);
+  free(h.silence);
+  puts("PASS: the duck stage hears a non-finite input sample as silence and keeps running");
 }
 
 // A backend that zeroes non-finite input itself, as the microphone stage
@@ -494,6 +613,8 @@ int main(void) {
   check_processing_failure();
   check_outputs_unread();
   check_invalid_audio();
+  check_sustained_invalid_input();
+  check_duck_invalid_input();
   check_guarded_input();
   check_inplace_audio();
   check_invalid_output_on_silence();

@@ -305,6 +305,28 @@ static bool finite_audio(float *const *buffers, unsigned channels,
   return true;
 }
 
+// Point each channel that carries a non-finite sample at a copy with every
+// such sample at 0, and return how many were replaced. PipeWire's buffer is
+// left as it came: other nodes may read it, and an in-place output shares
+// it. A clean channel costs one pass that stops at nothing.
+static uint32_t guard_input(Host *h, float **in, uint32_t frames) {
+  uint32_t replaced = 0;
+  for (unsigned c = 0; c < h->channels; ++c) {
+    uint32_t n = 0;
+    while (n < frames && isfinite(in[c][n])) ++n;
+    if (n == frames) continue;
+    float *copy = h->guarded_input[c];
+    memcpy(copy, in[c], sizeof(float) * n);
+    for (; n < frames; ++n) {
+      bool finite = isfinite(in[c][n]);
+      copy[n] = finite ? in[c][n] : 0.0f;
+      replaced += !finite;
+    }
+    in[c] = copy;
+  }
+  return replaced;
+}
+
 static bool silent_audio(float *const *buffers, unsigned channels,
                          uint32_t frames) {
   for (unsigned c = 0; c < channels; ++c)
@@ -582,19 +604,22 @@ static void process_audio(void *data, struct spa_io_position *position) {
     float *buffer = pw_filter_get_dsp_buffer(h->tap_ports[t], frames);
     h->taps[t] = buffer ? buffer : host_fallback(h->tap_scratch[t], frames, false);
   }
-  // The input as it enters the node, before a plugin can write over it.
+  // One invalid sample can poison a stateful processor until it is replaced,
+  // so the plugin hears silence in its place. Finite headroom above unity is
+  // left alone. Restarting the helper would not help: the sample came from
+  // upstream, an application or another node, and the next one may be just
+  // as bad, so this never counts as a failure however long it lasts. The
+  // main loop traces the count. A backend that guards its own input (the
+  // microphone stage) gets the block as it came and counts on its own.
+  if (!h->backend->guards_input) {
+    uint32_t replaced = guard_input(h, in, frames);
+    if (replaced)
+      atomic_fetch_add_explicit(&h->nonfinite_input, replaced,
+                                memory_order_relaxed);
+  }
+  // The input as it enters the plugin, before the plugin can write over it.
   if (h->measure)
     latency_meter_input(h->measure, in, h->channels, frames);
-  // One invalid sample can poison a stateful processor until it is replaced.
-  // Keep it out of the plugin and of downstream nodes. Finite headroom above
-  // unity is left alone. Reporting and replacement happen off this thread.
-  // A backend that guards its own input (the microphone stage) is trusted
-  // to, and keeps running.
-  if (!atomic_load(&h->audio_error) && !h->backend->guards_input &&
-      !finite_audio(in, h->channels, frames)) {
-    atomic_store(&h->invalid_audio, AUDIO_INVALID_INPUT);
-    atomic_store(&h->audio_error, true);
-  }
   bool invalid_output = false;
   if (h->own_block) {
     // The worker checks the plugin's output and brackets its calls; this
@@ -1151,12 +1176,26 @@ static void explain_audio_failure(Host *h) {
   unsigned invalid = atomic_load(&h->invalid_audio);
   const char *reason = atomic_load(&h->process_failed)
       ? "the plugin could not process audio"
-      : invalid == AUDIO_INVALID_INPUT
-      ? "non-finite audio at the plugin input"
       : invalid == AUDIO_INVALID_OUTPUT
       ? "non-finite audio from the plugin output"
       : "unsupported audio quantum or sample-rate change";
   fprintf(stderr, "%s; restart the chain\n", reason);
+}
+
+// Say how many non-finite input samples the host has replaced with silence:
+// as soon as the first arrives, then at most once every ten seconds while
+// more do. The daemon passes trace lines to its journal.
+static bool trace_nonfinite_input(Host *h) {
+  uint64_t replaced = atomic_load_explicit(&h->nonfinite_input, memory_order_relaxed);
+  if (replaced == h->traced_nonfinite) return false;
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  if (h->traced_nonfinite && now.tv_sec - h->traced_at.tv_sec < 10) return false;
+  h->traced_at = now;
+  h->traced_nonfinite = replaced;
+  fprintf(stderr, "trace: %llu non-finite input samples replaced with silence\n",
+          (unsigned long long)replaced);
+  return true;
 }
 
 // With OPENXLR_HOST_TRACE set, the own block says once a second, when either
@@ -1242,6 +1281,7 @@ static void tick(void *data, uint64_t expirations) {
   if (h->backend->main_thread)
     h->backend->main_thread(h);
   report_latency(h);
+  trace_nonfinite_input(h);
   if (h->own_block && h->heartbeat_ticks == 0)
     trace_own_block(h);
   if (h->editor_open)
