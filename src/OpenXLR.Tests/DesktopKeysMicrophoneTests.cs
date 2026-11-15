@@ -309,6 +309,7 @@ public sealed partial class DesktopKeysTests
         await Task.Delay(80);
         Assert.Equal(3, daemon.Commands.Count);
         fake.Activate(DesktopKeys.TalkKey);
+        await Wait(() => keys.Status == "Push to talk: XLR 1 on while the key is down.");
         fake.Deactivate(DesktopKeys.TalkKey);
         await Wait(() => daemon.Commands.Count == 5);
         Assert.Equal(["set mute false", "set mute true"], daemon.Commands.Skip(3));
