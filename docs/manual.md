@@ -4179,6 +4179,14 @@ second, the daemon replaces the chain under the same restart limit, and
 the journal says "the plugin could not process audio". This works even
 while the plugin's editor is frozen.
 
+A CLAP plugin may ask its host for a restart, usually because its latency
+changed. The plugin host restarts it in place. The insert plays silence
+for less than a tenth of a second while the plugin is switched off and on
+again, then carries on with the same settings, the same editor if one is
+open, and the new latency. A restart like this does not count toward the
+restart limit. The journal says "the plugin asked for a restart and
+was activated again" each time.
+
 A VST3 scan that says the original Windows plugin is missing usually means
 its yabridge wrapper still exists under `~/.vst3/yabridge`, but the source
 file was moved or deleted. The wrapper is a bridge, not a copy of the

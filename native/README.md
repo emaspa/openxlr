@@ -72,7 +72,11 @@ CLAP port layout against fake plugins that declare more buses than the
 chain uses, and that the scanner and the loader agree about which layouts
 can be carried. It also checks that a CLAP plugin's latency is read after
 activation and again only after the plugin says it changed, and that the
-host reports it once and then once per change. Teardown checks use a private
+host reports it once and then once per change. A plugin that asks for a
+restart is restarted in place in the order CLAP sets: processing stops
+before deactivation, the plugin is never called while inactive, and its
+new latency is reported. The test runs that 500 times with the audio on a
+thread of its own. Teardown checks use a private
 event loop: a plugin may unregister timers and file-descriptor watches in
 its destructor, and the host collects any remaining watches afterwards
 without closing the plugin's descriptors. Neither test needs a PipeWire
@@ -1159,7 +1163,17 @@ The setting is specific to LSP and applies to its editors in every hosted
 format. Set it to `1` in the daemon environment to test OpenGL again.
 
 For CLAP: parameters, the audio ports, the X11 editor, timers, file
-descriptors, thread checks and a log. The same binary describes a CLAP
+descriptors, thread checks and a log. A plugin that asks for a restart
+(`request_restart`, usually because its latency changed) gets one in
+place, not a new process. On the next tick the main thread asks the audio
+thread to let go, and on its next block the audio thread calls
+`stop_processing` and plays silence from then on. On the tick after that
+the main thread calls `deactivate` and `activate` with the same rate and
+block sizes and reads the latency again, which goes out as a `latency`
+line like any change. The block after that calls `start_processing`. Parameters and an open editor stay as they were. A
+node with no cycles running holds the request until audio comes back. A
+plugin that will not activate again ends the helper like any other
+failure. The same binary describes a CLAP
 bundle for the daemon's catalogue (`openxlr-lv2-host scan-clap FILE`), in a
 process of its own so the daemon never loads plugin code. The headers are
 vendored under `clap/` (MIT, version 1.2.10).
