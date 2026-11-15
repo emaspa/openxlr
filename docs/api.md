@@ -1899,7 +1899,15 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 - `devices/<vid-pid>/last-state.json`: for a device using connect-time
   restoration (`retainsSettings: false`), the hardware settings the daemon last saw, written a second
   after a change and restored on every fresh connect. The daemon tries a restore that fails partway
-  up to three times, and leaves the file alone until the restore completes or it gives up
+  up to three times, and leaves the file alone until the restore completes or it gives up. On a
+  device that stayed plugged in since the daemon last opened it (`seen.json`), the restore keeps a
+  mute and a lower headphone level the device holds, unless the device reads its value from
+  `defaults.json` for that control
+- `devices/<vid-pid>/seen.json`: `{boot, bus, address}`, the kernel's boot id and the USB address
+  at which the daemon last opened the device. Kept for the devices above and for the Wave:3 and
+  Wave:1, whose saved mute and headphone level the daemon writes back after the desktop restores
+  older ones. The daemon writes it at every fresh connect. A start in the same boot at the same
+  address counts as the device having stayed plugged in
 - `devices/<vid-pid>/defaults.json`: the settings such a device answered
   with after a power cycle, what `resetDevice` writes back
 - `active-device.json`: `{device}`, the instance id of the unit `setActiveDevice` chose last (a model id `vvvv:pppp` for a unit without a USB location), driven again as the primary after a restart. Written by the daemon.

@@ -123,7 +123,12 @@ WirePlumber puts back the mute and volume it saved for the card, which
 are older than OpenXLR's when only OpenXLR changed them since. For five
 seconds after that OpenXLR writes back the mute and headphone level it
 last had, kept over a daemon restart. A press of the mute pad or a turn
-of the dial in those five seconds is undone too. Wave:3 support is written from
+of the dial in those five seconds is undone too. A daemon restart is
+different, because a change made on the microphone while the daemon was
+stopped looks the same as the desktop's. If the microphone stayed
+plugged in, OpenXLR then only mutes it or turns the headphones down. Your
+own mute or quieter level stays, and the desktop's unmute or louder
+level is still undone. Wave:3 support is written from
 public protocol research and works on the maintainer's unit: gain,
 mute, headphone volume and the monitor balance. The Wave:1 uses the
 Wave:3's backend: an owner's diagnostics showed the microphone
@@ -3213,6 +3218,19 @@ held halfway. If the third attempt fails too, the daemon logs a warning
 and leaves the interface as it is. The remembered settings follow your
 next change from there.
 
+A daemon start cannot see what happened to the interface while no
+daemon ran. When the interface stayed plugged in since OpenXLR last
+opened it, in the same boot of the computer and at the same USB
+address, someone may have used it meanwhile, so the restore never
+unmutes it and never turns the headphones up. A mute and a headphone
+level you set on the interface while the daemon was stopped stay, and
+they are what OpenXLR remembers from then on. Everything else is
+restored as before. After a reboot, a replug or a power cycle the
+interface gets all its settings back, and so does a control that reads
+the value the interface powers on with, as recorded for "Reset device
+to defaults". OpenXLR keeps where it last opened each interface in
+`seen.json` beside the remembered settings.
+
 The Wave XLR Pro keeps its settings in its own memory, so there is no
 clean state to record and whatever is set on Linux is what Wave Link
 finds on Windows, and the other way round. For it the same button
@@ -5551,6 +5569,7 @@ settings. See
 | `$XDG_RUNTIME_DIR/openxlr/control.sock` (or `~/.config/openxlr/control.sock` without a runtime directory) | private control API socket, authenticated by Linux peer credentials ([api.md](api.md)); the same commands over HTTP at `/api/v1` ([http-api.md](http-api.md)) |
 | `$XDG_RUNTIME_DIR/openxlr/daemon.lock` (or under `~/.config/openxlr` without a runtime directory) | held by the running daemon; a second daemon started for the same user stops at once |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect when `retainsSettings` is false |
+| `~/.config/openxlr/devices/<vid-pid>/seen.json` | the boot and USB address at which the daemon last opened such an interface, a Wave:3 or a Wave:1, so a daemon start can tell whether it stayed plugged in ([Restoring settings on connect](#profiles)) |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
 | `~/.config/openxlr/daemon.json` | the submixer on/off preference and the added plugin folders |
 | `~/.config/openxlr/active-device.json` | the interface picked last in the header, driven again after a restart |
