@@ -970,11 +970,57 @@ public static class StartupIntegration
     /// the source install guide has users copy by hand, each byte for byte as
     /// releases shipped it. The one from v0.1.37 to v0.1.70 asks the user
     /// manager to drop capabilities, which fails with 218/CAPABILITIES where
-    /// it cannot. Recognising it lets Start audio at login, turned off and on,
-    /// replace such a copy with the current unit.
+    /// it cannot. The one from v0.1.71 to v0.8.1 allows three starts in five
+    /// minutes. Recognising them lets Start audio at login, turned off and
+    /// on, replace such a copy with the current unit.
     /// </summary>
     internal static readonly string[] LegacyReferenceUnits =
     [
+        """
+        [Unit]
+        Description=OpenXLR audio daemon
+        After=pipewire-pulse.service wireplumber.service
+        StartLimitIntervalSec=300
+        StartLimitBurst=3
+
+        [Service]
+        Type=notify
+        NotifyAccess=main
+        WatchdogSec=60
+        WatchdogSignal=SIGTERM
+        TimeoutStartSec=120
+        # %h is your home directory; adjust the path to where you cloned the repo.
+        ExecStart=%h/openxlr/src/OpenXLR.Daemon/bin/Release/net10.0/OpenXLR.Daemon
+        Environment=OPENXLR_BUILD_MIXER=1
+        TimeoutStopSec=45
+        # Bridged Windows plugins lock their shared audio buffers into memory, and
+        # they inherit this allowance from the daemon. The 8 MiB most sessions
+        # default to is below what yabridge asks for, which costs a warning on every
+        # plugin load and dropouts while one runs.
+        LimitMEMLOCK=infinity
+        # SIGTERM goes to the daemon alone, so it can end the Wine session a bridged
+        # plugin leaves behind before the rest of the group is killed. Sending it to
+        # the whole group would take wineserver down first and leave winedevice.exe
+        # to the timeout above.
+        KillMode=mixed
+        Restart=on-failure
+        RestartSec=3
+        NoNewPrivileges=true
+        PrivateTmp=true
+        ProtectSystem=strict
+        ProtectControlGroups=true
+        ProtectKernelTunables=true
+        RestrictSUIDSGID=true
+        UMask=0077
+        # Keep restrictions that do not require the user manager to drop capabilities.
+        KeyringMode=private
+        ProtectHostname=true
+        LockPersonality=true
+        RestrictNamespaces=true
+
+        [Install]
+        WantedBy=default.target
+        """ + "\n",
         """
         [Unit]
         Description=OpenXLR audio daemon
@@ -1033,7 +1079,7 @@ public static class StartupIntegration
                     Description=OpenXLR audio daemon
                     After=pipewire-pulse.service wireplumber.service
                     StartLimitIntervalSec=300
-                    StartLimitBurst=3
+                    StartLimitBurst=10
 
                     [Service]
                     Type=notify
@@ -1073,8 +1119,10 @@ public static class StartupIntegration
     /// block (v0.1.24); 6 KillMode (v0.1.33). Generation 7 adds LimitMEMLOCK
     /// (v0.1.37). These older bodies still carry capability restrictions that
     /// the current user unit omits, so upgrades can adopt their owned files.
+    /// Generation 8 drops those restrictions (v0.1.71) and still allows three
+    /// starts in five minutes, where the current unit allows ten.
     /// </summary>
-    internal static IEnumerable<string> LegacySourceUnits(string daemon) => Enumerable.Range(0, 8).Select(g => SourceUnit(daemon, g));
+    internal static IEnumerable<string> LegacySourceUnits(string daemon) => Enumerable.Range(0, 9).Select(g => SourceUnit(daemon, g));
 
     internal static string SourceUnit(string daemon, int generation)
     {
@@ -1091,7 +1139,8 @@ public static class StartupIntegration
         lines.AddRange(["Restart=on-failure", "RestartSec=3"]);
         if (generation >= 2) lines.AddRange(["NoNewPrivileges=true", "PrivateTmp=true", "ProtectSystem=strict", "ProtectControlGroups=true", "ProtectKernelTunables=true", "RestrictSUIDSGID=true"]);
         if (generation >= 4) lines.Add("UMask=0077");
-        if (generation >= 5) lines.AddRange(["KeyringMode=private", "ProtectClock=true", "ProtectHostname=true", "ProtectKernelLogs=true",
+        if (generation >= 8) lines.AddRange(["KeyringMode=private", "ProtectHostname=true", "LockPersonality=true", "RestrictNamespaces=true"]);
+        else if (generation >= 5) lines.AddRange(["KeyringMode=private", "ProtectClock=true", "ProtectHostname=true", "ProtectKernelLogs=true",
             "ProtectKernelModules=true", "LockPersonality=true", "RestrictNamespaces=true", "CapabilityBoundingSet="]);
         lines.AddRange(["", "[Install]", "WantedBy=default.target"]);
         return string.Join("\n", lines);

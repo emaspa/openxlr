@@ -1,9 +1,9 @@
 namespace OpenXLR.Daemon;
 
 /// <summary>
-/// A service that wants the whole daemon started afresh (the audio server
-/// restarted underneath it) records the exit code here and stops the host;
-/// Program returns it so systemd's Restart=on-failure brings the daemon back.
+/// A client that wants the whole daemon started afresh (restartDaemon)
+/// records the exit code here and stops the host; Program returns it so
+/// systemd's Restart=on-failure brings the daemon back.
 /// </summary>
 internal static class RestartRequest
 {

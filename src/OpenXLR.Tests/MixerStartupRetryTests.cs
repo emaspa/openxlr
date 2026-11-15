@@ -119,6 +119,90 @@ public sealed class MixerStartupRetryTests
         Assert.Equal(saved, File.ReadAllBytes(MixerSettings.DefaultPath));
     }
 
+    [Fact]
+    public async Task ALostGraphIsBuiltAgainInPlaceWithoutStoppingTheDaemon()
+    {
+        using var lifetime = new Lifetime();
+        using var fixture = new Fixture(lifetime: lifetime);
+        RestartRequest.Ask(0);
+        Assert.Null(new MixerSettings { MixVolumes = new() { ["monitor"] = 0.6 }, MonitorMuted = true }.Save());
+        fixture.Answer();
+        await fixture.Service.StartAsync(CancellationToken.None);
+        try
+        {
+            Assert.True(fixture.Service.Built);
+            // pipewire-pulse restarts: every module is gone, and it refuses
+            // new ones for a while.
+            fixture.LoseGraph();
+            Assert.True(SpinWait.SpinUntil(() => !fixture.Service.Built, TimeSpan.FromSeconds(10)), "the lost graph was not noticed");
+            int lostAt = fixture.Calls().Length;
+            byte[] saved = File.ReadAllBytes(MixerSettings.DefaultPath);
+            Assert.True(SpinWait.SpinUntil(() => fixture.Refusals() >= 3, TimeSpan.FromSeconds(10)), "the graph was not built again");
+
+            Assert.True(fixture.Service.WaitingForAudio);
+            Assert.Contains("still being built", fixture.Service.GraphWarning);
+            Assert.Contains("still being built", fixture.Service.Apply(new Command
+            {
+                Cmd = "setMixVolume", Mix = "monitor", Value = JsonSerializer.SerializeToElement(0.1),
+            }));
+            Assert.Null(fixture.Service.Snapshot());
+            // Nothing writes the emptied mixer over the user's file meanwhile.
+            fixture.Saver.Flush();
+            Assert.False(fixture.Saver.Closed);
+            Assert.Equal(saved, File.ReadAllBytes(MixerSettings.DefaultPath));
+
+            fixture.Answer();
+            Assert.True(SpinWait.SpinUntil(() => fixture.Service.Built && !fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)),
+                "the graph was not built again once the server answered");
+            Assert.Null(fixture.Service.GraphWarning);
+            Assert.Equal(0.6, fixture.Service.ExportScene()!.MixVolumes["monitor"]);
+            Assert.True(fixture.Mixer.MonitorMuted);
+            // The forgotten modules' ids belong to other clients now: none is unloaded.
+            Assert.DoesNotContain(fixture.Calls()[lostAt..], call => call.StartsWith("unload-module ", StringComparison.Ordinal));
+            Assert.False(lifetime.ApplicationStopping.IsCancellationRequested);
+            Assert.Equal(0, RestartRequest.ExitCode);
+        }
+        finally
+        {
+            await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30));
+            RestartRequest.Ask(0);
+        }
+        Assert.False(fixture.Service.Built);
+    }
+
+    [Fact]
+    public async Task AStopWhileALostGraphWaitsEndsTheRebuildAndUnloadsNothing()
+    {
+        using var lifetime = new Lifetime();
+        using var fixture = new Fixture(lifetime: lifetime);
+        fixture.Answer();
+        await fixture.Service.StartAsync(CancellationToken.None);
+        fixture.LoseGraph();
+        Assert.True(SpinWait.SpinUntil(() => fixture.Service.WaitingForAudio && fixture.Refusals() >= 2, TimeSpan.FromSeconds(10)));
+        int lostAt = fixture.Calls().Length;
+
+        await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.True(fixture.Service.BuildRetry.IsCompleted);
+        string[] calls = fixture.Calls();
+        Assert.DoesNotContain(calls[lostAt..], call => call.StartsWith("unload-module ", StringComparison.Ordinal));
+        // Nothing asks the server once the stop has run.
+        fixture.Answer();
+        Thread.Sleep(200);
+        Assert.Equal(calls, fixture.Calls());
+        Assert.False(fixture.Service.Built);
+        Assert.False(lifetime.ApplicationStopping.IsCancellationRequested);
+    }
+
+    private sealed class Lifetime : Microsoft.Extensions.Hosting.IHostApplicationLifetime, IDisposable
+    {
+        private readonly CancellationTokenSource _stop = new();
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => _stop.Token;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+        public void StopApplication() => _stop.Cancel();
+        public void Dispose() => _stop.Dispose();
+    }
+
     /// <summary>A ducking port that makes the build fail after the settings are applied.</summary>
     private sealed class FailingDuckingPort : IDaemonDuckingPort
     {
@@ -334,7 +418,8 @@ public sealed class MixerStartupRetryTests
                 => Refuse ? throw new InvalidOperationException("EQ restore failed") : DeviceEqStatus.None;
         }
 
-        internal Fixture(IDaemonDuckingPort? ducking = null, Func<int, TimeSpan>? retryDelay = null)
+        internal Fixture(IDaemonDuckingPort? ducking = null, Func<int, TimeSpan>? retryDelay = null,
+            Microsoft.Extensions.Hosting.IHostApplicationLifetime? lifetime = null)
         {
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", Path.Combine(_directory, "config"));
             new DaemonSettings { Submixer = true }.Save();
@@ -363,7 +448,14 @@ public sealed class MixerStartupRetryTests
                     n=$(/bin/cat "$dir/next" 2>/dev/null || echo 100)
                     n=$((n + 1))
                     echo "$n" > "$dir/next"
+                    case "$3" in sink_name=*) echo "${3#sink_name=}" >> "$dir/sinks" ;; esac
                     echo "$n" ;;
+                  list)
+                    # The sinks the loaded modules published, until the server restarts.
+                    if [ "$2 $3" = "sinks short" ] && [ -f "$dir/sinks" ]; then
+                      i=0
+                      while read -r name; do i=$((i + 1)); printf '%s\t%s\tmodule-null-sink.c\n' "$i" "$name"; done < "$dir/sinks"
+                    fi ;;
                   get-default-sink) echo desk ;;
                   get-default-source) echo mic ;;
                 esac
@@ -372,7 +464,7 @@ public sealed class MixerStartupRetryTests
             Environment.SetEnvironmentVariable("PATH", _directory);
             var config = new ConfigurationBuilder().Build();
             _devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => []);
-            Service = new MixerService(NullLogger<MixerService>.Instance, config, _devices,
+            Service = new MixerService(NullLogger<MixerService>.Instance, config, _devices, lifetime,
                 startupDefaults: new StartupDefaults("desk", "mic"))
             {
                 RetryDelay = retryDelay ?? (_ => TimeSpan.FromMilliseconds(20)),
@@ -381,6 +473,13 @@ public sealed class MixerStartupRetryTests
         }
 
         internal void Answer() => File.WriteAllText(Path.Combine(_directory, "answer"), "");
+
+        /// <summary>pipewire-pulse restarted: its sinks are gone and it refuses modules until <see cref="Answer"/>.</summary>
+        internal void LoseGraph()
+        {
+            File.Delete(Path.Combine(_directory, "answer"));
+            File.Delete(Path.Combine(_directory, "sinks"));
+        }
         internal int Refusals() => Lines("refusals").Length;
         internal string[] Calls() => Lines("calls");
         private string[] Lines(string name)

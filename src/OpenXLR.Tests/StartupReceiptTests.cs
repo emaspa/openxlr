@@ -724,8 +724,9 @@ public sealed class StartupReceiptTests : IDisposable
         const string daemon = "/My Projects/%/OpenXLR.Daemon";
         Assert.NotEqual(StartupIntegration.SourceUnit(daemon), StartupIntegration.SourceUnit(daemon, 7));
         string[] legacy = [.. StartupIntegration.LegacySourceUnits(daemon)];
-        Assert.Equal(8, legacy.Distinct().Count());
+        Assert.Equal(9, legacy.Distinct().Count());
         Assert.Contains(StartupIntegration.SourceUnit(daemon, 7), legacy);
+        Assert.Contains(StartupIntegration.SourceUnit(daemon, 8), legacy);
         Assert.DoesNotContain(StartupIntegration.SourceUnit(daemon), legacy);
         Assert.Equal(2, StartupIntegration.LegacyAutostartEntries(daemon).Distinct().Count());
     }
@@ -745,6 +746,36 @@ public sealed class StartupReceiptTests : IDisposable
             Assert.Contains("KillMode", unit);
             Assert.Contains("LimitMEMLOCK", unit);
         }
+    }
+
+    // The unit's own restarts (an explicit Restart daemon, a watchdog stop)
+    // share the start limit; three in five minutes left the unit failed.
+    [Fact]
+    public void UserUnitsAllowTenStartsInFiveMinutesAndTheirThreeStartBodiesStayRecognised()
+    {
+        string root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(SourceFile())!, "../.."));
+        const string daemon = "/My Projects/%/OpenXLR.Daemon";
+        string reference = File.ReadAllText(Path.Combine(root, "packaging/openxlr-daemon.service"));
+        string[] units = [StartupIntegration.SourceUnit(daemon), reference];
+        foreach (string unit in units)
+        {
+            Assert.Contains("\nStartLimitIntervalSec=300\n", unit);
+            Assert.Contains("\nStartLimitBurst=10\n", unit);
+        }
+        string nix = File.ReadAllText(Path.Combine(root, "packaging/nix/module.nix"));
+        Assert.Contains("StartLimitIntervalSec = 300;", nix);
+        Assert.Contains("StartLimitBurst = 10;", nix);
+
+        // The bodies written and shipped before keep being adopted.
+        static string ThreeStarts(string unit) => unit.Replace("StartLimitBurst=10\n", "StartLimitBurst=3\n", StringComparison.Ordinal);
+        Assert.Equal(ThreeStarts(StartupIntegration.SourceUnit(daemon)), StartupIntegration.SourceUnit(daemon, 8));
+        string path = StartupReceipt.StartupPaths[1];
+        Assert.True(StartupIntegration.IsGeneratedStartupFile(path, StartupIntegration.SourceUnit(daemon, 8)));
+        Assert.True(StartupIntegration.IsGeneratedStartupFile(path, ThreeStarts(reference)));
+        Assert.True(StartupIntegration.IsGeneratedStartupFile(path, ThreeStarts(reference).Replace(
+            "ExecStart=%h/openxlr/src/OpenXLR.Daemon/bin/Release/net10.0/OpenXLR.Daemon\n",
+            "ExecStart=%h/src/My Clone/src/OpenXLR.Daemon/bin/Release/net10.0/OpenXLR.Daemon\n", StringComparison.Ordinal)));
+        Assert.True(StartupIntegration.IsGeneratedStartupFile(path, reference));
     }
 
     private static string SourceFile([System.Runtime.CompilerServices.CallerFilePath] string path = "") => path;

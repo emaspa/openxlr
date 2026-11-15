@@ -64,7 +64,6 @@ public sealed partial class MixerService : IHostedService, IDisposable
     // Brings a unit's stalled capture back by a relink or a USB reset (the Wave:3 MK.2).
     private readonly CaptureRescue _rescue;
 
-    private readonly IHostApplicationLifetime? _lifetime;
     private int _graphMissing;
 
     // A failed startup build is retried in the background until the audio
@@ -74,7 +73,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
     internal Task BuildRetry => _buildRetry;
     private readonly object _sceneGate = new();
     private bool _waitingForAudio;
+    private string _waitingWarning = WaitingWarning;
     private OpenXLR.Core.MixerScene? _pendingScene;
+    // The monitor output the start was given; a rebuild passes it on again.
+    private string? _monitorOutput;
 
     /// <summary>
     /// The debounced writer for the mixer settings. It stops writing as soon
@@ -110,7 +112,6 @@ public sealed partial class MixerService : IHostedService, IDisposable
         SubmixerEnabled = DaemonSettings.SubmixerEnabled(launchDefault);
         _devices = devices;
         _startupDefaults = startupDefaults;
-        _lifetime = lifetime;
         // The budget runs from the start of the host's stop, not from this
         // service's turn: the services stopped before it spend the same 45 s.
         lifetime?.ApplicationStopping.Register(() => Interlocked.CompareExchange(ref _stopStarted, Environment.TickCount64, 0));
@@ -162,24 +163,65 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>
     /// pipewire-pulse restarted underneath the daemon: every module it hosted
     /// is gone and the module ids are being reused by other clients. Nothing
-    /// can be unloaded or healed piecemeal, so the graph is forgotten and the
-    /// daemon asks to be started afresh; systemd brings it back in seconds
-    /// with the saved layout. Two consecutive sightings, so a momentary pactl
-    /// hiccup does not trigger it.
+    /// can be unloaded or healed piecemeal, so the graph is forgotten and
+    /// built again in place from the saved settings, retried like a startup
+    /// build until the server takes modules again (see
+    /// <see cref="RebuildAsync"/>). Two consecutive sightings, so a momentary
+    /// pactl hiccup does not trigger it.
     /// </summary>
     private bool GraphLost()
     {
         if (_mixer.GraphPresent() is not false) { _graphMissing = 0; return false; }
         if (++_graphMissing < 2) return false;
-        _log.LogWarning("the submixer graph is gone (pipewire-pulse restarted?); restarting the daemon to rebuild it");
-        Timeline.Record(TimelineKind.Mixer, "the mixer's graph is gone (pipewire-pulse restarted?); the daemon restarts to build it again");
+        _graphMissing = 0;
+        _log.LogWarning("the submixer graph is gone (pipewire-pulse restarted?); building it again");
+        Timeline.Record(TimelineKind.Mixer, "the mixer's graph is gone (pipewire-pulse restarted?); it is built again");
+        // Commands are refused from here, as during any build, and a profile
+        // recalled meanwhile waits for the graph.
+        _building = true;
+        lock (_sceneGate) { _waitingForAudio = true; _waitingWarning = RebuildWarning; }
         // ForgetGraph empties the mixer, so this is the last chance to write
-        // and the end of writing, exactly as at a clean stop.
-        if (_saves.Close(write: _saves.Pending) is string err) _log.LogWarning("settings not saved before the restart: {err}", err);
+        // a pending change. Nothing is written after it until the rebuild has
+        // applied the saved settings again.
+        _saves.Flush();
+        _unsettled = true;
+        _saves.Discard();
+        // As at a stop, nothing is written to a unit meanwhile: it keeps the
+        // ducking it holds, and the rebuild attaches the port afresh.
+        _mixer.SetDeviceDuckingPort(null);
         _mixer.ForgetGraph();
-        RestartRequest.Ask(RestartRequest.TemporaryFailure);
-        _lifetime?.StopApplication();
+        // What this run wrote to the Wave XLR Pro's jacks and selectors went
+        // with the graph; the rebuild starts from the unit, as a start does.
+        lock (_selectorGate)
+        {
+            _hardwareMisses = 0;
+            _jackWritten.Clear();
+            _savedEntry = null;
+            _prevAuxDesired = false;
+        }
+        // The sweeps rest until the rebuild starts them again. They are only
+        // paused here: disposing one is what joins this callback, and the
+        // rebuild or a stop does that.
+        _streamSweep?.Change(Timeout.Infinite, Timeout.Infinite);
+        _meterPush?.Change(Timeout.Infinite, Timeout.Infinite);
+        _checkingProgress = false;
+        Changed?.Invoke();
+        _buildRetry = Task.Run(RebuildAsync);
         return true;
+    }
+
+    /// <summary>
+    /// The graph built again after <see cref="GraphLost"/>: the paused sweeps
+    /// are disposed, which waits out the one that saw the loss, then the
+    /// build is retried with the startup backoff until the server answers.
+    /// The defaults to defend are read again before each attempt, as a fresh
+    /// start would read them.
+    /// </summary>
+    private async Task RebuildAsync()
+    {
+        if (Interlocked.Exchange(ref _streamSweep, null) is { } sweep) await sweep.DisposeAsync();
+        if (Interlocked.Exchange(ref _meterPush, null) is { } meters) await meters.DisposeAsync();
+        await RetryBuildAsync(_monitorOutput, StartupDefaults.Capture, "the mixer's graph was lost", rebuild: true);
     }
 
     /// <summary>
@@ -853,7 +895,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
 
         // Optional: the physical sink the monitor mix feeds. Without it the
         // monitor mix exists but isn't routed anywhere audible.
-        string? output = _config.GetValue<string>("monitorOutput")
+        string? output = _monitorOutput = _config.GetValue<string>("monitorOutput")
                          ?? Environment.GetEnvironmentVariable("OPENXLR_MONITOR_OUTPUT");
 
         // WirePlumber auto-switches the system defaults to newly created sinks
@@ -880,12 +922,12 @@ public sealed partial class MixerService : IHostedService, IDisposable
             // device can hold it) answers again later, and nothing else would
             // ever build the graph: GraphLost only watches a built one. Keep
             // trying in the background until it answers or the daemon stops.
-            lock (_sceneGate) _waitingForAudio = true;
+            lock (_sceneGate) { _waitingForAudio = true; _waitingWarning = WaitingWarning; }
             _log.LogWarning("the mixer is waiting for the audio server; the graph build is retried with backoff, up to every {max} s (repeated failures are logged at debug level)",
                 (int)MaxBuildRetryDelay.TotalSeconds);
             Changed?.Invoke();
             string firstError = ex.Message;
-            _buildRetry = Task.Run(() => RetryBuildAsync(output, before, firstError));
+            _buildRetry = Task.Run(() => RetryBuildAsync(output, () => before, firstError));
         }
         finally { _initialized.TrySetResult(); }
         return Task.CompletedTask;
@@ -1039,7 +1081,12 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>Tests shorten the backoff; the daemon uses <see cref="BuildRetryDelay"/>.</summary>
     internal Func<int, TimeSpan> RetryDelay { get; init; } = BuildRetryDelay;
 
-    private async Task RetryBuildAsync(string? output, StartupDefaults before, string lastError)
+    /// <summary>
+    /// Build the graph with backoff until an attempt succeeds or the daemon
+    /// stops: after a failed startup build, or with <paramref name="rebuild"/>
+    /// after the graph was lost, when no attempt has run yet.
+    /// </summary>
+    private async Task RetryBuildAsync(string? output, Func<StartupDefaults> before, string lastError, bool rebuild = false)
     {
         CancellationToken stop = _stopping.Token;
         for (int failures = 1; ; failures++)
@@ -1047,13 +1094,20 @@ public sealed partial class MixerService : IHostedService, IDisposable
             try { await Task.Delay(RetryDelay(failures), stop); }
             catch (OperationCanceledException) { return; }
             if (stop.IsCancellationRequested) return;
+            StartupDefaults defaults = before();
             // Each attempt is watched like the first one: every helper it
             // runs has a deadline and marks progress.
             _progress.Mark();
             _checkingProgress = true;
             try
             {
-                BuildGraph(output, before);
+                BuildGraph(output, defaults);
+                if (rebuild)
+                {
+                    _log.LogInformation("the submix graph is built again after the audio server restarted (attempt {n})", failures);
+                    Timeline.Record(TimelineKind.Mixer, "the mixer's graph is built again after the audio server restarted");
+                    return;
+                }
                 _log.LogInformation("the audio server answers again; submix graph built after {n} failed attempt(s)", failures);
                 Timeline.Record(TimelineKind.Mixer, $"the audio server answers again, after {failures} failed attempt(s)");
                 return;
@@ -1289,6 +1343,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
         // phases instead of starting the rest of its repair work.
         await sweep;
         await meters;
+        // The last sweep may have found the graph lost and started a rebuild
+        // after the join above; that one ends at its first wait.
+        await _buildRetry;
         await _browserTitles.DisposeAsync();
         // Nothing is written to a unit at stop: it keeps the ducking it holds.
         _mixer.SetDeviceDuckingPort(null);
@@ -1387,9 +1444,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
     }
 
     /// <summary>Why a mixer command cannot run while the graph is not built.</summary>
-    internal string NotBuiltError => WaitingForAudio ? WaitingWarning
-        : _building ? BuildingWarning
-        : "mixer not built (start the daemon with --mixer)";
+    internal string NotBuiltError => GraphWarning
+        ?? (_building ? BuildingWarning
+        : "mixer not built (start the daemon with --mixer)");
 
     private const string BuildingWarning = "The mixer is still being built; send the command again once its state arrives.";
 
@@ -2149,13 +2206,14 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>Why the hardware input channels are silent although a source is present, or null.</summary>
     public string? InputWarning => _mixer.InputWarning;
 
-    /// <summary>Whether a failed startup build is being retried.</summary>
+    /// <summary>Whether a failed startup build, or a lost graph's rebuild, is being retried.</summary>
     public bool WaitingForAudio { get { lock (_sceneGate) return _waitingForAudio; } }
 
     private const string WaitingWarning = "The mixer is waiting for the audio server (pipewire-pulse), which did not answer when the daemon started; it is built as soon as the server answers.";
+    private const string RebuildWarning = "The mixer is still being built after the audio server (pipewire-pulse) restarted; it is back as soon as the server answers.";
 
     /// <summary>Why the mixer is not built although the submixer is on, or null.</summary>
-    public string? GraphWarning => WaitingForAudio ? WaitingWarning : null;
+    public string? GraphWarning { get { lock (_sceneGate) return _waitingForAudio ? _waitingWarning : null; } }
 
     /// <summary>pipewire-pulse close to its open-file limit, or null.</summary>
     public string? ResourceWarning => Volatile.Read(ref _resourceWarning);
