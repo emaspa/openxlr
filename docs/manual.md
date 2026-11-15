@@ -3202,6 +3202,14 @@ Saved hardware snapshots under `~/.config/openxlr/devices` must be regular
 JSON files no larger than 64 KiB. An unreadable snapshot is not applied:
 restoring last settings logs the problem, while Reset reports it.
 
+If the interface refuses one control during the restore, OpenXLR still
+writes the others and tries again a second later, up to three attempts.
+The remembered settings on disk stay as they were until a restore
+completes, so one cut short never replaces them with what the interface
+held halfway. If the third attempt fails too, the daemon logs a warning
+and leaves the interface as it is. The remembered settings follow your
+next change from there.
+
 The Wave XLR Pro keeps its settings in its own memory, so there is no
 clean state to record and whatever is set on Linux is what Wave Link
 finds on Windows, and the other way round. For it the same button

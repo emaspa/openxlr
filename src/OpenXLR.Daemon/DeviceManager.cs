@@ -486,6 +486,7 @@ public sealed partial class DeviceManager : BackgroundService
             WriteDynamics();
             WriteDucking();
             PollOnce();
+            lock (_gate) RetryRestoreLocked();
             Progress.Mark();
             TryParkCardProfile();
             FlushLastState(force: false);
@@ -756,6 +757,8 @@ public sealed partial class DeviceManager : BackgroundService
             // for the Wave XLR Pro only, so only its card is parked; every
             // driven card is checked for a capture node.
             EnsureCardProfile(dev.Info, parksUcm: dev.Capabilities.OutputRouting, fresh);
+            // A restore still being retried was for the connection before.
+            if (fresh) _restoreRetry = null;
             if (fresh && !dev.Capabilities.RetainsSettings)
             {
                 // A device without settings memory: what it answers now is
@@ -948,25 +951,84 @@ public sealed partial class DeviceManager : BackgroundService
     /// For a device without settings memory that just connected fresh and
     /// has no recall-on-connect profile: write back the last settings the
     /// daemon saw on it. Returns null when there was nothing to restore
-    /// (a device that keeps its own settings, or one never seen before),
-    /// otherwise a status line for the log. Persistence resumes either way.
+    /// (a device that keeps its own settings, or one never seen before) or
+    /// when the restore failed partway, otherwise a status line for the log.
+    /// A restore that failed partway is logged here and tried again by the
+    /// device loop (<see cref="RetryRestoreLocked"/>); persistence resumes
+    /// once the settings are back or the retries are given up, so a half
+    /// restored unit never replaces the saved settings.
     /// </summary>
     public string? RestoreLastState()
     {
         lock (_gate)
         {
+            _restoreRetry = null;
             if (_device is null || !_device.Connected) { _restorePending = false; return null; }
             if (_device.Capabilities.RetainsSettings) { _restorePending = false; return null; }
             string id = DevId(_device);
             DeviceState? last;
             try { last = DeviceStateStore.LoadLast(id); }
             catch (Exception ex) { last = null; _log.LogWarning("loading last settings of {dev}: {msg}", id, ex.Message); }
-            _restorePending = false;
-            if (last is null) return null;
-            string? err = ApplyProfile(last, restoring: true);
-            NoteChangedLocked();
-            return err is null ? $"restored the last settings of {id}" : $"restoring the last settings of {id}: {err}";
+            if (last is null) { _restorePending = false; return null; }
+            return RestoreAttemptLocked(new PendingRestore(id, last, 1, 0));
         }
+    }
+
+    /// <summary>
+    /// A restore on connect that failed partway: the settings it writes, the
+    /// unit they belong to, the attempts made and when the next is due.
+    /// </summary>
+    private sealed record PendingRestore(string Id, DeviceState Saved, int Attempt, long DueAt);
+    private PendingRestore? _restoreRetry;
+
+    /// <summary>Whether a restore on connect failed partway and is still being tried again. Read under the device lock.</summary>
+    internal bool RestoreRetrying => _restoreRetry is not null;
+
+    /// <summary>How many times the last settings are written to a unit on connect before the rest is given up.</summary>
+    internal const int RestoreAttempts = 3;
+    /// <summary>The wait between those attempts, so a unit that has just booted gets a moment to settle.</summary>
+    internal static readonly TimeSpan RestoreRetryDelay = TimeSpan.FromSeconds(1);
+
+    private string? RestoreAttemptLocked(PendingRestore restore)
+    {
+        string? err = ApplyProfile(restore.Saved, restoring: true);
+        if (err is null)
+        {
+            _restoreRetry = null;
+            _restorePending = false;
+            NoteChangedLocked();
+            if (restore.Attempt == 1) return $"restored the last settings of {restore.Id}";
+            _log.LogInformation("restored the last settings of {dev} on attempt {n} of {limit}", restore.Id, restore.Attempt, RestoreAttempts);
+            return null;
+        }
+        if (restore.Attempt < RestoreAttempts)
+        {
+            _restoreRetry = restore with { Attempt = restore.Attempt + 1, DueAt = NowMs + (long)RestoreRetryDelay.TotalMilliseconds };
+            _log.LogWarning("restoring the last settings of {dev}, attempt {n} of {limit}: {err}; trying again",
+                restore.Id, restore.Attempt, RestoreAttempts, err);
+            return null;
+        }
+        // Given up: what the unit holds now is what it has. The saved
+        // settings stay on disk until something changes, and changes are
+        // saved again from here on.
+        _restoreRetry = null;
+        _restorePending = false;
+        _log.LogWarning("restoring the last settings of {dev} failed {limit} times and is given up: {err}",
+            restore.Id, RestoreAttempts, err);
+        Timeline.Record(TimelineKind.Device, $"restoring the last settings of {restore.Id} was given up after {RestoreAttempts} attempts: {err}");
+        return null;
+    }
+
+    /// <summary>
+    /// The next attempt of a restore that failed partway, once it is due and
+    /// the unit it belongs to is connected. Called every sweep after the poll,
+    /// so the attempt compares against what the unit holds now.
+    /// </summary>
+    private void RetryRestoreLocked()
+    {
+        if (_restoreRetry is not { } restore || NowMs < restore.DueAt) return;
+        if (_device is not { Connected: true } device || DevId(device) != restore.Id) return;
+        RestoreAttemptLocked(restore);
     }
 
     /// <summary>
@@ -979,6 +1041,7 @@ public sealed partial class DeviceManager : BackgroundService
         lock (_gate)
         {
             _restorePending = false;
+            _restoreRetry = null;
             NoteChangedLocked();
         }
     }
@@ -1013,6 +1076,9 @@ public sealed partial class DeviceManager : BackgroundService
                 return "no defaults recorded for this interface yet: unplug it and plug it back in once, then try again";
             string? err = ApplyProfile(defaults);
             if (err is not null) return err;
+            // The defaults replace the last settings, so a restore still
+            // being retried has nothing left to give back.
+            if (_restoreRetry is not null) { _restoreRetry = null; _restorePending = false; }
             _dirtyAt = null;
             try { DeviceStateStore.ClearLast(id); }
             catch (Exception ex) { _log.LogWarning("clearing last settings of {dev}: {msg}", id, ex.Message); }
@@ -1406,48 +1472,65 @@ public sealed partial class DeviceManager : BackgroundService
             bool gainRestored = GainIsLocked && restoring && c.Gain && s.GainDb != p.GainDb;
             // An MK.1 state saved before its ClipGuard and mix were read holds placeholders for both.
             bool placeholders = s.ClipGuardAndMixRead == true && p.ClipGuardAndMixRead is null;
+            // Each control is written on its own: a transfer that fails for
+            // one (a unit just back from a power loss can stall one) does not
+            // leave the ones after it at the firmware's values. A transfer
+            // that never returned ends the write, since the helper is gone.
+            IAudioDevice d = _device;
+            List<string> failed = [];
+            void Write(string control, Action write)
+            {
+                try { write(); }
+                catch (Exception ex) when (ex is not UsbHungException) { failed.Add($"{control}: {ex.Message}"); }
+            }
             try
             {
-                if (c.Gain && !lockApplies && s.GainDb != p.GainDb) _device.SetGainDb(p.GainDb);
-                if (c.Mute && s.Mute != p.Mute) _device.SetMute(p.Mute);
-                if (c.LowCut && s.LowCut != p.LowCut) _device.SetLowCut(p.LowCut);
-                if (c.Expander && s.Expander != p.Expander) _device.SetExpander(p.Expander);
-                if (c.VoiceTune && s.VoiceTune != p.VoiceTune) _device.SetVoiceTune(p.VoiceTune);
-                if (c.VoiceTune && s.VoiceTuneStrength != p.VoiceTuneStrength) _device.SetVoiceTuneStrength(p.VoiceTuneStrength);
-                if (c.Phantom && s.Phantom != p.Phantom) { _device.SetPhantom(p.Phantom); _phantomWroteAt = UtcNow; }
-                if (c.ClipGuard && !placeholders && s.ClipGuard != p.ClipGuard) _device.SetClipGuard(p.ClipGuard);
-                if (c.Compressor && s.Compressor != p.Compressor) _device.SetCompressor(p.Compressor);
-                if (c.Gain && c.XlrInputs > 1 && !lockApplies && s.Gain2Db != p.Gain2Db) _device.SetGain2Db(p.Gain2Db);
-                if (c.Mute && c.XlrInputs > 1 && s.Mute2 != p.Mute2) _device.SetMute2(p.Mute2);
-                if (c.LowCut && c.XlrInputs > 1 && s.LowCut2 != p.LowCut2) _device.SetLowCut2(p.LowCut2);
-                if (c.Expander && c.XlrInputs > 1 && s.Expander2 != p.Expander2) _device.SetExpander2(p.Expander2);
-                if (c.VoiceTune && c.XlrInputs > 1 && s.VoiceTune2 != p.VoiceTune2) _device.SetVoiceTune2(p.VoiceTune2);
-                if (c.VoiceTune && c.XlrInputs > 1 && s.VoiceTuneStrength2 != p.VoiceTuneStrength2) _device.SetVoiceTuneStrength2(p.VoiceTuneStrength2);
-                if (c.Phantom && c.XlrInputs > 1 && s.Phantom2 != p.Phantom2) { _device.SetPhantom2(p.Phantom2); _phantomWroteAt2 = UtcNow; }
-                if (c.ClipGuard && c.XlrInputs > 1 && s.ClipGuard2 != p.ClipGuard2) _device.SetClipGuard2(p.ClipGuard2);
-                if (c.Compressor && c.XlrInputs > 1 && s.Compressor2 != p.Compressor2) _device.SetCompressor2(p.Compressor2);
-                if (c.HpVolume && s.HpVolumeDb != p.HpVolumeDb) _device.SetHpVolumeDb(p.HpVolumeDb);
-                if (c.HpVolume && c.HpOutputs > 1 && s.Hp2VolumeDb != p.Hp2VolumeDb) _device.SetHp2VolumeDb(p.Hp2VolumeDb);
-                if (c.LowImpedance && s.LowImpedance != p.LowImpedance) _device.SetLowImpedance(p.LowImpedance);
-                if (c.Crossfade && !placeholders && s.Crossfade != p.Crossfade) _device.SetCrossfade(p.Crossfade);
-                if (c.AuxInput && s.AuxLevelDb != p.AuxLevelDb) _device.SetAuxLevelDb(p.AuxLevelDb);
-                if (c.AuxInput && s.AuxLevelLock != p.AuxLevelLock) _device.SetAuxLevelLock(p.AuxLevelLock);
+                if (c.Gain && !lockApplies && s.GainDb != p.GainDb) Write("gain", () => d.SetGainDb(p.GainDb));
+                if (c.Mute && s.Mute != p.Mute) Write("mute", () => d.SetMute(p.Mute));
+                if (c.LowCut && s.LowCut != p.LowCut) Write("low cut", () => d.SetLowCut(p.LowCut));
+                if (c.Expander && s.Expander != p.Expander) Write("expander", () => d.SetExpander(p.Expander));
+                if (c.VoiceTune && s.VoiceTune != p.VoiceTune) Write("voice tune", () => d.SetVoiceTune(p.VoiceTune));
+                if (c.VoiceTune && s.VoiceTuneStrength != p.VoiceTuneStrength) Write("voice tune strength", () => d.SetVoiceTuneStrength(p.VoiceTuneStrength));
+                if (c.Phantom && s.Phantom != p.Phantom) Write("phantom power", () => { d.SetPhantom(p.Phantom); _phantomWroteAt = UtcNow; });
+                if (c.ClipGuard && !placeholders && s.ClipGuard != p.ClipGuard) Write("ClipGuard", () => d.SetClipGuard(p.ClipGuard));
+                if (c.Compressor && s.Compressor != p.Compressor) Write("compressor", () => d.SetCompressor(p.Compressor));
+                if (c.Gain && c.XlrInputs > 1 && !lockApplies && s.Gain2Db != p.Gain2Db) Write("gain 2", () => d.SetGain2Db(p.Gain2Db));
+                if (c.Mute && c.XlrInputs > 1 && s.Mute2 != p.Mute2) Write("mute 2", () => d.SetMute2(p.Mute2));
+                if (c.LowCut && c.XlrInputs > 1 && s.LowCut2 != p.LowCut2) Write("low cut 2", () => d.SetLowCut2(p.LowCut2));
+                if (c.Expander && c.XlrInputs > 1 && s.Expander2 != p.Expander2) Write("expander 2", () => d.SetExpander2(p.Expander2));
+                if (c.VoiceTune && c.XlrInputs > 1 && s.VoiceTune2 != p.VoiceTune2) Write("voice tune 2", () => d.SetVoiceTune2(p.VoiceTune2));
+                if (c.VoiceTune && c.XlrInputs > 1 && s.VoiceTuneStrength2 != p.VoiceTuneStrength2) Write("voice tune strength 2", () => d.SetVoiceTuneStrength2(p.VoiceTuneStrength2));
+                if (c.Phantom && c.XlrInputs > 1 && s.Phantom2 != p.Phantom2) Write("phantom power 2", () => { d.SetPhantom2(p.Phantom2); _phantomWroteAt2 = UtcNow; });
+                if (c.ClipGuard && c.XlrInputs > 1 && s.ClipGuard2 != p.ClipGuard2) Write("ClipGuard 2", () => d.SetClipGuard2(p.ClipGuard2));
+                if (c.Compressor && c.XlrInputs > 1 && s.Compressor2 != p.Compressor2) Write("compressor 2", () => d.SetCompressor2(p.Compressor2));
+                if (c.HpVolume && s.HpVolumeDb != p.HpVolumeDb) Write("headphones", () => d.SetHpVolumeDb(p.HpVolumeDb));
+                if (c.HpVolume && c.HpOutputs > 1 && s.Hp2VolumeDb != p.Hp2VolumeDb) Write("headphones 2", () => d.SetHp2VolumeDb(p.Hp2VolumeDb));
+                if (c.LowImpedance && s.LowImpedance != p.LowImpedance) Write("low impedance", () => d.SetLowImpedance(p.LowImpedance));
+                if (c.Crossfade && !placeholders && s.Crossfade != p.Crossfade) Write("crossfade", () => d.SetCrossfade(p.Crossfade));
+                if (c.AuxInput && s.AuxLevelDb != p.AuxLevelDb) Write("aux level", () => d.SetAuxLevelDb(p.AuxLevelDb));
+                if (c.AuxInput && s.AuxLevelLock != p.AuxLevelLock) Write("aux level lock", () => d.SetAuxLevelLock(p.AuxLevelLock));
                 // A snapshot from before the Line In existed holds none and leaves the unit's gain alone.
                 // One saved above the cap is written as the cap, once: the unit then reads it back.
                 if (c.LineInput && p.LineInGainDb is int saved && Math.Clamp(saved, 0, c.LineInGainMaxDb) is int lineIn
                     && s.LineInGainDb != lineIn)
                 {
-                    int written = _device.SetLineInGainDb(lineIn);
-                    _log.LogInformation("{dev}: Line In gain written as {db} dB from a saved state", _device.Info.DisplayName, written);
+                    Write("Line In gain", () =>
+                    {
+                        int written = d.SetLineInGainDb(lineIn);
+                        _log.LogInformation("{dev}: Line In gain written as {db} dB from a saved state", d.Info.DisplayName, written);
+                    });
                 }
                 // Likewise the Line In lock: a snapshot without it leaves the unit's lock as it is.
                 if (c.LineInput && p.LineInLevelLock is bool lineLock && s.LineInLevelLock != lineLock)
-                    _device.SetLineInLevelLock(lineLock);
+                    Write("Line In lock", () => d.SetLineInLevelLock(lineLock));
             }
             catch (Exception ex)
             {
+                // A transfer that never returned, or a saved value nothing can write.
                 return ex.Message;
             }
+            // The controls that were written are read back by the next poll.
+            if (failed.Count > 0) return string.Join("; ", failed);
             _last = Stamp(_device.ReadState());
             NoteChangedLocked();
             RaiseFromLocked();

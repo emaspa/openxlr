@@ -353,7 +353,12 @@ public sealed class WaveInterfaces : BackgroundService
                             try
                             {
                                 if (session.CurrentConnection is { } connection)
-                                    session.WithConnection(connection, () => { session.RestoreLastState(); session.MarkRestored(); });
+                                    session.WithConnection(connection, () =>
+                                    {
+                                        session.RestoreLastState();
+                                        // A restore that failed partway is retried by the session and resumes persistence itself.
+                                        if (!session.RestoreRetrying) session.MarkRestored();
+                                    });
                             }
                             catch (Exception ex) { _deviceLog.LogWarning(ex, "Restoring additional interface {id} failed", id); }
                         });
