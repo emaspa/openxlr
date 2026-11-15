@@ -144,8 +144,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
         });
         DuckingPort = new DeviceDuckingPort(devices);
         _offlineDucking = new(LoadOfflineDucking);
+        // Before a build has applied the saved settings, and once a failed
+        // attempt is being torn down, the mixer holds defaults or nothing;
+        // writing that would replace the user's file, so nothing is written.
         _saves = new SettingsSaver(
-            () => _mixer.ExportSettings().Save(),
+            () => _mixer.Built && !_unsettled ? _mixer.ExportSettings().Save() : null,
             error =>
             {
                 if (error is null) _log.LogInformation("mixer settings saved again");
@@ -766,6 +769,18 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>Whether the submix graph is up (built a few seconds after start).</summary>
     public bool Built => _mixer.Built;
 
+    // The mixer's own Built turns true part way through a build, before the
+    // inputs are wired and the saved settings applied. _building holds from
+    // the start of a build until it ends, and mixer commands wait for it.
+    // _unsettled holds from the start of a build until the saved settings
+    // are applied, and again from a failed attempt's teardown until the next
+    // attempt applies them; no save writes meanwhile.
+    private volatile bool _building;
+    private volatile bool _unsettled;
+
+    /// <summary>Whether a build has run to its end, so mixer commands are taken.</summary>
+    private bool Ready => _mixer.Built && !_building;
+
     /// <summary>The primary unit's ducking, as the mixer's port reaches it. Tests replace it before the start.</summary>
     internal IDaemonDuckingPort DuckingPort { get; init; }
 
@@ -883,6 +898,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     private void BuildGraph(string? output, StartupDefaults before)
     {
+        _building = _unsettled = true;
         if (_graphWatch is null)
         {
             _graphWatch = _pipeWire.WatchGraph(note =>
@@ -917,6 +933,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             _mixer.ApplySettings(saved.WithMonitorOverride(output));
             _log.LogInformation("restored settings from {path}", MixerSettings.DefaultPath);
         }
+        _unsettled = false;
         // A profile recalled while the graph was waiting for the audio
         // server lands on top of the saved settings, as it would have at a
         // normal start. Applied under the gate that queued it, so a recall
@@ -980,6 +997,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
         _meterPush = new Timer(_ => PushMeters(), null,
             TimeSpan.FromMilliseconds(200), TimeSpan.FromMilliseconds(66));
 
+        // Clients are told the graph is up here, so their commands are taken
+        // from here on. What follows only starts the default defense.
+        _building = false;
         Changed?.Invoke();
 
         // Defend the defaults after WirePlumber's delayed auto-switch. Two
@@ -999,11 +1019,17 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     private void DiscardPartialGraph()
     {
+        // Nothing the attempt held is written: a save it or a client
+        // scheduled would otherwise export the emptied mixer two seconds on,
+        // and the next attempt would load that.
+        _unsettled = true;
+        _saves.Discard();
         // A failure after the sweeps started must not leave them running
         // against the removed graph, or doubled by the next attempt.
         Interlocked.Exchange(ref _streamSweep, null)?.Dispose();
         Interlocked.Exchange(ref _meterPush, null)?.Dispose();
         try { _mixer.TearDown(); } catch (Exception) { /* best effort; the next build clears stale modules */ }
+        _building = false;
     }
 
     /// <summary>The wait before the next build attempt after <paramref name="failures"/> failed ones.</summary>
@@ -1361,7 +1387,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
     }
 
     /// <summary>Why a mixer command cannot run while the graph is not built.</summary>
-    internal string NotBuiltError => WaitingForAudio ? WaitingWarning : "mixer not built (start the daemon with --mixer)";
+    internal string NotBuiltError => WaitingForAudio ? WaitingWarning
+        : _building ? BuildingWarning
+        : "mixer not built (start the daemon with --mixer)";
+
+    private const string BuildingWarning = "The mixer is still being built; send the command again once its state arrives.";
 
     /// <summary>The soundboard's state, or null while the graph is not built.</summary>
     public SoundboardState? Soundboard() => _mixer.Built ? _mixer.Soundboard() : null;
@@ -1373,7 +1403,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     public ClipImportMessage ImportClip(Command cmd)
     {
-        if (!_mixer.Built) return new(false, NotBuiltError, null);
+        if (!Ready) return new(false, NotBuiltError, null);
         if (CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.PluginCatalog.Find) is { } invalid) return new(false, invalid, null);
         try
         {
@@ -1395,7 +1425,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     public SoundboardExportMessage ExportSoundboard(Command cmd)
     {
-        if (!_mixer.Built) return new(false, NotBuiltError, 0, []);
+        if (!Ready) return new(false, NotBuiltError, 0, []);
         if (CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.PluginCatalog.Find) is { } invalid) return new(false, invalid, 0, []);
         try
         {
@@ -1439,7 +1469,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     public StarterSoundsMessage RestoreStarterSounds(Command cmd)
     {
-        if (!_mixer.Built) return new(false, NotBuiltError, [], []);
+        if (!Ready) return new(false, NotBuiltError, [], []);
         if (CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.PluginCatalog.Find) is { } invalid) return new(false, invalid, [], []);
         try
         {
@@ -1475,7 +1505,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     public SoundboardImportMessage ImportSoundboard(Command cmd)
     {
         static SoundboardImportMessage Refused(string message) => new(false, message, [], new Dictionary<string, string>(), [], false);
-        if (!_mixer.Built) return Refused(NotBuiltError);
+        if (!Ready) return Refused(NotBuiltError);
         if (CommandValidation.Check(cmd, _mixer, OpenXLR.Core.Mixing.PluginCatalog.Find) is { } invalid) return Refused(invalid);
         try
         {
@@ -1509,7 +1539,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     public string? Apply(Command cmd, Guid? connection = null)
     {
-        if (!_mixer.Built) return NotBuiltError;
+        if (!Ready) return NotBuiltError;
         if (RefusedInHardwareMixing(cmd) is { } refused) return refused;
         string? invalid = CommandValidation.Check(cmd, _mixer, FindPlugin);
         if (invalid is not null) return invalid;
@@ -1979,7 +2009,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>Remove current uses and persist them before file-management actions become available.</summary>
     public (int Removed, int Chains, string? Error) RemovePluginInserts(IReadOnlySet<(string Kind, string Plugin)> plugins)
     {
-        if (!_mixer.Built) return (0, 0, "The audio mixer must be running to remove plugins from its current chains.");
+        if (!Ready) return (0, 0, "The audio mixer must be running to remove plugins from its current chains.");
         (int Removed, int Chains, string? Error) result = (0, 0, null);
         try
         {
@@ -2014,7 +2044,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 return null;
             }
         }
-        if (!_mixer.Built) return "mixer not built (start the daemon with --mixer)";
+        if (!Ready) return NotBuiltError;
         try { _mixer.ApplyScene(scene); }
         catch (Exception ex) { return ex.Message; }
         SyncOutputSelectors();
@@ -2035,7 +2065,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// </summary>
     internal IReadOnlyList<ScenePatchOutcome>? ApplyScenePatch(IReadOnlyList<ScenePatchEntry> entries)
     {
-        if (WaitingForAudio || !_mixer.Built) return null;
+        if (WaitingForAudio || !Ready) return null;
         IReadOnlyList<ScenePatchOutcome> outcomes;
         try { outcomes = _mixer.ApplyScenePatch(entries); }
         catch (InvalidOperationException) { return null; }
