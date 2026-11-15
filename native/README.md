@@ -46,9 +46,11 @@ desktop testing.
 `make -C native test-audio` checks the audio thread's safety rules
 without a graph: a cycle the fixed buffers cannot carry is refused before
 anything is written, a plugin stuck inside one process call is told apart
-from a node that has no work, and invalid output is silenced, counting
-toward a restart only on sound and only after half a second of it. The
-same target runs `tests/own-block`, which drives the
+from a node that has no work, and invalid input reaches the plugin as
+silence and never stops the host. That holds for three seconds of it on an
+in-place node and for single samples into the duck stage. Invalid output
+is silenced, and counts toward a restart only on sound and only after half
+a second of it. The same target runs `tests/own-block`, which drives the
 [own block](#own-block) without a graph: the output is the input delayed
 by exactly the reported delay, sample for sample; a block answered within
 its time is never late and one answered later costs only its own late
@@ -70,7 +72,11 @@ CLAP port layout against fake plugins that declare more buses than the
 chain uses, and that the scanner and the loader agree about which layouts
 can be carried. It also checks that a CLAP plugin's latency is read after
 activation and again only after the plugin says it changed, and that the
-host reports it once and then once per change. Teardown checks use a private
+host reports it once and then once per change. A plugin that asks for a
+restart is restarted in place in the order CLAP sets: processing stops
+before deactivation, the plugin is never called while inactive, and its
+new latency is reported. The test runs that 500 times with the audio on a
+thread of its own. Teardown checks use a private
 event loop: a plugin may unregister timers and file-descriptor watches in
 its destructor, and the host collects any remaining watches afterwards
 without closing the plugin's descriptors. Neither test needs a PipeWire
@@ -575,12 +581,18 @@ unknown backend.
 A NaN or an infinity that reaches a filter's state stays there. Every later
 sample comes out NaN, even with the EQ off, because its crossfade still
 multiplies the cascade's output, and the host silences the stage until it
-restarts. The host exits at once on non-finite input to a plugin, which
-costs a chain restart; the microphone stage instead tells the host it
-guards its own input (`guards_input` in `Backend`) and keeps running. It
-replaces a non-finite input sample with 0 before noise removal, the EQ or
-the voice changer hears it, on a copy of the block, never in the host's
-buffer. If a state turns non-finite anyway, the part that holds it clears
+restarts. So the host replaces every non-finite input sample with 0 before
+a plugin or a built-in stage hears it, on a copy of the block, and never
+in PipeWire's buffer, which other nodes may read. It never stops for
+them, however long they keep coming. They come from upstream, and a new
+process would hear the same ones. The host counts them, and the main loop
+writes `trace: N non-finite input samples replaced with silence` to stderr
+when the count first moves and at most once every 10 seconds after that.
+The microphone stage instead tells the host it guards its own input
+(`guards_input` in `Backend`), and the host hands it the block as it came.
+The stage replaces a non-finite input sample with 0 before noise removal,
+the EQ or the voice changer hears it, on a copy of the block, never in the
+host's buffer. If a state turns non-finite anyway, the part that holds it clears
 it: the EQ resets every band's filter and plays that one sample dry, and
 noise removal and the voice changer start their engines over as described
 below. The host still checks the stage's output as it checks a plugin's.
@@ -1151,7 +1163,17 @@ The setting is specific to LSP and applies to its editors in every hosted
 format. Set it to `1` in the daemon environment to test OpenGL again.
 
 For CLAP: parameters, the audio ports, the X11 editor, timers, file
-descriptors, thread checks and a log. The same binary describes a CLAP
+descriptors, thread checks and a log. A plugin that asks for a restart
+(`request_restart`, usually because its latency changed) gets one in
+place, not a new process. On the next tick the main thread asks the audio
+thread to let go, and on its next block the audio thread calls
+`stop_processing` and plays silence from then on. On the tick after that
+the main thread calls `deactivate` and `activate` with the same rate and
+block sizes and reads the latency again, which goes out as a `latency`
+line like any change. The block after that calls `start_processing`. Parameters and an open editor stay as they were. A
+node with no cycles running holds the request until audio comes back. A
+plugin that will not activate again ends the helper like any other
+failure. The same binary describes a CLAP
 bundle for the daemon's catalogue (`openxlr-lv2-host scan-clap FILE`), in a
 process of its own so the daemon never loads plugin code. The headers are
 vendored under `clap/` (MIT, version 1.2.10).

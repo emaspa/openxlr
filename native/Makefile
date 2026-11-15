@@ -125,7 +125,8 @@ deepfilter: deepfilter/target/release/libopenxlr_deepfilter.a
 tests/editor: tests/editor.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
-tests/audio: tests/audio.o lv2.o clap.o vst3.o
+# It links the duck stage to feed it non-finite input through the host.
+tests/audio: tests/audio.o duck.o lv2.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # The plugin's own block: the audio callback and its worker, without a graph.

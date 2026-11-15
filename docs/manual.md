@@ -4161,18 +4161,23 @@ changing or bypassing that chain starts it over. When the plugin host said
 why it stopped, its last message is shown after that reason and written to
 the daemon's log each time the chain stops.
 
-Native LV2, CLAP and VST3 hosts also reject non-finite audio samples (NaN or
-infinity). An invalid input never reaches the processor: the host exits at
-once with the input named in its message. An invalid output silences the
-whole block before it reaches another node. While the plugin is getting
-pure digital silence, such as a microphone muted on the device, those
-blocks are only silenced: some plugins put out NaN after a minute of
-silence and recover on their own once sound returns. With sound coming in,
-half a second of invalid output in a row makes the host exit with the
-output named in its message. Either way the affected chain is replaced
-under the same restart limit. This handles a processor whose internal
-state would otherwise stay invalid until a daemon restart. Finite levels
-above unity remain unchanged; this check is not a limiter.
+Native LV2, CLAP and VST3 hosts, and the ducking stage, also guard against
+non-finite audio samples (NaN or infinity). An invalid input sample, such
+as one an application sends into a mix, reaches the processor as silence.
+The chain keeps running however long that goes on, and nothing counts
+toward the restart limit. The bad samples come from upstream, so a new
+plugin process would get the same ones. The daemon's journal gets a
+`trace:` line with the number of samples replaced when the first one
+arrives, then at most once every 10 seconds while more arrive. An invalid output silences
+the whole block before it reaches another node. While the plugin is
+getting pure digital silence, such as a microphone muted on the device,
+those blocks are only silenced: some plugins put out NaN after a minute
+of silence and recover on their own once sound returns. With sound coming
+in, half a second of invalid output in a row makes the host exit with the
+output named in its message, and the chain is replaced under the same
+restart limit. This handles a processor whose internal state would
+otherwise stay invalid until a daemon restart. Finite levels above unity
+remain unchanged; this check is not a limiter.
 
 The microphone stage, which runs noise removal, the EQ, the compressor and
 expander, and the voice changer, handles this itself and keeps running. It
@@ -4191,6 +4196,14 @@ block silent, and the next block is tried. If it keeps failing for half a
 second, the daemon replaces the chain under the same restart limit, and
 the journal says "the plugin could not process audio". This works even
 while the plugin's editor is frozen.
+
+A CLAP plugin may ask its host for a restart, usually because its latency
+changed. The plugin host restarts it in place. The insert plays silence
+for less than a tenth of a second while the plugin is switched off and on
+again, then carries on with the same settings, the same editor if one is
+open, and the new latency. A restart like this does not count toward the
+restart limit. The journal says "the plugin asked for a restart and
+was activated again" each time.
 
 A VST3 scan that says the original Windows plugin is missing usually means
 its yabridge wrapper still exists under `~/.vst3/yabridge`, but the source

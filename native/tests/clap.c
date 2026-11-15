@@ -263,6 +263,179 @@ static void latency_reports(void) {
   puts("PASS: CLAP latency is read at activation and reported once per change");
 }
 
+// A plugin that asks for a restart from its process call, the way one does
+// when its latency changes, and once more from inside its own activation.
+// The counts and states are atomics because the last part of the test calls
+// the plugin from two threads, as the host does.
+static const clap_host_t *restart_host;
+static _Atomic unsigned restart_activations, restart_deactivations,
+    restart_starts, restart_stops, restart_processed;
+static _Atomic bool restart_ask_in_process, restart_ask_in_activate,
+    restart_active, restart_processing;
+static bool restart_activate(const clap_plugin_t *p, double r, uint32_t a, uint32_t b) {
+  assert(!restart_active);
+  restart_active = true;
+  ++restart_activations;
+  if (restart_ask_in_activate) restart_host->request_restart(restart_host);
+  return true;
+}
+static void restart_deactivate(const clap_plugin_t *p) {
+  assert(restart_active && !restart_processing);  // stopped before deactivated
+  restart_active = false;
+  ++restart_deactivations;
+}
+static bool restart_start(const clap_plugin_t *p) {
+  assert(restart_active && !restart_processing);
+  restart_processing = true;
+  ++restart_starts;
+  return true;
+}
+static void restart_stop(const clap_plugin_t *p) {
+  assert(restart_processing);
+  restart_processing = false;
+  ++restart_stops;
+}
+static clap_process_status restart_process(const clap_plugin_t *p, const clap_process_t *pr) {
+  assert(restart_active && restart_processing);
+  ++restart_processed;
+  if (restart_ask_in_process) {
+    restart_ask_in_process = false;
+    restart_host->request_restart(restart_host);
+  }
+  return fake_process(p, pr);
+}
+
+// One block of 0.25 in; true when the plugin's answer came out, false when
+// the block was silence.
+static bool restart_block(Host *h) {
+  float left[64], right[64], in_left[64], in_right[64];
+  float *in[] = {in_left, in_right}, *out[] = {left, right};
+  for (unsigned n = 0; n < 64; ++n) in_left[n] = in_right[n] = .25f, left[n] = right[n] = -1;
+  clap_process_audio(h, 64, in, out);
+  bool silent = true, answered = true;
+  for (unsigned n = 0; n < 64; ++n) {
+    silent &= left[n] == 0 && right[n] == 0;
+    answered &= left[n] == .25f * 64 * 2 + (float)n && right[n] == left[n];
+  }
+  assert(silent != answered);
+  return answered;
+}
+
+typedef struct {
+  Host *h;
+  unsigned until;  // run until the plugin has been activated this often
+  _Atomic bool done;
+  unsigned answered;
+} RestartRun;
+
+static void *restart_audio(void *data) {
+  RestartRun *run = data;
+  for (unsigned block = 0; atomic_load(&restart_activations) < run->until; ++block) {
+    if (block % 50 == 0) atomic_store(&restart_ask_in_process, true);
+    run->answered += restart_block(run->h);
+  }
+  atomic_store(&run->done, true);
+  return NULL;
+}
+
+// The plugin asks for a restart while it runs. The host does it in place:
+// the audio thread stops processing and plays silence, the main thread
+// deactivates and activates it, the new latency is reported, and processing
+// starts again. The process never fails and the restart budget is not spent.
+static void restart_in_place(void) {
+  Host h = {.rate = 48000, .channels = 2, .backend = &clap_backend,
+            .main_thread = pthread_self()};
+  Clap *c = fresh(&h);
+  clap_plugin_t plugin = fake;
+  plugin.activate = restart_activate;
+  plugin.deactivate = restart_deactivate;
+  plugin.start_processing = restart_start;
+  plugin.stop_processing = restart_stop;
+  plugin.process = restart_process;
+  c->plugin = &plugin;
+  c->host = (clap_host_t){.host_data = c, .get_extension = host_get_extension,
+                          .request_restart = host_request_restart};
+  restart_host = &c->host;
+  c->latency = &latency_ext;
+  in_side = out_side = (Side){.count = 1, .channels = {2}, .main = 0, .flag_main = true};
+  assert(clap_map_ports(c, &h, &ap_ext, true));
+  assert(clap_map_ports(c, &h, &ap_ext, false));
+  fake_latency_samples = 256;
+  assert(clap_activate(&h));
+  assert(restart_block(&h) && restart_starts == 1);
+  atomic_store(&h.audio_left, 1);
+  assert(report_latency(&h) && h.reported_latency == 256);
+
+  restart_ask_in_process = true;
+  assert(restart_block(&h));  // the block that asked is still answered
+  fake_latency_samples = 512;
+  clap_main_thread(&h);  // asks the audio thread to let go
+  assert(restart_deactivations == 0 && restart_stops == 0);
+  assert(!restart_block(&h) && restart_stops == 1 && !restart_processing);
+  assert(!restart_block(&h) && restart_processed == 2);  // held: not called
+  clap_main_thread(&h);  // deactivates and activates
+  assert(restart_deactivations == 1 && restart_activations == 2 && restart_active);
+  assert(report_latency(&h) && h.reported_latency == 512);
+  assert(restart_block(&h) && restart_starts == 2 && restart_processed == 3);
+  for (int tick = 0; tick < 10; ++tick) {
+    clap_main_thread(&h);
+    assert(restart_block(&h));
+  }
+  assert(restart_activations == 2 && !report_latency(&h));
+  assert(!atomic_load(&h.audio_error) && !atomic_load(&h.failure_explained));
+
+  // A request made inside the activation that answers one is answered by it,
+  // not by a restart after it, which would go round for ever.
+  restart_ask_in_process = restart_ask_in_activate = true;
+  assert(restart_block(&h));
+  clap_main_thread(&h);
+  assert(!restart_block(&h));
+  clap_main_thread(&h);
+  assert(restart_activations == 3 && restart_deactivations == 2);
+  for (int tick = 0; tick < 10; ++tick) {
+    clap_main_thread(&h);
+    assert(restart_block(&h));
+  }
+  assert(restart_activations == 3 && !atomic_load(&h.audio_error));
+  restart_ask_in_activate = false;
+
+  // The same with the audio on a thread of its own, as in the host: the
+  // plugin asks every 50 blocks, and the main thread ticks meanwhile, for
+  // 500 restarts. The
+  // plugin's own checks fail if it is ever called while inactive or
+  // deactivated while processing.
+  unsigned before = restart_activations;
+  RestartRun run = {.h = &h, .until = before + 500};
+  pthread_t audio;
+  assert(pthread_create(&audio, NULL, restart_audio, &run) == 0);
+  while (!atomic_load(&run.done)) {
+    clap_main_thread(&h);
+    struct timespec pause = {0, 100000};
+    nanosleep(&pause, NULL);
+  }
+  assert(pthread_join(audio, NULL) == 0);
+  // Finish a restart the last blocks asked for, with audio on this thread.
+  for (int tick = 0; tick < 3; ++tick) {
+    clap_main_thread(&h);
+    restart_block(&h);
+  }
+  assert(atomic_load(&c->restart) == RESTART_NONE && !atomic_load(&c->restart_requested));
+  assert(restart_block(&h));
+  assert(restart_activations > before && run.answered > 0);
+  assert(!atomic_load(&h.audio_error));
+
+  // A request the audio thread has not let go for yet is still held at
+  // shutdown, and the plugin is stopped and deactivated in order.
+  restart_ask_in_process = true;
+  assert(restart_block(&h));
+  clap_main_thread(&h);
+  clap_deactivate(&h);
+  assert(!restart_active && !restart_processing);
+  assert(restart_deactivations == restart_activations);
+  release(c);
+  puts("PASS: a CLAP plugin that asks for a restart is reactivated in place and keeps processing");
+}
+
 typedef struct {
   const clap_host_t *host;
   clap_id timer;
@@ -423,6 +596,7 @@ int main(void) {
   sources_live_through_plugin_destruction();
   readonly_parameters_use_main_thread();
   latency_reports();
+  restart_in_place();
   Host h = {.rate = 48000, .channels = 2};
 
   // 1. main stereo in + stereo sidechain in, one stereo out.

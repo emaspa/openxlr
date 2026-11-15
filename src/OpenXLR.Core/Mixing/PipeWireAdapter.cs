@@ -1548,7 +1548,10 @@ public sealed class PipeWireAdapter
         try
         {
             host = new NativePluginHost(new() { Id = mixId, Kind = "duck", Plugin = "duck", Params = new(controls) },
-                node, 2, rate, executable, [], meterSymbols: new HashSet<string>(StringComparer.Ordinal) { "reduction" });
+                node, 2, rate, executable, [], meterSymbols: new HashSet<string>(StringComparer.Ordinal) { "reduction" },
+                // The helper's trace says when it replaced non-finite input
+                // samples with silence; that belongs in the journal.
+                note: _note);
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException or System.ComponentModel.Win32Exception)
         {

@@ -25,6 +25,9 @@ enum {
 
 typedef struct Clap Clap;
 
+// Where an in-place restart stands; see clap_restart.
+enum { RESTART_NONE, RESTART_HOLD, RESTART_HELD };
+
 typedef struct {
   clap_id id;
   void *cookie;
@@ -61,6 +64,11 @@ struct Clap {
   bool activated, gui_created, gui_closed;
   _Atomic bool processing;  // start_processing has run, on the audio thread
   _Atomic bool callback_requested, flush_requested;
+  // A restart the plugin asked for, from any thread, and how far the host
+  // has got with it: the main thread moves NONE to HOLD and HELD to NONE,
+  // the audio thread HOLD to HELD.
+  _Atomic bool restart_requested;
+  _Atomic int restart;
   // The plugin's latency, read once after activation and again only after
   // the plugin says it changed.
   uint32_t latency_samples;
@@ -335,8 +343,13 @@ static const void *host_get_extension(const clap_host_t *host,
   return NULL;
 }
 
+// CLAP's answer to a change only a fresh activation can make, a new
+// latency most often: the host deactivates the plugin and activates it
+// again. That is done in place on the main thread (clap_restart), not by
+// replacing the process, so the plugin keeps its parameters and its editor.
+// This may be called from any thread, the audio thread included.
 static void host_request_restart(const clap_host_t *host) {
-  host_fail(of(host)->h, "the plugin asked to be restarted");
+  atomic_store(&of(host)->restart_requested, true);
 }
 
 static void host_request_process(const clap_host_t *host) {}
@@ -644,6 +657,20 @@ static void clap_unload(Host *h) {
 static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
                                float *const *out) {
   Clap *c = h->impl;
+  // A restart is under way: let go of the plugin and play silence until the
+  // main thread has activated it again. stop_processing belongs here, on
+  // the audio thread, before the plugin may be deactivated.
+  int restart = atomic_load(&c->restart);
+  if (restart != RESTART_NONE) {
+    if (restart == RESTART_HOLD) {
+      if (atomic_exchange(&c->processing, false))
+        c->plugin->stop_processing(c->plugin);
+      atomic_store(&c->restart, RESTART_HELD);
+    }
+    for (unsigned i = 0; i < h->channels; ++i)
+      memset(out[i], 0, frames * sizeof(float));
+    return;
+  }
   // Only the main ports change from cycle to cycle; the spare ones were
   // pointed at their buffers when the layout was mapped at load.
   for (unsigned i = 0; i < h->channels; ++i) {
@@ -722,8 +749,40 @@ static void on_main_thread(void *p) {
   c->plugin->on_main_thread(c->plugin);
 }
 
+// The restart the plugin asked for, one step per tick. First the audio
+// thread is asked to let go; on its next block it stops processing and plays
+// silence from then on. Once it has, the plugin is deactivated and activated
+// again with the same rate and block sizes, and its latency is read anew,
+// which the tick reports like any other change. The audio thread starts
+// processing again on the block after that. Nothing here touches the editor,
+// which CLAP keeps apart from activation. A node with no cycles running
+// holds the request until audio comes back, since nothing can say the audio
+// thread is not about to call the plugin. A request made while the plugin
+// is being deactivated or activated is answered by that same restart.
+static void clap_restart(Host *h, Clap *c) {
+  int state = atomic_load(&c->restart);
+  if (state == RESTART_NONE) {
+    if (atomic_exchange(&c->restart_requested, false) && c->activated)
+      atomic_store(&c->restart, RESTART_HOLD);
+    return;
+  }
+  if (state != RESTART_HELD)
+    return;
+  c->plugin->deactivate(c->plugin);
+  c->activated = false;
+  if (!clap_activate(h)) {
+    // Still held, so the audio thread never calls the inactive plugin.
+    host_fail(h, "the plugin did not activate again after asking for a restart");
+    return;
+  }
+  atomic_store(&c->restart_requested, false);
+  atomic_store(&c->restart, RESTART_NONE);
+  fputs("trace: the plugin asked for a restart and was activated again\n", stderr);
+}
+
 static void clap_main_thread(Host *h) {
   Clap *c = h->impl;
+  clap_restart(h, c);
   if (atomic_exchange(&c->callback_requested, false))
     host_run_guarded(h, on_main_thread, c);
   // A plugin that is not being processed flushes parameter changes here

@@ -50,7 +50,9 @@ typedef struct {
   const char *channel;  // "MONO", "FL" or "FR"
 } TapOutput;
 
-enum { AUDIO_INVALID_INPUT = 1, AUDIO_INVALID_OUTPUT };
+// Why the audio thread gave up on the plugin's audio. Non-finite input is
+// not among the reasons: the host replaces it with silence and carries on.
+enum { AUDIO_INVALID_OUTPUT = 1 };
 
 typedef struct Host Host;
 typedef struct Control Control;
@@ -99,8 +101,9 @@ typedef struct {
   // backend took it. NULL for a backend that only takes `set` lines.
   bool (*command)(Host *h, char *line);
   // The backend replaces non-finite input samples itself before they reach
-  // any state, so the host hands such a block on instead of stopping. Its
-  // output is still checked like any other's.
+  // any state, and counts them on a meter of its own, so the host hands it
+  // the block as it came. For every other backend the host replaces them.
+  // The output is checked like any other's either way.
   bool guards_input;
 } Backend;
 
@@ -174,7 +177,14 @@ struct Host {
   _Atomic bool process_failed;  // the plugin refused to start or process audio
   uint32_t failed_frames;  // audio thread: the current run of refused blocks
   uint32_t invalid_frames; // audio thread: the current run of invalid output on sound
-  _Atomic unsigned invalid_audio;  // input or output, explained by the main loop
+  _Atomic unsigned invalid_audio;  // AUDIO_INVALID_OUTPUT, explained by the main loop
+  // The input with its non-finite samples at 0, for a cycle that carried
+  // any; PipeWire's own buffer is never written. The count of samples
+  // replaced is the audio thread's; the main thread traces it.
+  float guarded_input[MAX_CHANNELS][MAX_FRAMES];
+  _Atomic uint64_t nonfinite_input;
+  uint64_t traced_nonfinite;   // main thread: what the last trace line said
+  struct timespec traced_at;   // main thread: when it said it
   _Atomic bool failure_explained;  // a non-audio thread has claimed the report
   _Atomic bool monitor_stop;
   unsigned heartbeat_ticks;

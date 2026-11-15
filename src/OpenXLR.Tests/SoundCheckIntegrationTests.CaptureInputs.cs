@@ -16,7 +16,7 @@ public sealed partial class SoundCheckIntegrationTests
     [MonitorPipeWireFact]
     public async Task AFailedRecordingKeepsItsNativeReasonAndRestoresTheLiveMicrophone()
     {
-        const string reason = "non-finite audio at the plugin input";
+        const string reason = "unsupported audio quantum or sample-rate change";
         var notes = new System.Collections.Concurrent.ConcurrentQueue<string>();
         var pw = new PipeWireAdapter(() => { }, notes.Enqueue);
         using var registry = pw.WatchGraph();
@@ -28,22 +28,15 @@ public sealed partial class SoundCheckIntegrationTests
             AssertCapture(.25);
             mixer.SoundCheck("capture", "record");
             CaptureChainFixture.Wait(() => mixer.Snapshot().SoundCheck.Seconds >= .1);
-            ProcessResult injected = ProcessRunner.Run("python3", ["-c", """
-                import struct, subprocess
-                args = ['pw-cat', '--playback', '--properties={ node.link-group = openxlr-test-playback }',
-                        '--format=f32', '--rate=48000', '--channels=2', '--target', 'soundcheck_capture_signal', '-']
-                if '--raw' in subprocess.check_output(['pw-cat', '--help'], text=True): args.insert(2, '--raw')
-                signal = struct.pack('<ff', 0, 0) * 24000
-                signal += struct.pack('<ff', 0, float('nan'))
-                signal += struct.pack('<ff', 0, 0) * 24000
-                subprocess.run(args, input=signal, check=True, timeout=10)
-                """], TimeSpan.FromSeconds(15));
-            Assert.True(injected.Ok, injected.Stderr);
+            // A non-finite sample reaches the take as silence, so the helper
+            // is made to fail by a graph rate it was not started at.
+            pw.Run("pw-metadata", "-n", "settings", "0", "clock.force-rate", "44100");
             CaptureChainFixture.Wait(() =>
             {
                 mixer.EnsureFilterRoutes();
                 return mixer.SoundCheckChannel is null;
             });
+            pw.Run("pw-metadata", "-n", "settings", "0", "clock.force-rate", "0");
             SoundCheckState state = mixer.Snapshot().SoundCheck;
             Assert.Equal("capture", state.Channel);
             Assert.Equal("idle", state.Mode);
@@ -61,6 +54,7 @@ public sealed partial class SoundCheckIntegrationTests
         }
         finally
         {
+            pw.Run("pw-metadata", "-n", "settings", "0", "clock.force-rate", "0");
             stop.Cancel();
             await play;
         }
