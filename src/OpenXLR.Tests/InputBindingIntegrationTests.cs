@@ -144,7 +144,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             stop.Cancel(); await generator;
             await mixer.StopAsync(CancellationToken.None);
             pw.TearDown();
-            if (File.Exists(MixerSettings.DefaultPath)) File.Delete(MixerSettings.DefaultPath);
+            MixerSettingsFiles.Delete();
         }
     }
 
@@ -210,7 +210,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             mixer.Dispose();
             devices.SuspendSession();
             pw.TearDown();
-            if (File.Exists(MixerSettings.DefaultPath)) File.Delete(MixerSettings.DefaultPath);
+            MixerSettingsFiles.Delete();
         }
     }
 
@@ -330,7 +330,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         {
             if (mixer.Built) await mixer.StopAsync(CancellationToken.None);
             ProfileStore.Delete("generic", "Generic test");
-            if (File.Exists(MixerSettings.DefaultPath)) File.Delete(MixerSettings.DefaultPath);
+            MixerSettingsFiles.Delete();
         }
     }
 

@@ -32,10 +32,27 @@ public sealed class MeterReader : IDisposable
     /// </summary>
     internal TimeSpan ReleaseHold { get; init; } = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// How long after its capture process exits a meter starts a new one.
+    /// The wait doubles for each start that ends within
+    /// <see cref="RestartSettle"/>, up to <see cref="RestartLimit"/>, so a
+    /// reader that dies at once (its sink is gone) is not started every tick.
+    /// </summary>
+    internal TimeSpan RestartDelay { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>The longest wait between starts of a reader that keeps exiting.</summary>
+    internal TimeSpan RestartLimit { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long a reader runs before its next exit is waited out from <see cref="RestartDelay"/> again.</summary>
+    internal TimeSpan RestartSettle { get; init; } = TimeSpan.FromSeconds(30);
+
     private sealed class Meter
     {
         public required Process Process { get; init; }
+        public required ProcessStartInfo StartInfo { get; init; }
         public string? SinkName { get; init; }  // set for a sink meter, which a new force restarts
+        public long Started { get; init; }      // Environment.TickCount64 when its process started
+        public int Restarts { get; init; }      // quick exits in a row before this start (see RestartSettle)
         public double SumL, SumR;    // sums of squares since the last poll
         public long Count;
         public double DispL, DispR;  // smoothed display values
@@ -175,14 +192,31 @@ public sealed class MeterReader : IDisposable
     private void AddLocked(string id, ProcessStartInfo psi, string? sinkName)
     {
         if (_disposed || _meters.ContainsKey(id)) return;
+        if (StartLocked(id, psi, sinkName, null, 0) is { } meter) _meters[id] = meter;
+    }
 
+    /// <summary>
+    /// Start a capture process for meter <paramref name="id"/>. A restart
+    /// passes the meter it replaces, whose display and last sound carry over,
+    /// so an output released while idle is not taken for busy by a reader
+    /// that keeps being started. <paramref name="restarts"/> counts the
+    /// quick exits before this start. Null when the process cannot start.
+    /// </summary>
+    private Meter? StartLocked(string id, ProcessStartInfo psi, string? sinkName, Meter? previous, int restarts)
+    {
         Process? p;
         try { p = Process.Start(psi); }
-        catch (Exception) { return; }
-        if (p is null) return;
+        catch (Exception) { return null; }
+        if (p is null) return null;
 
-        var meter = new Meter { Process = p, SinkName = sinkName, LastSound = Environment.TickCount64 };
-        _meters[id] = meter;
+        long now = Environment.TickCount64;
+        var meter = new Meter
+        {
+            Process = p, StartInfo = psi, SinkName = sinkName, Started = now,
+            Restarts = restarts,
+            LastSound = previous?.LastSound ?? now,
+            DispL = previous?.DispL ?? 0, DispR = previous?.DispR ?? 0,
+        };
         // Take both streams here, while the gate still holds the process:
         // Remove and Dispose can retire the meter before either thread is
         // scheduled, and Process.StandardOutput on a disposed process
@@ -191,10 +225,52 @@ public sealed class MeterReader : IDisposable
         // it is caught.
         Stream output = p.StandardOutput.BaseStream;
         Stream errors = p.StandardError.BaseStream;
-        new Thread(() => Pump(meter, output)) { IsBackground = true, Name = $"meter-{id}" }.Start();
+        new Thread(() => { Pump(meter, output); Exited(id, meter); }) { IsBackground = true, Name = $"meter-{id}" }.Start();
         // stderr must be drained: parec blocks once the pipe fills with
         // warnings, which silently freezes its audio output mid-stream.
         new Thread(() => Drain(errors)) { IsBackground = true, Name = $"meter-err-{id}" }.Start();
+        return meter;
+    }
+
+    /// <summary>
+    /// A meter's capture process ended on its own: parec exits when its sink
+    /// goes, when pipewire-pulse drops its stream or when it is killed from
+    /// outside, and a meter without one reads zero for good, which also takes
+    /// an output released while idle for silent. The meter keeps its entry and
+    /// starts a new process after the backoff (see <see cref="RestartDelay"/>).
+    /// A meter removed, replaced or disposed meanwhile is left alone.
+    /// </summary>
+    private void Exited(string id, Meter meter)
+    {
+        bool quick = Environment.TickCount64 - meter.Started < (long)RestartSettle.TotalMilliseconds;
+        ScheduleRestart(id, meter, quick ? meter.Restarts + 1 : 0);
+    }
+
+    /// <summary>
+    /// Start meter <paramref name="id"/>'s process again after a wait that
+    /// doubles with <paramref name="streak"/>, the quick exits in a row.
+    /// </summary>
+    private void ScheduleRestart(string id, Meter meter, int streak)
+    {
+        double wait = Math.Min(RestartLimit.TotalMilliseconds,
+            RestartDelay.TotalMilliseconds * Math.Pow(2, Math.Clamp(streak - 1, 0, 16)));
+        _ = Task.Delay(TimeSpan.FromMilliseconds(wait)).ContinueWith(_ =>
+        {
+            lock (_gate)
+            {
+                if (_disposed || !_meters.TryGetValue(id, out Meter? current) || current != meter) return;
+                // A sink meter is started as it would be now, with the force in place.
+                ProcessStartInfo psi = meter.SinkName is { } sink ? SinkMeter(sink) : meter.StartInfo;
+                if (StartLocked(id, psi, meter.SinkName, meter, streak) is not { } fresh)
+                {
+                    // Not even started: the dead entry stays, and the next try waits longer.
+                    ScheduleRestart(id, meter, streak + 1);
+                    return;
+                }
+                _meters[id] = fresh;
+                meter.Process.Dispose();
+            }
+        }, TaskScheduler.Default);
     }
 
     /// <summary>Stop metering one sink; its process goes with it.</summary>

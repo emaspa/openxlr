@@ -526,11 +526,29 @@ public sealed partial class Mixer
             _streams.Remove(streamId);   // the next sweep confirms the destination
         }
         string oldDescription = $"OpenXLR {previousName}";
+        _meters.Remove($"ch:{id}");
+        if (_combineModules.Remove(id, out uint old))
+        {
+            try { _pw.UnloadModule(old); }
+            catch (InvalidOperationException) when (_pw.SinkExists(channel.SinkName) == false)
+            {
+                // The sink went already, with its module: the id may belong
+                // to another client by now, so it is only forgotten, and the
+                // new sink is made as after an unload.
+                _pw.ForgetModule(old);
+            }
+            catch (InvalidOperationException)
+            {
+                // The old sink still plays: the channel keeps it and its
+                // meter, and the next reload or teardown unloads it.
+                _combineModules[id] = old;
+                _meters.Add($"ch:{id}", channel.SinkName);
+                throw;
+            }
+        }
         // The soundboard's link goes with the sink: presses are refused
         // until it is made again on the new one.
         if (id == SoundboardChannel) _playerLinked = false;
-        _meters.Remove($"ch:{id}");
-        if (_combineModules.Remove(id, out uint old)) _pw.UnloadModule(old);
         uint fresh;
         try { fresh = _pw.CreateCombineSink(channel.SinkName, MixSinkPattern, $"OpenXLR {channel.Name}", visible: channel.IsApplication); }
         catch (Exception renameError)

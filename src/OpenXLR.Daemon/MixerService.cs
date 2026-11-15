@@ -61,6 +61,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
     // than let it stack up.
     private int _sweepRunning;
     private string? _lastSweepError;
+    // The last failure of each sweep phase that has not run cleanly since,
+    // touched by the sweep alone (see Phase).
+    private readonly Dictionary<string, string> _phaseErrors = new(StringComparer.Ordinal);
     // Brings a unit's stalled capture back by a relink or a USB reset (the Wave:3 MK.2).
     private readonly CaptureRescue _rescue;
 
@@ -166,16 +169,21 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// can be unloaded or healed piecemeal, so the graph is forgotten and
     /// built again in place from the saved settings, retried like a startup
     /// build until the server takes modules again (see
-    /// <see cref="RebuildAsync"/>). Two consecutive sightings, so a momentary
-    /// pactl hiccup does not trigger it.
+    /// <see cref="RebuildAsync"/>). A single mix, post sink or virtual
+    /// microphone that went (unloaded from outside, or dropped by a server out
+    /// of open files) is handled the same way: every channel's sends need
+    /// every mix, and the build first unloads what is left of this graph by
+    /// name. Two consecutive sightings, so a momentary pactl hiccup does not
+    /// trigger it.
     /// </summary>
     private bool GraphLost()
     {
-        if (_mixer.GraphPresent() is not false) { _graphMissing = 0; return false; }
+        if (_mixer.MissingGraphNodes() is not { Count: > 0 } missing) { _graphMissing = 0; return false; }
         if (++_graphMissing < 2) return false;
         _graphMissing = 0;
-        _log.LogWarning("the submixer graph is gone (pipewire-pulse restarted?); building it again");
-        Timeline.Record(TimelineKind.Mixer, "the mixer's graph is gone (pipewire-pulse restarted?); it is built again");
+        string what = missing.Count == 1 ? $"{missing[0]} is gone" : $"{missing.Count} of its nodes are gone";
+        _log.LogWarning("the submixer graph is not whole: {what} (pipewire-pulse restarted?); building it again", what);
+        Timeline.Record(TimelineKind.Mixer, $"the mixer's graph is not whole ({what}; pipewire-pulse restarted?); it is built again");
         // Commands are refused from here, as during any build, and a profile
         // recalled meanwhile waits for the graph.
         _building = true;
@@ -1104,8 +1112,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 BuildGraph(output, defaults);
                 if (rebuild)
                 {
-                    _log.LogInformation("the submix graph is built again after the audio server restarted (attempt {n})", failures);
-                    Timeline.Record(TimelineKind.Mixer, "the mixer's graph is built again after the audio server restarted");
+                    _log.LogInformation("the submix graph is built again after it was lost (attempt {n})", failures);
+                    Timeline.Record(TimelineKind.Mixer, "the mixer's graph is built again after it was lost");
                     return;
                 }
                 _log.LogInformation("the audio server answers again; submix graph built after {n} failed attempt(s)", failures);
@@ -1153,114 +1161,137 @@ public sealed partial class MixerService : IHostedService, IDisposable
             CancellationToken stop = _stopping.Token;
             stop.ThrowIfCancellationRequested();
             if (GraphLost()) return true;
+            // Each phase runs in its own try: a strip that cannot be wired, or
+            // a helper that fails, leaves the routes, ducking, the clock and
+            // the Wave XLR Pro's selectors after it to run as usual.
             stop.ThrowIfCancellationRequested();
-            // Which input jacks the device actually has, so a client does
-            // not offer a strip the hardware cannot feed. Before the driven
-            // unit is handed on below, so the strips it carries are counted
-            // by its own jacks, never by the unit before it.
-            OpenXLR.Core.Devices.DeviceCapabilities? jacks = _devices.ActiveCapabilities;
-            if (_mixer.SetInputJacks(jacks?.XlrInputs, jacks?.AuxInput, jacks?.LineInput)) Changed?.Invoke();
-            stop.ThrowIfCancellationRequested();
-            if (UpdateInputDeviceHint()) Changed?.Invoke();
-            stop.ThrowIfCancellationRequested();
-            // Which driven units run the microphone EQ, and each microphone's
-            // EQ put where it runs: a unit that connected or left, a firmware
-            // update, a binding that moved.
-            if (_mixer.SetUnitEqSupport(_eqPort.Units()) | _mixer.SyncDeviceEq()) Changed?.Invoke();
-            // Software DSP only for devices without the hardware version.
-            // Raw capture takes XLR 1 before the unit's low cut, so the soft one applies.
-            _mixer.SetLowCutApplicable(!(_devices.ActiveCapabilities?.LowCut ?? false) || _devices.Xlr1RawCapture);
-            stop.ThrowIfCancellationRequested();
-            _mixer.SetClipGuardApplicable(!(_devices.ActiveCapabilities?.ClipGuard ?? false));
-            stop.ThrowIfCancellationRequested();
-            bool monitorChanged = _mixer.SyncOwnSinkLevels(out IReadOnlyList<string> restoredSinks);
-            if (restoredSinks.Count > 0)
+            Phase("device inputs", () =>
             {
-                _log.LogWarning("restored the expected level and mute of {n} OpenXLR sink(s) or stage stream(s) ({names}); something outside OpenXLR had changed them",
-                    restoredSinks.Count, string.Join(", ", restoredSinks));
-                Timeline.Record(TimelineKind.Mixer, $"restored the level and mute of {string.Join(", ", restoredSinks)}; something outside OpenXLR had changed them");
-            }
-            // Collect what the plugins' own editors changed before the
-            // healing pass below, so a chain that is about to be rebuilt
-            // comes back with the values its editor last showed.
-            // Desktop volume and mute changes are user settings too.
+                // Which input jacks the device actually has, so a client does
+                // not offer a strip the hardware cannot feed. Before the driven
+                // unit is handed on below, so the strips it carries are counted
+                // by its own jacks, never by the unit before it.
+                OpenXLR.Core.Devices.DeviceCapabilities? jacks = _devices.ActiveCapabilities;
+                if (_mixer.SetInputJacks(jacks?.XlrInputs, jacks?.AuxInput, jacks?.LineInput)) Changed?.Invoke();
+                stop.ThrowIfCancellationRequested();
+                if (UpdateInputDeviceHint()) Changed?.Invoke();
+                stop.ThrowIfCancellationRequested();
+                // Which driven units run the microphone EQ, and each microphone's
+                // EQ put where it runs: a unit that connected or left, a firmware
+                // update, a binding that moved.
+                if (_mixer.SetUnitEqSupport(_eqPort.Units()) | _mixer.SyncDeviceEq()) Changed?.Invoke();
+                // Software DSP only for devices without the hardware version.
+                // Raw capture takes XLR 1 before the unit's low cut, so the soft one applies.
+                _mixer.SetLowCutApplicable(!(_devices.ActiveCapabilities?.LowCut ?? false) || _devices.Xlr1RawCapture);
+                stop.ThrowIfCancellationRequested();
+                _mixer.SetClipGuardApplicable(!(_devices.ActiveCapabilities?.ClipGuard ?? false));
+                return false;
+            });
             stop.ThrowIfCancellationRequested();
-            if (_mixer.SyncPluginControls() | monitorChanged | _mixer.SyncDeviceVolumes())
+            Phase("levels", () =>
             {
-                ScheduleSave();
-                Changed?.Invoke();
-            }
+                bool monitorChanged = _mixer.SyncOwnSinkLevels(out IReadOnlyList<string> restoredSinks);
+                if (restoredSinks.Count > 0)
+                {
+                    _log.LogWarning("restored the expected level and mute of {n} OpenXLR sink(s) or stage stream(s) ({names}); something outside OpenXLR had changed them",
+                        restoredSinks.Count, string.Join(", ", restoredSinks));
+                    Timeline.Record(TimelineKind.Mixer, $"restored the level and mute of {string.Join(", ", restoredSinks)}; something outside OpenXLR had changed them");
+                }
+                // Collect what the plugins' own editors changed before the
+                // healing pass below, so a chain that is about to be rebuilt
+                // comes back with the values its editor last showed.
+                // Desktop volume and mute changes are user settings too.
+                stop.ThrowIfCancellationRequested();
+                if (_mixer.SyncPluginControls() | monitorChanged | _mixer.SyncDeviceVolumes())
+                {
+                    ScheduleSave();
+                    Changed?.Invoke();
+                }
+                return false;
+            });
             // A combine leg that appeared after its cell was applied, or
             // that the session manager gave a remembered level after
             // OpenXLR set it, plays at the wrong level until the stored
             // fader is pushed onto it.
             stop.ThrowIfCancellationRequested();
-            // A leg that ended, as one can while a restarted WirePlumber
-            // links the graph again, comes back with its channel's sink.
-            _mixer.EnsureCellLevels(out IReadOnlyList<string> heldSends, out IReadOnlyList<string> reloadedChannels);
-            if (heldSends.Count > 0)
+            Phase("sends", () =>
             {
-                _log.LogInformation("put {n} send(s) back on their faders ({cells}); something outside OpenXLR had changed them",
-                    heldSends.Count, string.Join(", ", heldSends));
-                Timeline.Record(TimelineKind.Mixer, $"put {string.Join(", ", heldSends)} back on their faders; something outside OpenXLR had changed them");
-            }
-            if (reloadedChannels.Count > 0)
+                // A leg that ended, as one can while a restarted WirePlumber
+                // links the graph again, comes back with its channel's sink.
+                _mixer.EnsureCellLevels(out IReadOnlyList<string> heldSends, out IReadOnlyList<string> reloadedChannels);
+                if (heldSends.Count > 0)
+                {
+                    _log.LogInformation("put {n} send(s) back on their faders ({cells}); something outside OpenXLR had changed them",
+                        heldSends.Count, string.Join(", ", heldSends));
+                    Timeline.Record(TimelineKind.Mixer, $"put {string.Join(", ", heldSends)} back on their faders; something outside OpenXLR had changed them");
+                }
+                if (reloadedChannels.Count > 0)
+                {
+                    _log.LogWarning("reloaded the sink of {channels} to make its sends again; a send's stream had ended",
+                        string.Join(", ", reloadedChannels));
+                    Timeline.Record(TimelineKind.Mixer, $"reloaded the sink of {string.Join(", ", reloadedChannels)}: a send's stream had ended");
+                }
+                return false;
+            });
+            stop.ThrowIfCancellationRequested();
+            bool changed = Phase("streams", () =>
             {
-                _log.LogWarning("reloaded the sink of {channels} to make its sends again; a send's stream had ended",
-                    string.Join(", ", reloadedChannels));
-                Timeline.Record(TimelineKind.Mixer, $"reloaded the sink of {string.Join(", ", reloadedChannels)}: a send's stream had ended");
-            }
+                bool moved = _mixer.SyncStreams();
+                // A level the desktop or the program moved is a setting too.
+                if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
+                if (_mixer.MigrateCaptureInputs(source => _devices.SupportedUnitFor(source)?.Id))
+                {
+                    ScheduleSave();
+                    moved = true;
+                }
+                return moved;
+            });
+            changed |= Phase("default devices", () => _mixer.EnforceDefaults(stop));
             stop.ThrowIfCancellationRequested();
-            bool changed = _mixer.SyncStreams();
-            // A level the desktop or the program moved is a setting too.
-            if (_mixer.TakeAppVolumesChanged()) ScheduleSave();
-            if (_mixer.MigrateCaptureInputs(source => _devices.SupportedUnitFor(source)?.Id))
-            {
-                ScheduleSave();
-                changed = true;
-            }
-            changed |= _mixer.EnforceDefaults(stop);
+            changed |= Phase("input feeds", _mixer.EnsureInputFeeds);
+            changed |= Phase("aux route", _mixer.EnsureAuxRoute);
             stop.ThrowIfCancellationRequested();
-            changed |= _mixer.EnsureInputFeeds() | _mixer.EnsureAuxRoute();
+            changed |= Phase("filter routes", _mixer.EnsureFilterRoutes);
             stop.ThrowIfCancellationRequested();
-            changed |= _mixer.EnsureFilterRoutes();
-            stop.ThrowIfCancellationRequested();
-            changed |= _mixer.EnsureMonitorRoutes() | _mixer.SyncDeviceList();
+            changed |= Phase("monitor routes", _mixer.EnsureMonitorRoutes);
+            changed |= Phase("device list", _mixer.SyncDeviceList);
             // What a selected output is called, kept for when it is away.
-            if (_mixer.SyncMonitorOutputLabels())
+            changed |= Phase("output labels", () =>
             {
+                if (!_mixer.SyncMonitorOutputLabels()) return false;
                 ScheduleSave();
-                changed = true;
-            }
+                return true;
+            });
             // A unit whose capture stalls under its own playback is reset,
             // after the routes are current so the watch sees what plays.
             stop.ThrowIfCancellationRequested();
-            _rescue.Sweep();
+            Phase("capture rescue", () => { _rescue.Sweep(); return false; });
             // A capture input's gain that another program moved is
             // reported, never written back.
             stop.ThrowIfCancellationRequested();
-            changed |= _mixer.SyncCaptureGains();
+            changed |= Phase("capture gains", _mixer.SyncCaptureGains);
             // A capture input's own clock: its bridge started or stopped
             // carrying audio, or counted an underrun or an overrun.
-            changed |= _mixer.SyncClockBridges();
+            changed |= Phase("clock bridges", _mixer.SyncClockBridges);
             stop.ThrowIfCancellationRequested();
             // Where ducking runs, after routing and the device status are
             // current: the unit when the setup fits it, software otherwise.
             // EnsureFilterRoutes above keeps repairing its buses and stages.
-            changed |= SyncUnitDucking() | _mixer.SyncDucking();
+            changed |= Phase("ducking", () => SyncUnitDucking() | _mixer.SyncDucking());
             // Which device drives the graph: refresh after graph changes,
             // or retry if the previous read failed.
-            if (_mixer.SyncClock())
+            changed |= Phase("graph clock", () =>
             {
-                changed = true;
+                if (!_mixer.SyncClock()) return false;
                 NoteClock(NamedClock(_mixer.GraphClock));
-            }
+                return true;
+            });
             // The audio clock the user picked: its rule, which can also be
             // edited or deleted by hand.
-            changed |= SyncClockRule();
+            changed |= Phase("clock rule", SyncClockRule);
             if (changed) Changed?.Invoke();
             stop.ThrowIfCancellationRequested();
-            SyncOutputSelectors();
+            Phase("output selectors", () => { SyncOutputSelectors(); return false; });
             // Once a minute: is the PulseAudio server close to its
             // open-file limit? Cheap (one /proc directory listing).
             if (++_sweepCount % 60 == 1)
@@ -1283,11 +1314,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            // A wiring failure repeats every second (a filter chain
-            // that cannot be built leaves the microphone unwired, with
-            // no other trace at the default log level). Say it once
-            // per distinct message at warning so it reaches the
-            // journal and the diagnostics archive, then keep quiet.
+            // What runs outside the phases, said once per distinct message
+            // as a phase's failure is.
             if (ex.Message != _lastSweepError)
             {
                 _lastSweepError = ex.Message;
@@ -1302,6 +1330,43 @@ public sealed partial class MixerService : IHostedService, IDisposable
             Volatile.Write(ref _sweepRunning, 0);
         }
         return true;
+    }
+
+    /// <summary>
+    /// One phase of <see cref="SweepOnce"/>, isolated from the others: a
+    /// failure here is logged at warning once per distinct message for this
+    /// phase, then at debug level while it repeats, and the sweep goes on
+    /// with the next phase. A stop is passed on. False when the phase failed.
+    /// </summary>
+    private bool Phase(string phase, Func<bool> step)
+    {
+        try
+        {
+            bool changed = step();
+            if (_phaseErrors.Remove(phase))
+            {
+                _log.LogInformation("stream sweep: {phase} recovered", phase);
+                Timeline.Record(TimelineKind.Mixer, $"the mixer's sweep runs its {phase} again");
+            }
+            return changed;
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            // A wiring failure repeats every second (a filter chain
+            // that cannot be built leaves the microphone unwired, with
+            // no other trace at the default log level). Say it once
+            // per distinct message at warning so it reaches the
+            // journal and the diagnostics archive, then keep quiet.
+            if (_phaseErrors.GetValueOrDefault(phase) != ex.Message)
+            {
+                _phaseErrors[phase] = ex.Message;
+                _log.LogWarning("stream sweep: {phase}: {msg} (repeats logged at debug level)", phase, ex.Message);
+                Timeline.Record(TimelineKind.Mixer, $"the mixer's sweep failed in its {phase}: {ex.Message}");
+            }
+            else _log.LogDebug("stream sweep: {phase}: {msg}", phase, ex.Message);
+            return false;
+        }
     }
 
     /// <summary>
@@ -2210,7 +2275,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     public bool WaitingForAudio { get { lock (_sceneGate) return _waitingForAudio; } }
 
     private const string WaitingWarning = "The mixer is waiting for the audio server (pipewire-pulse), which did not answer when the daemon started; it is built as soon as the server answers.";
-    private const string RebuildWarning = "The mixer is still being built after the audio server (pipewire-pulse) restarted; it is back as soon as the server answers.";
+    private const string RebuildWarning = "The mixer is still being built after the audio server (pipewire-pulse) restarted or lost one of its devices; it is back as soon as the server answers.";
 
     /// <summary>Why the mixer is not built although the submixer is on, or null.</summary>
     public string? GraphWarning { get { lock (_sceneGate) return _waitingForAudio ? _waitingWarning : null; } }

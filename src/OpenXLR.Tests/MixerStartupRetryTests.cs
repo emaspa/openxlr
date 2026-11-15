@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenXLR.Core;
 using OpenXLR.Core.Mixing;
@@ -191,6 +192,81 @@ public sealed class MixerStartupRetryTests
         Assert.Equal(calls, fixture.Calls());
         Assert.False(fixture.Service.Built);
         Assert.False(lifetime.ApplicationStopping.IsCancellationRequested);
+    }
+
+    /// <summary>
+    /// One mix sink, post sink or virtual microphone that goes while the
+    /// server stays (unloaded from outside, or dropped near pipewire-pulse's
+    /// open-file limit) is seen as a lost graph, not only the first mix's
+    /// sink, and the graph is built again in place with that node back.
+    /// </summary>
+    [Theory]
+    [InlineData("OpenXLR_mix_chat")]
+    [InlineData("OpenXLR_post_stream")]
+    [InlineData("OpenXLR_chat")]
+    public async Task ANodeLostAloneIsSeenAndTheGraphIsBuiltAgain(string node)
+    {
+        using var lifetime = new Lifetime();
+        using var fixture = new Fixture(lifetime: lifetime);
+        fixture.Answer();
+        await fixture.Service.StartAsync(CancellationToken.None);
+        try
+        {
+            Assert.True(fixture.Service.Built);
+            Assert.True(fixture.Publishes(node));
+            Assert.Equal(0, fixture.Mixer.MissingGraphNodes()?.Count);
+            fixture.LoseNode(node);
+            Assert.Equal([node], fixture.Mixer.MissingGraphNodes());
+            Assert.True(SpinWait.SpinUntil(() => !fixture.Service.Built, TimeSpan.FromSeconds(10)), $"the lost {node} was not noticed");
+            Assert.True(SpinWait.SpinUntil(() => fixture.Service.Built && !fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)),
+                "the graph was not built again");
+            Assert.True(fixture.Publishes(node));
+            Assert.Equal(0, fixture.Mixer.MissingGraphNodes()?.Count);
+            Assert.False(lifetime.ApplicationStopping.IsCancellationRequested);
+        }
+        finally
+        {
+            await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30));
+        }
+    }
+
+    /// <summary>
+    /// A sweep phase that fails leaves the phases after it to run, and each
+    /// failure is logged at warning once, not on every sweep it repeats.
+    /// </summary>
+    [Fact]
+    public async Task ASweepPhaseThatFailsLeavesTheOthersToRun()
+    {
+        var log = new RecordingLogger<MixerService>();
+        var ducking = new FailingDuckingPort();
+        using var fixture = new Fixture(ducking, log: log);
+        fixture.Answer();
+        await fixture.Service.StartAsync(CancellationToken.None);
+        try
+        {
+            await fixture.PauseSweeps();
+            fixture.RefuseStreamListings();
+            ducking.Fail = true;
+            // The sends fail early in each pass, the ducking late in it.
+            for (int i = 0; i < 3; i++) Assert.True(fixture.Service.SweepOnce());
+            string[] warnings = [.. Sweep(LogLevel.Warning)];
+            Assert.Equal(2, warnings.Length);
+            Assert.StartsWith("stream sweep: sends: pactl list sink-inputs failed", warnings[0]);
+            Assert.StartsWith("stream sweep: ducking: the ducking port failed", warnings[1]);
+
+            fixture.RefuseStreamListings(false);
+            ducking.Fail = false;
+            Assert.True(fixture.Service.SweepOnce());
+            Assert.Equal(["stream sweep: sends recovered", "stream sweep: ducking recovered"], Sweep(LogLevel.Information));
+            Assert.Equal(2, Sweep(LogLevel.Warning).Count());
+        }
+        finally
+        {
+            await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30));
+        }
+
+        IEnumerable<string> Sweep(LogLevel level) => log.Entries
+            .Where(e => e.Level == level && e.Message.StartsWith("stream sweep", StringComparison.Ordinal)).Select(e => e.Message);
     }
 
     private sealed class Lifetime : Microsoft.Extensions.Hosting.IHostApplicationLifetime, IDisposable
@@ -419,7 +495,7 @@ public sealed class MixerStartupRetryTests
         }
 
         internal Fixture(IDaemonDuckingPort? ducking = null, Func<int, TimeSpan>? retryDelay = null,
-            Microsoft.Extensions.Hosting.IHostApplicationLifetime? lifetime = null)
+            Microsoft.Extensions.Hosting.IHostApplicationLifetime? lifetime = null, ILogger<MixerService>? log = null)
         {
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", Path.Combine(_directory, "config"));
             new DaemonSettings { Submixer = true }.Save();
@@ -438,6 +514,11 @@ public sealed class MixerStartupRetryTests
             ExecutableScript.Write(Path.Combine(_directory, "pactl"), """
                 dir=${0%/*}
                 echo "$*" >> "$dir/calls"
+                # A listing the server refuses, as a sweep phase's helper fails.
+                if [ "$1 $2" = "list sink-inputs" ] && [ -f "$dir/refuse-streams" ]; then
+                  echo 'Connection failure: Timeout' >&2
+                  exit 1
+                fi
                 case "$1" in
                   load-module)
                     if [ ! -e "$dir/answer" ]; then
@@ -448,13 +529,17 @@ public sealed class MixerStartupRetryTests
                     n=$(/bin/cat "$dir/next" 2>/dev/null || echo 100)
                     n=$((n + 1))
                     echo "$n" > "$dir/next"
-                    case "$3" in sink_name=*) echo "${3#sink_name=}" >> "$dir/sinks" ;; esac
+                    case "$3" in
+                      sink_name=*) echo "${3#sink_name=}" >> "$dir/sinks" ;;
+                      source_name=*) echo "${3#source_name=}" >> "$dir/sources" ;;
+                    esac
                     echo "$n" ;;
                   list)
-                    # The sinks the loaded modules published, until the server restarts.
-                    if [ "$2 $3" = "sinks short" ] && [ -f "$dir/sinks" ]; then
+                    # The sinks and sources the loaded modules published, until
+                    # the server restarts or one is taken away.
+                    if [ "$3" = short ] && { [ "$2" = sinks ] || [ "$2" = sources ]; } && [ -f "$dir/$2" ]; then
                       i=0
-                      while read -r name; do i=$((i + 1)); printf '%s\t%s\tmodule-null-sink.c\n' "$i" "$name"; done < "$dir/sinks"
+                      while read -r name; do i=$((i + 1)); printf '%s\t%s\tmodule-null-sink.c\n' "$i" "$name"; done < "$dir/$2"
                     fi ;;
                   get-default-sink) echo desk ;;
                   get-default-source) echo mic ;;
@@ -464,7 +549,7 @@ public sealed class MixerStartupRetryTests
             Environment.SetEnvironmentVariable("PATH", _directory);
             var config = new ConfigurationBuilder().Build();
             _devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => []);
-            Service = new MixerService(NullLogger<MixerService>.Instance, config, _devices, lifetime,
+            Service = new MixerService(log ?? NullLogger<MixerService>.Instance, config, _devices, lifetime,
                 startupDefaults: new StartupDefaults("desk", "mic"))
             {
                 RetryDelay = retryDelay ?? (_ => TimeSpan.FromMilliseconds(20)),
@@ -479,7 +564,27 @@ public sealed class MixerStartupRetryTests
         {
             File.Delete(Path.Combine(_directory, "answer"));
             File.Delete(Path.Combine(_directory, "sinks"));
+            File.Delete(Path.Combine(_directory, "sources"));
         }
+
+        /// <summary>One published sink or source goes, its module unloaded from outside, while the server stays.</summary>
+        internal void LoseNode(string name)
+        {
+            foreach (string kind in new[] { "sinks", "sources" })
+            {
+                string path = Path.Combine(_directory, kind);
+                if (File.Exists(path)) File.WriteAllLines(path, File.ReadAllLines(path).Where(line => line != name));
+            }
+        }
+
+        internal void RefuseStreamListings(bool refuse = true)
+        {
+            if (refuse) File.WriteAllText(Path.Combine(_directory, "refuse-streams"), "");
+            else File.Delete(Path.Combine(_directory, "refuse-streams"));
+        }
+
+        internal bool Publishes(string name)
+            => Lines("sinks").Contains(name) || Lines("sources").Contains(name);
         internal int Refusals() => Lines("refusals").Length;
         internal string[] Calls() => Lines("calls");
         private string[] Lines(string name)

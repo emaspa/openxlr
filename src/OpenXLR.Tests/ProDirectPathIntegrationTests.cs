@@ -154,7 +154,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             devices?.SuspendSession();
             devices?.Dispose();
             foreach (uint module in Enumerable.Reverse(modules)) UnloadModule(module);
-            if (File.Exists(MixerSettings.DefaultPath)) File.Delete(MixerSettings.DefaultPath);
+            MixerSettingsFiles.Delete();
             string state = Path.Combine(OpenXlrPaths.ConfigDir, "devices", "0fd9-00b4");
             if (Directory.Exists(state)) Directory.Delete(state, true);
         }
@@ -278,7 +278,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             devices?.SuspendSession();
             devices?.Dispose();
             foreach (uint module in Enumerable.Reverse(modules)) UnloadModule(module);
-            if (File.Exists(MixerSettings.DefaultPath)) File.Delete(MixerSettings.DefaultPath);
+            MixerSettingsFiles.Delete();
             string state = Path.Combine(OpenXlrPaths.ConfigDir, "devices", "0fd9-00b4");
             if (Directory.Exists(state)) Directory.Delete(state, true);
         }
@@ -373,7 +373,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             devices?.SuspendSession();
             devices?.Dispose();
             foreach (uint module in Enumerable.Reverse(modules)) UnloadModule(module);
-            if (File.Exists(MixerSettings.DefaultPath)) File.Delete(MixerSettings.DefaultPath);
+            MixerSettingsFiles.Delete();
             string state = Path.Combine(OpenXlrPaths.ConfigDir, "devices", "0fd9-00b4");
             if (Directory.Exists(state)) Directory.Delete(state, true);
         }

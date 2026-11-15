@@ -35,10 +35,14 @@ public sealed partial class Mixer
     /// rename does, which makes every leg again and puts its streams back; at
     /// most <see cref="LegReloadLimit"/> times in <see cref="LegReloadWindow"/>.
     /// A send whose leg is still missing waits with the other pending sends.
+    /// A channel left without a sink, by a reload whose sink could not be made
+    /// again, is short of every leg and is made again the same way.
     /// </summary>
     /// <returns>The channels whose sink was reloaded.</returns>
     private List<string> RestoreLostLegsLocked(HashSet<string> missing)
     {
+        foreach (ChannelDefinition channel in _config.Channels)
+            if (!_combineModules.ContainsKey(channel.Id)) missing.Add(channel.Id);
         foreach (string channel in _legMissing.Keys.Where(c => !missing.Contains(c)).ToList()) _legMissing.Remove(channel);
         foreach (string channel in missing) _legMissing[channel] = _legMissing.GetValueOrDefault(channel) + 1;
         List<string> due = [.. _legMissing.Where(e => e.Value >= LegMissingSweeps).Select(e => e.Key)];
@@ -50,7 +54,7 @@ public sealed partial class Mixer
         foreach (string id in due)
         {
             _legMissing.Remove(id);
-            if (_config.Channels.FirstOrDefault(c => c.Id == id) is not { } channel || !_combineModules.ContainsKey(id)) continue;
+            if (_config.Channels.FirstOrDefault(c => c.Id == id) is not { } channel) continue;
             string[] mixes = [.. _config.Mixes.Select(m => m.Id).Where(mix => _cells.Contains(Cell(id, mix)))];
             List<long> recent = _legReloads.TryGetValue(id, out List<long>? times) ? times : _legReloads[id] = [];
             recent.RemoveAll(at => now - at >= (long)LegReloadWindow.TotalMilliseconds);
