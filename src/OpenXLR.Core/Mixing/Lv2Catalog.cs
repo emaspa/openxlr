@@ -46,8 +46,8 @@ public static class Lv2Catalog
     /// <summary>Every LV2 plugin lilv can see (blocks on the first call).</summary>
     public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
 
-    /// <summary>Forget what was read; the next read scans again.</summary>
-    public static void Reset() => Scan.Reset();
+    /// <summary>Scan again; until the new list is complete, readers get the old one.</summary>
+    public static void Refresh() => Scan.Refresh();
 
     /// <summary>Kick the scan off without waiting for it.</summary>
     public static void Warm() => ThreadPool.QueueUserWorkItem(_ => { try { _ = Scan.Value; } catch (Exception) { } });

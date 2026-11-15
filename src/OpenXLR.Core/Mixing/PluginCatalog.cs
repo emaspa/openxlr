@@ -48,25 +48,29 @@ public static class PluginCatalog
     /// builds on its own passes by. Rescanning is how a user who has fixed
     /// a broken plugin gets it looked at again.
     ///
-    /// The old catalogue is dropped first and the heap swept before the new
-    /// one is built: the daemon runs under a firm heap limit, and holding
-    /// two catalogues and a large module's description at once does not fit
-    /// in it. Whatever a caller still holds keeps its own copy alive, so a
-    /// caller that only wants to compare should keep the plugins' names,
-    /// not the plugins.
+    /// The new catalogue is built aside and takes the old one's place only
+    /// once it is complete. Until then every reader gets the old catalogue
+    /// without waiting: the mixer resolves inserts under its own lock for
+    /// every state push, and a lookup that waited for a scan of several
+    /// minutes would hold every command and the sweep with it, long enough
+    /// for the service watchdog to stop the daemon. Module descriptions are
+    /// read as a stream, so the old catalogue and the one being built fit in
+    /// the heap together; the old one is swept as soon as it is replaced.
+    /// Whatever a caller still holds keeps its own copy alive past that, so a
+    /// caller that only wants to compare should keep the plugins' names, not
+    /// the plugins.
     /// </summary>
     public static IReadOnlyList<PluginInfo> Refresh()
     {
-        Lv2Catalog.Reset();
-        ClapCatalog.Reset(retryFailures: true);
-        Vst3Catalog.Reset(retryFailures: true);
-        All.Reset();
-        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true);
-        NativeHeap.Trim();
+        Lv2Catalog.Refresh();
+        ClapCatalog.Refresh(retryFailures: true);
+        Vst3Catalog.Refresh(retryFailures: true);
+        All.Refresh();
         IReadOnlyList<PluginInfo> plugins = All.Value;
-        // lilv builds and frees a large model to answer this; without the
-        // trim the C library keeps every megabyte of it for a use that never
-        // comes, and a few rescans cost more memory than the daemon ever needs.
+        // The old catalogue goes now. lilv builds and frees a large model to
+        // answer this; without the trim the C library keeps every megabyte of
+        // it for a use that never comes, and a few rescans cost more memory
+        // than the daemon ever needs.
         GC.Collect(2, GCCollectionMode.Aggressive, blocking: true);
         NativeHeap.Trim();
         return plugins;

@@ -2547,7 +2547,10 @@ searched; the plugin manager below adds folders of your own). What a CLAP or VST
 until the bundle changes, so a rescan costs nothing for plugins already
 known. Updating OpenXLR reads every one of them again once, because the
 new version may see them differently, which makes the first scan after
-an update as slow as the first ever.
+an update as slow as the first ever. While a scan runs, the mixer and the
+plugin picker keep the plugins they already knew, and new ones appear when
+it finishes. OpenXLR remembers each bundle as soon as it has read it, so a
+scan cut short by a restart does not read those bundles again.
 
 <a name="plugin-search-folders"></a>
 **Plugin folders.** To use plugins where they already are, without copying

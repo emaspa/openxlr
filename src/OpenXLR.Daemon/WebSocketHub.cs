@@ -834,8 +834,8 @@ public sealed partial class WebSocketHub
         lock (_installGate)
         {
             // Only the plugins' identities are kept across the rescan: the
-            // catalogue itself is large, and holding the old one while the
-            // new is built would not fit in the daemon's heap.
+            // catalogue itself is large, and holding the old one here would
+            // keep it alive after the refresh has replaced it.
             HashSet<(string Kind, string Plugin)> before = OpenXLR.Core.Mixing.PluginCatalog.Identities();
             OpenXLR.Core.Mixing.InstallOutcome outcome;
             try { outcome = step(new OpenXLR.Core.Mixing.PluginInstaller()); }

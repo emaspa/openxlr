@@ -17,11 +17,12 @@ public static class ClapCatalog
 
     public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
 
+    /// <summary>Scan again; until the new list is complete, readers get the old one.</summary>
     /// <param name="retryFailures">Ask again about bundles the last scan could not describe.</param>
-    public static void Reset(bool retryFailures = false)
+    public static void Refresh(bool retryFailures = false)
     {
         _retryFailures = retryFailures;
-        Scan.Reset();
+        Scan.Refresh();
     }
 
     /// <summary>Where bundles live, in the order the CLAP specification gives.</summary>
@@ -66,11 +67,12 @@ public static class Vst3Catalog
 
     public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
 
+    /// <summary>Scan again; until the new list is complete, readers get the old one.</summary>
     /// <param name="retryFailures">Ask again about bundles the last scan could not describe.</param>
-    public static void Reset(bool retryFailures = false)
+    public static void Refresh(bool retryFailures = false)
     {
         _retryFailures = retryFailures;
-        Scan.Reset();
+        Scan.Refresh();
     }
 
     public static IReadOnlyList<string> SearchPath()
@@ -289,6 +291,7 @@ internal static class HostScan
                             evidence.Add(bundle, outcome, exitCode: scan.ExitCode, detail: detail,
                                 logId: log.Id, logNote: log.Note, wineTrace: environment.WineTrace);
                             cache.StoreFailure(bundle, outcome, startedAt);
+                            cache.Flush();
                             continue;
                         }
                         description = scan.Stdout;
@@ -296,7 +299,13 @@ internal static class HostScan
                     try
                     {
                         IReadOnlyList<PluginInfo> parsed = Parse(description, kind);
-                        if (!cached) cache.Store(bundle, description);
+                        if (!cached)
+                        {
+                            // A bundle can take a minute; one the daemon is
+                            // stopped after must not cost that minute again.
+                            cache.Store(bundle, description);
+                            cache.Flush();
+                        }
                         int before = result.Count;
                         result.AddRange(parsed.Where(plugin => known.Add(plugin.Plugin)));
                         evidence.Add(bundle, parsed.Count == 0 ? "no-plugins" : "ok", cached,
@@ -316,7 +325,11 @@ internal static class HostScan
                         // cached bytes do not: discard them so the next scan can
                         // ask the scanner before deciding the bundle is broken.
                         if (cached) cache.Invalidate(bundle);
-                        else cache.StoreFailure(bundle, "invalid-description", startedAt);
+                        else
+                        {
+                            cache.StoreFailure(bundle, "invalid-description", startedAt);
+                            cache.Flush();
+                        }
                     }
                 }
             }

@@ -748,15 +748,66 @@ public sealed class PluginInstallerTests : IDisposable
     }
 
     [Fact]
-    public void ARefreshableForgetsItsValueOnReset()
+    public void ARefreshableComputesItsValueAgainOnRefresh()
     {
         int computed = 0;
         var value = new Refreshable<int>(() => ++computed);
         Assert.Equal(1, value.Value);
         Assert.Equal(1, value.Value);
-        value.Reset();
+        value.Refresh();
         Assert.Equal(2, value.Value);
         Assert.Equal(2, computed);
+    }
+
+    /// <summary>
+    /// A plugin rescan can take minutes, and the mixer reads the catalogue
+    /// under its own lock for every state push. A read during a refresh that
+    /// waited for it would hold every command, broadcast and sweep for as
+    /// long as the scan runs.
+    /// </summary>
+    [Fact]
+    public async Task AReadDuringARefreshGetsTheOldValueWithoutWaiting()
+    {
+        int computed = 0;
+        using var started = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var value = new Refreshable<int>(() =>
+        {
+            int n = Interlocked.Increment(ref computed);
+            if (n > 1)
+            {
+                started.Set();
+                release.Wait(TimeSpan.FromSeconds(30));
+            }
+            return n;
+        });
+        Assert.Equal(1, value.Value);
+        Task refresh = Task.Run(value.Refresh);
+        try
+        {
+            Assert.True(started.Wait(TimeSpan.FromSeconds(10)));
+            Task<int> read = Task.Run(() => value.Value);
+            Assert.True(await Task.WhenAny(read, Task.Delay(TimeSpan.FromSeconds(2))) == read,
+                "a read during a refresh waited for it");
+            Assert.Equal(1, await read);
+        }
+        finally { release.Set(); }
+        await refresh.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(2, value.Value);
+    }
+
+    [Fact]
+    public void ARefreshThatFailsIsKeptLikeAFirstReadThatFails()
+    {
+        int computed = 0;
+        var value = new Refreshable<int>(() => ++computed == 2 ? throw new InvalidOperationException("scan died") : computed);
+        Assert.Equal(1, value.Value);
+        value.Refresh();
+        Assert.Throws<InvalidOperationException>(() => value.Value);
+        Assert.Throws<InvalidOperationException>(() => value.Value);
+        Assert.Equal(2, computed);
+        value.Refresh();
+        Assert.Equal(3, value.Value);
     }
 
     [Fact]
