@@ -176,7 +176,35 @@ const cmd = (o) => {
 
 // ---------- OpenDeck host connection ----------
 const host = new WebSocket(`ws://localhost:${port}`);
-const send = (o) => host.send(JSON.stringify(o));
+// What each instance was last sent, so a redraw that changes nothing is not
+// sent again. OpenDeck answers every setImage and setFeedback by handing its
+// icon editor a fresh copy of the action, which drops what the user is typing
+// there (#834). The image is kept whole; a dial's feedback item by item, as
+// OpenDeck merges each payload into what the strip already shows.
+const sentImage = new Map();      // context -> the last setImage payload, as JSON
+const sentFeedback = new Map();   // context -> Map(feedback item -> its value as JSON)
+function unchanged(o) {
+  if (typeof o.context !== "string") return false;
+  if (o.event === "setImage") {
+    const json = JSON.stringify(o.payload);
+    if (sentImage.get(o.context) === json) return true;
+    sentImage.set(o.context, json);
+    return false;
+  }
+  if (o.event === "setFeedback") {
+    let items = sentFeedback.get(o.context);
+    if (!items) sentFeedback.set(o.context, items = new Map());
+    const values = Object.entries(o.payload ?? {}).map(([key, value]) => [key, JSON.stringify(value)]);
+    if (values.length && values.every(([key, json]) => items.get(key) === json)) return true;
+    for (const [key, json] of values) items.set(key, json);
+    return false;
+  }
+  // A new layout puts every item back to the layout's own.
+  if (o.event === "setFeedbackLayout") sentFeedback.delete(o.context);
+  return false;
+}
+function forgetSent(context) { sentImage.delete(context); sentFeedback.delete(context); }
+const send = (o) => { if (!unchanged(o)) host.send(JSON.stringify(o)); };
 host.onopen = () => send({ event: registerEvent, uuid: pluginUUID });
 host.onclose = () => process.exit(0);
 
@@ -334,6 +362,7 @@ host.onmessage = (e) => {
       keyCommands.clear(m.context);
       clearEqTurns(m.context);
       dialLook.delete(m.context);   // it appears in the manifest's layout
+      forgetSent(m.context);        // and with the action's own image
       instances.set(m.context, {
         action: m.action,
         device: m.device,
@@ -353,6 +382,7 @@ host.onmessage = (e) => {
       lastMeter.delete(m.context);
       dialLook.delete(m.context);
       marquee.delete(m.context);
+      forgetSent(m.context);
       break;
     case "deviceDidDisconnect":
       // A device may go away without a key up or willDisappear for its keys.
@@ -394,11 +424,20 @@ host.onmessage = (e) => {
       else onDialPress(m.context, inst);
       break;
     case "titleParametersDidChange": {
+      // OpenDeck sends this for every change made in its icon editor, and
+      // again each time the editor takes a fresh copy of the action, which a
+      // redraw causes. Redrawing on each one kept the editor in a loop that
+      // swallowed keystrokes and put its choices back (#834). A key's face
+      // only depends on whether it has a title, and a dial's strip not on the
+      // title at all, so only a key whose title comes or goes is redrawn.
       const title = m.payload?.title ?? "";
-      if (title === "") { emptyTitle.add(m.context); refresh(m.context); }
-      else if (inst && isLegacyDefaultTitle(inst, title)) {
+      if (title !== "" && inst && isLegacyDefaultTitle(inst, title)) {
         send({ event: "setTitle", context: m.context, payload: { title: "" } });
-      } else { emptyTitle.delete(m.context); refresh(m.context); }
+        break;
+      }
+      if ((title === "") === emptyTitle.has(m.context)) break;
+      if (title === "") emptyTitle.add(m.context); else emptyTitle.delete(m.context);
+      if (inst?.action !== "com.emaspa.openxlr.dial") refresh(m.context);
       break;
     }
     case "sendToPlugin":
