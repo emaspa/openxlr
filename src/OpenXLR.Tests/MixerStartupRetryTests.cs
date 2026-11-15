@@ -82,6 +82,64 @@ public sealed class MixerStartupRetryTests
         Assert.False(fixture.Service.Built);
     }
 
+    [Fact]
+    public async Task AFailedBuildAttemptLeavesTheSavedSettingsOnDisk()
+    {
+        var port = new FailingDuckingPort();
+        // One failed attempt after the server answers, then no more until the stop.
+        using var fixture = new Fixture(port, _ => port.Thrown > 0 ? TimeSpan.FromHours(1) : TimeSpan.FromMilliseconds(20));
+        Assert.Null(new MixerSettings { MixVolumes = new() { ["monitor"] = 0.6 }, MonitorMuted = true }.Save());
+        byte[] saved = File.ReadAllBytes(MixerSettings.DefaultPath);
+        string? during = "not asked";
+        port.DuringBuild = () => during = fixture.Service.Apply(new Command
+        {
+            Cmd = "setMixVolume", Mix = "monitor", Value = JsonSerializer.SerializeToElement(0.1),
+        });
+
+        await fixture.Service.StartAsync(CancellationToken.None);
+        try
+        {
+            Assert.True(fixture.Service.WaitingForAudio);
+            // The profile recalled while waiting is applied, and a save
+            // scheduled, part way through the attempt that then fails.
+            Assert.Null(fixture.Service.ApplyScene(new MixerScene { MixVolumes = new() { ["monitor"] = 0.25 } }));
+            port.Fail = true;
+            fixture.Answer();
+            Assert.True(SpinWait.SpinUntil(() => port.Thrown > 0 && fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)));
+            Assert.False(fixture.Service.Built);
+
+            bool pending = fixture.Saver.Pending;
+            fixture.Saver.Flush();
+            Assert.Equal(saved, File.ReadAllBytes(MixerSettings.DefaultPath));
+            Assert.False(pending);
+            // A command sent while the graph existed but the build had not ended was refused.
+            Assert.Contains("still being built", during);
+        }
+        finally { await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30)); }
+        Assert.Equal(saved, File.ReadAllBytes(MixerSettings.DefaultPath));
+    }
+
+    /// <summary>A ducking port that makes the build fail after the settings are applied.</summary>
+    private sealed class FailingDuckingPort : IDaemonDuckingPort
+    {
+        public volatile bool Fail;
+        public Action? DuringBuild;
+        private int _thrown;
+        public int Thrown => Volatile.Read(ref _thrown);
+
+        public event Action? StatusChanged { add { } remove { } }
+
+        public (string Unit, UnitDuckingSupport Support)? Primary()
+        {
+            if (!Fail) return null;
+            if (Interlocked.Increment(ref _thrown) == 1) DuringBuild?.Invoke();
+            throw new InvalidOperationException("the ducking port failed");
+        }
+
+        public void Post(string unit, ProDuckingTarget target, string owner) { }
+        public DeviceDuckingStatus Status(string unit) => DeviceDuckingStatus.None;
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -276,7 +334,7 @@ public sealed class MixerStartupRetryTests
                 => Refuse ? throw new InvalidOperationException("EQ restore failed") : DeviceEqStatus.None;
         }
 
-        internal Fixture()
+        internal Fixture(IDaemonDuckingPort? ducking = null, Func<int, TimeSpan>? retryDelay = null)
         {
             Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", Path.Combine(_directory, "config"));
             new DaemonSettings { Submixer = true }.Save();
@@ -317,7 +375,8 @@ public sealed class MixerStartupRetryTests
             Service = new MixerService(NullLogger<MixerService>.Instance, config, _devices,
                 startupDefaults: new StartupDefaults("desk", "mic"))
             {
-                RetryDelay = _ => TimeSpan.FromMilliseconds(20),
+                RetryDelay = retryDelay ?? (_ => TimeSpan.FromMilliseconds(20)),
+                DuckingPort = ducking ?? new DeviceDuckingPort(_devices),
             };
         }
 

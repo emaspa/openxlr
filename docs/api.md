@@ -603,7 +603,12 @@ The daemon then keeps running with `mixer` null and `mixerWaiting` true, and
 again after 2, 4, 8 and 16 seconds, then every 30 seconds until the server
 answers or the daemon stops. Nothing has to be restarted. Once the graph is
 up, `mixerWaiting` is false and the next state carries the mixer. Mixer commands sent
-meanwhile are refused with the same sentence. A profile recalled meanwhile,
+meanwhile are refused with the same sentence. While a build runs, at startup
+or on a retry, the daemon refuses mixer commands. It answers with that
+sentence while `mixerWaiting` is true and otherwise says the mixer is still
+being built. A client sends the command again once a state carries the mixer.
+The daemon saves nothing from an attempt that fails, so `mixer.json` keeps the
+settings the next attempt restores. A profile recalled meanwhile,
 on connect or with `loadProfile`, applies its device settings at once and
 its mixer settings when the graph is built; the latest recall wins.
 `mixerWaiting` is false while the submixer is off.

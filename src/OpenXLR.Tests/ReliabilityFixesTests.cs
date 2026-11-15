@@ -201,6 +201,28 @@ public sealed class ReliabilityFixesTests
     }
 
     [Fact]
+    public void ADiscardedChangeIsNeverWrittenAndTheWriterStaysOpen()
+    {
+        // A failed build attempt is torn down and retried. What was scheduled
+        // during it is dropped, and the next attempt's changes still save.
+        var written = new List<string>();
+        string state = "";
+        using var saver = new SettingsSaver(() => { written.Add(state); return null; }, _ => { });
+
+        saver.Schedule();
+        saver.Discard();
+        Assert.False(saver.Pending);
+        saver.Flush();
+        Assert.Empty(written);
+        Assert.False(saver.Closed);
+
+        state = "the user's mixer";
+        saver.Schedule();
+        saver.Flush();
+        Assert.Equal(["the user's mixer"], written);
+    }
+
+    [Fact]
     public void ALayoutSaveCannotRunAfterTheFinalSave()
     {
         var written = new List<string>();

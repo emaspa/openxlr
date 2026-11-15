@@ -123,6 +123,21 @@ internal sealed class SettingsSaver : IDisposable
     }
 
     /// <summary>
+    /// Forget a pending change without writing it, and stay open. A build
+    /// attempt that failed is torn down, and what it held is not the user's
+    /// settings, so a change scheduled during it must not reach the file.
+    /// </summary>
+    public void Discard()
+    {
+        lock (_gate)
+        {
+            _debounce?.Change(Timeout.Infinite, Timeout.Infinite);
+            _dirty = false;
+            _retry = SaveDelay;
+        }
+    }
+
+    /// <summary>
     /// The final write, and the end of writing. The debounce is stopped first
     /// so no tick can run against a mixer that is about to be torn down, the
     /// pending change is written while the graph is still up, and every later
