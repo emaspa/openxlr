@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
@@ -17,8 +18,9 @@ namespace OpenXLR.Core;
 /// the file modes: everything under the configuration directory is private
 /// to the user (0700 directories, 0600 files), since profiles and the app
 /// registry describe what runs on the machine. Writes are atomic: a
-/// temporary file next to the target, then a rename, so a crash mid-write
-/// never leaves a truncated file behind.
+/// temporary file next to the target, synced to disk, then a rename and a
+/// sync of the directory, so neither a crash mid-write nor a power loss
+/// right after one leaves a truncated file behind.
 ///
 /// Compiled into the daemon through OpenXLR.Core and into the window and the
 /// terminal mixer as a linked source file (internal, in that application's own
@@ -150,9 +152,15 @@ public static class OpenXlrPaths
             {
                 stream.Write(bytes);
                 if (!OperatingSystem.IsWindows() && fileMode is { } mode) File.SetUnixFileMode(stream.SafeFileHandle, mode);
+                // The data reaches the disk before the rename can. Without it a
+                // file system that orders metadata ahead of data (XFS, F2FS)
+                // can come back from a power loss with the new name on an
+                // empty file.
+                stream.Flush(flushToDisk: true);
             }
             File.Move(tmp, path, overwrite: true);
             published = true;
+            SyncDirectory(dir);
         }
         finally
         {
@@ -165,6 +173,31 @@ public static class OpenXlrPaths
             }
         }
     }
+
+    /// <summary>
+    /// Make a rename in the directory durable. Best effort: the file is
+    /// already complete under one name or the other, so a directory that
+    /// cannot be opened or synced only loses which of the two survives.
+    /// </summary>
+    private static void SyncDirectory(string dir)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        // O_RDONLY | O_CLOEXEC, the same values on x86-64 and arm64. .NET
+        // refuses to open a directory, so the descriptor comes from libc.
+        int fd = LibcOpen(dir, 0x80000);
+        if (fd < 0) return;
+        _ = LibcFsync(fd);
+        _ = LibcClose(fd);
+    }
+
+    [DllImport("libc", EntryPoint = "open", SetLastError = true)]
+    private static extern int LibcOpen([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
+
+    [DllImport("libc", EntryPoint = "fsync", SetLastError = true)]
+    private static extern int LibcFsync(int fd);
+
+    [DllImport("libc", EntryPoint = "close", SetLastError = true)]
+    private static extern int LibcClose(int fd);
 
     /// <summary>Serialize a value and write it as a private file atomically.</summary>
     public static void WriteAtomicJson<T>(string path, T value, JsonSerializerOptions options)

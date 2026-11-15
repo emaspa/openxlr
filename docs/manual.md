@@ -5538,6 +5538,7 @@ settings. See
 | `~/.config/openxlr/installation-history/<sha256>.json` | retained package inventories for doctor |
 | `~/.config/openxlr/installation.lock` | serializes installation inventory writes |
 | `~/.config/openxlr/mixer.json` | every mixer decision, the layout included (`userChannels`, `mixes`, see [mixer-layout.md](mixer-layout.md)), written by the daemon |
+| `~/.config/openxlr/mixer.json.bak` | the previous `mixer.json`, kept by each save and read when `mixer.json` is missing or broken |
 | `~/.config/openxlr/profiles/<vid-pid>/<name>.json` | saved profiles, one file each |
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
 | `$XDG_RUNTIME_DIR/openxlr/control.sock` (or `~/.config/openxlr/control.sock` without a runtime directory) | private control API socket, authenticated by Linux peer credentials ([api.md](api.md)); the same commands over HTTP at `/api/v1` ([http-api.md](http-api.md)) |
@@ -5584,13 +5585,17 @@ Saved mixer and hardware data are checked before restoration. A null entry
 or a number that is not finite (`1e999`) counts as a bad entry. What happens
 next depends on the file:
 
-- `mixer.json` with a bad entry: the entry is dropped, the rest of the file
-  is used, and the daemon log names the field. The next save writes the file
-  without the entry.
-- `mixer.json` that cannot be parsed: the daemon logs the path and the
-  reason, keeps a private copy as `mixer.json.corrupt`, and starts with default
-  settings. The copy is published atomically; an existing backup link is
-  replaced without writing through it. The next save replaces the original.
+- `mixer.json` with a bad entry, a value of the wrong type included: the
+  entry is dropped, the rest of the file is used, and the daemon log names
+  the field. The next save writes the file without the entry.
+- `mixer.json` that is empty or cannot be parsed: the daemon logs the path
+  and the reason, keeps a private copy as `mixer.json.corrupt`, and starts
+  from `mixer.json.bak`, the file as it was before the last save, or with
+  default settings when there is no backup. The copy is published
+  atomically; an existing backup link is replaced without writing through
+  it. The next save replaces the original. A missing `mixer.json` also
+  starts from the backup, so a reset removes both files with the daemon
+  stopped.
 - a hardware snapshot (`last-state.json`, `defaults.json`) with a bad entry:
   treated as unreadable, nothing from it is applied.
 - a profile with a bad entry: refused before any of its hardware or mixer
