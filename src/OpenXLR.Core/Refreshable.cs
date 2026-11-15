@@ -1,13 +1,15 @@
 namespace OpenXLR.Core;
 
 /// <summary>
-/// A value computed once and kept, like a Lazy, that can be thrown away so
-/// the next read computes it again. Reads during a reset get either the old
-/// value or the new one, never an exception from the swap.
+/// A value computed once and kept, like a Lazy, that can be computed again.
+/// A refresh builds the new value aside and swaps it in once it is complete,
+/// so reads during a refresh get the old value without waiting for it. Only
+/// a read before the first value exists waits for a computation.
 /// </summary>
 public sealed class Refreshable<T>
 {
     private readonly Func<T> _compute;
+    private readonly Lock _refreshing = new();
     private Lazy<T> _current;
 
     public Refreshable(Func<T> compute)
@@ -20,6 +22,20 @@ public sealed class Refreshable<T>
 
     public T Value => Volatile.Read(ref _current).Value;
 
-    /// <summary>Forget the value; the next read computes it again.</summary>
-    public void Reset() => Volatile.Write(ref _current, Fresh());
+    /// <summary>
+    /// Compute the value again on the calling thread and publish it when it
+    /// is done. A computation that throws is published the way a first read
+    /// keeps it: every read after rethrows, until the next refresh. Refreshes
+    /// run one at a time.
+    /// </summary>
+    public void Refresh()
+    {
+        lock (_refreshing)
+        {
+            Lazy<T> next = Fresh();
+            try { _ = next.Value; }
+            catch (Exception) { /* kept in next, and rethrown to its readers */ }
+            Volatile.Write(ref _current, next);
+        }
+    }
 }

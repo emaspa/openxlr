@@ -2111,7 +2111,12 @@ optional directories, an absent native helper and bundles reporting no
 plugins are not counted as scan failures. The summary uses the retained
 entries, so check `omitted` for larger scans. A timed-out scan is remembered
 as a failure and is retried on an explicit rescan. Automatic scans skip
-unchanged failures without repeating the warning. `source-missing` identifies a missing
+unchanged failures without repeating the warning. The daemon saves each
+bundle's result as soon as it has it, so a scan it does not finish keeps
+what it learnt. While an install, sync or rescan reads the catalogues
+again, state messages and catalogue reads answer from the old catalogue.
+The new one replaces it whole when the scan is done, before the daemon
+sends `pluginInstall`. `source-missing` identifies a missing
 plugin path or dangling bundle link. `windows-module-missing` identifies a
 yabridge wrapper that cannot find its original Windows module; its detail
 includes the broken Windows link target when available. Both are scan

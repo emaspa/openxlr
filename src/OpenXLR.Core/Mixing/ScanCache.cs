@@ -163,6 +163,16 @@ public sealed class ScanCache
                 try { File.Delete(Path.Combine(_directory, entry.File)); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
             _dirty = true;
         }
+        Flush();
+    }
+
+    /// <summary>
+    /// Write the index if anything changed, without the sweep for bundles
+    /// that are gone. A scan calls this after each bundle it had to ask, so
+    /// a scan stopped halfway keeps what it learnt.
+    /// </summary>
+    public void Flush()
+    {
         if (!_dirty) return;
         try
         {

@@ -363,6 +363,43 @@ public sealed class PluginScanLogTests
         finally { Directory.Delete(dir, recursive: true); }
     }
 
+    /// <summary>
+    /// Each bundle can take a minute, so a scan that is stopped halfway must
+    /// not lose what it already learnt: a daemon started again would spend
+    /// the same minutes on the same bundles, and a hanging one would be asked
+    /// again at every start.
+    /// </summary>
+    [Fact]
+    public void EachScannedBundleIsInTheCacheBeforeTheNextOneIsAsked()
+    {
+        string dir = Directory.CreateTempSubdirectory("plugin-scan-cache-progress-").FullName;
+        string kind = Guid.NewGuid().ToString("N");
+        try
+        {
+            string described = Path.Combine(dir, "a.vst3"), hangs = Path.Combine(dir, "b.vst3"), last = Path.Combine(dir, "c.vst3");
+            foreach (string bundle in new[] { described, hangs, last }) File.WriteAllText(bundle, "fixture");
+            string cacheDir = Path.Combine(dir, "cache");
+            bool knewDescribed = false, knewHang = false;
+            ProcessResult Describe(string path)
+            {
+                if (path == hangs) return new(137, [], "hung", true, false);
+                if (path == last)
+                {
+                    var onDisk = new ScanCache(cacheDir);
+                    knewDescribed = onDisk.Lookup(described) is not null;
+                    knewHang = onDisk.KnownFailure(hangs);
+                }
+                string id = Path.GetFileNameWithoutExtension(path);
+                return new(0, Encoding.UTF8.GetBytes($"{{\"plugins\":[{{\"id\":\"{id}\",\"name\":\"EQ\",\"audioIns\":2,\"audioOuts\":2}}]}}"), "", false, false);
+            }
+
+            Assert.Equal(2, HostScan.Run(kind, "unused", [dir], Vst3Catalog.Bundles, Describe, new ScanCache(cacheDir)).Count);
+            Assert.True(knewDescribed, "a described bundle was not saved before the next scan");
+            Assert.True(knewHang, "a failed bundle was not saved before the next scan");
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
     [Fact]
     public void ABundleThatFailsAgainReplacesItsOwnLogAndCountsTheAttempt()
     {
