@@ -1868,7 +1868,8 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   recalled when that device connects, when one is chosen
 - `devices/<vid-pid>/last-state.json`: for a device using connect-time
   restoration (`retainsSettings: false`), the hardware settings the daemon last saw, written a second
-  after a change and restored on every fresh connect
+  after a change and restored on every fresh connect. The daemon tries a restore that fails partway
+  up to three times, and leaves the file alone until the restore completes or it gives up
 - `devices/<vid-pid>/defaults.json`: the settings such a device answered
   with after a power cycle, what `resetDevice` writes back
 - `active-device.json`: `{device}`, the instance id of the unit `setActiveDevice` chose last (a model id `vvvv:pppp` for a unit without a USB location), driven again as the primary after a restart. Written by the daemon.
