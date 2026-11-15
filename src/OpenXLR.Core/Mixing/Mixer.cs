@@ -1731,6 +1731,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MixMaximizer = ExportMaximizersLocked(),
                 Ducking = DuckingSetupLocked().Copy(),
                 Appearance = ExportAppearanceLocked(),
+                UnknownKeys = _unknownSettings,
             };
         }
     }
@@ -1778,6 +1779,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         lock (_gate)
         {
+            _unknownSettings = s.UnknownKeys;
             SetRouteAppsByDefault(s.RouteAppsByDefault);
             SetBlockSize(s.BlockSize);
             RestoreBrowserSettingsLocked(s);
@@ -3106,6 +3108,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     // The Pro's sections 18 and 54 as they were before a jack feed first
     // used them (see MixerSettings.HardwareRestore).
     private readonly Dictionary<int, string> _hardwareRestore = [];
+
+    /// <summary>The settings file's keys this release does not know, written back by every save. Never changed here.</summary>
+    private Dictionary<string, System.Text.Json.JsonElement>? _unknownSettings;
 
     /// <summary>The Pro's sections to put back once no jack plays them, by section, hex (see <see cref="MixerSettings.HardwareRestore"/>).</summary>
     public IReadOnlyDictionary<int, string> HardwareRestore { get { lock (_gate) return new Dictionary<int, string>(_hardwareRestore); } }

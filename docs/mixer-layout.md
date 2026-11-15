@@ -40,15 +40,36 @@ feeds by surviving mix ids, ignoring whitespace and removed ids. An empty or
 entirely stale feed follows the default monitor, just as the daemon does.
 
 A single invalid entry is dropped and logged with its path, and the rest of the
-file still applies; a file that cannot be parsed at all is copied to
-`mixer.json.corrupt` before the next save replaces it. An empty or malformed
-explicit mix list with no monitor is repaired to one Monitor A with every send
+file still applies. A value of the wrong type, such as `"0.5"` for a level,
+counts as an invalid entry. Inside a list or a map only that entry goes;
+anywhere else the daemon drops that one field. The next save writes the file
+without it. Comments and trailing commas left by a hand edit are accepted.
+
+Each save first copies the file it replaces to `mixer.json.bak`, as long as
+that file still holds a JSON object, so the backup is the last good file
+before the current one. A file that cannot be parsed at all, an empty one
+included, is copied to `mixer.json.corrupt` before the next save replaces it.
+When `mixer.json` is missing, empty or cannot be parsed, the daemon starts
+from the backup and logs that; with neither, it starts with defaults. To
+reset the mixer settings, stop the daemon and remove both files. Each save
+reaches the disk before it replaces the old file, so a power loss right
+after a save leaves either the old file or the new one.
+
+`version` names the format of the release that last saved the file. A file
+without it was written by an older release. Every save writes back the
+top-level keys this release does not know, such as a setting a newer release
+added, so stepping back one release and moving a fader does not erase them.
+Unknown keys inside a channel, a mix, an insert or an EQ are not kept,
+because the daemon rebuilds those from its own state on each save.
+
+An empty or malformed explicit mix list with no monitor is repaired to one Monitor A with every send
 muted, ignoring stale saved levels for that synthesized monitor. At the size
 limit the last accepted virtual microphone is dropped to make room. An empty
 application list falls back to System so incoming applications have a destination.
 
-The settings must be a regular file. Pipes, devices and sockets are refused
-without reading them or replacing an earlier `mixer.json.corrupt` backup.
+The settings must be a regular file of at most 16 MiB. Pipes, devices and
+sockets are refused without reading them or replacing an earlier
+`mixer.json.corrupt` or `mixer.json.bak` copy.
 
 Only hardware inputs and Aux (`auxout`) remain structural. Monitor A
 (`monitor`) and Monitor B (`monitor2`) can be renamed, moved or removed;

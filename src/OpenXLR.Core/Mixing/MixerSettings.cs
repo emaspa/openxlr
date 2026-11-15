@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace OpenXLR.Core.Mixing;
@@ -13,6 +14,27 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public sealed record MixerSettings
 {
+    /// <summary>The format a save writes as <see cref="Version"/>.</summary>
+    public const int CurrentVersion = 1;
+
+    /// <summary>The largest mixer.json read or written.</summary>
+    public const int MaxFileBytes = 16 * 1024 * 1024;
+
+    /// <summary>
+    /// The format of the release that last wrote the file; 0 in files written
+    /// before it was recorded. A save always writes <see cref="CurrentVersion"/>.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Version { get; init; }
+
+    /// <summary>
+    /// Top-level keys this release does not know, such as a setting a newer
+    /// release wrote. The mixer keeps them and every save writes them back
+    /// unchanged, so stepping back one release does not erase them.
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? UnknownKeys { get; init; }
+
     /// <summary>
     /// Hardware strips bound to a source, by strip id (<c>xlr1</c>, <c>xlr2</c>);
     /// a strip left out takes the interface's pair. Machine wiring, never profile state.
@@ -276,72 +298,189 @@ public sealed record MixerSettings
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // Named so the loader can list the fields before the first serializer call fills it in.
+        TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(),
+    };
+
+    /// <summary>A hand-edited file may keep a trailing comma or a comment.</summary>
+    private static readonly JsonDocumentOptions Document = new()
+    {
+        AllowTrailingCommas = true,
+        CommentHandling = JsonCommentHandling.Skip,
     };
 
     /// <summary>~/.config/openxlr/mixer.json, honouring XDG_CONFIG_HOME.</summary>
     public static string DefaultPath => OpenXlrPaths.ConfigFile("mixer.json");
 
-    /// <summary>Read settings, or null when there is no file or it is unreadable.</summary>
+    /// <summary>Read settings, or null when neither the file nor its backup can be read.</summary>
     public static MixerSettings? Load(string? path = null) => Load(path, out _);
 
     /// <summary>
-    /// Read settings, or null when there is no file or it is unreadable.
+    /// Read settings, or null when neither the file nor its backup can be read.
     /// <paramref name="warning"/> is null when the file was read as is. It names
     /// the entries dropped from a file that could otherwise be kept, or the
     /// reason a file could not be read at all. Such a file is copied next to
-    /// itself with a ".corrupt" suffix, because the next save replaces it.
+    /// itself with a ".corrupt" suffix, because the next save replaces it, and
+    /// the settings come from the ".bak" copy the last save kept, when there is one.
     /// </summary>
     public static MixerSettings? Load(string? path, out string? warning)
     {
         path ??= DefaultPath;
         warning = null;
+        if (File.Exists(path))
+        {
+            try
+            {
+                return Read(path, out warning);
+            }
+            catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+            {
+                // A corrupt file must not stop the daemon starting, and the copy
+                // survives the save that would otherwise overwrite it.
+                warning = $"{path}: {ex.Message}";
+                string copy = path + ".corrupt";
+                try
+                {
+                    RegularFile.Require(path);
+                    OpenXlrPaths.WriteAtomic(copy, File.ReadAllBytes(path));
+                    warning += $"; copy kept as {copy}";
+                }
+                catch (Exception copyEx) when (copyEx is IOException or UnauthorizedAccessException)
+                {
+                    warning += $"; could not keep a copy as {copy}: {copyEx.Message}";
+                }
+            }
+        }
+        string backup = path + ".bak";
+        if (!File.Exists(backup)) return null;
+        warning = (warning ?? $"{path}: the file is missing") + $"; read the backup {backup}";
         try
         {
-            if (!File.Exists(path)) return null;
-            RegularFile.Require(path);
-            MixerSettings? settings = JsonSerializer.Deserialize<MixerSettings>(File.ReadAllText(path), Json);
-            if (settings is null) return null;
-            settings = SavedMixerValidation.Sanitize(settings, out IReadOnlyList<string> dropped);
-            if (dropped.Count > 0) warning = $"{path}: dropped malformed entries ({string.Join(", ", dropped)})";
+            MixerSettings settings = Read(backup, out string? dropped);
+            if (dropped is not null) warning += $"; {dropped}";
             return settings;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
-            // A corrupt file must not stop the daemon starting, and the copy
-            // survives the save that would otherwise overwrite it.
-            warning = $"{path}: {ex.Message}";
-            string copy = path + ".corrupt";
-            try
-            {
-                RegularFile.Require(path);
-                OpenXlrPaths.WriteAtomic(copy, File.ReadAllBytes(path));
-                warning += $"; copy kept as {copy}";
-            }
-            catch (Exception copyEx) when (copyEx is IOException or UnauthorizedAccessException)
-            {
-                warning += $"; could not keep a copy as {copy}: {copyEx.Message}";
-            }
+            warning += $", which cannot be read either: {ex.Message}";
             return null;
         }
     }
 
     /// <summary>
-    /// Write atomically so a crash mid-write cannot corrupt the file. Never
-    /// throws for a failed write (losing one is not worth taking the daemon
-    /// down) but returns the reason, so the caller can keep the change
-    /// pending, retry, and tell the user.
+    /// One file's settings. A value of the wrong type is dropped on its own:
+    /// one entry of a list or a map, or a whole field otherwise. Throws when
+    /// the file is not a JSON object at all.
+    /// </summary>
+    private static MixerSettings Read(string path, out string? warning)
+    {
+        warning = null;
+        string text = RegularFile.ReadText(path, MaxFileBytes);
+        var dropped = new List<string>();
+        JsonObject readable;
+        using (JsonDocument document = JsonDocument.Parse(text, Document))
+        {
+            if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException("the file does not hold an object");
+            Dictionary<string, Type> fields = Json.GetTypeInfo(typeof(MixerSettings)).Properties
+                .Where(p => !p.IsExtensionData).ToDictionary(p => p.Name, p => p.PropertyType, StringComparer.Ordinal);
+            readable = new JsonObject();
+            foreach (JsonProperty field in document.RootElement.EnumerateObject())
+            {
+                // A key this release does not know is kept as it is.
+                if (!fields.TryGetValue(field.Name, out Type? type)) readable[field.Name] = Canonical(field.Value);
+                else if (Readable(field.Value, type, field.Name, dropped, out JsonNode? value)) readable[field.Name] = value;
+            }
+        }
+        MixerSettings settings = readable.Deserialize<MixerSettings>(Json) ?? throw new JsonException("the file holds null");
+        settings = SavedMixerValidation.Sanitize(settings, out IReadOnlyList<string> invalid);
+        dropped.AddRange(invalid);
+        if (dropped.Count > 0) warning = $"{path}: dropped malformed entries ({string.Join(", ", dropped)})";
+        return settings;
+    }
+
+    /// <summary>
+    /// The value as JSON this release can read as <paramref name="type"/>, or
+    /// false when it cannot. A list or a map keeps every entry that reads and
+    /// names each one that does not in <paramref name="dropped"/>.
+    /// </summary>
+    private static bool Readable(JsonElement value, Type type, string at, List<string> dropped, out JsonNode? node)
+    {
+        Type? generic = type.IsGenericType ? type.GetGenericTypeDefinition() : null;
+        if (generic == typeof(Dictionary<,>) && value.ValueKind == JsonValueKind.Object)
+        {
+            Type entry = type.GetGenericArguments()[1];
+            var map = new JsonObject();
+            foreach (JsonProperty item in value.EnumerateObject())
+                if (Readable(item.Value, entry, $"{at}.{item.Name}", dropped, out JsonNode? kept)) map[item.Name] = kept;
+            node = map;
+            return true;
+        }
+        if (generic == typeof(List<>) && value.ValueKind == JsonValueKind.Array)
+        {
+            Type entry = type.GetGenericArguments()[0];
+            var list = new JsonArray();
+            int index = 0;
+            foreach (JsonElement item in value.EnumerateArray())
+                if (Readable(item, entry, $"{at}[{index++}]", dropped, out JsonNode? kept)) list.Add(kept);
+            node = list;
+            return true;
+        }
+        node = Canonical(value);
+        try
+        {
+            _ = node.Deserialize(type, Json);
+            return true;
+        }
+        catch (JsonException)
+        {
+            dropped.Add($"{at}: wrong type");
+            node = null;
+            return false;
+        }
+    }
+
+    /// <summary>A copy of the value without the file's comments and trailing commas, which the serializer refuses.</summary>
+    private static JsonNode? Canonical(JsonElement value) => JsonNode.Parse(value.GetRawText(), documentOptions: Document);
+
+    /// <summary>
+    /// Write atomically so a crash mid-write cannot corrupt the file, after
+    /// copying the file it replaces to ".bak". Never throws for a failed write
+    /// (losing one is not worth taking the daemon down) but returns the
+    /// reason, so the caller can keep the change pending, retry, and tell the user.
     /// </summary>
     public string? Save(string? path = null)
     {
         path ??= DefaultPath;
         try
         {
-            OpenXlrPaths.WriteAtomicJson(path, this, Json);
+            KeepBackup(path);
+            OpenXlrPaths.WriteAtomicJson(path, this with { Version = CurrentVersion }, Json, MaxFileBytes);
             return null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return $"{path}: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Copy the file a save is about to replace to ".bak", when it still holds
+    /// a JSON object. A broken file never replaces the backup, which is then
+    /// the last good one. A backup that cannot be kept does not stop the save.
+    /// </summary>
+    private static void KeepBackup(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return;
+            byte[] previous = RegularFile.ReadBytes(path, MaxFileBytes);
+            using (JsonDocument document = JsonDocument.Parse(RegularFile.Decode(previous), Document))
+                if (document.RootElement.ValueKind != JsonValueKind.Object) return;
+            OpenXlrPaths.WriteAtomic(path + ".bak", previous);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            // The new settings matter more than a copy of the old ones.
         }
     }
 }

@@ -36,7 +36,13 @@ internal static class RegularFile
     {
         // Preserve the ordinary missing-file exceptions for optional stores.
         _ = File.GetAttributes(path);
-        using var reader = new StreamReader(new MemoryStream(ReadBytes(path, maximum)));
+        return Decode(ReadBytes(path, maximum));
+    }
+
+    /// <summary>Bytes read with <see cref="ReadBytes"/> as text, with the same BOM detection as <see cref="ReadText"/>.</summary>
+    internal static string Decode(byte[] bytes)
+    {
+        using var reader = new StreamReader(new MemoryStream(bytes));
         return reader.ReadToEnd();
     }
 
