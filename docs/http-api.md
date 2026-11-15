@@ -269,7 +269,8 @@ Both transports share the dispatcher,
 validation and broadcasts. HTTP returns
 `{"apiVersion":"1","ok":true,"messages":[]}` after a successful mutation.
 Read replies are in `messages`; rejected commands return HTTP 400, `ok:false`
-and an error message. This includes failed plugin installation, refused
+and an error message, and so does a command that fails inside the daemon.
+This includes failed plugin installation, refused
 clip imports, refused soundboard exports, imports and starter sound restores, and Windows plugin file operations: their typed reply remains in `messages`, followed by
 the error or failed `commandResult` when a request id was supplied.
 Some rejected optimistic edits also include current state.
@@ -287,7 +288,10 @@ on the events route without a WebSocket upgrade; 401 a request under `/api/v1` w
 403 foreign Origin; 404 unknown resource id; 408 body-read deadline; 413
 body over 64 KiB; 415 wrong Content-Type; 429 budget exhausted, or another
 HTTP command or command-backed read in flight; 503 mixer resource while the
-mixer is off. Chunked bodies have the same 64 KiB cap and five-second
+mixer is off, and every state read (`/state`, `/devices`, `/profiles` and the
+mixer resources) while the state cannot be built, as while the audio server
+is away, with an `error` message giving the reason. Chunked bodies have the
+same 64 KiB cap and five-second
 deadline. One HTTP command or command-backed read runs at a time, with no
 waiting queue; snapshot reads answer while a command runs. Every
 authenticated request under `/api/v1`, read or write, the events route

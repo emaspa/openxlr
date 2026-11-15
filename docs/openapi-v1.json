@@ -53,6 +53,9 @@
           },
           "429": {
             "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "State could not be built, for example while the audio server is away; the body is an error message"
           }
         }
       }
@@ -71,6 +74,9 @@
           },
           "429": {
             "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "State could not be built, for example while the audio server is away; the body is an error message"
           }
         }
       }
@@ -89,6 +95,9 @@
           },
           "429": {
             "description": "Request budget exhausted"
+          },
+          "503": {
+            "description": "State could not be built, for example while the audio server is away; the body is an error message"
           }
         }
       }
@@ -109,7 +118,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           }
         }
       }
@@ -130,7 +139,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           }
         }
       }
@@ -162,7 +171,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           },
           "404": {
             "description": "No such id"
@@ -186,7 +195,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           }
         }
       }
@@ -218,7 +227,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           },
           "404": {
             "description": "No such id"
@@ -242,7 +251,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           }
         }
       }
@@ -274,7 +283,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           },
           "404": {
             "description": "No such id"
@@ -305,7 +314,7 @@
             "description": "Request budget exhausted"
           },
           "503": {
-            "description": "Mixer off"
+            "description": "Mixer off, or the state could not be built"
           }
         }
       }

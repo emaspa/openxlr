@@ -123,6 +123,48 @@ public sealed partial class WebSocketHub
         };
     }
 
+    // The last reason a state could not be built, so a failure that repeats
+    // for every client and every read is a warning once.
+    private string? _snapshotFailure;
+
+    /// <summary>
+    /// <see cref="Snapshot"/>, or null with the reason when it cannot be
+    /// built, as while the audio server is away. The first failure of each
+    /// kind is logged as a warning and its repeats at debug level.
+    /// </summary>
+    internal StateMessage? TrySnapshot(out string? failure)
+    {
+        try
+        {
+            StateMessage state = Snapshot();
+            Volatile.Write(ref _snapshotFailure, null);
+            failure = null;
+            return state;
+        }
+        catch (Exception ex)
+        {
+            failure = ex.Message;
+            if (Interlocked.Exchange(ref _snapshotFailure, ex.Message) != ex.Message)
+                _log.LogWarning(ex, "The state could not be built (repeats logged at debug level)");
+            else _log.LogDebug("The state could not be built again: {msg}", ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The first state for a client while the whole one cannot be built: the
+    /// device half the manager has published, which reads nothing, with the
+    /// mixer left out and the failure in the warning. The full state follows
+    /// with the next broadcast that can build it, or a getState.
+    /// </summary>
+    private StateMessage PartialSnapshot(string failure) => _devices.Snapshot() with
+    {
+        DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
+        Warning = string.Join(" ", new[] { _devices.Warning, $"The daemon could not read its full state: {failure}" }.Where(w => w is not null)),
+        MixerWaiting = _mixer.SubmixerEnabled,
+        History = History.State(),
+    };
+
     /// <summary>A correlation id longer than this is refused rather than echoed.</summary>
     internal const int MaxRequestId = 64;
 
@@ -134,8 +176,10 @@ public sealed partial class WebSocketHub
         {
             // The first thing a client reads is a whole state: register it
             // for broadcasts only once that is queued, so no meters frame
-            // can slip in ahead of it.
-            Task initialState = client.SendAsync(Serialize(Snapshot()));
+            // can slip in ahead of it. A state that cannot be built is no
+            // reason to drop the client: it gets the device half meanwhile.
+            StateMessage first = TrySnapshot(out string? failure) ?? PartialSnapshot(failure!);
+            Task initialState = client.SendAsync(Serialize(first));
             _clients[client.Id] = client;
             // Include changes made while the first snapshot was being built,
             // and subscribe before waiting for its network write to finish.
@@ -220,6 +264,49 @@ public sealed partial class WebSocketHub
             return;
         }
 
+        try { await ExecuteAsync(reply, cmd, browserOwner, connection); }
+        catch (Exception ex) when (Answerable(ex, connection)) { await AnswerFailureAsync(reply, cmd, ex); }
+    }
+
+    /// <summary>
+    /// Whether a command's failure is the daemon's to answer: anything but
+    /// its connection going away or the daemon stopping. A send that fails
+    /// aborts the socket before it reports the failure (see
+    /// <see cref="Client"/>), so a socket still open means the daemon failed.
+    /// </summary>
+    private bool Answerable(Exception ex, Client? connection)
+        => (connection is null || connection.Socket.State == WebSocketState.Open)
+           && !(ex is OperationCanceledException && _stopping.IsCancellationRequested);
+
+    /// <summary>
+    /// Answer a command that failed inside the daemon the way a refused one
+    /// is answered, so the client is not left waiting: with a request id the
+    /// state and a failed commandResult, without one an error and the state,
+    /// so an optimistic edit snaps back. The failure is logged here, once.
+    /// </summary>
+    private async Task AnswerFailureAsync(Func<object, Task> reply, Command cmd, Exception ex)
+    {
+        _log.LogWarning(ex, "{cmd} failed inside the daemon", cmd.Cmd);
+        string error = $"{cmd.Cmd}: {ex.Message}";
+        // The state is often what failed; then the answer goes without it.
+        StateMessage? state = null;
+        try { state = Snapshot(); }
+        catch (Exception) { }
+        if (cmd.RequestId is not null)
+        {
+            if (state is not null) await reply(state);
+            await reply(new CommandResultMessage(cmd.RequestId, error));
+        }
+        else
+        {
+            await reply(new ErrorMessage(error));
+            if (state is not null) await reply(state);
+        }
+    }
+
+    /// <summary>Run one parsed command and answer it; <see cref="DispatchAsync"/> answers a failure inside it.</summary>
+    private async Task ExecuteAsync(Func<object, Task> reply, Command cmd, Guid? browserOwner, Client? connection)
+    {
         // Every command ends here with one outcome. A requestId gets the
         // state that reflects it and then a commandResult, success or not;
         // without one, a failure is an error message, followed by the state
@@ -288,8 +375,12 @@ public sealed partial class WebSocketHub
                 // import on the connection waits for the first.
                 await connection.RunImportAsync(async () =>
                 {
-                    await ReplyOperationAsync(await Task.Run(() => _mixer.ImportClip(cmd)));
-                    await FinishAsync();
+                    try
+                    {
+                        await ReplyOperationAsync(await Task.Run(() => _mixer.ImportClip(cmd)));
+                        await FinishAsync();
+                    }
+                    catch (Exception ex) when (Answerable(ex, connection)) { await AnswerFailureAsync(reply, cmd, ex); }
                 }, ex => _log.LogWarning(ex, "soundboard: an import failed"));
                 return;
             case "importClip":
@@ -303,13 +394,17 @@ public sealed partial class WebSocketHub
                 // commands go on beside it, as for importClip.
                 await connection.RunImportAsync(async () =>
                 {
-                    await ReplyOperationAsync(await Task.Run<object>(() => cmd.Cmd switch
+                    try
                     {
-                        "exportSoundboard" => _mixer.ExportSoundboard(cmd),
-                        "importSoundboard" => _mixer.ImportSoundboard(cmd),
-                        _ => _mixer.RestoreStarterSounds(cmd),
-                    }));
-                    await FinishAsync();
+                        await ReplyOperationAsync(await Task.Run<object>(() => cmd.Cmd switch
+                        {
+                            "exportSoundboard" => _mixer.ExportSoundboard(cmd),
+                            "importSoundboard" => _mixer.ImportSoundboard(cmd),
+                            _ => _mixer.RestoreStarterSounds(cmd),
+                        }));
+                        await FinishAsync();
+                    }
+                    catch (Exception ex) when (Answerable(ex, connection)) { await AnswerFailureAsync(reply, cmd, ex); }
                 }, ex => _log.LogWarning(ex, "soundboard: a library {command} failed", cmd.Cmd));
                 return;
             case "exportSoundboard":
@@ -1056,8 +1151,11 @@ public sealed partial class WebSocketHub
             catch (Exception ex)
             {
                 failure = ex;
-                active?.Completion?.TrySetException(ex);
+                // Abort before the sender hears of it: a command awaiting
+                // this send then finds the socket closed and ends the
+                // connection, rather than answering it as a daemon failure.
                 try { Socket.Abort(); } catch (ObjectDisposedException) { }
+                active?.Completion?.TrySetException(ex);
             }
             finally
             {

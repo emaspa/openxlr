@@ -1245,6 +1245,8 @@ public sealed partial class DeviceManager : BackgroundService
             if (_device is null || !_device.Connected) return new("no device connected");
             DeviceState? before = _last;
             if (WriteControlLocked(_device, control, value) is { } error) return new(error);
+            // A readback that hung has dropped the unit: no step to record.
+            if (_device is null) return new(null);
             return new(null, _device.Info.InstanceId, _device.Info.DisplayName, _stateStorageId is not null, before, _last);
         }
     }
@@ -1332,14 +1334,38 @@ public sealed partial class DeviceManager : BackgroundService
         }
         // Reflect immediately; the poll loop will also catch it, but this
         // makes the client's own change feel instant.
-        _last = Stamp(dev.ReadState());
+        if (ReadBackLocked(dev) is not { } read) return null;
         // Each Line In gain write is logged with what the unit reads back.
         if (lineInWritten is int written)
             _log.LogInformation("{dev}: Line In gain written as {db} dB (block 0x0004 byte 76), read back as {readback} dB",
-                dev.Info.DisplayName, written, _last.LineInGainDb);
+                dev.Info.DisplayName, written, read.LineInGainDb);
         NoteChangedLocked();
         RaiseFromLocked();
         return null;
+    }
+
+    /// <summary>
+    /// Read the unit back after writes it took. A read that fails leaves the
+    /// state to the next poll, which reads the unit again and reports one that
+    /// keeps failing; the writes still succeeded. A transfer that never
+    /// returned goes to the hang handling. The state read, or null.
+    /// </summary>
+    private DeviceState? ReadBackLocked(IAudioDevice dev)
+    {
+        try
+        {
+            return _last = Stamp(dev.ReadState());
+        }
+        catch (UsbHungException ex)
+        {
+            NoteHung(ex);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug("{dev}: the readback after a write failed, left to the next poll: {msg}", dev.Info.DisplayName, ex.Message);
+            return null;
+        }
     }
 
     /// <summary>
@@ -1531,9 +1557,11 @@ public sealed partial class DeviceManager : BackgroundService
             }
             // The controls that were written are read back by the next poll.
             if (failed.Count > 0) return string.Join("; ", failed);
-            _last = Stamp(_device.ReadState());
-            NoteChangedLocked();
-            RaiseFromLocked();
+            if (ReadBackLocked(d) is not null)
+            {
+                NoteChangedLocked();
+                RaiseFromLocked();
+            }
             // Not an error: the profile loaded and the state was broadcast.
             // The lock is visible to every client in the state itself.
             if (gainBlocked) _log.LogInformation("profile loaded; gain left unchanged because the gain lock is active");
