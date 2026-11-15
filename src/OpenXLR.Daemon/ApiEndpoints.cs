@@ -38,6 +38,17 @@ internal static class ApiEndpoints
         return select(mixer) is { } value ? Results.Json(value) : Results.NotFound();
     }
 
+    /// <summary>
+    /// A read answered from one snapshot, or 503 with an error message while
+    /// the state cannot be built, as while the audio server is away.
+    /// </summary>
+    internal static IResult StateResource(WebSocketHub hub, Func<StateMessage, IResult> answer)
+        => hub.TrySnapshot(out string? failure) is { } state ? answer(state)
+            : Results.Json(new ErrorMessage($"the state could not be read: {failure}"), statusCode: 503);
+
+    private static IResult MixerResource(WebSocketHub hub, Func<MixerState, object?> select)
+        => StateResource(hub, state => MixerResource(state.Mixer, select));
+
     internal static void Map(WebApplication app)
     {
         // Bind access control to the resolved endpoints, not a request-path
@@ -67,29 +78,23 @@ internal static class ApiEndpoints
             plugins = "/api/v1/plugins", pluginSetup = "/api/v1/plugin-setup",
             pluginDiagnostics = "/api/v1/plugin-diagnostics", diagnostics = "/api/v1/diagnostics",
             editorRules = "/api/v1/editor-rules", commands = "/api/v1/commands", events = "/api/v1/events" }));
-        api.MapGet("/state", (WebSocketHub hub) => Results.Json(hub.Snapshot()));
-        api.MapGet("/devices", (WebSocketHub hub) =>
-        {
-            StateMessage state = hub.Snapshot();
-            return Results.Json(new { state.Connected, state.Device, state.Capabilities, state.Detected, state.Devices });
-        });
-        api.MapGet("/profiles", (WebSocketHub hub) =>
-        {
-            StateMessage state = hub.Snapshot();
-            return Results.Json(new { state.Profiles, state.ActiveProfile, state.RecallOnConnect });
-        });
+        api.MapGet("/state", (WebSocketHub hub) => StateResource(hub, state => Results.Json(state)));
+        api.MapGet("/devices", (WebSocketHub hub) => StateResource(hub, state =>
+            Results.Json(new { state.Connected, state.Device, state.Capabilities, state.Detected, state.Devices })));
+        api.MapGet("/profiles", (WebSocketHub hub) => StateResource(hub, state =>
+            Results.Json(new { state.Profiles, state.ActiveProfile, state.RecallOnConnect })));
         // Reads only: these never build, rebuild or save anything.
-        api.MapGet("/mixer", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m));
-        api.MapGet("/channels", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m.Channels));
+        api.MapGet("/mixer", (WebSocketHub hub) => MixerResource(hub, m => m));
+        api.MapGet("/channels", (WebSocketHub hub) => MixerResource(hub, m => m.Channels));
         api.MapGet("/channels/{id}", (string id, WebSocketHub hub) =>
-            MixerResource(hub.Snapshot().Mixer, m => m.Channels.FirstOrDefault(c => c.Id == id)));
-        api.MapGet("/mixes", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m.Mixes));
+            MixerResource(hub, m => m.Channels.FirstOrDefault(c => c.Id == id)));
+        api.MapGet("/mixes", (WebSocketHub hub) => MixerResource(hub, m => m.Mixes));
         api.MapGet("/mixes/{id}", (string id, WebSocketHub hub) =>
-            MixerResource(hub.Snapshot().Mixer, m => m.Mixes.FirstOrDefault(x => x.Id == id)));
-        api.MapGet("/inserts", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m.Inserts));
+            MixerResource(hub, m => m.Mixes.FirstOrDefault(x => x.Id == id)));
+        api.MapGet("/inserts", (WebSocketHub hub) => MixerResource(hub, m => m.Inserts));
         api.MapGet("/inserts/{id}", (string id, WebSocketHub hub) =>
-            MixerResource(hub.Snapshot().Mixer, m => m.Inserts.GetValueOrDefault(id)));
-        api.MapGet("/soundboard", (WebSocketHub hub) => MixerResource(hub.Snapshot().Mixer, m => m.Soundboard));
+            MixerResource(hub, m => m.Inserts.GetValueOrDefault(id)));
+        api.MapGet("/soundboard", (WebSocketHub hub) => MixerResource(hub, m => m.Soundboard));
         // Reads answered by an existing command, in the same result envelope
         // as POST /commands. They take the command slot because some of them
         // scan plugins or start helpers.

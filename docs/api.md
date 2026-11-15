@@ -112,6 +112,20 @@ cannot silently retain stale state. Reconnect to
 receive a fresh snapshot; reload any cached plugin catalogue and editor rules.
 The UI, terminal mixer and OpenDeck plugin reconnect automatically.
 
+When a command fails inside the daemon, for example a USB transfer or an
+audio server helper that fails while it runs, the daemon answers it the way
+it answers a refused command. It sends an `error` naming the command and the
+reason, or a failed `commandResult` when the command carried a `requestId`,
+with a state when it can build one. It logs the failure and keeps the
+connection open. Only a failure of the connection itself, or the daemon
+stopping, ends it. A hardware control the unit took is not reported as
+failed when the read after the write fails; the next poll reads the unit
+again. When the daemon cannot build the state for a client that has just
+connected, as while the audio server is away, the client's first message is
+still a `state`. It holds the device half, `mixer` null, `mixerWaiting` true
+while the submixer is on, and the reason in `warning`. The whole state
+follows in the next one the daemon sends, or in answer to `getState`.
+
 Messages from the daemon, each a JSON object with a `type` field:
 
 | Type | When | Content |
@@ -137,7 +151,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `browserTabActivation` | to the browser companion connection that registered the tab, after an accepted `activateBrowserTab` | `tabId` and `site`, the tab's canonical origin; no other client receives it. See [browser tabs](#browser-tabs) |
 | `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports. A scan entry that failed carries `logId`, the name of the file holding that attempt's bounded scanner output, or `logNote` saying why there is none; both are absent from an entry that did not fail and from one an older daemon recorded. `scanLogs` gives the `directory` those files are in and the bounds they are kept under (`stderrCapBytes`, `traceStderrCapBytes`, `traceCaptureBytes`, `stdoutCapBytes`, `maxFiles`, `maxTotalBytes`). Reading the reply or the directory scans nothing and starts no process |
 | `pluginInstall` | in answer to `installPlugin`, `addPluginSearchPath`, `removePluginSearchPath`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `removeWindowsPluginInserts`, `setWindowsPluginEnabled`, `deleteWindowsPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
-| `error` | when a command without a `requestId` is rejected | `message`; for the mixer commands a `state` follows, so an optimistic edit can be reverted |
+| `error` | when a command without a `requestId` is rejected or fails inside the daemon | `message`; for the mixer commands a `state` follows, so an optimistic edit can be reverted |
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
 
 `daemonBuildId` is the running assembly's module identity (a GUID). Doctor
