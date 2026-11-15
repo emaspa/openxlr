@@ -1111,7 +1111,9 @@ marked to recall on connect: at daemon start, after a replug or power
 cycle, or when switching to that device. Interfaces using OpenXLR's connect-time
 restoration (Wave XLR, the first XLR Dock) get their last settings back
 on every fresh connect without a profile, and can be reset to the
-firmware defaults recorded after a power cycle. The Wave XLR Pro, which
+firmware defaults recorded after a power cycle. A daemon start keeps a
+mute and a lower headphone level someone set on an interface that
+stayed plugged in. The Wave XLR Pro, which
 keeps its own settings, can be reset to OpenXLR's baseline instead:
 gain 30 dB, everything off, levels at half. With no
 Elgato device connected, profiles are kept under `generic` and hold the

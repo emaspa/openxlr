@@ -594,7 +594,12 @@ ones from before the card went away, else the last ones saved. On the
 desk's unit, with OpenXLR at -27 dB and WirePlumber's saved -30 dB, the
 headphones came back at -30 dB before this. A change made through
 OpenXLR in those five seconds stays; one made on the unit or on the
-desktop is undone.
+desktop is undone. The last ones saved come from before a daemon start,
+and a change made on the unit while the daemon was stopped looks the
+same as the desktop's. When the unit stayed plugged in since the daemon
+last opened it, in the same boot and at the same USB address, the daemon
+writes them back only where they mute the microphone or turn the
+headphones down. After a reboot or a replug it writes them back in full.
 
 The one input strip is the capsule, not an XLR jack. The capabilities
 say so with `xlrJacks` false, so the mixer names that strip Mic 1 rather

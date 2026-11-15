@@ -753,6 +753,8 @@ public sealed partial class DeviceManager : BackgroundService
             _lastLoopError = null;
             bool powerCycled = _absentInstances.Remove(dev.Info.InstanceId) || AddressChanged(dev.Info);
             bool fresh = !_everConnected || powerCycled || _lastInstance != dev.Info.InstanceId;
+            bool stayed = fresh && (!dev.Capabilities.RetainsSettings || dev.DesktopRestoresControls) && StayedOnTheBusLocked(dev);
+            _unwatchedArrival = stayed && !powerCycled;
             // The UCM split profile that hides the raw multichannel nodes exists
             // for the Wave XLR Pro only, so only its card is parked; every
             // driven card is checked for a capture node.
@@ -850,6 +852,35 @@ public sealed partial class DeviceManager : BackgroundService
     // costs one file write, not hundreds.
     private bool _restorePending;
     private DateTime? _dirtyAt;
+
+    // The unit connected fresh having stayed on the bus, in the same boot of
+    // the system and at the same USB address, since the daemon last opened
+    // it: at a daemon start, or on a switch to a unit left plugged in. Its
+    // mute and headphone level may have been changed on the unit meanwhile,
+    // so the saved ones are written to it only where they mute it or turn
+    // the headphones down (KeepUnwatchedChangesLocked, HoldDesktopRestoreLocked).
+    // A unit back from a replug or a reboot lost what it held and gets
+    // everything back, as one seen leaving the bus in this run does.
+    private bool _unwatchedArrival;
+
+    /// <summary>
+    /// Whether the unit was last opened in this boot of the system at the
+    /// USB address it has now, by this run or one before it. Records this
+    /// connect for the next one. False when either is unknown.
+    /// </summary>
+    private bool StayedOnTheBusLocked(IAudioDevice dev)
+    {
+        string? boot = DeviceStateStore.CurrentBoot();
+        if (boot is null) return false;
+        string id = DevId(dev);
+        DeviceStateStore.Sighting now = new(boot, dev.Info.Location?.Bus, dev.Info.Location?.Address);
+        DeviceStateStore.Sighting? before = null;
+        try { before = DeviceStateStore.LoadSighting(id); }
+        catch (Exception ex) { _log.LogWarning("loading where {dev} was last opened: {msg}", id, ex.Message); }
+        try { DeviceStateStore.SaveSighting(id, now); }
+        catch (Exception ex) { _log.LogWarning("saving where {dev} was opened: {msg}", id, ex.Message); }
+        return before == now;
+    }
     private static readonly TimeSpan PersistDelay = TimeSpan.FromSeconds(1);
 
     private void NoteChangedLocked()
@@ -896,6 +927,7 @@ public sealed partial class DeviceManager : BackgroundService
             return now;
         }
         DeviceState? held = _last;
+        bool fromDisk = false;
         long arrivals = dev.CardArrivals;
         if (arrivals != _cardArrivalsSeen)
         {
@@ -908,12 +940,22 @@ public sealed partial class DeviceManager : BackgroundService
             {
                 try { held = DeviceStateStore.LoadLast(DevId(dev)); }
                 catch (Exception ex) { _log.LogWarning("loading last settings of {dev}: {msg}", DevId(dev), ex.Message); }
+                fromDisk = held is not null;
             }
         }
         else if (NowMs >= _desktopHoldUntil) return now;
         if (held is null) return now;
         bool mute = held.Mute != now.Mute;
         bool hp = Math.Abs(held.HpVolumeDb - now.HpVolumeDb) >= 0.25;   // half-dB steps
+        // Saved before a daemon start on a unit that stayed plugged in: the
+        // unit's own mute or a lower level may have been set on it since,
+        // which looks the same as the desktop's write. Only a mute and a
+        // lower level are written back then.
+        if (fromDisk && _unwatchedArrival)
+        {
+            mute &= held.Mute;
+            hp &= held.HpVolumeDb < now.HpVolumeDb;
+        }
         if (!mute && !hp) return now;
         try
         {
@@ -922,8 +964,13 @@ public sealed partial class DeviceManager : BackgroundService
             if (!_desktopHoldSaid)
             {
                 _desktopHoldSaid = true;
-                _log.LogInformation("{dev}: the desktop restored older values for the card, wrote back mute {mute} and headphones {hp} dB",
-                    dev.Info.DisplayName, held.Mute ? "on" : "off", held.HpVolumeDb.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                string written = string.Join(" and ", new[]
+                {
+                    mute ? $"mute {(held.Mute ? "on" : "off")}" : null,
+                    hp ? $"headphones {held.HpVolumeDb.ToString(System.Globalization.CultureInfo.InvariantCulture)} dB" : null,
+                }.OfType<string>());
+                _log.LogInformation("{dev}: the desktop restored older values for the card, wrote back {written}",
+                    dev.Info.DisplayName, written);
             }
             return Stamp(dev.ReadState());
         }
@@ -970,8 +1017,36 @@ public sealed partial class DeviceManager : BackgroundService
             try { last = DeviceStateStore.LoadLast(id); }
             catch (Exception ex) { last = null; _log.LogWarning("loading last settings of {dev}: {msg}", id, ex.Message); }
             if (last is null) { _restorePending = false; return null; }
+            if (_unwatchedArrival) last = KeepUnwatchedChangesLocked(_device, id, last);
             return RestoreAttemptLocked(new PendingRestore(id, last, 1, 0));
         }
+    }
+
+    /// <summary>
+    /// The settings to restore on a unit that stayed plugged in while the
+    /// daemon was not driving it (<see cref="_unwatchedArrival"/>). A mute
+    /// the unit holds and a headphone level lower than the saved one stay,
+    /// since someone may have set them on the unit. A unit that reads the
+    /// mute or level it powers on with (its recorded defaults) may have lost
+    /// power without leaving the bus, and gets that control back as saved.
+    /// </summary>
+    private DeviceState KeepUnwatchedChangesLocked(IAudioDevice dev, string id, DeviceState saved)
+    {
+        DeviceState now = _last ?? Stamp(dev.ReadState());
+        DeviceState? defaults = null;
+        try { defaults = DeviceStateStore.LoadDefaults(id); }
+        catch (Exception ex) { _log.LogWarning("loading the defaults of {dev}: {msg}", id, ex.Message); }
+        bool keepMute = now.Mute && !saved.Mute && defaults?.Mute != true;
+        bool keepHp = saved.HpVolumeDb - now.HpVolumeDb >= 0.25
+            && !(defaults is not null && Math.Abs(defaults.HpVolumeDb - now.HpVolumeDb) < 0.25);
+        if (!keepMute && !keepHp) return saved;
+        _log.LogInformation("{dev} stayed plugged in while OpenXLR was not driving it: kept {kept} it holds",
+            id, keepMute && keepHp ? "the mute and the headphone level" : keepMute ? "the mute" : "the headphone level");
+        return saved with
+        {
+            Mute = keepMute || saved.Mute,
+            HpVolumeDb = keepHp ? now.HpVolumeDb : saved.HpVolumeDb,
+        };
     }
 
     /// <summary>
