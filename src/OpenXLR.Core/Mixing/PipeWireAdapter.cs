@@ -845,6 +845,31 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>
+    /// Which of these sinks and sources are not published right now: empty
+    /// when every one is, null when pactl cannot answer. One registry read
+    /// answers for the nodes it lists, as in <see cref="SinkExists"/>, and
+    /// one pactl listing per kind confirms what it does not, so a sweep that
+    /// finds everything in place starts no helper.
+    /// </summary>
+    public IReadOnlyList<string>? MissingNodes(IReadOnlyCollection<string> sinks, IReadOnlyCollection<string> sources)
+    {
+        JsonElement[]? objects = LiveObjects();
+        List<string> sinksUnseen = [.. sinks.Where(name => objects is null || FindNode(objects, BareSink(name), "Audio/Sink") is null)];
+        List<string> sourcesUnseen = [.. sources.Where(name => objects is null
+            || (FindNode(objects, name, "Audio/Source") is null && FindNode(objects, name, "Audio/Source/Virtual") is null))];
+        var missing = new List<string>();
+        foreach ((List<string> unseen, string kind) in new[] { (sinksUnseen, "sinks"), (sourcesUnseen, "sources") })
+        {
+            if (unseen.Count == 0) continue;
+            if (TryConfirm("pactl", "list", kind, "short") is not { } listing) return null;
+            var listed = listing.Split('\n').Select(line => line.Split('\t')).Where(columns => columns.Length >= 2)
+                .Select(columns => columns[1]).ToHashSet(StringComparer.Ordinal);
+            missing.AddRange(unseen.Where(name => !listed.Contains(name)));
+        }
+        return missing;
+    }
+
+    /// <summary>
     /// Drop the module bookkeeping without unloading anything: after a
     /// pipewire-pulse restart the modules are gone and their ids are being
     /// handed to other clients, so unloading them would hit someone else.
@@ -3174,13 +3199,15 @@ public sealed class PipeWireAdapter
     /// </summary>
     internal JsonElement[] ReadGraphOnce() => ParseObjects(RunBytes("pw-dump"));
 
-    private static JsonElement? FindSink(JsonElement[] objects, string name)
+    private static JsonElement? FindSink(JsonElement[] objects, string name) => FindNode(objects, name, "Audio/Sink");
+
+    private static JsonElement? FindNode(JsonElement[] objects, string name, string mediaClass)
     {
         foreach (JsonElement item in objects)
             if (item.TryGetProperty("type", out var type) && IsString(type, "PipeWire:Interface:Node")
                 && item.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
                 && info.TryGetProperty("props", out var props) && props.ValueKind == JsonValueKind.Object
-                && props.TryGetProperty("media.class", out var kind) && IsString(kind, "Audio/Sink")
+                && props.TryGetProperty("media.class", out var kind) && IsString(kind, mediaClass)
                 && props.TryGetProperty("node.name", out var node) && IsString(node, name))
                 return info;
         return null;

@@ -150,6 +150,20 @@ public sealed partial class MonitorVolumeIntegrationTests
         using var watch = pw.WatchGraph();
         try
         {
+            // The session manager gives a new sink its ports. Right after an
+            // earlier test tore a mixer down it is still busy with that
+            // graph, and a sink created then has no ports yet, in the
+            // registry or for pw-link, whatever the adapter reads. Wait until
+            // it answers a new sink at once before timing the reads.
+            bool settled = false;
+            for (int attempt = 0; attempt < 50 && !settled; attempt++)
+            {
+                string probe = $"test_registry_settle_{attempt}";
+                pw.CreateNullSink(probe, "Settle");
+                settled = ProcessRunner.Run("pw-link", ["-i"]).StdoutText.Contains(probe + ":playback_FL", StringComparison.Ordinal);
+                if (!settled) Thread.Sleep(200);
+            }
+            Assert.True(settled, "the session manager did not settle");
             for (int i = 0; i < 20; i++)
             {
                 string name = $"test_registry_fresh_{i}";

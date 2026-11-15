@@ -301,13 +301,37 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     /// Each chained input is wired from its <see cref="InputRoute"/>.
     /// <paramref name="only"/> limits the work to those inputs: the rest keep
     /// their feeds and chains untouched, so their plugins keep running. Safe
-    /// to call again after a hotplug.
+    /// to call again after a hotplug. The strips on the interface commit
+    /// together and a failure is thrown, so a command can roll back; with
+    /// <paramref name="isolate"/>, as the sweep heals, each strip commits
+    /// alone, as capture inputs always do, and a failure becomes that strip's
+    /// warning so the others and the rest of the sweep go on.
     /// </summary>
-    private void WireInputFeedsLocked(IReadOnlyCollection<string>? only = null)
+    private void WireInputFeedsLocked(IReadOnlyCollection<string>? only = null, bool isolate = false)
     {
         string[] strips = [.. _config.Channels.Where(c => c.InputPair is not null && !UnconfirmedMicrophonePauseLocked(c)
             && (only is null || only.Contains(c.Id))).Select(c => c.Id)];
-        if (strips.Length > 0) WireInputFeedLocked(strips);
+        if (!isolate)
+        {
+            if (strips.Length > 0) WireInputFeedLocked(strips);
+        }
+        else foreach (string strip in strips)
+        {
+            string? before = _stripWarnings.GetValueOrDefault(strip);
+            try { WireInputFeedLocked([strip]); }
+            catch (Exception ex)
+            {
+                // The strip keeps the path it had, rolled back as a command's
+                // would be, with the reason as its warning until a later sweep
+                // wires it; a chain that keeps failing is given up on as a
+                // capture input's is. Said once per distinct failure: the
+                // sweep tries again every second.
+                string warning = $"could not be wired ({ex.Message}); retrying.";
+                if (before != warning) _pw.Note($"{strip} could not be wired: {ex.Message}");
+                _stripWarnings[strip] = warning;
+                _restarts.Failed(strip, ex.Message);
+            }
+        }
         foreach (ChannelDefinition ch in _config.Channels.Where(c => c.CaptureSource is not null).ToList())
         {
             if (only is not null && !only.Contains(ch.Id)) continue;
@@ -770,7 +794,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 }
             foreach ((string key, PortLink link) in _chainOuts)
                 if (waitingForPause?.Contains(key) != true && !broken.Contains(key) && _pw.EnsureLinks(link) == LinkHealth.Broken) broken.Add(key);
-            if (broken.Count > 0) { WireInputFeedsLocked(broken); changed = true; }
+            if (broken.Count > 0) { WireInputFeedsLocked(broken, isolate: true); changed = true; }
             changed |= UpdateMixLatencyLocked();
             changed |= EnsureMixRoutesLocked();
             // A heal can retire the last bridged plugin without any command
@@ -1651,7 +1675,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             if (due.Count == 0) return captureChanged;
             var before = new Dictionary<string, PortLink>(_inputFeeds);
             string? warning = InputWarningLocked();
-            WireInputFeedsLocked(due);
+            WireInputFeedsLocked(due, isolate: true);
             bool feedsChanged = before.Count != _inputFeeds.Count
                 || before.Any(e => !_inputFeeds.TryGetValue(e.Key, out PortLink? now) || !ReferenceEquals(now, e.Value));
             return captureChanged || feedsChanged || warning != InputWarningLocked();
@@ -4284,17 +4308,27 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     }
 
     /// <summary>
-    /// Whether the built graph is still published: false once pipewire-pulse
-    /// restarted underneath the daemon and took every module with it. Null
-    /// when the question cannot be answered right now.
+    /// The nodes of the built graph that are no longer published: every mix
+    /// sink, and each virtual microphone mix's post sink and capture device.
+    /// All of them once pipewire-pulse restarted underneath the daemon and
+    /// took every module with it; one when it was unloaded from outside or
+    /// dropped by a server out of open files. The channels' sends need every
+    /// mix, so none of these is healed alone. Empty while all are in place,
+    /// null when the question cannot be answered right now.
     /// </summary>
-    public bool? GraphPresent()
+    public IReadOnlyList<string>? MissingGraphNodes()
     {
         lock (_gate)
         {
-            if (!_built) return null;
-            MixDefinition? probe = _config.Mixes.FirstOrDefault();
-            return probe is null ? null : _pw.SinkExists(probe.SinkName);
+            if (!_built || _config.Mixes.Count == 0) return null;
+            List<string> sinks = [], sources = [];
+            foreach (MixDefinition mix in _config.Mixes)
+            {
+                if (_mixModules.ContainsKey(mix.Id)) sinks.Add(mix.SinkName);
+                if (_postModules.ContainsKey(mix.Id)) sinks.Add(mix.PostSinkName);
+                if (_virtualMicModules.ContainsKey(mix.Id)) sources.Add(mix.VirtualMicName);
+            }
+            return _pw.MissingNodes(sinks, sources);
         }
     }
 

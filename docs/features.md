@@ -1370,7 +1370,8 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   monitor, microphone or USB Aux route that came up with a side missing
   is linked again rather than kept as healthy
 - The daemon builds its graph again in place after a pipewire-pulse
-  restart, without exiting, retries a graph build the audio server did
+  restart, or when any one mix, post sink or virtual microphone is gone,
+  without exiting, retries a graph build the audio server did
   not answer at 2, 4, 8 and 16 s and
   then every 30 s while the state warns that the mixer is waiting, and
   refuses to grow the layout when pipewire-pulse has no open-file
@@ -1380,7 +1381,12 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   cut the mixes it feeds. A WirePlumber restart needs no daemon restart:
   WirePlumber links what names a target again, the sweep links the
   devices as after a replug, and a channel whose send stream ended or was
-  left unlinked has its sink reloaded, at most three times in ten minutes
+  left unlinked has its sink reloaded, at most three times in ten minutes;
+  a channel sink unloaded from outside is made again. Each part of the
+  one-second sweep runs on its own, so one strip that cannot be wired or
+  one failing helper leaves the rest to run, and the failure is logged
+  once. A level meter whose `parec` exits starts again with a backoff
+  from 1 to 30 s
 - Text size: five settings from 80% to 120% in Options under Appearance.
   The change reaches open windows immediately and is saved in `ui.json`.
 - Skins: every surface, label, indicator, meter, fader and control in the

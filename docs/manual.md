@@ -669,6 +669,11 @@ strip and reports the ambiguity. Rename or remove the duplicate so the name
 identifies one microphone before its route resumes. Two strips may take the
 same source, even the same port.
 
+When a strip's route cannot be built, for example because its filter
+chain does not start, its chip says why and OpenXLR tries again about
+once a second. The other strips are wired as usual meanwhile, whether
+they take the interface or a source of their own.
+
 The choice lives in `mixer.json` and survives restart, and profiles never
 change it. Profiles belong to the connected interface as always. While no
 interface is connected, whatever the strips take, they are kept apart under
@@ -988,6 +993,12 @@ option off for a headset you use for calls.
 A mix that carries your own microphone never counts as silent, because
 room noise alone is above -80 dBFS. A headset whose feed includes your
 microphone stays linked with the option on.
+
+The level meters decide when a feed is silent. When a meter's reader
+stops, OpenXLR starts it again after a second, and waits longer each
+time it keeps stopping, up to 30 seconds. A stopped meter never holds a
+feed silent for good, and the headset links again once the feed has
+sound.
 
 <a name="ducking"></a>
 #### Lower what you hear while you speak
@@ -4928,10 +4939,13 @@ diagnostics** in Options and open an issue with the archive.
   mixer is up. If the warning stays, check the audio server with
   `pactl info` and `journalctl --user -u pipewire-pulse -b`, and look for
   USB errors with `journalctl -k -b | grep -i usb`.
-- "The mixer is still being built after the audio server restarted":
-  pipewire-pulse restarted and took OpenXLR's devices with it. The daemon
-  keeps running and builds the mixer again from your saved settings as
-  soon as the server takes new devices. Mixer controls answer again once
+- "The mixer is still being built after the audio server restarted or
+  lost one of its devices": pipewire-pulse restarted and took OpenXLR's
+  devices with it, or a single mix or virtual microphone went, unloaded by
+  another program or dropped by the server near its open-file limit (see
+  [5.8](#open-files)). The daemon keeps running and
+  builds the mixer again from your saved settings as soon as the server
+  takes new devices. Mixer controls answer again once
   the mixer is back. If the warning
   stays, check the audio server as above.
 
@@ -5082,7 +5096,9 @@ limit to 65536:
    Restarting pipewire-pulse reconnects every PulseAudio client for a
    moment and takes OpenXLR's nodes with it; the daemon notices within two
    seconds and builds the graph again from the saved layout, without
-   restarting.
+   restarting. It does the same when the server, short of files, drops
+   one mix or virtual microphone, and a channel whose sink was dropped
+   gets it back with its sends.
 
 3. Check:
 
