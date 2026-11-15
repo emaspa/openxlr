@@ -292,7 +292,7 @@ server leaves device control running rather than causing a restart loop.
 Startup timeout extensions are sent only while the workers make progress.
 
 On a watchdog timeout systemd sends SIGTERM, allowing normal graph teardown.
-Failed starts are limited to three attempts in five minutes. After fixing a
+Starts are limited to ten in five minutes. After fixing a
 persistent failure, use `systemctl --user reset-failed openxlr-daemon` followed
 by `systemctl --user start openxlr-daemon`. Manual launches without
 `NOTIFY_SOCKET` do not enable the watchdog.
@@ -310,7 +310,7 @@ systemctl --user restart pipewire-pulse
 ```
 
 The restart takes OpenXLR's nodes with it; the daemon notices and
-restarts itself to rebuild them. The manual's
+builds them again without restarting. The manual's
 [open-files section](manual.md#open-files) has the background and the check.
 
 <a name="desktop-entry"></a>

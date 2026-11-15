@@ -4928,6 +4928,12 @@ diagnostics** in Options and open an issue with the archive.
   mixer is up. If the warning stays, check the audio server with
   `pactl info` and `journalctl --user -u pipewire-pulse -b`, and look for
   USB errors with `journalctl -k -b | grep -i usb`.
+- "The mixer is still being built after the audio server restarted":
+  pipewire-pulse restarted and took OpenXLR's devices with it. The daemon
+  keeps running and builds the mixer again from your saved settings as
+  soon as the server takes new devices. Mixer controls answer again once
+  the mixer is back. If the warning
+  stays, check the audio server as above.
 
 <a name="missing-plugins"></a>
 ### 5.4 ClipGuard greyed out, empty plugin picker
@@ -4978,9 +4984,9 @@ stays responsive, and the button is disabled until the service commands
 finish. An explicit restart first clears the daemon service's failed state
 and start counter, so the button also works after repeated starts produced
 `start-limit-hit` in the journal. Automatic restarts after crashes still
-obey the service's start limit. The waiting message clears when the daemon
-reconnects, including a connection restored before the service command
-finishes. If the explicit restart fails, check
+obey the service's start limit of ten starts in five minutes. The waiting
+message clears when the daemon reconnects, including a connection restored
+before the service command finishes. If the explicit restart fails, check
 `journalctl --user -u openxlr-daemon`. A daemon started by hand must be
 restarted by hand.
 
@@ -5075,7 +5081,8 @@ limit to 65536:
 
    Restarting pipewire-pulse reconnects every PulseAudio client for a
    moment and takes OpenXLR's nodes with it; the daemon notices within two
-   seconds and restarts itself to rebuild the graph from the saved layout.
+   seconds and builds the graph again from the saved layout, without
+   restarting.
 
 3. Check:
 

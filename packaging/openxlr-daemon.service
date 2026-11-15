@@ -2,7 +2,7 @@
 Description=OpenXLR audio daemon
 After=pipewire-pulse.service wireplumber.service
 StartLimitIntervalSec=300
-StartLimitBurst=3
+StartLimitBurst=10
 
 [Service]
 Type=notify

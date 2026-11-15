@@ -71,7 +71,7 @@ in
       wantedBy = [ "default.target" ];
       unitConfig = {
         StartLimitIntervalSec = 300;
-        StartLimitBurst = 3;
+        StartLimitBurst = 10;
       };
       environment = {
         OPENXLR_BUILD_MIXER = "1";

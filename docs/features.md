@@ -1369,8 +1369,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   that snapshot and runs `pw-link` only for a link that is missing; a
   monitor, microphone or USB Aux route that came up with a side missing
   is linked again rather than kept as healthy
-- The daemon rebuilds its graph after a pipewire-pulse restart, retries
-  a graph build the audio server did not answer at 2, 4, 8 and 16 s and
+- The daemon builds its graph again in place after a pipewire-pulse
+  restart, without exiting, retries a graph build the audio server did
+  not answer at 2, 4, 8 and 16 s and
   then every 30 s while the state warns that the mixer is waiting, and
   refuses to grow the layout when pipewire-pulse has no open-file
   headroom left; the packages raise that limit with a systemd drop-in.
