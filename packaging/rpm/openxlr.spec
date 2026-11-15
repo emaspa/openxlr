@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.8.0
+Version: 0.8.1
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -254,6 +254,10 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Sun Nov 15 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.8.1-1
+- Deck: OpenDeck's icon editor no longer flickers or drops typing on OpenXLR dials and keys
+- UI: Avalonia 12.1.6
+
 * Sat Nov 14 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.8.0-1
 - Mixer: undo and redo for levels, mutes, processing, insert chains and the unit's controls, shared by every client
 - UI, Deck and terminal mixer: undo and redo buttons, keys and shortcuts
