@@ -159,7 +159,13 @@ public sealed class MixerStartupRetryTests
                 "the graph was not built again once the server answered");
             Assert.Null(fixture.Service.GraphWarning);
             Assert.False(fixture.Service.RebuildingGraph);
-            Assert.Equal(0.6, fixture.Service.ExportScene().Scene!.MixVolumes["monitor"]);
+            // The wait ends a moment before the build does (ducking, the
+            // soundboard and the timers come first), and the scene is refused
+            // until then.
+            OpenXLR.Core.MixerScene? scene = null;
+            Assert.True(SpinWait.SpinUntil(() => (scene = fixture.Service.ExportScene().Scene) is not null, TimeSpan.FromSeconds(10)),
+                "the rebuilt mixer's scene could not be read");
+            Assert.Equal(0.6, scene!.MixVolumes["monitor"]);
             Assert.True(fixture.Mixer.MonitorMuted);
             // The forgotten modules' ids belong to other clients now: none is unloaded.
             Assert.DoesNotContain(fixture.Calls()[lostAt..], call => call.StartsWith("unload-module ", StringComparison.Ordinal));
