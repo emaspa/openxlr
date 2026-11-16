@@ -171,7 +171,10 @@ internal static class MonitorOutputPickerWindowTests
                 pointer.MoveTo(at.X, at.Y);
                 pointer.Click();
             }
-            await Until(() => Item(main, Headset)!.Feed?.Id == "monitor+monitor2" && daemon.Feeds.GetValueOrDefault(Headset) == "monitor+monitor2");
+            // The fake daemon stores the feed before it records the command, so the
+            // feed alone does not say the command can be taken from the queue yet.
+            await Until(() => Item(main, Headset)!.Feed?.Id == "monitor+monitor2" && daemon.Feeds.GetValueOrDefault(Headset) == "monitor+monitor2"
+                && !feeds.IsEmpty);
             Assert.True(feeds.TryDequeue(out var combined));
             Assert.Equal((Headset, "monitor+monitor2"), combined);
             chooseMix.Flyout.Hide();

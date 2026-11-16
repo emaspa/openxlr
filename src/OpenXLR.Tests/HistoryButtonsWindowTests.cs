@@ -31,9 +31,15 @@ internal static class HistoryButtonsWindowTests
 {
     internal static void Check()
     {
-        var window = new MainWindow(new DaemonClient("ws://127.0.0.1:1/ws"));
+        var client = new DaemonClient("ws://127.0.0.1:1/ws");
+        var window = new MainWindow(client);
         try
         {
+            // Nothing answers on that port, and every refused attempt, one a second, says the
+            // connection is down, which clears the history the test gave the window. Stop the
+            // client and take the reports it already queued before supplying the fixture.
+            client.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Dispatcher.UIThread.RunJobs();
             var model = (MainViewModel)window.DataContext!;
             typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(model, [JsonNode.Parse("""
                 {"mixes":[{"id":"monitor","name":"Monitor A","kind":"monitor"},{"id":"stream","name":"Stream","kind":"virtualMic"}],
