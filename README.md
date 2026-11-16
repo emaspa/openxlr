@@ -77,7 +77,9 @@ untested device, open an issue with a diagnostics archive
 - **Submixer** built from PipeWire nodes, no kernel modules: channels for
   the XLR inputs, Aux In, application groups and any other capture
   source, monitor mixes on any outputs, virtual microphones other apps
-  record from. You change all of it while audio plays.
+  record from. You change all of it while audio plays. A channel's sends
+  can be [linked](docs/manual.md#linked-sends) so one fader moves the
+  channel in every mix.
 - **Ducking**: one to eight keys, each a microphone or a channel such as
   Voice Chat, lower chosen channels in chosen mixes while the loudest key
   is loud, in software everywhere and on the Pro's own processor when the
@@ -245,8 +247,8 @@ AI-assisted development.
 - Windows plugins depend on Wine and yabridge. An editor that misbehaves
   there can be swapped for OpenXLR's generated controls.
 
-The [roadmap](docs/roadmap.md) has what comes next, starting with user
-reports and hardware checks of the 0.2 features.
+The [roadmap](docs/roadmap.md) has what comes next, starting with
+stability and hardware checks of the features released since 0.2.
 
 ## Documentation
 

@@ -43,8 +43,8 @@ every package has them and there is nothing to install:
   and a monitor toolbar that takes the remaining width. Wider name columns
   and faders expand to use the desk's space, muted faders stay readable,
   application tiles share the available width and give names more room, and the
-  header keeps Profiles, Flow and Arrange beside an overflow menu for the
-  other actions. It uses the existing controls and does not change Broadcast.
+  header keeps Profiles, undo and redo, Flow and Arrange beside an overflow
+  menu for the other actions. It uses the existing controls and does not change Broadcast.
 - **Nyan Pink**, a dark plum palette with candy pink faders, cyan details
   and segmented green, amber and red meters. It keeps the classic mixer
   arrangement and the saved section order.
@@ -53,7 +53,7 @@ every package has them and there is nothing to install:
   column in the matrix. HEADPHONES and MONITOR's toolbar share the row
   above the matrix, INPUTS is hidden, and APPLICATIONS is under the matrix
   in columns of up to four. Its cards sit 8 pixels apart where Broadcast's sit 12.
-  On a wide window its matrix cells, application tiles and classic tiles grow
+  Where the UI is wide its matrix cells, application tiles and classic tiles grow
   and its faders stop at 640 pixels, as in Compact Desk and Nyan Pink.
   It uses the same routing and controls as the other skins; no Elgato
   artwork or additional software is needed.
@@ -96,7 +96,7 @@ folders and the same saved choice, on its own Options tab, so an appearance
 picked in one is the appearance in the other. A terminal has no gradients,
 images or corner radii, so it takes a gradient at its first stop. It also
 reads `controls`: console faders get a three-cell cap, cap keys get
-brackets and lamp LEDs get a square face rather than a round one. The pixel sizes and segment counts
+brackets and lamp and lens LEDs get a square face rather than a round one. The pixel sizes and segment counts
 remain the UI's; the terminal sizes these drawings to its cells. A
 meter is a solid bar in eighth blocks whichever appearance is named, and
 its colour blends from `Ox.Meter.Fill` through `Ox.Meter.Warning` to
@@ -934,7 +934,7 @@ past the skin's maximum to fill the available width.
 
 | Token | Kind | Default | Range | What it paints |
 |---|---|---|---|---|
-| `Ox.Matrix.NameWidth` | number | 140 | 56 to 400 | the width of a row head's name column, which holds the name, the binding line under it, the **Mic** button and the gain under it, or on SFX's row its **Sounds** button |
+| `Ox.Matrix.NameWidth` | number | 140 | 56 to 400 | the width of a row head's name column, which holds the name, the binding line under it, the **Mic** button and the gain under it |
 | `Ox.Matrix.CellWidth` | number | 168 | 120 to 400 | the width of a cell, of a column head and of a row head's source controls |
 | `Ox.Matrix.CellMaxWidth` | number | 0 | 0 to 1000 | the width up to which matrix cells and source controls grow together; 0 keeps the base cell width |
 | `Ox.Matrix.RowHeight` | number | 40 | 28 to 120 | the height of a row: its head and every cell in it; a row whose head stacks a gain over the channel volume, or the **EQ** button over the chain's, is as tall as the two need, never less |
@@ -1173,8 +1173,8 @@ UI keeps the size you gave it.
 
 A `size` that is not an object with both numbers in range, or that holds
 any other field, is reported in Options and the UI keeps its size. The
-skin's other values still apply. the three Broadcast skins and the three
-Hi-Fi skins are the shipped skins that name a size.
+skin's other values still apply. The three Broadcast skins, the three
+Hi-Fi skins and the three VFD skins are the shipped skins that name a size.
 
 ## Layout
 
@@ -1195,11 +1195,11 @@ its top right cell, and the submixer, a `"mix-matrix"`, spans both columns
 under them.
 Then come INPUTS, `"hidden"` since the matrix's row heads carry the input
 gain, mute, microphone switches and plugins, and the applications as `"application-columns"`
-of 6, each across the whole width. Nothing starts folded. The tree leaves the
+of 4, each across the whole width. Nothing starts folded. The tree leaves the
 header out, so the header stays across the top of the UI, with every
 action in its row and none in the overflow menu. Showing INPUTS from
 Arrange mode puts it under the matrix. HEADPHONES beside the toolbar asks
-for about 1000 pixels, so a narrower window scrolls the tree sideways, as
+for about 1000 pixels, so a narrower UI scrolls the tree sideways, as
 [Sizes](#sizes) says.
 Its row heads list every part, `binding` included, so a copy shows each
 part there is to move or hide. The shipped Wave skin uses the same tree
@@ -1396,10 +1396,10 @@ region in a vertical stack, or along a dock's top or bottom, or filling
 it, takes the container's width. A `size` column smaller than what its region needs
 grows to fit, and a column of `auto` is as wide as its widest region.
 
-When the tree needs more width than the window has, it scrolls sideways
+When the tree needs more width than the UI has, it scrolls sideways
 instead of squeezing a region. With the header above the tree the header
-keeps the window's width; with the header inside the tree it scrolls with
-the rest. A horizontal stack at the top of the tree shares the window's
+keeps the UI's width; with the header inside the tree it scrolls with
+the rest. A horizontal stack at the top of the tree shares the UI's
 width among its regions; one inside another container gives each region
 the width it needs.
 
@@ -1506,7 +1506,7 @@ channels; the list only assigns.
 
 APPLICATIONS' columns are tiles of one width, ordered down each column
 and then to the right. Each column holds `perColumn` applications. In a skin that sets
-`Ox.AppColumns.TileMaxWidth`, `perColumn` is a maximum, and a wide window
+`Ox.AppColumns.TileMaxWidth`, `perColumn` is a maximum, and a wide UI
 gets more columns and fewer rows when the tiles fit side by side. A tile holds
 what a chip holds: its state lamp, its icon, its name and its channel
 picker. Each part is the same width in every tile, so the tiles of a column
@@ -1522,7 +1522,7 @@ reduce motion, since the UI toolkit does not report one. The picker is as wide a
 lists. When the columns do not fit the section's width side by side, the
 names narrow, down to 64 pixels, so that as many columns as that makes room
 for stand beside each other. Columns that still do not fit start a new row
-of columns below, whole, so nothing scrolls sideways; a window narrower than
+of columns below, whole, so nothing scrolls sideways; a UI narrower than
 two narrowed columns shows them one under the other. The default template's chips
 keep the width of their own name and channel, or share a row's spare
 width up to the same limit when the skin sets it.
@@ -1619,11 +1619,11 @@ An input row's parts, in their default order, are `identity`, `binding`,
 | `binding` | XLR 1's or XLR 2's input binding: a chip naming the interface's jack or the capture source that feeds the strip, with a light that is on while the feed is linked and, under it, why the strip is silent. Clicking opens the binding dialog. A capture input has a source chip with the same light and warning, opening the dialog's capture form with mono ports and stereo pairs |
 | `meter` | the channel's own level meter, left and right. A capture input on one microphone port draws one bar and leaves the second bar's room empty |
 | `gain` | the input's hardware gain, Aux In's level or Line In's gain, with the channel's own volume under it; on an application or capture channel, its own volume |
-| `hardware-controls` | the input's switches, or Aux In's or Line In's level lock. A capture input with a gain of its own has its source's mute here, and a capture input has its **Own clock** switch here |
+| `hardware-controls` | the input's switches, or Aux In's or Line In's level lock, with Line In's **Raw** switch on a unit that takes raw capture there. A capture input with a gain of its own has its source's mute here, and a capture input has its **Own clock** switch here |
 | `effects` | the input's processing in software: the microphone's **EQ** button, which opens its EQ editor, then its plugin chain's button and the chain at a glance. A capture input has the chain without EQ, only when the daemon reports `chainWidth` |
 | `fader` | the send's level into the bank's mix, or the channel's own volume while the bank shows the volumes |
 | `value` | that level as a number, or the volume as a percentage |
-| `mute` | the send's mute in the bank's mix, or the channel's own mute while the bank shows the volumes |
+| `mute` | the send's mute in the bank's mix, with the channel's **Link** chip over it, or before it in a send list, where the daemon reports the link; or the channel's own mute, without the chip, while the bank shows the volumes |
 
 Each list holds no more names than the strip has parts, and a part
 appears once across `partsOrder` and `hidden`. A part a channel does not
@@ -1659,7 +1659,8 @@ older daemon that does not report `chainWidth`, a capture input has no
 the bank's strips, and the default; or `"master-strip"`, one more strip at
 the end of the bank, on the right of upright strips or under a send list.
 Both keep the master's level, mute, 150% range and dry switch for a
-monitor mix, its EQ, the button that opens its plugin chain and the To USB
+monitor mix, its EQ, the Wave XLR Pro's maximizer while the unit builds
+the mix, the button that opens its plugin chain and the To USB
 Aux port switch, and in Arrange mode the mix's handle, above the card or
 over the strip's name. The master card also shows the chain at a glance; the
 master strip shows one lamp per plugin, lit in the alert colour when a
@@ -1817,10 +1818,13 @@ which waits while phantom power settles, and the button that opens their
 plugin chain. Where the interface has the gain lock, XLR 1's **Lock** sits
 at the end of its gain's line, and the lock still disables the gain. At the end of the name
 column a **Mic** button opens a flyout with the switches INPUTS shows beside
-the mute: low cut, expander, Voice Tune, phantom power, ClipGuard and the
-compressor, each where the interface has it, with the Voice Tune strength
+the mute: low cut, expander, Voice Tune, phantom power, ClipGuard, the
+compressor and raw capture as **Raw**, each where the interface has it, with
+the Voice Tune strength
 while Voice Tune is on and, on XLR 1, the software low cut and ClipGuard of
-an interface without hardware ones. They are the INPUTS panel's own buttons,
+an interface without hardware ones. Under them come the microphone's noise
+removal and its software expander and compressor, where the daemon reports
+them. They are the INPUTS panel's own buttons,
 bound to the same settings, so a click there does what it does in INPUTS.
 The mute is not repeated in the flyout, since the head has its own. **Mic**
 is lettered in `Ox.Led.On` while one of the switches is on, and carries the
@@ -1830,15 +1834,18 @@ the interface's microphone has the button too, with that input's switches,
 and a strip carrying an additional interface's input has that interface's
 switches. Aux In has its level
 and level lock and Line In its gain and level lock, each read out in the name column.
-On a unit that takes raw capture on Line In, Line In's row has a **Raw
-Capture** button at the end of its name column, lettered in `Ox.Led.On`
+On a unit that takes raw capture on Line In, Line In's row has a **Raw**
+button at the end of its name column, lettered in `Ox.Led.On`
 while it is on, with the readout under it.
 Every channel has its own volume, which scales every send
 in its row. On XLR 1, XLR 2, Aux In and Line In it is a second fader under the gain
 or the level, the meter under the gain, and that row is as tall as the two
 faders need, never less than `Ox.Matrix.RowHeight`; its cells follow it.
 An application or capture channel, or a strip bound to another source,
-has the volume alone, with its meter under it. While a volume fader moves,
+has the volume alone, with its meter under it. After the volume fader
+comes the channel's **Link** chip, which links the channel's sends and is
+lit while they are linked; a daemon that reports no link leaves it out.
+While a volume fader moves,
 and for a second after, the row's readout shows the volume. A row with no
 readout shows it at the top centre of its controls instead, in the chip
 that `"over-fader"` gives a cell, on `Ox.Control.Background`. The chip is
@@ -1890,7 +1897,7 @@ cell's are `mute`, `fader` and `value`.
 | `identity` | row head, column head | the channel's or the mix's icon and name. It cannot be hidden. In a row head it is the name column, on the left unless `parts` puts it last. In a column head it is the name line, which also holds the mix's **Dry**, **Max** and **USB** chips where the mix has them |
 | `binding` | row head | XLR 1's or XLR 2's input binding as a line under the name in the name column, wherever `parts` puts it: a light that is on while the feed is linked and the interface's jack or the source's name. The name and this line are one target that opens the binding dialog, and its tooltip says why the strip is silent. A capture input draws the same line for its source and opens the dialog's capture form |
 | `meter` | row head | the channel's meter as a part of its own. Under the faders it is the gain's track instead, so a channel with gain draws it there |
-| `gain` | row head | the input's hardware gain with XLR 1's gain lock where the interface has one, Aux In's level and level lock, or Line In's gain and level lock, with the channel's own volume as a second fader under it; a channel without a gain shows its volume alone. A capture channel carrying the interface's microphone shows the interface's gain over its volume |
+| `gain` | row head | the input's hardware gain with XLR 1's gain lock where the interface has one, Aux In's level and level lock, or Line In's gain and level lock, with the channel's own volume as a second fader under it; a channel without a gain shows its volume alone. A capture channel carrying the interface's microphone shows the interface's gain over its volume. The channel's **Link** chip stands after the volume |
 | `mute` | row head, column head, cell | the input's hardware mute, the mix's mute, or the send's mute in the column's mix. A capture channel carrying the interface's microphone has the interface's mute, and a capture input with a gain of its own has its source's mute |
 | `processing` | row head | the **Mic** button that opens the input's switches in a flyout. It is lettered in `Ox.Led.On` while a switch is on, and its lamp lights while phantom power is on. It stands at the end of the name column, wherever `parts` puts it, so the source controls keep their room. The flyout also holds a capture input's **Own clock** switch, which lights the button while it is on; when that switch is all the input has, the part is an **Own clock** button that turns it on and off, with no flyout. On Line In the part is a **Raw** button that turns Line In's raw capture on and off, where the unit takes it. A row whose input has no switch does not draw it, nor does a channel that is not Line In or a capture input and carries no interface's input. A skin that lists every other part and not this one still gets it |
 | `effects` | row head, column head | the button that opens the input's or the mix's plugin chain, including a capture input whose daemon reports `chainWidth`. On XLR 1 and XLR 2 the **EQ** button, which opens the microphone's EQ editor, stands over it in the same part, as the signal meets them, so the row grows to hold both and the source controls keep their width |
@@ -2175,10 +2182,11 @@ sets where a section starts the first time, recorded in `ui.json` under
   code. It picks from the appearances listed under Controls and tints
   them. Apart from placing the header and the five sections under
   [Layout](#layout), ordering the header's actions, hiding a section the
-  user can bring back, and choosing one of the application's templates
-  with its parts in another order, there is no way for a skin to add a
-  control, move one out of its template, resize the window, or change
-  what a control does.
+  user can bring back, choosing one of the application's templates
+  with its parts in another order, and naming the outline and the size the
+  UI opens at under [Window shape](#window-shape) and
+  [Window size](#window-size), there is no way for a skin to add a
+  control, move one out of its template, or change what a control does.
 - It cannot change the mixer layout, the mixer, the routing or anything
   the daemon owns. It sets the values in this document and nothing else.
 - It cannot reach outside its own folder, and it cannot make a network
@@ -2190,9 +2198,11 @@ sets where a section starts the first time, recorded in `ui.json` under
   plugin, are drawn by the plugin's own toolkit, and OpenXLR only hosts
   them. The generated controls OpenXLR draws for a plugin do follow the
   skin.
-- It cannot change the OpenDeck plugin's key art. The plugin draws its own
-  images on the device; the Deck skin borrows that visual language for the
-  UI, not the other way round.
+- It cannot supply the OpenDeck plugin's key art. The plugin draws its own
+  glyphs and key shapes on the device and takes only a skin's colours,
+  meter thresholds and segment lettering, as
+  [Stream Deck colours](#stream-deck-colours) says; the Deck skin borrows
+  that visual language for the UI, not the other way round.
 - It cannot hold a light and a dark version of itself, or follow the
   desktop's preference. A skin is one set of values. Only Material has a
   light and a dark palette, chosen by its mode. The toolkit values a skin

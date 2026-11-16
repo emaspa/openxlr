@@ -9,13 +9,15 @@ to help map the rest of its protocol. No programming needed, only
 Wireshark and about 15 minutes.
 
 The remaining targets are low cut, ClipGuard, mic/PC crossfade and the
-hardware-save action exposed by Wave Link. Their OpenXLR commands are not
-yet mapped; the [support table](hardware-support.md#wave-xlr-0fd9007d)
+hardware-save action exposed by Wave Link. The low cut and the
+hardware-save action are not yet mapped. ClipGuard and the mic/PC
+crossfade are coded from another project's map and not yet confirmed with
+OpenXLR; the [support table](hardware-support.md#wave-xlr-0fd9007d)
 tracks current status. Capture these device controls separately from
 software plugin effects.
-Phantom power is already coded (the
+Phantom power is already verified on hardware (the
 [openwave](https://github.com/rikkichy/openwave) project found its
-byte); the phantom toggles in your capture serve as confirmation, and
+byte); the phantom toggles in your capture serve as a reference, and
 the front 48V LED makes them the easiest events to line up.
 
 ## What you need

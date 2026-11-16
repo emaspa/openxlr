@@ -37,8 +37,8 @@ drops. Diagnostics show the block decoded with it.
 
 Block 0x0002, the unit's meters (section 21), has its own codec,
 `src/OpenXLR.Core/Devices/ProMeters.cs`. Diagnostics show it decoded, and
-the device loop reads it for the ducking reduction only while the unit
-runs ducking and a client takes meters.
+the device loop reads it only while a client takes meters and the unit
+runs ducking or builds mixes in hardware mixing.
 
 OpenXLR writes block 0x0001 in one place,
 `src/OpenXLR.Core/Devices/ProMixPlan.cs`: the output selectors, the USB Aux
@@ -68,7 +68,7 @@ Everything below was validated live against the plugged-in Pro with a ctypes-lib
   vendor off0 track 1:1 (40 = 0x28, 65 = 0x41, 52 = 0x34), reading AND writing either side.
 - **Mic mute = block 0x0004 offset 1, bit 0.** Proven: vendor bit0=1 means ALSA capture switch off
   (muted); bit0=0 means on. Read-modify-write of the block is confirmed non-destructive to audio.
-- Current device state read live: gain 0x34 (52 dB, matches the Windows config), flags off1=0xd8
+- Current device state read live: gain 0x34 (52 dB, the gain Wave Link showed on Windows), flags off1=0xd8
   (bits 3,4,6,7 set), HP block `00 00 00 00 50 00 00 00`.
 
 Confidence upgraded below from this: gain and mute are now **CONFIRMED**; low-cut/expander/
@@ -192,14 +192,14 @@ phantom, low-cut, ClipGuard, headphone, monitor, mic-output) are covered above.
 ### Post-live-probe status (2026-08-25)
 - **CONFIRMED on hardware**: gain (0x0004 off0), mute (0x0004 off1 bit0).
 - **HIGH (via MK.2 field identity)**: low-cut = off1 **bit4** (also corroborated, device reads
-  bit4=1 and the Windows config has LowCut ON); expander = bit5; voice-tune = bit6; voice-tune
+  bit4=1 while Wave Link showed Low Cut on); expander = bit5; voice-tune = bit6; voice-tune
   strength = off10; HP volume = 0x0005 off0 (dB = −byte0/4); low-impedance = 0x0005 off1 bit1;
   crossfade = 0x0001 off0 (on the Pro, XLR 1's level in the jacks' mix; see section 12). (Note: the MK.2 map reassigns what §3 tentatively called "monitor
   blend"/"mic-output", 0x0005 off2 and 0x0004 off10, so treat those two as MK.2 says: HP is
   0x0005 off0, and off10 is voice-tune strength. The 0x0005 off2 second level is Pro-specific,
   still unlabeled.)
 - **NEEDS EARS (Pro-only extras)**: phantom power, ClipGuard, polarity live in off1 bits **1, 3,
-  7** (currently 0,1,1). Cross-ref: Windows config has Phantom OFF, ClipGuard ON, Polarity OFF, so a currently-set bit (3 or 7) is ClipGuard, and bit1 (=0) is likely phantom. Not
+  7** (currently 0,1,1). Cross-ref: Wave Link showed Phantom off, ClipGuard on, Polarity off, so a currently-set bit (3 or 7) is ClipGuard, and bit1 (=0) is likely phantom. Not
   auto-verifiable (no ALSA control, no LED on the Pro). Finalize by toggling each and listening,
   or by recording the mic and measuring the spectral change (low-cut/expander are audible).
 
@@ -342,7 +342,9 @@ second computer on the aux port. Everything below is verified live on Linux by e
 1. off92 = 0x20 (aux out -> aux mix) + commit.
 2. Open the music cell: off45 = 0x00, off49 |= 0x02 + commit.
 3. Stream the monitor mix on playback pair 10/11 (`#usbaux` pseudo-device routes there;
-   analog outputs keep pair 2/3 via the Personal mix).
+   analog outputs keep pair 2/3 via the Personal mix). That was the recipe at the
+   time. Today OpenXLR streams the Aux mix on pair 10/11, and `#usbaux` is a route
+   marker, not an output in the picker.
 4. THE LATCH: the device samples the aux-return routing when the HOST PLAYBACK STREAM
    STARTS. Changing the cell under a running stream has no effect until the stream restarts;
    `pactl suspend-sink 1/0` (PipeWireAdapter.BounceSink) is sufficient and the daemon does it
@@ -521,19 +523,24 @@ amount and speed in bytes 0 to 5 of all twelve entries while ducking is
 on, the key mask of the setup's keys (`01 00` for XLR 1 alone, section
 20) in bytes 6 and 7 of the target pairs' and inputs' entries and `00 00`
 in every other entry, so the keys Wave Link leaves behind are cleared,
-and the high bit of each pair field in the three mix sections. Every
+and both bits of each target pair's field in the first four mix sections,
+or in hardware mixing in the sections of the ducked mixes (section 12
+says why the high bit alone is not enough). Every
 write of block 0x0001 that carries ducking also sets the target inputs'
 tap fields to `11` and puts every other input tap field at `11` back to
 `10` (section 20). Every other
 byte of both blocks is copied from a fresh read.
 It writes 0x0008, then 0x0001, only the blocks that change, without the
 commit. Its targets are the pairs OpenXLR streams to: 2/3 (the jacks'
-monitor feed) and 10/11 (the Aux mix, through the aux mix's Music cell).
-On the desk the unit's ducking did not reach the jacks, so OpenXLR ducks in
-software on the Pro ([hardware support](hardware-support.md)). Section 12
+monitor feed), 4/5 and 6/7 (a second and third jack feed) and 10/11 (the
+Aux mix, through the aux mix's Music cell).
+On the desk on 2026-10-21 the unit's ducking did not reach the jacks, so
+OpenXLR ducked in software on the Pro at the time. Section 12
 explains it: the unit ducks a pair only when its field reads `11`, and on
 this unit, outside Wave Link, the fields read `00`, so setting the high bit
-alone writes `10`, which the unit ignores.
+alone wrote `10`, which the unit ignores. With both bits written the unit
+runs ducking on the jacks and the USB Aux port when the setup fits
+([hardware support](hardware-support.md)).
 
 ## 12. The mix sections and the jacks (desk probe of 2026-10-23)
 
@@ -616,10 +623,11 @@ The other selector values from `18` to `2f` played nothing.
   are not a playback meter for it. The bytes that moved all followed XLR 1.
 
 Wave Link leaves every field at `01` and sets the high bit on a ducked
-pair, which makes `11`. The daemon sets the high bit and keeps the low bit
+pair, which makes `11`. The daemon set the high bit and kept the low bit
 as read; with the fields at `00`, as this unit holds them under OpenXLR,
-that writes `10`, which is why the desk test of 2026-10-21 saw the engine
-reduce and the headphones stay level.
+that wrote `10`, which is why the desk test of 2026-10-21 saw the engine
+reduce and the headphones stay level. The daemon now sets both bits on a
+ducked pair.
 
 ### Open
 
@@ -864,7 +872,7 @@ read-modify-write path and timing as the EQ ([api.md](api.md#where-the-compresso
 ## 15. The mix sections as a mixer (desk probe of 2026-11-02)
 
 Firmware 1.0.14, the desk unit, the daemon running. These are the probes
-the roadmap's hardware mixing mode waits on: whether the unit takes level
+the roadmap's hardware mixing mode waited on: whether the unit takes level
 and membership changes live, the gain of each section, and the delay of
 the returned mixes. Writes went to section 54 and section 72, which no
 output selector played (bytes 90 to 93 read `23 23 20 23`), so nothing

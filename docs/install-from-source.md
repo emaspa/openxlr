@@ -97,8 +97,10 @@ you just built, pass `--no-build` with the same configuration, runtime
 identifier and build options.
 
 You may omit the flag for hardware control and LV2 filter-chain inserts
-without native editors. CLAP, VST3, the microphone EQ in software, noise
-removal, ducking and the soundboard require the helper. Keep the flag
+without native editors. CLAP, VST3, the microphone EQ, compressor and
+expander in software, the EQ on a mix, noise removal, the voice changer,
+ducking, Mic setup, the soundboard and a capture input on its own clock
+require the helper. Keep the flag
 on every later build once you rely on it: an existing helper is retained
 without the flag, but it is not rebuilt and may miss native fixes. See
 [plugin editors](manual.md#plugin-editors).
@@ -248,7 +250,7 @@ Then, in a second terminal from the same repository root, run the UI:
 ```
 
 The header dot turns green when the daemon has the device. If it says
-"no device", re-check the udev rule and replug.
+"No device", re-check the udev rule and replug.
 
 ## 6. Make it permanent
 

@@ -177,7 +177,7 @@ writes `inputBindings` only. `setInputBinding` changes the field live; see
   letters, digits or hyphens. The built-in set is `mic`, `microphone`, `headset`,
   `speaker`, `jack`, `music`, `game`, `browser`, `chat`, `people`,
   `broadcast`, `camera`, `bell`, `star`, `globe`, `cog`, `film`, `voice`,
-  `podcast`, `record`, `apps`, `burst` and `monitor`; a skin may add names
+  `podcast`, `record`, `apps`, `burst`, `monitor` and `dollar`; a skin may add names
   of its own ([skins.md](skins.md#icons)).
 
 The daemon checks a name's shape only, so a layout may keep the name of an

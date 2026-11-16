@@ -103,15 +103,17 @@ happen on your system:
 The UI's header shows the connected interface with a green dot. With
 more than one interface attached, the name there is a picker, and the one
 you pick is driven again after a restart, even when the other one appears
-first. "No device" means the daemon cannot open the interface: replug it once
-after installing so the udev rule applies ([section 5.1](#no-device)).
+first. "No device" with an interface attached means the daemon cannot open
+it: replug it once after installing so the udev rule applies
+([section 5.1](#no-device)).
 
 <a name="without-elgato"></a>
 **Without Elgato hardware.** The mixer works with any microphone, headset,
 webcam or audio interface PipeWire can record from. With no Elgato device
 attached the header reads **No interface.** followed by a link, **Choose a
 microphone for XLR 1**. Pick your microphone and its port there, then Save
-([Use another microphone on XLR 1 or XLR 2](#input-bindings)). The strip is
+([Use another microphone on XLR 1 or XLR 2](#input-bindings)). From then on
+the header reads "No device". The strip is
 then named Mic 1 and carries that microphone into every mix, with its
 volume, meter, EQ, inserts, Mic setup, software low cut and ClipGuard
 (ClipGuard needs `swh-plugins`). XLR 2 stays hidden until you bind it in
@@ -338,11 +340,13 @@ its way to a monitor mix. Noise removal, the voice changer and plugins that
 work in blocks add the most. On an interface without a direct monitor, such
 as the first XLR Dock, you hear that delay in your headphones. Each monitor
 mix has a **Dry** chip at the top right of its head in the mix matrix,
-opposite its name, and beside 150% on its master in every other layout. Grey
+opposite its name, and on its master in every other layout, beside 150% on
+a tile and under it in a mix bank. Grey
 means off. Click it and it turns green, and that monitor mix now hears
 XLR 1, XLR 2 and every microphone capture input before their effects, so
-you hear your voice raw and earlier. While you move the monitor's fader the
-chip turns grey and shows its volume, then reads Dry again. Each monitor
+you hear your voice raw and earlier. In the mix matrix, while you move the
+monitor's fader the chip turns grey and shows its volume, then reads Dry
+again. Each monitor
 mix has its own chip, so Monitor A can be dry while Monitor B keeps the
 effects, and a profile saves and recalls each chip on its own. Stream, Chat, the other
 virtual microphones and the Aux mix always get the processed voice. The
@@ -457,7 +461,7 @@ buttons in the header do the same. Point at one and its tooltip names the
 step it would take; a button with nothing to take is greyed out. When the
 step changes one volume, level, gain or switch, the tooltip also gives the
 value now and the value it goes back to, such as "Undo Stream volume: 100%
-back to 75%". A second line names the next three steps and how many more
+back to 75% (Ctrl+Z)". A second line names the next three steps and how many more
 follow, such as "Then: Game mute in Stream, XLR 1 gain, and 3 more".
 After each undo or redo, a note under the arrows names
 the step for three seconds, or says what was left alone and why, so you
@@ -531,8 +535,8 @@ monitoring pause stay as they are however far back you go. Routing and
 layout edits are not covered yet.
 Loading a profile, a profile recalled when the interface connects,
 deleting a channel or a mix, switching between software and hardware
-mixing, and switching to another interface empty the history: nothing
-before them can be undone.
+mixing, switching to another interface, and resetting the interface to its
+defaults empty the history: nothing before them can be undone.
 
 Undo writes a value back only where it is still what you left. If the
 desktop, the unit or a profile moved the control since, undo leaves it
@@ -580,8 +584,9 @@ is one step, like a fader drag.
 
 A Wave XLR MK.2 on firmware 1.0.15 or later tells OpenXLR whether a
 microphone is plugged into its XLR jack. While none is, the strip that
-carries its microphone says **No microphone is plugged into the
-interface.** under its source. The other models do not report it.
+carries its microphone in an input rack says **No microphone is plugged
+into the interface.** under its source. The classic INPUTS panel and the
+mix matrix do not show the line. The other models do not report it.
 
 Options has a tip for step 2: enforcing `OpenXLR Chat` as the system
 default input ([section 3.7](#default-devices)) makes every voice app pick it up without
@@ -614,7 +619,8 @@ from three places:
   **No interface.** is followed by a link, **Choose a microphone for XLR 1**.
 
 The dialog lists the interface's own input first, **Interface jack (XLR 1)**,
-or **Built-in microphone** on a Wave:3, Wave:3 MK.2 or Wave:1. Every other capture
+or **Built-in microphone** with the unit's name in brackets on a Wave:3,
+Wave:3 MK.2 or Wave:1. Every other capture
 source follows, other Elgato interfaces included, except OpenXLR's own
 nodes and the primary interface's own. An unplugged bound source stays in the list, marked
 "(not connected)" and named after its device, such as "Shure MV7".
@@ -649,7 +655,8 @@ working, and an icon you chose in the layout editor stays.
 
 When the strip being replaced has a connected interface behind it, the
 dialog offers **Keep the interface's microphone as a capture channel**,
-ticked. Save then binds the strip and adds a capture channel on the
+ticked, unless a capture channel already takes that input. Save then binds
+the strip and adds a capture channel on the
 interface's own input at that jack's port, named after the interface. If
 adding the channel fails, the strip stays bound and the dialog says so.
 Untick it and the interface's own microphone drops out of the mixer, as if
@@ -723,7 +730,9 @@ same source, even the same port.
 When a strip's route cannot be built, for example because its filter
 chain does not start, its chip says why and OpenXLR tries again about
 once a second. The other strips are wired as usual meanwhile, whether
-they take the interface or a source of their own.
+they take the interface or a source of their own. After three failures in
+five minutes a strip with plugins is wired without them, and its chain
+stays off, with the reason on it, until you change or bypass it.
 
 The choice lives in `mixer.json` and survives restart, and profiles never
 change it. Profiles belong to the connected interface as always. While no
@@ -1148,7 +1157,8 @@ computer runs it and the state says why
 - a key is heard in the ducked mix through its software send, so the unit
   would lower it as well;
 - the unit did not keep the setting written to it. Switch ducking off and
-  on to try again.
+  on to try again;
+- the unit did not answer when OpenXLR read its ducking settings.
 
 Moving from one to the other never ducks twice. There can be a moment
 without ducking while it moves. To keep it on this computer whatever the
@@ -1305,7 +1315,8 @@ heard through it. Browser tab routing and saved website choices are separate.
 
 The APPLICATIONS card lists every app that is currently registered with
 PipeWire as an audio client; a green light means it is playing. Manage sits
-beside the APPLICATIONS heading, like Edit layout beside SUBMIXER. Browser
+beside the APPLICATIONS heading, like Edit layout beside SUBMIXER, and is
+greyed out until OpenXLR knows at least one app. Browser
 tabs sits beside Manage when the daemon supports browser tab routing. The
 app controls wrap onto further rows when the UI is narrower.
 
@@ -1467,8 +1478,8 @@ assignments remain readable and editable.
    Pro as a plain USB audio device.
 2. In the SUBMIXER card, set the sends into the Aux mix: typically your
    microphone and the game, without the second computer's own chat.
-3. Turn on **To USB Aux port** on the Aux mix's master. In Broadcast and
-   Wave it is the **USB** chip on the Aux column's name line, which turns
+3. Turn on **To USB Aux port** on the Aux mix's master. In a mix matrix
+   it is the **USB** chip on the Aux column's name line, which turns
    green while it is on. The interface's audio stream
    restarts once, which interrupts playback for a moment; the device
    only picks up the new routing at stream start. If the Pro is
@@ -1610,10 +1621,11 @@ rebuild.
 **Plugin latency.** Some plugins delay the audio they process, a limiter
 that looks ahead or a linear-phase equaliser for instance, and report by
 how much. The controls window shows the figure under the plugin's name.
-"Latency: unknown" means the plugin gave no figure. That happens when it
-runs in the PipeWire filter chain, which cannot read one, when the plugin
-reports nothing, and until its host first reports, once audio has run
-through it.
+"Latency: unknown" means no figure could be read. That happens when the
+plugin runs in the PipeWire filter chain, which cannot read one, and while
+its host is not running. A plugin in the native host that reports nothing,
+or has not reported yet, reads "Latency: not reported" with the measured
+delay described below.
 
 <a name="measured-latency"></a>
 A plugin can report one delay and add another, and some report none at
@@ -1993,8 +2005,9 @@ and ends with **Stop and discard** or when the window closes:
   refusal names the channel whose session is running.
 - The take stays in memory and is never written to a file or a profile.
   A session ends by itself when its source changes, when its audio path
-  is lost, when its capture channel is deleted, when the mixer is rebuilt
-  and after ten minutes. If the channel still exists, the window says why,
+  is lost, when its capture channel is deleted, when the mixer is rebuilt,
+  when monitoring is paused with **Mute microphone sends with monitoring**
+  on, and after ten minutes. If the channel still exists, the window says why,
   including the helper's last failure message when it supplied one. The same
   failure is written to the daemon's log. **Stop and discard** clears the
   window's message. The daemon's messages call the session Sound Check, the
@@ -2015,8 +2028,8 @@ can have background noise taken out before anything else hears the
 microphone: it runs first, ahead of the EQ, the low cut, ClipGuard and your
 plugins, so they, your mixes, your calls and Mic setup's loop all get the
 cleaned voice. In INPUTS and in an input rack, **Denoise** right after the
-microphone's **EQ** button opens its controls. In the Broadcast, Wave and
-Compact Desk matrix they are in the row head's **Mic** button, under the
+microphone's **EQ** button opens its controls. In a mix matrix they are in
+the row head's **Mic** button, under the
 interface's switches. They are also in Mic setup's **Shape** step, in the
 terminal mixer's Inputs tab, and on a Deck key. **Denoise** turns green
 while noise removal runs and red when it is on and cannot run; **Mic**
@@ -2080,7 +2093,7 @@ speaking, so room noise, keyboard and breaths between words drop away. The
 compressor turns loud passages down so loud and quiet speech come out
 closer in level. In INPUTS and in an input rack, **Dynamics** right after
 **Denoise** opens a small panel with an **On** switch and an **Open**
-button for each; in the Broadcast, Wave and Compact Desk matrix the same
+button for each; in a mix matrix the same
 panel is in the row head's **Mic** button. **Dynamics** turns green while
 either runs and red when one is on and cannot run. Both are off until you
 switch them on.
@@ -2098,7 +2111,8 @@ left to right:
 - The graph of the input over the last twelve seconds: a line for the
   expander, a filled shape for the compressor. The line across it is the
   **Threshold**. Drag it, or the tab on its right edge, or click the graph
-  and use the arrow keys, a decibel at a time.
+  and use the arrow keys, a decibel at a time, or Page Up and Page Down,
+  six at a time.
 - **Gain reduction**, how far it turns the microphone down now. It fills
   from the top.
 - **Make-up gain**, on the compressor only, a slider that brings the voice
@@ -2203,18 +2217,21 @@ not been checked by ear yet.
 The settings are saved with the mixer and in profiles. A profile saved
 before them leaves them as they are. Where they run is saved with the
 mixer and never in a profile. The terminal mixer's Inputs tab has the
-switches and every setting, without the levels; on the unit it shows the
+switches and the thresholds, and the other settings while a processor is
+on, without the levels; on the unit it shows the
 values the unit holds, and the choice of where they run is made in the
 UI.
 
 <a name="microphone-eq"></a>
 **Microphone EQ.** XLR 1, XLR 2 and every capture input, on one mono port
 or a stereo pair, each have an EQ with one to sixteen bands and the same
-band types, ranges and steps as Wave Link's, and the same curves. It comes
-first on the input, before the low cut, ClipGuard and your plugins, so
+band types, ranges and steps as Wave Link's, and the same curves. On a
+microphone it comes after noise removal and the expander and before the
+compressor and the voice changer. All of them come before the low cut,
+ClipGuard and your plugins, so
 ClipGuard also catches a boost, and Mic setup's loop goes through it. A
-capture input has no low cut or ClipGuard, so its EQ comes straight before
-its plugins.
+capture input has no low cut or ClipGuard, so its plugins follow
+directly.
 
 The existing four-band setup stays the default. **Add band** adds a neutral
 bell in a gap between the existing frequencies; **Remove** beside a band
@@ -2242,8 +2259,8 @@ they cannot change a replacement channel with the same id.
 
 Open it with **EQ**. In INPUTS it sits on the microphone's input line,
 right after the chip that says what feeds it, and stands as tall as the
-chip. In an input rack it comes before **Inserts**, and in the Broadcast and
-Wave matrix it sits over **FX** in the row head. **EQ** turns green while
+chip. In an input rack it comes before **Inserts**, and in a mix
+matrix it sits over **FX** in the row head. **EQ** turns green while
 the EQ runs and red when it cannot run. Each microphone has one editor;
 clicking **EQ** again brings it to the front.
 
@@ -2391,8 +2408,8 @@ every microphone's EQ with the rest of the mixer.
 **EQ on a capture input.** Every capture input, on one mono port or a
 stereo pair, gets the same EQ button and editor as XLR 1, in INPUTS after
 its source chip, and in an input rack and in the matrix before its effects
-button. Its EQ always runs on this computer, at the
-head of the input before its plugins, even when the input carries another
+button. Its EQ always runs on this computer, ahead of
+its plugins, even when the input carries another
 Wave interface's microphone, so the editor shows no **Where the EQ runs**
 switch, its header shows **Software processing**, and its bottom line says
 it runs on this computer. Switching it on moves the input onto its own route,
@@ -2614,7 +2631,8 @@ known. Updating OpenXLR reads every one of them again once, because the
 new version may see them differently, which makes the first scan after
 an update as slow as the first ever. While a scan runs, the mixer and the
 plugin picker keep the plugins they already knew, and new ones appear when
-it finishes. OpenXLR remembers each bundle as soon as it has read it, so a
+it finishes. A change to a plugin chain or to an input's source, a profile
+save or load and an undo wait until the scan has finished. OpenXLR remembers each bundle as soon as it has read it, so a
 scan cut short by a restart does not read those bundles again.
 
 <a name="plugin-search-folders"></a>
@@ -3192,7 +3210,8 @@ remaining legacy profiles still migrate. The existing device-specific
 profile is the one shown in the picker; the colliding original remains in
 the legacy folder for manual comparison.
 
-**Recall on connect.** The "On connect" picker under the list names a
+**Recall on connect.** The "On connect" picker under the list, which
+shows once a profile is saved, names a
 profile the daemon recalls by itself whenever the interface connects
 fresh: at daemon start (so at login), after a replug or a power cycle,
 and when you switch to it in the device picker. Use it to land on a
@@ -3268,7 +3287,9 @@ install.
 
 Saved hardware snapshots under `~/.config/openxlr/devices` must be regular
 JSON files no larger than 64 KiB. An unreadable snapshot is not applied:
-restoring last settings logs the problem, while Reset reports it.
+restoring last settings logs the problem, while Reset reports it. A
+snapshot whose JSON is damaged counts as missing: nothing is restored from
+it, and Reset answers that no defaults are recorded yet.
 
 If the interface refuses one control during the restore, OpenXLR still
 writes the others and tries again a second later, up to three attempts.
@@ -3294,8 +3315,9 @@ to defaults". OpenXLR keeps where it last opened each interface in
 The Wave XLR Pro keeps its settings in its own memory, so there is no
 clean state to record and whatever is set on Linux is what Wave Link
 finds on Windows, and the other way round. For it the same button
-writes OpenXLR's baseline instead: gain 30 dB on both inputs, every
-processing stage and phantom power off, headphones and aux level at
+writes OpenXLR's baseline instead: gain 30 dB on both inputs and both
+unmuted, every processing stage, phantom power, Low Imp. and the USB Aux
+level lock off, Voice Tune strength at 50, headphones and aux level at
 half. Output routing, the microphone's level in the headphones, the Line
 In gain and saved profiles stay. The gain lock has to be off.
 
@@ -3560,8 +3582,8 @@ over the picker to read its full summary. In the Compact Desk, Wave and
 Nyan Pink skins, a wider UI gives the matrix and classic mixer
 tiles more room, and application chips and columns move more tiles side by
 side. Their input, headphone and monitor faders stop at a maximum track
-width so the readouts stay close to the controls. These rules use logical
-window dimensions and follow the display scale. The other skins keep their
+width so the readouts stay close to the controls. These rules use the UI's
+logical dimensions and follow the display scale. The other skins keep their
 base widths.
 
 The view, the channel and the mix are saved in `ui.json`. When the chosen
@@ -3574,7 +3596,7 @@ changes a level, a mute or a route.
 
 <a name="show-hidden"></a>
 **Show hidden** sits in the SUBMIXER header beside Pop out, Edit layout,
-[Mic setup](#mic-setup), Ducking and [Soundboard](#play-sound-clips), and appears only while a channel or a mix is hidden in the layout
+[Mic setup](#mic-setup), Ducking, [Soundboard](#play-sound-clips) and [Voice changer](#voice-changer), and appears only while a channel or a mix is hidden in the layout
 editor. Switched on, it draws the hidden channels and mixes in their
 places in every layout, faded so you can tell them apart, and they work
 as usual. This applies in the separate mixer window too. It is a UI
@@ -3742,16 +3764,17 @@ it is on neither gain moves; phantom power's settling time still applies.
 Beside the name,
 **Mic** opens the switches INPUTS shows next to the mute: Low Cut,
 Expander, Voice Tune, Phantom, ClipGuard, Compressor and
-[Raw Capture](#raw-capture), the ones your interface has, with the Voice Tune strength while Voice Tune is on. On an
+[Raw](#raw-capture), the ones your interface has, with the Voice Tune strength while Voice Tune is on. On an
 interface without a hardware low cut or ClipGuard, XLR 1's software low cut
-and ClipGuard are there too. Under them is the microphone's
-[noise removal](#noise-removal), which also gives a capture input with no
-interface behind it a **Mic** button. A capture input whose only switch
+and ClipGuard are there too. Under them are the microphone's
+[noise removal](#noise-removal) and its
+[compressor and expander](#compressor-and-expander), which also give a
+capture input with no interface behind it a **Mic** button. A capture input whose only switch
 is [Own clock](#own-clock) gets an **Own clock** button instead, which
 turns it on and off at a click and turns green while it is on; its
 tooltip shows the delay and the dropouts. They are the same controls as
 in INPUTS, so switching one here switches it there. **Mic** turns green while
-one of them is on or noise removal runs, and its small lamp lights red while phantom power is on, so you can
+one of them is on or noise removal, the compressor or the expander runs, and its small lamp lights red while phantom power is on, so you can
 see both without opening it. Under **Mic** is the input's gain in dB. While
 you move the row's volume fader it shows the volume instead, as a
 percentage, and goes back to the gain one second after you let go. A
@@ -3764,7 +3787,8 @@ show the level or gain in the name column the same way
 in the name column, green while it is on, with the gain under it. Each of them also has its [volume](#channel-volume),
 a second fader under the gain or the level, and the row grows to hold
 both. An application or capture channel has its volume, with its meter
-under it. While you move the volume fader of a row with no readout, the
+under it. After the volume fader, before the row's first cell, every row
+has the **Link** chip that [links its sends](#linked-sends). While you move the volume fader of a row with no readout, the
 volume shows over the fader as a cell's level does, and stays one second
 after you let go.
 XLR 2 has a row only on an interface with two XLR inputs. The head at the
@@ -3805,15 +3829,15 @@ copy of the skin to start your own from is in
 [docs/examples/skins](examples/skins/README.md).
 
 **Compact Desk** is an optional dark skin for a denser desk. Choose it in
-Options under APPEARANCE. Its matrix cells and application tiles grow on wide
-windows and keep their minimum widths when space runs short. It keeps the headphone card 600 pixels wide and
+Options under APPEARANCE. Its matrix cells and application tiles grow in a wide
+UI and keep their minimum widths when space runs short. It keeps the headphone card 600 pixels wide and
 lets MONITOR use the rest of the row. Applications wrap across the page
 instead of filling six rows first. Longer matrix faders and wider name
 columns keep a three-mix desk from leaving half the card empty; muted
-faders stay visible against the dark blue-grey surfaces. Profiles,
-Flow and Arrange stay in the header, with Restart daemon, the version and
+faders stay visible against the dark blue-grey surfaces. Profiles, Undo,
+Redo, Flow and Arrange stay in the header, with Restart daemon, the version and
 About in its overflow menu. All the same headphone, input, effect and mix
-controls remain available. A narrow window scrolls the page sideways as
+controls remain available. A narrow UI scrolls the page sideways as
 Broadcast does, and the normal and Touch control sizes still apply.
 
 The choice takes effect at once. Windows that are already open repaint;
@@ -4118,7 +4142,10 @@ Appearance is part of the layout, saved with it, and not part of a profile.
 Every change is saved before the editor confirms it. Once the daemon has
 finished its final save during shutdown or restart, late layout changes are
 refused before they alter the mixer or write settings. Retry them after the
-daemon starts again. If the settings
+daemon starts again. The daemon also refuses a layout change while it
+builds the mixer, at startup or after the audio server restarted, and says
+so ([section 5.3](#daemon-not-starting)); make the change again once the
+mixer shows. If the settings
 file cannot be written the change is undone and the editor says why. The
 same happens when pipewire-pulse has no room for more streams
 ([section 5.8](#open-files) explains the limit and the drop-in that raises
@@ -4148,11 +4175,11 @@ the mutes as they are.
 
 A Stream Deck key can switch the group ([section 4](#stream-deck)).
 
-On a Wave XLR Pro, putting XLR 1 in a group turns off the interface's
-zero-latency path from the microphone to the headphone jacks, because
-that path bypasses the mixer and the group could not mute it. The
+On a Wave XLR Pro, putting XLR 1 or XLR 2 in a group turns off the
+interface's zero-latency path from that microphone to the headphone jacks,
+because that path bypasses the mixer and the group could not mute it. The
 microphone then reaches the jacks through its Monitor A send, with the
-latency of the PipeWire graph. Take XLR 1 out of the group to get the
+latency of the PipeWire graph. Take it out of the group to get the
 direct path back. The microphone's hardware mute is separate from the
 group and mutes it everywhere, as before.
 
@@ -4240,8 +4267,8 @@ processing; pressing "Plugin UI" again opens a fresh one. If an editor
 stops answering, the insert says its controls are frozen and its audio
 carries on. A crash of the plugin process interrupts the chain while it
 recovers, and so does a plugin that stops passing audio: one that blocks
-inside its own processing is noticed after a few seconds and replaced the
-same way a crashed one is, since an instance that is neither dead nor
+inside its own processing is noticed after about a quarter of a minute and
+replaced the same way a crashed one is, since an instance that is neither dead nor
 processing would otherwise sit there silent. A plugin that keeps crashing
 has its chain switched off after it has failed three times in five
 minutes, with the reason on the insert;
@@ -4299,6 +4326,12 @@ plugin off and on again with the same short silence, and the plugin
 carries on with the same settings, the same editor and its new latency.
 This does not count toward the restart limit either. The journal says
 "the plugin asked to be reloaded and was activated again" each time.
+
+A CLAP or VST3 plugin that does not start again after such a request ends
+its host, and the chain is replaced under the restart limit. The journal
+takes at most 64 `trace:` lines from one plugin process, so a plugin that
+keeps asking, or a long run of invalid samples, goes quiet there while the
+host carries on.
 
 A VST3 scan that says the original Windows plugin is missing usually means
 its yabridge wrapper still exists under `~/.vst3/yabridge`, but the source
@@ -4375,7 +4408,7 @@ the monitor mix**, **Stop**, **Move earlier**, **Move later** and **Delete**. Ed
 | Name | what the pad and a Deck key show; renaming keeps the clip's id, so keys keep working |
 | Gain | the clip's own level before SFX's fader; a change reaches a playing clip at once |
 | Press | **Overlap** plays the clip again over any that still play; **Restart** starts it again from the top; **Toggle** plays it and the next press stops it; **Hold** plays it while the pad is held down |
-| Start over at the end | loops the clip until it is stopped; turning it off lets the current pass finish |
+| Start over at the end until stopped | loops the clip until it is stopped; turning it off lets the current pass finish |
 | Icon, Colour | the pad's icon, and its colour: a swatch fills the field in, any `#RRGGBB` can be typed, and the struck-out swatch removes the colour |
 | Page | the page the pad is on; empty puts it on **Main**, and a name no page has yet makes a new page. A clip moved to a page goes last on it |
 
@@ -4599,7 +4632,7 @@ profiles work as before. What changes on the mixes the unit builds:
 | Headphones when it starts | Turned down 21 dB, or 29 dB while a jack's mix holds Line In, Aux In or a microphone that reaches the unit raw, so nothing gets louder. |
 | Output volume of a jack | Turns that jack's headphone volume, or Line Out's level, down. It never goes above where it was. |
 | Balance | Applications sit 7.9 dB under the microphones at equal faders, as they do under Wave Link. |
-| Noise removal, the voice changer, a software EQ and plugins on a microphone | Heard on the unit's mixes too: the processed voice plays back to the unit on a free USB pair, a few milliseconds later than the raw microphone, as it reaches your headset today. With no pair free, the unit's mixes get the microphone as it comes in, without them, and the UI says so. Stream and Chat always get them. |
+| Noise removal, the voice changer, a software EQ, compressor or expander and plugins on a microphone | Heard on the unit's mixes too: the processed voice plays back to the unit on a free USB pair, a few milliseconds later than the raw microphone, as it reaches your headset today. With no pair free, the unit's mixes get the microphone as it comes in, without them, and the UI says so. Stream and Chat always get them. |
 | Plugins on a mix the unit builds | Not run there, and no plugin can be added. |
 | The [output EQ](#output-eq) of a mix the unit builds | Off, with its **EQ** button greyed. Your settings are kept and come back with software mixing. |
 | Ducking on a mix the unit builds | Runs on the unit for each chosen channel, its own inputs included. Its inputs and any channel on a USB pair can be keys; a capture microphone cannot. |
@@ -4609,7 +4642,7 @@ profiles work as before. What changes on the mixes the unit builds:
 | Exclusive groups and the monitoring pause | Work, by taking channels out of the unit's mix. |
 | The USB Aux port | Plays the Aux mix, which the unit builds too while the port is on, at the same balance as the jacks and without Aux In. Your output volume no longer turns it down, and the monitoring pause leaves it playing. |
 | Mix volume and mute | On a mix the unit builds on its own for Headphones 2, Line Out or the USB Aux port, the mix's fader and mute move one level and one mute on the unit for the whole mix, and the channel faders stay where they are. The first jack's mix, and two mixes summed on a jack, still carry the mix volume in each channel's level. |
-| Maximizer | Each mix the unit builds on its own has the unit's maximizer, a **Max** button on the mix's master, or on its name line in Broadcast and Wave. See below. |
+| Maximizer | Each mix the unit builds on its own has the unit's maximizer, a **Max** button on the mix's master, or on its name line in a mix matrix. See below. |
 | Mix meters | A mix the unit builds on its own, for a jack or the USB Aux port, shows the unit's own meter. It follows the faders and the mix volume, not the headphone volume or the output volume. The unit shows peaks, so a mix reads a little higher than in software mixing on the same audio. When a jack plays two mixes summed, each of them keeps this computer's meter, and so do Stream, Chat and every other mix the computer builds. The input meters are unchanged: they show each input as the unit sends it. |
 
 A greyed control says why in its tooltip. The plugin chain window, Mic
@@ -4623,7 +4656,7 @@ on a plugin of a mix the unit builds. Scripts use `setMixing` in the
 raises the mix and holds its peaks under about -1 dBFS, so a quiet mix
 comes up without clipping. While the unit builds a mix on its own, for a
 jack or the USB Aux port, the mix's master shows a **Max** button with the
-amount, or Off. In Broadcast and Wave the button sits on the mix's name
+amount, or Off. In a mix matrix the button sits on the mix's name
 line, where a monitor mix has **Dry**, and reads **Max**, green while on
 with the amount under it. Press it and move the slider from Off to 100%.
 Each percent adds about 0.2 dB, so 50% raises the mix by about 10 dB and
@@ -5066,8 +5099,8 @@ diagnostics** in Options and open an issue with the archive.
   loses its mixer settings. If the warning stays, check the audio server with
   `pactl info` and `journalctl --user -u pipewire-pulse -b`, and look for
   USB errors with `journalctl -k -b | grep -i usb`.
-- "The mixer is still being built after the audio server restarted or
-  lost one of its devices": pipewire-pulse restarted and took OpenXLR's
+- "The mixer is still being built after the audio server (pipewire-pulse)
+  restarted or lost one of its devices": pipewire-pulse restarted and took OpenXLR's
   devices with it, or a single mix or virtual microphone went, unloaded by
   another program or dropped by the server near its open-file limit (see
   [5.8](#open-files)). The daemon keeps running and
@@ -5134,7 +5167,7 @@ restarted by hand.
 
 Changing **Enable software mixer** in Options uses the same background
 restart. Its switch is disabled while a restart is in progress, so the
-window stays responsive and concurrent changes cannot race the restart.
+UI stays responsive and concurrent changes cannot race the restart.
 
 An older user unit can fail before starting the daemon with
 `218/CAPABILITIES` and `Failed to drop capabilities`. Update the package
@@ -5363,9 +5396,9 @@ connection discards the previous connection's state until its first update
 arrives. The graph and vendor blocks are collected separately and can
 describe a later moment.
 
-Start with `system-info.json` to compare the window and daemon builds and
+Start with `system-info.json` to compare the UI and daemon builds and
 see the distribution, kernel, CPU architectures, .NET runtime, desktop and
-session type. A Flatpak report describes the window's sandbox and the
+session type. A Flatpak report describes the UI's sandbox and the
 kernel it runs on. The file also lists the running PipeWire server version,
 the graph's sample rate and quantum settings, and the versions reported by
 the available PipeWire, WirePlumber, PulseAudio and ALSA tools. A version
@@ -5374,7 +5407,7 @@ Its hardware section lists the interfaces the daemon detected and the
 primary unit's firmware when the device reports it. See
 `daemon-state.json` for the effective controls, mixer and profile state,
 `mixer.json` for the saved mixer layout and routing, and `ui.json` for
-window preferences.
+UI preferences.
 
 `audio-applications.json` lists playback and capture streams in the same
 PipeWire snapshot as `pw-dump.json`. It shows application names, executable
@@ -5390,7 +5423,7 @@ an archive to add `deep-trace.json`. This is a one-export choice. It lists
 the process names and counts visible to OpenXLR under your Linux user,
 including programs that have no audio streams. Names come from the kernel
 and may be shortened. It also records system RAM and swap totals and
-availability, and the window's and common audio processes' resident,
+availability, and the UI's and common audio processes' resident,
 peak, locked and swapped memory, thread counts and task state when
 available. Daemon processes are listed by name, so a daemon and its USB
 worker can both appear. A sandbox reports only what it can see, and a
@@ -5406,7 +5439,7 @@ archived receipt is evidence of a past installation. Use `system-info.json`
 to identify the builds that were running.
 
 `windowRuntime` and `daemonRuntime` contain a numerical memory snapshot
-from the window and the daemon that replied. They include the managed heap
+from the UI and the daemon that replied. They include the managed heap
 size, committed bytes, fragmentation and collection counts, plus the
 proportional and private RAM usage when the kernel supplies those counters.
 The daemon reply carries its own build ID and collection time. A daemon
@@ -5433,9 +5466,8 @@ unredacted contents. The original log on disk is kept.
 A crackle or a dropout is over before you can open Options. Mark the moment
 instead, as soon as you hear it, and collect diagnostics afterwards:
 
-- in the UI, press **Ctrl+G** in the main window or in the mixer's own
-  window once it is popped out, or choose **Mark a glitch** in Options,
-  SUPPORT;
+- in the UI, press **Ctrl+G**, in the mixer's own window too once it is
+  popped out, or choose **Mark a glitch** in Options, SUPPORT;
 - on the Stream Deck, press a Toggle key set to **Mark a glitch for the
   diagnostics archive**, under **Diagnostics** in the key's settings;
 - in the terminal mixer, press **Ctrl+G** on any tab;
@@ -5707,6 +5739,7 @@ settings. See
 | `~/.config/openxlr/profiles/<vid-pid>/recall-on-connect` | the profile recalled when that interface connects, when one is chosen |
 | `$XDG_RUNTIME_DIR/openxlr/control.sock` (or `~/.config/openxlr/control.sock` without a runtime directory) | private control API socket, authenticated by Linux peer credentials ([api.md](api.md)); the same commands over HTTP at `/api/v1` ([http-api.md](http-api.md)) |
 | `$XDG_RUNTIME_DIR/openxlr/daemon.lock` (or under `~/.config/openxlr` without a runtime directory) | held by the running daemon; a second daemon started for the same user stops at once |
+| `$XDG_RUNTIME_DIR/openxlr/ui.sock` (`flatpak-ui.sock` in the Flatpak; under `~/.config/openxlr` without a runtime directory) | the running UI's socket; launching OpenXLR again asks that UI to show itself and opens no second one |
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect when `retainsSettings` is false |
 | `~/.config/openxlr/devices/<vid-pid>/seen.json` | the boot and USB address at which the daemon last opened such an interface, a Wave:3 or a Wave:1, so a daemon start can tell whether it stayed plugged in ([Restoring settings on connect](#profiles)) |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
@@ -6831,8 +6864,8 @@ be written, and the bottom line says the saved choice could not be written.
 Material held dark, and
 `--list-skins` prints what this machine has, `OPENXLR_SKIN` names a skin
 the same way, and `--version` prints the version. Deck, Nyan Pink, the
-three Hi-Fi skins and the Omarchy skins get console fader caps, bracketed keys
-and lamps; Wave and
+three Hi-Fi skins, the three VFD skins and the Omarchy skins get console
+fader caps, bracketed keys and lamps; Wave, Compact Desk and
 the three Broadcast skins get the console cap with plain keys; Material is plain
 throughout.
 The terminal reads these choices from `controls` and derives its surfaces

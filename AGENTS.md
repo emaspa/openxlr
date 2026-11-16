@@ -45,8 +45,13 @@ python3 tools/deck-icons.py --check  # regenerate with no flag after changing La
 python3 tools/deck-segments.py --check  # regenerate with no flag after changing the OpenXLR Segment 14 font
 node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
 node --test plugin/tests/*.test.mjs
+python3 -m json.tool browser/chromium/manifest.json >/dev/null
+python3 -m json.tool browser/native-host.json >/dev/null
+for file in browser/chromium/*.mjs; do node --check "$file"; done
 node --test browser/tests/*.test.mjs
+node --check packaging/gnome/openxlr-focus@emaspa.github.com/extension.js
 node --test packaging/gnome/tests/*.test.mjs
+python3 -m json.tool packaging/gnome/openxlr-focus@emaspa.github.com/metadata.json >/dev/null
 dbus-run-session -- gjs -m packaging/gnome/tests/bus.mjs  # private GIO/D-Bus tests; gjs and dbus
 node --check browser/tests/chromium-integration.mjs
 python3 -I tools/browser-extension.py --check  # the Store zip (no manifest key) and the release tar.gz (the key), every referenced file present
@@ -58,7 +63,8 @@ python3 packaging/flatpak/nuget-sources.py --check  # regenerate with no flag af
 python3 packaging/flatpak/cargo-sources.py --check  # regenerate with no flag after a change to native/deepfilter/Cargo.lock
 python3 packaging/check-deepfilter.py  # every package builds DeepFilterNet in, with the pinned model
 python3 packaging/ppa/test-prune-cargo-vendor.py  # the PPA's pruned crates still pass cargo's checksums
-shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh packaging/ppa/make-source.sh
+shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh tools/ci-test-scope.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service packaging/openxlr-control
+python3 tools/test-ci-test-scope.py  # CI jobs selected for changed paths
 tools/check-version.sh
 tools/check-locked-restore.sh
 tools/check-openapi.py docs/openapi-v1.json
@@ -67,7 +73,6 @@ python3 tools/check-omarchy.py  # Qt 6 QML tools; external type declarations, no
 python3 tools/omarchy-skins.py --check  # regenerate with no flag after changing embedded meter tokens
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input packaging/omarchy/tests  # strip controls with a fake daemon
 node --test packaging/omarchy/tests/*.test.mjs
-shellcheck --severity=error packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service
 make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers; cargo for DeepFilterNet (DEEPFILTER=0 builds without)
 make -C native test-audio test-clap test-lv2 test-vst3 test-scan  # audio bounds, stall detection, measured delay, CLAP bus layouts, latency reports, VST3 parameter and stream checks, scan phase markers
 dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~Lv2BundleTests|FullyQualifiedName~PluginSearchPathTests"  # run with lilv installed, even if the earlier suite ran without it
@@ -80,10 +85,12 @@ make -C native test-denoise  # noise removal, RNNoise and DeepFilterNet when bui
 make -C native test-voice  # voice changer: every voice bounded and near the input level, exact when off, clean switches, no audio server
 make -C native test-player  # soundboard player: decoding, limits, press modes and ramps, libsndfile, no audio server
 make -C native test-bridge  # clock bridge: ring, drift loop and resampler between two simulated clocks, no audio server
+python3 native/tests/incremental.py  # the Make plan after the builds above: nothing for an unchanged tree, only the objects that include a changed header
 python3 tools/eq-reference.py --check  # regenerate with no flag after changing the EQ reference settings
 python3 tools/starter-sounds.py --check  # the soundboard's starter sounds; regenerate with no flag after changing their table
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
+python3 tools/test-mixer-fit.py --no-build  # the detached mixer's Fit to window mode across window sizes and display scales, one Xvfb session per scale
 OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
 OPENXLR_TEST_SKIN=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~SkinWindowTests
 OPENXLR_TEST_EQ=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~EqEditorWindowTests  # also needs libXtst
@@ -126,6 +133,10 @@ and [package checks](packaging/yabridge/README.md).
   linked source, under its own namespace through `OPENXLR_TUI`.
 - `plugin/com.emaspa.openxlr.sdPlugin`: the OpenDeck plugin
   (`plugin.mjs`) and its property inspectors; tests in `plugin/tests`.
+- `browser/`: the Chromium companion that routes single tabs
+  (`chromium/`) and the native messaging manifest that names `openxlr` as
+  its host (`native-host.json`); tests in `browser/tests`. The host side is
+  `src/OpenXLR.UI/BrowserNativeHost.cs`.
 - `native/`: C/C++ LV2, CLAP and VST3 host, editor regression tests.
 - `packaging/omarchy/`: Omarchy bar plugin and its user enable command;
   the external Arch recipe is documented in `docs/omarchy.md`. Its `Skins.js`

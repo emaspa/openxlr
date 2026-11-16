@@ -61,6 +61,7 @@ python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
 python3 -m json.tool packaging/omarchy/openxlr.mixer/manifest.json >/dev/null
 python3 tools/deck-skins.py --check  # regenerate with no flag after changing embedded skins or colour defaults
 python3 tools/deck-icons.py --check  # regenerate with no flag after changing LayoutIcons.cs
+python3 tools/deck-segments.py --check  # regenerate with no flag after changing the OpenXLR Segment 14 font
 python3 tools/eq-reference.py --check  # regenerate with no flag after changing the EQ reference settings
 python3 tools/starter-sounds.py --check  # the soundboard's starter sounds; regenerate with no flag after changing their table
 python3 packaging/flatpak/test-package.py  # the Flatpak manifest and its files
@@ -89,6 +90,8 @@ make -C native test-duck  # duck detector, gain depth and timing, no audio serve
 make -C native test-denoise  # noise removal, RNNoise and DeepFilterNet when built (cargo), no audio server
 make -C native test-voice  # voice changer: every voice bounded and near the input level, exact when off, clean switches, no audio server
 make -C native test-player  # soundboard player: decoding, limits, press modes and ramps, libsndfile, no audio server
+make -C native test-bridge  # clock bridge: ring, drift loop and resampler between two simulated clocks, no audio server
+python3 native/tests/incremental.py  # the Make plan after the builds above: nothing for an unchanged tree, only the objects that include a changed header
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
 OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
@@ -243,9 +246,12 @@ push to a pull request cancels the run it replaces. To check a branch
 before its pull request exists, open the pull request as a draft or start
 CI by hand with `gh workflow run CI --ref <branch>`. The checks that need
 no .NET build run for every change. A change that touches only Markdown
-files other than `docs/skins.md`, pictures under `docs/`, or the deck
-plugin's script, pages and tests skips the build and tests, and the
-Omarchy QML check runs only when its own files or the workflow change.
+files, PNG or SVG pictures under `docs/`, or the deck plugin's scripts,
+pages and tests skips the build and tests. The unit job still builds and
+runs when the change touches a document its tests read: `docs/skins.md`,
+`docs/manual.md`, `docs/install-from-source.md`, `docs/localization.md` or
+`docs/examples/skins/README.md`. The Omarchy QML check runs only when its
+own files or the workflow change.
 Skipped jobs count as passing for the required `ci-ok` check. CodeQL
 skips a change to `README.md` alone.
 

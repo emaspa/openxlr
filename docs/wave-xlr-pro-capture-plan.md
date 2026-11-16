@@ -6,7 +6,8 @@ resolved the input and output-selector controls described here; use
 for current offsets. The steps below are retained as the methodology for
 capturing another device, not as the current protocol specification.
 The hardware EQ was captured on 2026-10-21 (section 10 of the protocol
-notes); the remaining mix matrix still needs separate captures; see
+notes) and the mix matrix was measured on the desk after that (sections 12
+and 15 to 22); for what still needs captures see
 [hardware support](hardware-support.md) and the [roadmap](roadmap.md#devices).
 
 Goal: capture every USB control transfer Wave Link sends to the Wave XLR Pro so its vendor
@@ -141,7 +142,7 @@ move on.
 19. **Monitor blend / direct-monitor volume**: move it in ~4 discrete steps from one end to the
     other (e.g. 0%, 33%, 66%, 100%), ~5 s each. Log each step. Result: resolves the open question of
     whether the zero-latency monitor blend is exposed as a vendor command or only in DSP.
-20. **Mic output volume** (the "Microphone Output Volume" in your config) to a couple of distinct
+20. **Mic output volume** (Wave Link's "Microphone Output Volume" setting) to a couple of distinct
     values. 21. **Mic output mute** on/off.
 22. **Polarity / polarization** toggle if present.
 23. (Optional confirmation) Change mic gain once **from the Stream Deck dial** instead of the
@@ -193,5 +194,5 @@ Analysis steps on Linux:
   **If3 vendor-specific class 0xFF, no endpoints, no kernel driver**, the control target.
 - Mic gain is ALSO a standard ALSA control on Linux (0 to 80 dB), already works without this
   protocol; the capture is for phantom / low-cut / ClipGuard / monitor blend / mic-output.
-- No LEDs, no physical controls; LED/knob/button settings in a Wave Link config belong to
+- No LEDs, no physical controls; Wave Link's LED, knob and button settings belong to
   the XLR Dock, not the Pro.

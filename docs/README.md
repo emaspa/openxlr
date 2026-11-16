@@ -7,6 +7,9 @@ open `main`, so they can describe changes newer than the installed release.
 ## Using OpenXLR
 
 - [Project README](../README.md): supported devices, packages and quick start.
+- [Getting started](getting-started.md): the first microphone, listening
+  output and routed app after installing, then a separate mix for a call
+  or stream.
 - [Manual](manual.md): mixer tasks, application routing, plugins, the
   soundboard, profiles, Flow, Stream Deck, troubleshooting, local files,
   the terminal mixer and the Omarchy bar.
