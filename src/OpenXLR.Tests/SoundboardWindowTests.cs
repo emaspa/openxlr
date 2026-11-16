@@ -210,6 +210,9 @@ internal static class SoundboardWindowTests
         var commands = new ConcurrentQueue<JsonNode>();
         var daemon = new Daemon();
         FakeSocket? live = null;
+        // One change to the daemon at a time, each with the state it pushes: a command's answer
+        // is never a state from before a change the test made meanwhile, sent after the test's.
+        var turn = new SemaphoreSlim(1, 1);
         await using var server = await SocketTestServer.Start(async (socket, stop) =>
         {
             var holder = new FakeSocket(socket, stop);
@@ -220,38 +223,57 @@ internal static class SoundboardWindowTests
                 JsonNode cmd = await SocketTestServer.Receive(socket, stop);
                 string name = cmd["cmd"]?.GetValue<string>() ?? "";
                 if (name is "listPlugins" or "getPluginSetup") continue;
-                string? id = cmd["requestId"]?.GetValue<string>();
-                if (name == "importClip")
-                {
-                    commands.Enqueue(cmd);
-                    bool ok = cmd["path"]!.GetValue<string>().EndsWith(".wav", StringComparison.Ordinal);
-                    string message = ok ? "Applause was added to the soundboard." : "The clip is 31.0 s long; the limit is 30 s.";
-                    if (ok) daemon.Clips.Add(new JsonObject
-                    {
-                        ["id"] = "applause", ["name"] = "Applause", ["seconds"] = 3.0, ["gain"] = 1.0, ["mode"] = "overlap", ["loop"] = false,
-                        ["icon"] = "", ["colour"] = null, ["loaded"] = true, ["error"] = null, ["playing"] = false,
-                    });
-                    await holder.Push(daemon.State());
-                    await holder.Push(new JsonObject { ["type"] = "clipImport", ["ok"] = ok, ["message"] = message, ["clip"] = ok ? "applause" : null });
-                    await holder.Push(new JsonObject { ["type"] = "commandResult", ["requestId"] = id, ["error"] = ok ? null : message });
-                    continue;
-                }
-                if (name == "restoreStarterSounds")
-                {
-                    commands.Enqueue(cmd);
-                    await holder.Push(new JsonObject { ["type"] = "starterSounds", ["ok"] = true, ["message"] = "Every starter sound is on the soundboard already.",
-                        ["clips"] = new JsonArray(), ["skipped"] = new JsonArray() });
-                    await holder.Push(new JsonObject { ["type"] = "commandResult", ["requestId"] = id, ["error"] = null });
-                    continue;
-                }
-                if (!name.Contains("Clip", StringComparison.Ordinal) && name is not ("setSoundboard" or "stopAudition")) continue;
-                string? error = daemon.Handle(cmd);
-                commands.Enqueue(cmd);
-                // As the daemon does: the state first, then the answer to the request.
-                await holder.Push(daemon.State());
-                if (id is not null) await holder.Push(new JsonObject { ["type"] = "commandResult", ["requestId"] = id, ["error"] = error });
+                await turn.WaitAsync(stop);
+                try { await Answer(holder, cmd, name); }
+                finally { turn.Release(); }
             }
         });
+
+        async Task Answer(FakeSocket holder, JsonNode cmd, string name)
+        {
+            string? id = cmd["requestId"]?.GetValue<string>();
+            if (name == "importClip")
+            {
+                commands.Enqueue(cmd);
+                bool ok = cmd["path"]!.GetValue<string>().EndsWith(".wav", StringComparison.Ordinal);
+                string message = ok ? "Applause was added to the soundboard." : "The clip is 31.0 s long; the limit is 30 s.";
+                if (ok) daemon.Clips.Add(new JsonObject
+                {
+                    ["id"] = "applause", ["name"] = "Applause", ["seconds"] = 3.0, ["gain"] = 1.0, ["mode"] = "overlap", ["loop"] = false,
+                    ["icon"] = "", ["colour"] = null, ["loaded"] = true, ["error"] = null, ["playing"] = false,
+                });
+                await holder.Push(daemon.State());
+                await holder.Push(new JsonObject { ["type"] = "clipImport", ["ok"] = ok, ["message"] = message, ["clip"] = ok ? "applause" : null });
+                await holder.Push(new JsonObject { ["type"] = "commandResult", ["requestId"] = id, ["error"] = ok ? null : message });
+                return;
+            }
+            if (name == "restoreStarterSounds")
+            {
+                commands.Enqueue(cmd);
+                await holder.Push(new JsonObject { ["type"] = "starterSounds", ["ok"] = true, ["message"] = "Every starter sound is on the soundboard already.",
+                    ["clips"] = new JsonArray(), ["skipped"] = new JsonArray() });
+                await holder.Push(new JsonObject { ["type"] = "commandResult", ["requestId"] = id, ["error"] = null });
+                return;
+            }
+            if (!name.Contains("Clip", StringComparison.Ordinal) && name is not ("setSoundboard" or "stopAudition")) return;
+            string? error = daemon.Handle(cmd);
+            commands.Enqueue(cmd);
+            // As the daemon does: the state first, then the answer to the request.
+            await holder.Push(daemon.State());
+            if (id is not null) await holder.Push(new JsonObject { ["type"] = "commandResult", ["requestId"] = id, ["error"] = error });
+        }
+
+        // Change the fake daemon as it changes by itself, and push the state it now has.
+        async Task Change(Action change)
+        {
+            await turn.WaitAsync();
+            try
+            {
+                change();
+                await live!.Push(daemon.State());
+            }
+            finally { turn.Release(); }
+        }
 
         var window = new MainWindow(new DaemonClient(server.Url));
         if (Environment.GetEnvironmentVariable("OPENXLR_LAYOUT_FONT") is { Length: > 0 } font)
@@ -433,16 +455,14 @@ internal static class SoundboardWindowTests
             Assert.True(whileAuditioned.Single(i => i.Name == "SoundClipStop").IsEnabled);
             // The audition ends by itself while the menu is open: the entry still
             // stops, and never starts the clip again.
-            daemon.Auditioning = null;
-            await live.Push(daemon.State());
+            await Change(() => daemon.Auditioning = null);
             await Until(() => !main.Soundboard.Clips[0].Auditioned);
             Assert.Equal("stopAudition", (await Sent(() => stopAudition.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent))))["cmd"]!.GetValue<string>());
             // The other way round: a menu opened on a silent clip auditions it,
             // even when an audition of it started meanwhile.
             MenuItem startAudition = board.PadMenu(main.Soundboard, main.Soundboard.Clips[0]).Items.OfType<MenuItem>().Single(i => i.Name == "SoundClipAudition");
             Assert.Equal(Localizer.Text("SoundClipAudition"), startAudition.Header);
-            daemon.Auditioning = "airhorn";
-            await live.Push(daemon.State());
+            await Change(() => daemon.Auditioning = "airhorn");
             await Until(() => main.Soundboard.Clips[0].Auditioned);
             Assert.Equal("auditionClip", (await Sent(() => startAudition.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent))))["cmd"]!.GetValue<string>());
             // The pad's Stop ends the audition.
@@ -491,12 +511,10 @@ internal static class SoundboardWindowTests
 
             // A hold pad held down is released when it turns off: the board stops under it.
             await Sent(() => Key(Pad("drumroll"), Avalonia.Input.Key.Enter, true));
-            daemon.Enabled = false;
-            await live.Push(daemon.State());
+            await Change(() => daemon.Enabled = false);
             await Until(() => commands.ToArray()[^1]["cmd"]!.GetValue<string>() == "releaseClip");
             Assert.Equal("drumroll", commands.ToArray()[^1]["clip"]!.GetValue<string>());
-            daemon.Enabled = true;
-            await live.Push(daemon.State());
+            await Change(() => daemon.Enabled = true);
             await Until(() => Pad("drumroll").IsEffectivelyEnabled);
             // Held, then moved: the press releases its own clip exactly once, whether the pad goes
             // with the move or the window loses focus first, and a key up afterwards sends nothing.
@@ -554,8 +572,7 @@ internal static class SoundboardWindowTests
             Assert.False(pageBar.IsEffectivelyVisible);
 
             // Pages: a tab each, the pads of the page shown, the menu for a named page.
-            daemon.Clips.Single(c => c["id"]!.GetValue<string>() == "drumroll")["page"] = "Jingles with a long page name for the tab";
-            await live.Push(daemon.State());
+            await Change(() => daemon.Clips.Single(c => c["id"]!.GetValue<string>() == "drumroll")["page"] = "Jingles with a long page name for the tab");
             Button[] Tabs() => [.. board.GetVisualDescendants().OfType<Button>().Where(b => b.Name == "SoundboardPageTab")];
             // The bar shows before a layout pass has made its tabs.
             await Until(() => pageBar.IsEffectivelyVisible && Tabs().Length == 2);
@@ -595,10 +612,12 @@ internal static class SoundboardWindowTests
 
             // SFX deleted: the daemon's sentence and the switch, which creates SFX again; the header keeps its button.
             const string deleted = "The soundboard is off because the SFX channel was deleted. Turn it on again to create SFX, muted in every mix.";
-            daemon.HasSfx = false;
-            daemon.Enabled = false;
-            daemon.Error = deleted;
-            await live.Push(daemon.State());
+            await Change(() =>
+            {
+                daemon.HasSfx = false;
+                daemon.Enabled = false;
+                daemon.Error = deleted;
+            });
             TextBlock notice = Find<TextBlock>(board, "SoundboardNotice");
             CheckBox turnOn = Find<CheckBox>(board, "SoundboardEnabled");
             await Until(() => notice.IsEffectivelyVisible && notice.Text == deleted && turnOn.IsEffectivelyVisible && turnOn.IsChecked == false);
@@ -618,8 +637,7 @@ internal static class SoundboardWindowTests
 
             // The software mixer stops: the pads stay, the same ones, unable to play, and the window says why.
             SoundPad kept = Pad("airhorn");
-            daemon.MixerOff = true;
-            await live.Push(daemon.State());
+            await Change(() => daemon.MixerOff = true);
             await Until(() => notice.IsEffectivelyVisible && notice.Text == Localizer.Text("SoundboardMixerOff") && !kept.IsEnabled);
             // No mixer, no header button; the tray and Options still reach the window.
             Assert.False(fromHeader.IsEffectivelyVisible);
@@ -630,13 +648,11 @@ internal static class SoundboardWindowTests
             Layout(board, 760, 620);
             AssertFits(board, "with the mixer off");
             Capture(board, "soundboard-mixer-off");
-            daemon.MixerOff = false;
-            await live.Push(daemon.State());
+            await Change(() => daemon.MixerOff = false);
             await Until(() => kept.IsEnabled && !notice.IsEffectivelyVisible && fromHeader.IsEffectivelyVisible);
 
             // No native helper: the sentence, and nothing to add or turn on.
-            daemon.Available = false;
-            await live.Push(daemon.State());
+            await Change(() => daemon.Available = false);
             await Until(() => notice.IsEffectivelyVisible && notice.Text == SoundboardViewModelTests.NeedsHost);
             Assert.False(Find<Button>(board, "SoundboardAddFiles").IsEnabled);
             Assert.False(turnOn.IsEffectivelyVisible);
