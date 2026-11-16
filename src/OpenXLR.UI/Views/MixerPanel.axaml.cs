@@ -109,6 +109,18 @@ public partial class MixerPanel : UserControl
         key.SetCurrentValue(ToggleButton.IsCheckedProperty, choice.IsSelected);
     }
 
+    /// <summary>
+    /// The volume key ahead of a bank's picker: show every channel's own
+    /// volume in the bank. As with a mix's key, the toggle is put back to
+    /// what the bank shows, so pressing it again leaves it lit.
+    /// </summary>
+    private void OnBankVolumeKey(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton { DataContext: MixBankViewModel bank } key) return;
+        bank.SelectVolume();
+        key.SetCurrentValue(ToggleButton.IsCheckedProperty, bank.ShowsVolume);
+    }
+
     private void OnMixInserts(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is BankMasterViewModel master && TopLevel.GetTopLevel((Control)sender!) is Window window)

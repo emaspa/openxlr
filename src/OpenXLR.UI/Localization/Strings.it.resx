@@ -2482,6 +2482,15 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="BankPickerTip" xml:space="preserve">
     <value>Il mix mostrato da questo banco. Sono elencati tutti i mix; sceglierne uno mostrato da un altro banco scambia i due. La scelta viene conservata per questa skin e non cambia mai l'ordine del mixer.</value>
   </data>
+  <data name="BankVolumeKeyName" xml:space="preserve">
+    <value>Volumi dei canali</value>
+  </data>
+  <data name="BankVolumeTip" xml:space="preserve">
+    <value>Mostra in questo banco il volume proprio di ogni canale, che alza o abbassa insieme tutte le mandate del canale. La scelta viene conservata per questa skin.</value>
+  </data>
+  <data name="BankVolumeMeterTip" xml:space="preserve">
+    <value>Il livello proprio del canale, prima del suo volume</value>
+  </data>
   <data name="BankSendName" xml:space="preserve">
     <value>Mandata di {0} verso {1}</value>
   </data>

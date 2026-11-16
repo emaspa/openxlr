@@ -19,7 +19,7 @@
     <!-- A bank's cell, by the skin's strip template. -->
     <layout:StripTemplateSelector x:Key="BankCells">
       <DataTemplate x:Key="vertical-strip" x:DataType="layout:BankCellViewModel">
-        <Border Classes="tile strip upright" Name="BankCell" IsVisible="{Binding Shown}" Classes.revealed="{Binding Send.Revealed}" VerticalAlignment="Top">
+        <Border Classes="tile strip upright" Name="BankCell" IsVisible="{Binding Shown}" Classes.revealed="{Binding Revealed}" VerticalAlignment="Top">
           <DockPanel>
             <Button DockPanel.Dock="Top" Classes="ghost reorderHandle" Classes.fixedPlace="{Binding HandleHidden}"
                     Content="↔" Tag="{Binding Channel}" HorizontalAlignment="Left" Margin="0,0,0,4"
@@ -27,7 +27,7 @@
                     ToolTip.Tip="{loc:Text Key=DragOntoAnotherChannelYouCanEdit}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <StackPanel layout:StripPanel.Part="identity" Spacing="2">
-                <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Send.Muted}"
+                <vm:LayoutIconBlock Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Muted}"
                            HorizontalAlignment="Center" IsVisible="{Binding ShowsIcon}"
                            AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <skin:LitText Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
@@ -35,39 +35,52 @@
                               ToolTip.Tip="{Binding Channel.Name}"/>
               </StackPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1"
-                          ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
+                          ToolTip.Tip="{Binding MeterTip}">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterL}"
                                  AutomationProperties.Name="{Binding LeftLevelName}"/>
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterR}" Classes.monoSpare="{Binding Channel.MonoMeter}"
                                  AutomationProperties.Name="{Binding RightLevelName}"/>
               </StackPanel>
               <Panel layout:StripPanel.Part="fader">
+                <!-- the send's level, or in the volume view the channel's own volume -->
                 <Slider Classes="stripFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
                         Orientation="{Binding Spec.FaderOrientation}" IsDirectionReversed="{Binding Spec.FaderReversed}"
-                        Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
+                        Value="{Binding Level, Mode=TwoWay}" IsVisible="{Binding HasFader}"
+                        vm:FaderInput.IsAdjusting="{Binding Adjusting, Mode=OneWayToSource}"
+                        AutomationProperties.Name="{Binding SendName}" ToolTip.Tip="{Binding FaderTip}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value">
-                <skin:LitText Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
+                <skin:LitText Text="{Binding LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"
+                              IsVisible="{Binding HasFader}"/>
               </Panel>
-              <!-- the channel's link chip over the send's mute: a bank shows one send of the channel,
-                   and the chip links all of them -->
+              <!-- the channel's link chip over the mute: a bank shows one send of the channel, and
+                   the chip links all of them; the volume view has no send to link -->
               <StackPanel layout:StripPanel.Part="mute" Spacing="4" HorizontalAlignment="Center">
                 <ToggleButton Name="BankLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
                               Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"
                               MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" HorizontalContentAlignment="Center"
-                              IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
-                              AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
-                <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
+                              IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                              AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}">
+                  <ToggleButton.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="Channel.HasLinkedSends"/>
+                      <Binding Path="!ShowsVolume"/>
+                    </MultiBinding>
+                  </ToggleButton.IsVisible>
+                </ToggleButton>
+                <!-- the send's mute, or in the volume view the channel's own where it has one -->
+                <ToggleButton Classes="mute mutemini" IsChecked="{Binding Muted, Mode=TwoWay}"
+                              IsVisible="{Binding HasMute}" IsEnabled="{Binding CanMute}"
                               Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                               HorizontalAlignment="Center" AutomationProperties.Name="{Binding MuteName}"
-                              ToolTip.Tip="{Binding MuteName}"/>
+                              ToolTip.Tip="{Binding MuteTip}"/>
               </StackPanel>
             </layout:StripPanel>
           </DockPanel>
         </Border>
       </DataTemplate>
       <DataTemplate x:Key="send-list" x:DataType="layout:BankCellViewModel">
-        <Border Classes="strip" Name="BankCell" IsVisible="{Binding Shown}" Classes.revealed="{Binding Send.Revealed}" Padding="0,2">
+        <Border Classes="strip" Name="BankCell" IsVisible="{Binding Shown}" Classes.revealed="{Binding Revealed}" Padding="0,2">
           <DockPanel>
             <Button DockPanel.Dock="Left" Classes="ghost reorderHandle alongY" Classes.fixedPlace="{Binding HandleHidden}"
                     Content="↔" Tag="{Binding Channel}" Margin="0,0,4,0"
@@ -77,7 +90,7 @@
               <!-- a fixed column, so the rows' faders line up; the name shortens to fit it -->
               <DockPanel layout:StripPanel.Part="identity" VerticalAlignment="Center" Width="{DynamicResource Ox.Mixer.StripWidth}">
                 <vm:LayoutIconBlock DockPanel.Dock="Left" Icon="{Binding Channel.Appearance.Icon}" Fallback="{Binding Channel.Appearance.DefaultIcon}" Classes="strip"
-                           Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Send.Muted}" Margin="0,0,4,0"
+                           Classes.layoutAccent="{Binding Channel.Appearance.HasColour}" Classes.muted="{Binding Muted}" Margin="0,0,4,0"
                            VerticalAlignment="Center" IsVisible="{Binding ShowsIcon}"
                            AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                 <skin:LitText Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
@@ -85,30 +98,42 @@
                               ToolTip.Tip="{Binding Channel.Name}"/>
               </DockPanel>
               <StackPanel layout:StripPanel.Part="meter" Orientation="{Binding Spec.MeterPairOrientation}" Spacing="1"
-                          VerticalAlignment="Center" ToolTip.Tip="{loc:Text Key=ChannelMeterTip}">
+                          VerticalAlignment="Center" ToolTip.Tip="{Binding MeterTip}">
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterL}"
                                  AutomationProperties.Name="{Binding LeftLevelName}"/>
                 <skin:LevelMeter Orientation="{Binding Spec.MeterOrientation}" Level="{Binding Channel.MeterR}" Classes.monoSpare="{Binding Channel.MonoMeter}"
                                  AutomationProperties.Name="{Binding RightLevelName}"/>
               </StackPanel>
               <Panel layout:StripPanel.Part="fader" VerticalAlignment="Center">
+                <!-- the send's level, or in the volume view the channel's own volume -->
                 <Slider Classes="stripFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
                         Orientation="{Binding Spec.FaderOrientation}" IsDirectionReversed="{Binding Spec.FaderReversed}"
-                        Value="{Binding Send.Level, Mode=TwoWay}" AutomationProperties.Name="{Binding SendName}"/>
+                        Value="{Binding Level, Mode=TwoWay}" IsVisible="{Binding HasFader}"
+                        vm:FaderInput.IsAdjusting="{Binding Adjusting, Mode=OneWayToSource}"
+                        AutomationProperties.Name="{Binding SendName}" ToolTip.Tip="{Binding FaderTip}"/>
               </Panel>
               <Panel layout:StripPanel.Part="value" VerticalAlignment="Center" MinWidth="28">
-                <skin:LitText Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Right"/>
+                <skin:LitText Text="{Binding LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Right"
+                              IsVisible="{Binding HasFader}"/>
               </Panel>
-              <!-- the channel's link chip before the send's mute: a bank shows one send of the
-                   channel, and the chip links all of them -->
+              <!-- the channel's link chip before the mute: a bank shows one send of the channel, and
+                   the chip links all of them; the volume view has no send to link -->
               <StackPanel layout:StripPanel.Part="mute" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                 <ToggleButton Name="BankLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
                               Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
-                              IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
-                              AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
-                <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
+                              IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                              AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}">
+                  <ToggleButton.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="Channel.HasLinkedSends"/>
+                      <Binding Path="!ShowsVolume"/>
+                    </MultiBinding>
+                  </ToggleButton.IsVisible>
+                </ToggleButton>
+                <ToggleButton Classes="mute mutemini" IsChecked="{Binding Muted, Mode=TwoWay}"
+                              IsVisible="{Binding HasMute}" IsEnabled="{Binding CanMute}"
                               Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
-                              AutomationProperties.Name="{Binding MuteName}" ToolTip.Tip="{Binding MuteName}"/>
+                              AutomationProperties.Name="{Binding MuteName}" ToolTip.Tip="{Binding MuteTip}"/>
               </StackPanel>
             </layout:StripPanel>
           </DockPanel>
@@ -122,6 +147,10 @@
       <DataTemplate x:Key="master-card" x:DataType="layout:BankMasterViewModel">
         <Border Classes="tile" Name="BankMaster" Padding="10" VerticalAlignment="Top">
           <StackPanel Spacing="6">
+            <!-- Arrange mode's handle on the mix, as the classic mix tile has it -->
+            <Button Name="BankMasterHandle" Classes="ghost reorderHandle" Classes.fixedPlace="{Binding !Mix.IsEditable}" Content="↔" Tag="{Binding Mix}"
+                    HorizontalAlignment="Left" AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"
+                    ToolTip.Tip="{loc:Text Key=DragOntoAnotherMixYouAddedArrow}"/>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <Grid layout:StripPanel.Part="identity" ColumnDefinitions="Auto,*" ColumnSpacing="6">
                 <vm:LayoutIconBlock Icon="{Binding Mix.Appearance.Icon}" Fallback="{Binding Mix.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}" Classes.muted="{Binding Mix.Muted}"
@@ -271,6 +300,10 @@
             </Grid.Styles>
             <layout:StripPanel Spec="{Binding Spec}" Spacing="6">
               <StackPanel layout:StripPanel.Part="identity" Spacing="2">
+                <!-- Arrange mode's handle on the mix, over its name as a bank strip has its channel's -->
+                <Button Name="BankMasterHandle" Classes="ghost reorderHandle" Classes.fixedPlace="{Binding !Mix.IsEditable}" Content="↔" Tag="{Binding Mix}"
+                        HorizontalAlignment="Left" Margin="0,0,0,2" AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"
+                        ToolTip.Tip="{loc:Text Key=DragOntoAnotherMixYouAddedArrow}"/>
                 <vm:LayoutIconBlock Icon="{Binding Mix.Appearance.Icon}" Fallback="{Binding Mix.Appearance.DefaultIcon}" Classes="strip" Classes.layoutAccent="{Binding Mix.Appearance.HasColour}" Classes.muted="{Binding Mix.Muted}"
                            HorizontalAlignment="Center" AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{Binding Mix.Name}">
                   <vm:LayoutIconBlock.IsVisible>
@@ -401,31 +434,38 @@
           <DataTemplate x:DataType="layout:MixBankViewModel">
             <Border Classes="tile" Name="Bank" Padding="8" VerticalAlignment="Top">
               <DockPanel HorizontalAlignment="{Binding ContentAlignment}">
-                <ComboBox DockPanel.Dock="Top" Name="BankPicker" ItemsSource="{Binding Available}" IsVisible="{Binding PickerDropdown}"
-                          SelectedItem="{Binding Mix, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
-                          AutomationProperties.Name="{Binding PickerName}" ToolTip.Tip="{loc:Text Key=BankPickerTip}">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:MixViewModel">
-                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <!-- the same pick as a row of keys, one per mix, the shown mix's key lit -->
-                <ItemsControl DockPanel.Dock="Top" Name="BankKeys" ItemsSource="{Binding Choices}" IsVisible="{Binding PickerButtons}"
-                              Margin="0,0,0,4" AutomationProperties.Name="{Binding PickerName}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="layout:BankChoiceViewModel">
-                      <ToggleButton Name="BankKey" Content="{Binding Mix.Name}" IsChecked="{Binding IsSelected, Mode=OneWay}"
-                                    Click="OnBankKey" Margin="0,0,4,4" MinWidth="64" HorizontalContentAlignment="Center"
-                                    AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{loc:Text Key=BankPickerTip}"/>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- the picker's row: the volume key, which shows every channel's own
+                     volume in the bank, ahead of the dropdown or the mixes' keys -->
+                <DockPanel DockPanel.Dock="Top" Name="BankPickerRow">
+                  <ToggleButton DockPanel.Dock="Left" Name="BankVolumeKey" Content="{loc:Text Key=Volume}" IsChecked="{Binding ShowsVolume, Mode=OneWay}"
+                                Click="OnBankVolumeKey" Margin="0,0,4,4" MinWidth="64" HorizontalContentAlignment="Center" VerticalAlignment="Top"
+                                AutomationProperties.Name="{loc:Text Key=BankVolumeKeyName}" ToolTip.Tip="{loc:Text Key=BankVolumeTip}"/>
+                  <ComboBox DockPanel.Dock="Top" Name="BankPicker" ItemsSource="{Binding Available}" IsVisible="{Binding PickerDropdown}"
+                            SelectedItem="{Binding Mix, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
+                            AutomationProperties.Name="{Binding PickerName}" ToolTip.Tip="{loc:Text Key=BankPickerTip}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:MixViewModel">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <!-- the same pick as a row of keys, one per mix, the shown mix's key lit -->
+                  <ItemsControl DockPanel.Dock="Top" Name="BankKeys" ItemsSource="{Binding Choices}" IsVisible="{Binding PickerButtons}"
+                                Margin="0,0,0,4" AutomationProperties.Name="{Binding PickerName}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="layout:BankChoiceViewModel">
+                        <ToggleButton Name="BankKey" Content="{Binding Mix.Name}" IsChecked="{Binding IsSelected, Mode=OneWay}"
+                                      Click="OnBankKey" Margin="0,0,4,4" MinWidth="64" HorizontalContentAlignment="Center"
+                                      AutomationProperties.Name="{Binding Mix.Name}" ToolTip.Tip="{loc:Text Key=BankPickerTip}"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </DockPanel>
                 <ContentControl Name="BankMasterHost" DockPanel.Dock="{Binding MasterDock}" Content="{Binding Master}"
                                 ContentTemplate="{StaticResource BankMasters}" Margin="{Binding MasterMargin}"
                                 HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Classes.revealed="{Binding Mix.Revealed}"/>

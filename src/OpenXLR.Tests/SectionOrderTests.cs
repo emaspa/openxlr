@@ -1,4 +1,5 @@
 using OpenXLR.UI;
+using OpenXLR.UI.Layout;
 
 namespace OpenXLR.Tests;
 
@@ -221,6 +222,10 @@ public sealed class SectionOrderTests
             // An empty choice is no entry at all.
             Assert.Null(again.WithSkinBanks("broadcast", 1, []).SkinBanksFor("broadcast", 1));
             Assert.Null(again.WithSkinBanks("broadcast", 1, null).SkinBanksFor("broadcast", 1));
+            // A bank on the channels' volumes keeps that choice; nothing else that is not a mix id does.
+            Assert.Equal([MixerPresentationViewModel.VolumeChoice, "stream"],
+                again.WithSkinBanks("hifi", 1, [MixerPresentationViewModel.VolumeChoice, "*other", "stream", MixerPresentationViewModel.VolumeChoice])
+                    .SkinBanksFor("hifi", 1));
         }
         finally
         {

@@ -2424,6 +2424,15 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="BankPickerTip" xml:space="preserve">
     <value>Ang mix nga gipakita niining bank. Gilista ang tanang mix; kon pilion ang gipakita sa laing bank, magbaylo ang duha. Gitipigan alang niining skin ang gipili ug dili usbon ang han-ay sa mixer.</value>
   </data>
+  <data name="BankVolumeKeyName" xml:space="preserve">
+    <value>Volume sa mga channel</value>
+  </data>
+  <data name="BankVolumeTip" xml:space="preserve">
+    <value>Ipakita niining bank ang kaugalingong volume sa matag channel, nga dungan nga mopataas o mopaubos sa tanang send sa channel. Gitipigan alang niining skin ang gipili.</value>
+  </data>
+  <data name="BankVolumeMeterTip" xml:space="preserve">
+    <value>Kaugalingong level sa channel, sa dili pa ang volume niini</value>
+  </data>
   <data name="BankSendName" xml:space="preserve">
     <value>Send sa {0} ngadto sa {1}</value>
   </data>

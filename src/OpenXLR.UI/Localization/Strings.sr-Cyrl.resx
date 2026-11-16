@@ -2424,6 +2424,15 @@
   <data name="BankPickerTip" xml:space="preserve">
     <value>Микс који ова банка приказује. Сви миксеви су на листи; избор оног који приказује друга банка замењује та два. Избор се чува за ову тему и никада не мења редослед миксера.</value>
   </data>
+  <data name="BankVolumeKeyName" xml:space="preserve">
+    <value>Јачине канала</value>
+  </data>
+  <data name="BankVolumeTip" xml:space="preserve">
+    <value>Приказује у овој банци сопствену јачину сваког канала, која заједно појачава или утишава сва слања канала. Избор се чува за ову тему.</value>
+  </data>
+  <data name="BankVolumeMeterTip" xml:space="preserve">
+    <value>Сопствени ниво канала, пре његове јачине</value>
+  </data>
   <data name="BankSendName" xml:space="preserve">
     <value>Слање {0} ка {1}</value>
   </data>

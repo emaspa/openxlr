@@ -278,8 +278,9 @@ public sealed record UiSettings
 
     /// <summary>
     /// The bank choices made safe to use: entries with no skin, repeats of
-    /// one skin and version (the last wins), and ids that are not a mix id
-    /// go; each entry keeps at most as many mixes as a skin may show banks.
+    /// one skin and version (the last wins), and ids that are neither a mix
+    /// id nor the volume view's go; each entry keeps at most as many choices
+    /// as a skin may show banks.
     /// </summary>
     private static IReadOnlyList<SkinBankSelection> NormalizeBankSelections(IReadOnlyList<SkinBankSelection?>? entries)
     {
@@ -289,7 +290,7 @@ public sealed record UiSettings
         {
             if (entry is not { Skin.Length: > 0 }) continue;
             kept.RemoveAll(e => e.Skin == entry.Skin && e.Version == entry.Version);
-            string[] banks = [.. (entry.Banks ?? []).Where(Skinning.SkinLayoutReader.ValidMixId).Distinct(StringComparer.Ordinal)
+            string[] banks = [.. (entry.Banks ?? []).Where(id => Skinning.SkinLayoutReader.ValidMixId(id) || id == Layout.MixerPresentationViewModel.VolumeChoice).Distinct(StringComparer.Ordinal)
                 .Take(Skinning.SkinFormat.MaxVisibleBanks)];
             if (banks.Length > 0) kept.Add(entry with { Banks = banks });
         }
@@ -400,8 +401,10 @@ public sealed record SkinArrangement
 
 /// <summary>
 /// The mixes the user picked for one skin's banks: the skin's id, the layout
-/// version, and the mix ids in bank order. An id whose mix is gone is
-/// skipped when the banks are filled, so the bank moves on to the next mix.
+/// version, and the mix ids in bank order, with
+/// <see cref="Layout.MixerPresentationViewModel.VolumeChoice"/> for a bank
+/// that shows the channels' volumes. An id whose mix is gone is skipped
+/// when the banks are filled, so the bank moves on to the next mix.
 /// </summary>
 public sealed record SkinBankSelection
 {

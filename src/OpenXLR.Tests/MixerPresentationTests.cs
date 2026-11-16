@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Avalonia.Layout;
 using OpenXLR.UI;
 using OpenXLR.UI.Layout;
+using OpenXLR.UI.Localization;
 using OpenXLR.UI.Skinning;
 
 namespace OpenXLR.Tests;
@@ -386,6 +387,148 @@ public sealed class MixerPresentationTests
         // A layout edit waits for its answer, so everything sent before it has arrived.
         Assert.Null(await client.DeleteExclusiveGroupAsync("barrier").WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal([$"setChannelMuted:game:{send.MixId}", "deleteExclusiveGroup::"], commands.ToArray());
+    }
+
+    /// <summary>
+    /// The volume key: a bank on it shows no mix and no master, every cell
+    /// hands on to its channel's own volume, and the choice trades places
+    /// with another bank's like a mix's, is kept as the volume view's own
+    /// entry, and comes back from it. A bank back on a mix holds its sends again.
+    /// </summary>
+    [Fact]
+    public void TheVolumeKeyTradesPlacesLikeAMixAndIsKept()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        Apply(model, ["game", "music"], ["monitor", "stream", "chat"]);
+        using var presentation = Presentation(model, Banks(2) with { Picker = SkinLayoutTemplates.PickerButtons });
+        MixBankViewModel first = presentation.Banks[0], second = presentation.Banks[1];
+        var chosen = new List<IReadOnlyList<string>>();
+        presentation.SelectionChosen += chosen.Add;
+        var raised = new List<string?>();
+        first.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        first.SelectVolume();
+        Assert.True(first.ShowsVolume);
+        Assert.Null(first.Mix);
+        Assert.Null(first.Master);
+        Assert.Contains(nameof(MixBankViewModel.ShowsVolume), raised);
+        Assert.All(first.Choices, c => Assert.False(c.IsSelected));
+        Assert.Equal([MixerPresentationViewModel.VolumeChoice, "stream"], presentation.Selection);
+        Assert.Equal([MixerPresentationViewModel.VolumeChoice, "stream"], Assert.Single(chosen));
+        foreach (BankCellViewModel cell in first.Cells)
+        {
+            Assert.True(cell.ShowsVolume);
+            Assert.Null(cell.Send);
+            Assert.True(cell.Shown);
+            Assert.Equal(cell.Channel.Volume, cell.Level);
+            Assert.Equal(cell.Channel.VolumeText, cell.LevelText);
+            Assert.Equal(Localizer.Format("ChannelVolumeName", cell.Channel.Name), cell.SendName);
+            Assert.Equal(Localizer.Text("BankVolumeMeterTip"), cell.MeterTip);
+            // An application channel's mutes are its sends'; its volume has none.
+            Assert.False(cell.HasMute);
+        }
+        // The other bank still holds its sends.
+        Assert.All(second.Cells, c => Assert.Same(c.Channel.Sends.Single(s => s.MixId == "stream"), c.Send));
+
+        // Pressing the lit key changes nothing; the other bank's key trades the two.
+        first.SelectVolume();
+        Assert.Single(chosen);
+        second.SelectVolume();
+        Assert.Equal(["stream", MixerPresentationViewModel.VolumeChoice], presentation.Selection);
+        Assert.False(first.ShowsVolume);
+        Assert.NotNull(first.Master);
+        Assert.All(first.Cells, c => Assert.Same(c.Channel.Sends.Single(s => s.MixId == "stream"), c.Send));
+        Assert.All(first.Cells, c => Assert.Equal(Localizer.Text("ChannelMeterTip"), c.MeterTip));
+        Assert.True(second.ShowsVolume);
+        // A mix picked on the volume bank takes that bank back to a mix; a
+        // mix another bank shows trades, so the volumes move with it.
+        second.Mix = model.Mixes.Single(m => m.Id == "stream");
+        Assert.Equal([MixerPresentationViewModel.VolumeChoice, "stream"], presentation.Selection);
+        Assert.True(first.ShowsVolume);
+
+        // The kept choice brings the volume bank back, and only one bank shows the volumes.
+        presentation.Configure(Banks(3), [MixerPresentationViewModel.VolumeChoice, "chat", MixerPresentationViewModel.VolumeChoice]);
+        Assert.Equal([MixerPresentationViewModel.VolumeChoice, "chat", "monitor"], presentation.Selection);
+        Assert.Single(presentation.Banks, b => b.ShowsVolume);
+        // A mix going away leaves the volume bank where it is.
+        Apply(model, ["game", "music"], ["chat", "stream"]);
+        Assert.Equal([MixerPresentationViewModel.VolumeChoice, "chat"], presentation.Selection);
+    }
+
+    /// <summary>
+    /// A write through a cell of the volume view is the channel's own
+    /// setChannelVolume for that channel, and its mute is the channel's own
+    /// mute: a capture input's source mute, sent as setCaptureMuted. No send
+    /// level or mute moves.
+    /// </summary>
+    [Fact]
+    public async Task AVolumeCellWritesTheChannelsOwnVolumeAndMute()
+    {
+        var commands = new ConcurrentQueue<string>();
+        await using var server = await SocketTestServer.Start(async (socket, stop) =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                JsonNode command = await SocketTestServer.Receive(socket, stop);
+                if (command["cmd"]?.GetValue<string>() == "listPlugins") continue;
+                commands.Enqueue($"{command["cmd"]}:{command["channel"]}:{command["value"]?.ToJsonString()}");
+                if (command["requestId"] is { } requestId)
+                    await SocketTestServer.Send(socket, new { type = "commandResult", requestId = requestId.GetValue<string>() }, stop);
+            }
+        });
+        await using var client = new DaemonClient(server.Url);
+        var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.ConnectionChanged += up => { if (up) connected.TrySetResult(); };
+        client.Start();
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var model = new MainViewModel(new DaemonClient());
+        foreach (string id in new[] { "monitor", "stream" }) model.Mixes.Add(new MixViewModel(client, id, id));
+        var game = new ChannelViewModel(client, "game", "Game", [.. model.Mixes.Select(m => m.Id)]);
+        game.ApplyFromDaemon(JsonNode.Parse("""{"id":"game","name":"Game","volume":0.8,"levels":{"monitor":0.5,"stream":0.4}}""")!);
+        var cam = new ChannelViewModel(client, "cam", "Camera", [.. model.Mixes.Select(m => m.Id)]);
+        cam.ApplyFromDaemon(JsonNode.Parse("""
+            {"id":"cam","name":"Camera","volume":1,"captureSource":"alsa_input.usb","captureConnected":true,
+             "captureGain":{"gainDb":0,"minDb":-60,"maxDb":10,"muted":false}}
+            """)!);
+        model.Channels.Add(game);
+        model.Channels.Add(cam);
+        using var presentation = Presentation(model, Banks(2, "stream"));
+        MixBankViewModel bank = presentation.Banks[0];
+        bank.SelectVolume();
+
+        BankCellViewModel gameCell = bank.Cells.Single(c => c.Channel.Id == "game");
+        Assert.Equal(0.8, gameCell.Level);
+        Assert.Equal("80%", gameCell.LevelText);
+        Assert.True(gameCell.HasFader);
+        Assert.False(gameCell.HasMute);
+        var raised = new List<string?>();
+        gameCell.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        gameCell.Level = 0.25;
+        Assert.Equal(0.25, game.Volume);
+        Assert.Contains(nameof(BankCellViewModel.Level), raised);
+        Assert.Contains(nameof(BankCellViewModel.LevelText), raised);
+        // The fader under the hand shows the volume in the input's readout, as the matrix's does.
+        gameCell.Adjusting = true;
+        Assert.True(game.VolumeAdjusting);
+        gameCell.Adjusting = false;
+        Assert.False(game.VolumeAdjusting);
+        SliderSync.FlushPending();
+
+        BankCellViewModel camCell = bank.Cells.Single(c => c.Channel.Id == "cam");
+        Assert.True(camCell.HasMute);
+        Assert.True(camCell.CanMute);
+        Assert.False(camCell.Muted);
+        Assert.Equal(Localizer.Format("MixMuteName", "Camera"), camCell.MuteName);
+        Assert.Equal(Localizer.Text("CaptureMuteTip"), camCell.MuteTip);
+        camCell.Muted = true;
+        Assert.True(cam.CaptureMuted);
+        Assert.All(model.Channels.SelectMany(c => c.Sends), s => Assert.False(s.Muted));
+        Assert.Equal(0.4, game.Sends.Single(s => s.MixId == "stream").Level);
+
+        // A layout edit waits for its answer, so everything sent before it has arrived.
+        Assert.Null(await client.DeleteExclusiveGroupAsync("barrier").WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(["setChannelVolume:game:0.25", "setCaptureMuted:cam:true", "deleteExclusiveGroup::"], commands.ToArray());
     }
 
     [Fact]
