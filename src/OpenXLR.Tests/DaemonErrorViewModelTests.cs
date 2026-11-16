@@ -126,6 +126,51 @@ public sealed class DaemonErrorViewModelTests
     }
 
     [Fact]
+    public async Task ARefusalThatIsTheStandingWarningIsShownOnce()
+    {
+        const string rebuilding = "The mixer is still being built after the audio server (pipewire-pulse) restarted or lost one of its devices; it is back as soon as the server answers.";
+        await using var client = new DaemonClient();
+        var holds = new List<TimeSpan>();
+        MainViewModel model = Model(client, holds);
+        JsonObject state = State();
+        state["warning"] = rebuilding;
+        Push(model, state);
+        Assert.Equal(rebuilding, model.DaemonWarning);
+
+        // The warning already says it: no notice under it.
+        Refuse(model, rebuilding);
+        Assert.Null(model.Notice);
+        Assert.Empty(holds);
+
+        // Another refusal still shows.
+        Refuse(model, "set: the unit refused the change");
+        Assert.Equal("set: the unit refused the change", model.Notice);
+    }
+
+    [Fact]
+    public async Task ANoticeGoesWhenTheWarningThatFollowsSaysTheSame()
+    {
+        const string rebuilding = "The mixer is still being built after the audio server (pipewire-pulse) restarted or lost one of its devices; it is back as soon as the server answers.";
+        await using var client = new DaemonClient();
+        MainViewModel model = Model(client);
+        Push(model, State());
+        // The refusal comes in before the state that carries the warning.
+        Refuse(model, rebuilding);
+        Assert.Equal(rebuilding, model.Notice);
+
+        JsonObject state = State();
+        state["warning"] = rebuilding;
+        Push(model, state);
+        Assert.Null(model.Notice);
+        Assert.Equal(rebuilding, model.DaemonWarning);
+
+        // A different warning leaves a notice alone.
+        Refuse(model, "set: the unit refused the change");
+        Push(model, state);
+        Assert.Equal("set: the unit refused the change", model.Notice);
+    }
+
+    [Fact]
     public async Task WithoutAConnectionAFailedChangeAddsNoNotice()
     {
         await using var client = new DaemonClient();

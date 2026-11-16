@@ -226,12 +226,23 @@ public sealed partial class MainViewModel : ViewModelBase
     /// Say a refused change or a failed command in the main window's notice,
     /// for <see cref="ErrorNoticeHold"/>. Without a connection the header
     /// already says the daemon is not running, and a change that could not be
-    /// sent says nothing more.
+    /// sent says nothing more. A refusal that is the daemon's standing warning
+    /// word for word (a mixer being built again refuses changes with it) is
+    /// already on screen and is not shown twice.
     /// </summary>
     private void ReportError(string error)
     {
         Status = error;
-        if (DaemonConnected) ShowNotice(error, ErrorNoticeHold);
+        if (DaemonConnected && error != DaemonWarning) ShowNotice(error, ErrorNoticeHold);
+    }
+
+    /// <summary>A notice the daemon's warning now says too goes, so the sentence shows once.</summary>
+    private void DropNoticeTheWarningRepeats()
+    {
+        if (string.IsNullOrEmpty(Notice) || Notice != DaemonWarning) return;
+        _noticeHold?.Dispose();
+        _noticeHold = null;
+        Notice = null;
     }
 
     /// <summary>
@@ -1241,6 +1252,7 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             _client.EqProfiles.Apply(node);
             DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
+            DropNoticeTheWarningRepeats();
             CardProfileProblem = node["cardProfile"]?["problem"] is JsonValue problem && problem.TryGetValue(out string? text) && text.Length > 0;
             Clock = AudioClock.From(node["mixer"]);
             // A card without a microphone input is the bigger problem and keeps its own button.
