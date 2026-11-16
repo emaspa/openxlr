@@ -11,7 +11,7 @@ internal sealed class MixerView : View
     public override string Title => "Mixer";
 
     public override string Keys =>
-        "Up/Down channel  Left/Right mix  Space mute  -/+ [/] level  </> ,/. channel volume  Home masters  End last  r rename  n/N new  M monitor  c capture  d delete";
+        "Up/Down channel  Left/Right mix  Space mute  -/+ [/] level  </> ,/. channel volume  l link sends  Home masters  End last  r rename  n/N new  M monitor  c capture  d delete";
 
     public override void Draw(Screen screen, Rect area, App app)
     {
@@ -73,7 +73,7 @@ internal sealed class MixerView : View
                 keyMuted, app.Link.StereoMeter("ch", channel.Id), _row == index + 1, false,
                 sendMuted: hardwareMute is not null && channel.IsMuted(selectedMix.Id), mono: channel.Mono,
                 last: i == channelCount - 1, accent: channel.Appearance.Accent,
-                kindAlert: channel.Hardware && !channel.BindingConnected);
+                kindAlert: channel.Hardware && !channel.BindingConnected, linked: channel.LinkedSends == true);
         }
         for (int i = 0; i < masterCount; i++)
         {
@@ -98,8 +98,10 @@ internal sealed class MixerView : View
         // A channel volume scales every send of the channel, so it is shown
         // with the send it scales.
         string volume = selectedChannel?.Volume is double v ? $"   channel volume {Widgets.Percent(v)}" : "";
+        // A channel the daemon reports a link for says which way it is set.
+        string link = selectedChannel?.LinkedSends is bool on ? on ? "   sends linked" : "   sends not linked" : "";
         screen.TextPad(area.X + 1, area.Bottom - 1,
-            $" {focus}   {Widgets.Percent(value)}   {(muted ? "MUTED" : "ON")}{volume}{Feed(selectedChannel, state)}", area.Width - 2,
+            $" {focus}   {Widgets.Percent(value)}   {(muted ? "MUTED" : "ON")}{volume}{link}{Feed(selectedChannel, state)}", area.Width - 2,
             theme.TextPrimary, theme.Selection, bold: true);
     }
 
@@ -140,7 +142,8 @@ internal sealed class MixerView : View
 
     private static void DrawStrip(Screen screen, Rect area, App app, string name, string kind,
         double value, double ceiling, bool muted, MeterReading meter, bool focused, bool master,
-        bool sendMuted = false, bool mono = false, bool last = false, Rgb? accent = null, bool kindAlert = false)
+        bool sendMuted = false, bool mono = false, bool last = false, Rgb? accent = null, bool kindAlert = false,
+        bool linked = false)
     {
         Theme theme = app.Theme;
         Rgb back = focused ? theme.SelectedFace : master ? theme.Tile : theme.Card;
@@ -167,10 +170,13 @@ internal sealed class MixerView : View
         Widgets.Center(screen, area.X, area.Y, area.Width - 1, first, ink, plate, true);
         Widgets.Center(screen, area.X, area.Y + 1, area.Width - 1, second.Length > 0 ? second : kind,
             second.Length > 0 ? ink : kindAlert ? theme.TextWarning : theme.TextMuted, plate);
+        // A linked channel's sends share one level, so its strip carries
+        // the link's mark after the level, which reads the same in every mix.
+        string mark = linked ? " " + LinkMark : string.Empty;
         if (sendMuted)
-            Widgets.Center(screen, area.X, area.Y + 2, area.Width - 1, "muted", theme.MuteBackChecked, back, true);
+            Widgets.Center(screen, area.X, area.Y + 2, area.Width - 1, "muted" + mark, theme.MuteBackChecked, back, true);
         else
-            Widgets.Center(screen, area.X, area.Y + 2, area.Width - 1, Widgets.Percent(value),
+            Widgets.Center(screen, area.X, area.Y + 2, area.Width - 1, Widgets.Percent(value) + mark,
                 focused ? theme.Accent : theme.TextDetail, back, true);
 
         bool compact = area.Height < 14;
@@ -296,6 +302,7 @@ internal sealed class MixerView : View
                 case '-' or '_': Step(app, mix, channel, -0.05); return true;
                 case ']': Step(app, mix, channel, 0.01); return true;
                 case '[': Step(app, mix, channel, -0.01); return true;
+                case 'l': ToggleLink(app, channel); return true;
                 case '>': ChannelEntry.StepVolume(app, channel, 0.05); return true;
                 case '<': ChannelEntry.StepVolume(app, channel, -0.05); return true;
                 case '.': ChannelEntry.StepVolume(app, channel, 0.01); return true;
@@ -314,6 +321,25 @@ internal sealed class MixerView : View
         }
 
         return false;
+    }
+
+    /// <summary>The mark after a linked channel's level on its strip.</summary>
+    internal const char LinkMark = '∞';
+
+    /// <summary>
+    /// l: link or unlink every send of the selected channel, as the UI's Link
+    /// chip does. The daemon reports the link on every channel it can link,
+    /// so a channel without the field, from an older daemon, offers none.
+    /// </summary>
+    private static void ToggleLink(App app, ChannelEntry? channel)
+    {
+        if (channel is null) { app.Say("Choose a channel to link its sends"); return; }
+        if (channel.LinkedSends is not bool linked) { app.Say("Linked sends need a newer daemon"); return; }
+        app.Link.Send("setLinkedSends", body =>
+        {
+            body["channel"] = channel.Id;
+            body["value"] = !linked;
+        });
     }
 
     private static void NewChannel(App app) =>

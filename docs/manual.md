@@ -279,7 +279,8 @@ of the channel's sends moves all of them, on a Deck dial, in the terminal
 mixer or over the API too, and one undo puts all of them back. The mutes
 stay per mix, so you can still keep a linked channel out of one mix, and
 the channel's Volume works as before. Click the chip again to unlink. No
-level changes, and each send moves on its own again.
+level changes, and each send moves on its own again. In the [terminal
+mixer](#terminal), `l` on a channel's strip links or unlinks it.
 
 Every mix counts, the Aux mix and hidden mixes included, and the first mix
 is the first in the layout's order even when it is hidden. A mix you add
@@ -6447,7 +6448,11 @@ comes back, the header shows the interface and the version again.
 When the daemon refuses a change, the bottom line shows its reason until the
 next key. The terminal skips a message it cannot read, for instance one from a
 daemon of another version, says so on the bottom line and keeps the
-connection.
+connection. A null where it expects a name, a list or a section reads as
+empty, and the tabs draw the rest of the state. If a tab still cannot be
+drawn, the header says **this tab could not be drawn** with the error
+under it, and the section keys still reach the other tabs. A key that fails
+the same way says so on the bottom line. Neither closes the terminal mixer.
 
 In Inputs, **Input EQ** lists each microphone and every capture
 input, on a mono port or a stereo pair. Open its **bands** row for the
@@ -6502,7 +6507,12 @@ channel's own [volume](#channel-volume) when the channel has one. Monitor
 masters can reach 150%; other masters, channel volumes and channel sends
 stop at 100%. The Matrix section shows a channel's volume beside its name,
 XLR 1's, XLR 2's, Aux In's and Line In's included; `<` and `>` move it by five points
-and `,` and `.` by one, on the Mixer and Matrix tabs alike.
+and `,` and `.` by one, on the Mixer and Matrix tabs alike. On the Mixer tab,
+`l` [links the sends](#linked-sends) of the selected channel, or unlinks
+them, as the UI's Link chip does. A linked channel's strip shows `∞` after
+its level, and the line under the desk says `sends linked` or `sends not
+linked` for the selected channel. A daemon from before linked sends reports
+no link, so neither shows and `l` says it needs a newer daemon.
 
 Above the strips, the selected mix has a stereo meter, a large held RMS
 reading and fifteen seconds of level history. Meters read -60 to 0 dBFS
@@ -6568,6 +6578,7 @@ Controls below the visible hardware cards appear as the selection moves.
 | Mixer | Space | mute or unmute the selected master or send |
 | Mixer | `-`, `+`, `[`, `]` | lower or raise the level by five points, or by one point |
 | Mixer, Matrix | `<`, `>`, `,`, `.` | lower or raise the selected channel's volume by five points, or by one point |
+| Mixer | `l` | link or unlink the selected channel's sends, so it plays at one level in every mix |
 | Mixer | `M` | add a monitor mix |
 | Mixer | `r`, `n`, `N`, `c`, `d` | rename, add an application channel, add a virtual microphone, add a capture input, or delete |
 | Mixer | Ctrl+Left/Right | move the selected channel or user mix one strip along, past hidden ones to the next strip shown |
