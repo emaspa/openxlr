@@ -669,16 +669,21 @@ public sealed partial class DeviceManager : BackgroundService
             if (_unansweredId is { } silent && !all.Any(d => d.Info.InstanceId == silent)) ClearUnansweredLocked();
             // The unit went away under its transport without a drop: clients
             // stop seeing it as driven now, not when the next state is read.
-            if (_device is { Connected: false } gone && _published.Message.Connected)
+            if (_device is { Connected: false } gone)
             {
-                // No failed transfer says this anywhere else.
-                _log.LogWarning("{dev} closed without a failed USB transfer (its USB helper exited); its state is gone until it reconnects",
-                    gone.Info.DisplayName);
-                Timeline.Record(TimelineKind.Device, $"{gone.Info.DisplayName} closed: its USB helper exited");
-                RaiseFromLocked();
-                ForgetEq();
-                ForgetDynamics();
-                ForgetDucking();
+                if (_published.Message.Connected)
+                {
+                    // No failed transfer says this anywhere else.
+                    _log.LogWarning("{dev} closed without a failed USB transfer (its USB helper exited); its state is gone until it reconnects",
+                        gone.Info.DisplayName);
+                    Timeline.Record(TimelineKind.Device, $"{gone.Info.DisplayName} closed: its USB helper exited");
+                }
+                // The closed device still owns what it opened besides the
+                // helper, an ALSA control handle on some models, until it
+                // is disposed. The last good read is what the unit was left
+                // at, as after a failed poll.
+                FlushLastState(force: true);
+                Drop();
             }
             foreach (string drivenInstance in _drivenInstances)
                 if (!all.Any(d => d.Info.InstanceId == drivenInstance)) _absentInstances.Add(drivenInstance);
@@ -1017,8 +1022,7 @@ public sealed partial class DeviceManager : BackgroundService
             try { last = DeviceStateStore.LoadLast(id); }
             catch (Exception ex) { last = null; _log.LogWarning("loading last settings of {dev}: {msg}", id, ex.Message); }
             if (last is null) { _restorePending = false; return null; }
-            if (_unwatchedArrival) last = KeepUnwatchedChangesLocked(_device, id, last);
-            return RestoreAttemptLocked(new PendingRestore(id, last, 1, 0));
+            return RestoreAttemptLocked(new PendingRestore(id, last, 1, 0, _unwatchedArrival));
         }
     }
 
@@ -1052,8 +1056,10 @@ public sealed partial class DeviceManager : BackgroundService
     /// <summary>
     /// A restore on connect that failed partway: the settings it writes, the
     /// unit they belong to, the attempts made and when the next is due.
+    /// <paramref name="KeepUnwatched"/> while what the unit holds has still to
+    /// be read for <see cref="KeepUnwatchedChangesLocked"/>.
     /// </summary>
-    private sealed record PendingRestore(string Id, DeviceState Saved, int Attempt, long DueAt);
+    private sealed record PendingRestore(string Id, DeviceState Saved, int Attempt, long DueAt, bool KeepUnwatched = false);
     private PendingRestore? _restoreRetry;
 
     /// <summary>Whether a restore on connect failed partway and is still being tried again. Read under the device lock.</summary>
@@ -1066,7 +1072,22 @@ public sealed partial class DeviceManager : BackgroundService
 
     private string? RestoreAttemptLocked(PendingRestore restore)
     {
-        string? err = ApplyProfile(restore.Saved, restoring: true);
+        string? err = null;
+        if (restore.KeepUnwatched)
+        {
+            // Settled once, on the first attempt that reads the unit; the
+            // attempts after it write what that read kept.
+            try { restore = restore with { Saved = KeepUnwatchedChangesLocked(_device!, restore.Id, restore.Saved), KeepUnwatched = false }; }
+            catch (UsbHungException ex)
+            {
+                NoteHung(ex);
+                err = ex.Message;
+            }
+        }
+        // A transfer that never returned has dropped the unit (NoteHung, in
+        // ApplyProfile too): the attempt counts as failed and the next one
+        // waits for the reconnect.
+        err ??= ApplyProfile(restore.Saved, restoring: true);
         if (err is null)
         {
             _restoreRetry = null;
@@ -1137,6 +1158,11 @@ public sealed partial class DeviceManager : BackgroundService
                 // OpenXLR's own baseline is written instead, when the model has one.
                 DeviceState current;
                 try { current = _last ?? Stamp(_device.ReadState()); }
+                catch (UsbHungException ex)
+                {
+                    NoteHung(ex);
+                    return ex.Message;
+                }
                 catch (Exception ex) { return ex.Message; }
                 DeviceState? baseline = DeviceDefaults.Baseline(_device.Info, current);
                 if (baseline is null) return "resetDevice: this interface keeps its own settings and OpenXLR has no baseline for it";
@@ -1489,6 +1515,14 @@ public sealed partial class DeviceManager : BackgroundService
                     catch (Exception ex) { error = ex.Message; }
                     outcomes[i] = error is null ? DevicePatchOutcome.Applied
                         : error == "gain is locked" ? DevicePatchOutcome.Locked : DevicePatchOutcome.Failed;
+                    // A transfer that never returned dropped the unit
+                    // (WriteControlLocked notes the hang): nothing more is
+                    // written to the closed device.
+                    if (!ReferenceEquals(_device, dev))
+                    {
+                        for (int j = i + 1; j < entries.Count; j++) outcomes[j] = DevicePatchOutcome.Gone;
+                        break;
+                    }
                     if (error is null && _last is { } read) live = read;
                 }
             }
@@ -1560,7 +1594,13 @@ public sealed partial class DeviceManager : BackgroundService
         lock (_gate)
         {
             if (_device is null || !_device.Connected) return "no device connected";
-            DeviceState s = _last ?? Stamp(_device.ReadState());
+            DeviceState s;
+            try { s = _last ?? Stamp(_device.ReadState()); }
+            catch (UsbHungException ex)
+            {
+                NoteHung(ex);
+                return ex.Message;
+            }
             DeviceCapabilities c = EffectiveCapabilitiesLocked(_device);
             // A saved state holds the Pro's jacks as software mixing plays them,
             // or above 0 dB when saved in the mode, where only the mode plays them.
@@ -1625,9 +1665,17 @@ public sealed partial class DeviceManager : BackgroundService
                 if (c.LineInput && p.LineInLevelLock is bool lineLock && s.LineInLevelLock != lineLock)
                     Write("Line In lock", () => d.SetLineInLevelLock(lineLock));
             }
+            catch (UsbHungException ex)
+            {
+                // The helper is gone: the unit is dropped and reopened after
+                // the hang backoff, and the hang counts toward setting it
+                // aside, as one in the poll does.
+                NoteHung(ex);
+                return ex.Message;
+            }
             catch (Exception ex)
             {
-                // A transfer that never returned, or a saved value nothing can write.
+                // A saved value nothing can write.
                 return ex.Message;
             }
             // The controls that were written are read back by the next poll.

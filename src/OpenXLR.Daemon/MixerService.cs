@@ -2156,8 +2156,25 @@ public sealed partial class MixerService : IHostedService, IDisposable
         return result;
     }
 
-    /// <summary>The current mixer scene for saving into a profile, or null.</summary>
-    public OpenXLR.Core.MixerScene? ExportScene() => _mixer.Built ? _mixer.ExportScene() : null;
+    /// <summary>
+    /// The current mixer scene for saving into a profile. With the submixer
+    /// off the scene is null and nothing is refused. While a build runs, or
+    /// the daemon waits for the audio server, the mixer holds defaults, a
+    /// half-built graph or a torn-down one, and a profile saved from it would
+    /// lose the user's mix: the save is refused with the sentence mixer
+    /// commands get then.
+    /// </summary>
+    public (OpenXLR.Core.MixerScene? Scene, string? Refused) ExportScene()
+    {
+        if (_building || WaitingForAudio) return (null, NotBuiltError);
+        if (!_mixer.Built) return (null, null);
+        OpenXLR.Core.MixerScene scene;
+        try { scene = _mixer.ExportScene(); }
+        catch (Exception) when (_building || WaitingForAudio || !_mixer.Built) { return (null, NotBuiltError); }
+        // A rebuild that started while the scene was read may have emptied
+        // part of it before the read ended.
+        return _building || WaitingForAudio || !_mixer.Built ? (null, NotBuiltError) : (scene, null);
+    }
 
     /// <summary>Recall a profile's mixer scene. Returns null on success.</summary>
     public string? ApplyScene(OpenXLR.Core.MixerScene scene)

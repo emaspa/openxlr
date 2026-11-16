@@ -621,7 +621,10 @@ up, `mixerWaiting` is false and the next state carries the mixer. Mixer commands
 meanwhile are refused with the same sentence. While a build runs, at startup
 or on a retry, the daemon refuses mixer commands. It answers with that
 sentence while `mixerWaiting` is true and otherwise says the mixer is still
-being built. A client sends the command again once a state carries the mixer.
+being built. `saveProfile` is refused the same way, with the same sentences,
+and leaves an existing profile of that name as it was, since a profile saved
+then would hold no mixer settings. A client sends the command again once a
+state carries the mixer.
 The daemon saves nothing from an attempt that fails, so `mixer.json` keeps the
 settings the next attempt restores. A profile recalled meanwhile,
 on connect or with `loadProfile`, applies its device settings at once and

@@ -5054,7 +5054,8 @@ diagnostics** in Options and open an issue with the archive.
   The daemon tries again every 30 seconds at most and builds the mixer as
   soon as the server answers, so you do not have to restart anything. A
   profile recalled on connect meanwhile gets its mixer settings once the
-  mixer is up. If the warning stays, check the audio server with
+  mixer is up. Saving a profile is refused until then, so a profile never
+  loses its mixer settings. If the warning stays, check the audio server with
   `pactl info` and `journalctl --user -u pipewire-pulse -b`, and look for
   USB errors with `journalctl -k -b | grep -i usb`.
 - "The mixer is still being built after the audio server restarted or
@@ -5065,8 +5066,8 @@ diagnostics** in Options and open an issue with the archive.
   builds the mixer again from your saved settings as soon as the server
   takes new devices. Meanwhile the UI's mixer area says the mixer is being
   built again, rather than that the server did not answer at startup.
-  Mixer controls answer again once the mixer is back. If the warning
-  stays, check the audio server as above.
+  Mixer controls and saving a profile answer again once the mixer is back.
+  If the warning stays, check the audio server as above.
 
 <a name="missing-plugins"></a>
 ### 5.4 ClipGuard greyed out, empty plugin picker
@@ -5146,8 +5147,10 @@ seconds instead of stalling the daemon; the device is dropped and
 reconnected after 10 seconds, and the fault is recorded. The USB
 library runs in a small helper process of its own (the daemon binary
 started with `--usb-helper`), which is killed and started again on such
-a hang, so nothing stays stuck inside the daemon. After three hangs in
-one run the daemon stops driving that interface and says so under the
+a hang, so nothing stays stuck inside the daemon. A hang while a profile
+is recalled, or while the last settings are restored on connect, is handled
+the same way, and the restore is tried again once the interface is back.
+After three hangs in one run the daemon stops driving that interface and says so under the
 UI's header, while the submixer and any other interface keep
 working. Unplug the interface and plug it back in, or restart the
 daemon, to try again. A helper whose device could not be opened at all

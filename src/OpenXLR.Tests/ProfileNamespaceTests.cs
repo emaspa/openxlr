@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -106,6 +107,33 @@ public sealed class ProfileNamespaceTests : IDisposable
         Assert.Contains("no profile named", Error(await hub.ExecuteForApiAsync("""{"cmd":"loadProfile","name":"Podcast"}""")));
         Assert.True((await hub.ExecuteForApiAsync("""{"cmd":"deleteProfile","name":"Desk scene"}""")).Ok);
         Assert.Empty(hub.Snapshot().Profiles!);
+    }
+
+    [Fact]
+    public async Task AProfileIsNotSavedWhileTheMixerIsBeingBuilt()
+    {
+        var wave = new Unit();
+        using var devices = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [wave]);
+        using var mixer = new MixerService(NullLogger<MixerService>.Instance, new ConfigurationBuilder().Build(), devices);
+        var hub = new WebSocketHub(devices, mixer, NullLogger<WebSocketHub>.Instance, new Lifetime());
+        devices.SweepOnce();
+        var scene = new MixerScene { MixVolumes = new() { ["monitor"] = 0.4 } };
+        ProfileStore.Save("0fd9:007d", "Podcast", new Profile { Device = new() { GainDb = 30 }, Mixer = scene });
+        FieldInfo building = typeof(MixerService).GetField("_building", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        // A build under way: the device part could be saved, but the mixer
+        // part would be lost, so the existing profile is left as it was.
+        building.SetValue(mixer, true);
+        ApiCommandResult save = await hub.ExecuteForApiAsync("""{"cmd":"saveProfile","name":"Podcast"}""");
+        Assert.False(save.Ok);
+        Assert.Contains("still being built", Error(save));
+        Assert.Equal(0.4, ProfileStore.Load("0fd9:007d", "Podcast")!.Mixer!.MixVolumes["monitor"]);
+
+        // With no build under way and no graph a profile holds the device alone, as before.
+        building.SetValue(mixer, false);
+        Assert.True((await hub.ExecuteForApiAsync("""{"cmd":"saveProfile","name":"Podcast"}""")).Ok);
+        Assert.Null(ProfileStore.Load("0fd9:007d", "Podcast")!.Mixer);
+        devices.SuspendSession();
     }
 
     private static string Error(ApiCommandResult result)
