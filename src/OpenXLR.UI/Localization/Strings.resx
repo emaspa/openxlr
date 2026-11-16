@@ -2525,6 +2525,15 @@ Select the interface OpenXLR drives</value>
   <data name="BankPickerTip" xml:space="preserve">
     <value>The mix this bank shows. Every mix is listed; picking one another bank shows swaps the two. The choice is kept for this skin and never changes the mixer's order.</value>
   </data>
+  <data name="BankVolumeKeyName" xml:space="preserve">
+    <value>Channel volumes</value>
+  </data>
+  <data name="BankVolumeTip" xml:space="preserve">
+    <value>Show every channel's own volume in this bank, which turns all of the channel's sends up or down together. The choice is kept for this skin.</value>
+  </data>
+  <data name="BankVolumeMeterTip" xml:space="preserve">
+    <value>The channel's own level, before its volume</value>
+  </data>
   <data name="BankSendName" xml:space="preserve">
     <value>{0} send to {1}</value>
   </data>

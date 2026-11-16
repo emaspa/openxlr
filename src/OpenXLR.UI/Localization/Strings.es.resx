@@ -2463,6 +2463,15 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="BankPickerTip" xml:space="preserve">
     <value>La mezcla que muestra este banco. Aparecen todas las mezclas; si eliges una que ya muestra otro banco, los dos se intercambian. La elección se guarda para este tema y nunca cambia el orden del mezclador.</value>
   </data>
+  <data name="BankVolumeKeyName" xml:space="preserve">
+    <value>Volúmenes de los canales</value>
+  </data>
+  <data name="BankVolumeTip" xml:space="preserve">
+    <value>Muestra en este banco el volumen propio de cada canal, que sube o baja a la vez todos los envíos del canal. La elección se guarda para este tema.</value>
+  </data>
+  <data name="BankVolumeMeterTip" xml:space="preserve">
+    <value>El nivel propio del canal, antes de su volumen</value>
+  </data>
   <data name="BankSendName" xml:space="preserve">
     <value>Envío de {0} a {1}</value>
   </data>

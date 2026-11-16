@@ -2421,6 +2421,15 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
   <data name="BankPickerTip" xml:space="preserve">
     <value>Ang mix na ipinapakita ng bank na ito. Nakalista ang lahat ng mix; kapag pinili ang ipinapakita ng ibang bank, magpapalitan ang dalawa. Naka-save para sa skin na ito ang pagpili at hindi binabago ang ayos ng mixer.</value>
   </data>
+  <data name="BankVolumeKeyName" xml:space="preserve">
+    <value>Volume ng mga channel</value>
+  </data>
+  <data name="BankVolumeTip" xml:space="preserve">
+    <value>Ipakita sa bank na ito ang sariling volume ng bawat channel, na sabay na nagpapalakas o nagpapahina sa lahat ng send ng channel. Naka-save para sa skin na ito ang pagpili.</value>
+  </data>
+  <data name="BankVolumeMeterTip" xml:space="preserve">
+    <value>Sariling level ng channel, bago ang volume nito</value>
+  </data>
   <data name="BankSendName" xml:space="preserve">
     <value>Send ng {0} sa {1}</value>
   </data>

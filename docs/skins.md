@@ -63,7 +63,8 @@ every package has them and there is nothing to install:
   icons and the title glow like lit legends, a muted channel's icon turns
   red, and the lamps are glowing lenses. INPUTS and APPLICATIONS stand on
   the left, HEADPHONES and MONITOR above, and the submixer shows three mix
-  banks stacked on the right, each with its mix picked from a row of keys.
+  banks stacked on the right, each with its mix, or every channel's
+  volume, picked from a row of keys.
   It letters in Fira Sans Condensed, which the UI carries itself, and
   opens the UI at 1668 by 1174, the size that layout was drawn for.
 - **Hi-Fi Amber**, Hi-Fi with an amber display in place of the blue one.
@@ -1579,6 +1580,24 @@ A meter drawn beside a send is the channel's own meter, before its send.
 It is named that way for a screen reader. No template shows the level of a
 send after its fader.
 
+Every bank's picker, dropdown or keys, starts with a **Volume** key that
+wears the skin's key face. Pressing it makes the bank show every
+channel's own volume in place of a mix. The bank then has no master, and
+each strip's parts take the channel instead of a send. `fader` and `value` set
+and show the channel's volume, which scales every send the channel makes,
+and `mute` is the channel's own mute where it has one, the one its matrix
+row head draws: the interface's mute on the strip that carries the
+interface's microphone, an additional interface's mute, or a capture
+input's source mute. An application channel's mutes are its sends', so its
+strip has no mute there, and a channel the daemon reports no volume for
+has no fader. The meter is still the channel's own, before its volume,
+and is named that way. The key is lit while the bank shows the volumes.
+One bank at most shows them, so pressing the key on another bank trades
+the two, as a mix does. The choice is kept with the bank's picks in
+`ui.json`, as `"*volume"` in the place of a mix id, which no mix id can be.
+Picking a mix in the bank's picker takes it back to that mix. A skin
+cannot start a bank on the volumes; `selectionDefaults` names mixes only.
+
 #### Strips and their parts
 
 | Strip option | What it is |
@@ -1602,9 +1621,9 @@ An input row's parts, in their default order, are `identity`, `binding`,
 | `gain` | the input's hardware gain, Aux In's level or Line In's gain, with the channel's own volume under it; on an application or capture channel, its own volume |
 | `hardware-controls` | the input's switches, or Aux In's or Line In's level lock. A capture input with a gain of its own has its source's mute here, and a capture input has its **Own clock** switch here |
 | `effects` | the input's processing in software: the microphone's **EQ** button, which opens its EQ editor, then its plugin chain's button and the chain at a glance. A capture input has the chain without EQ, only when the daemon reports `chainWidth` |
-| `fader` | the send's level into the bank's mix |
-| `value` | that level as a number |
-| `mute` | the send's mute in the bank's mix |
+| `fader` | the send's level into the bank's mix, or the channel's own volume while the bank shows the volumes |
+| `value` | that level as a number, or the volume as a percentage |
+| `mute` | the send's mute in the bank's mix, or the channel's own mute while the bank shows the volumes |
 
 Each list holds no more names than the strip has parts, and a part
 appears once across `partsOrder` and `hidden`. A part a channel does not
@@ -1641,7 +1660,8 @@ the bank's strips, and the default; or `"master-strip"`, one more strip at
 the end of the bank, on the right of upright strips or under a send list.
 Both keep the master's level, mute, 150% range and dry switch for a
 monitor mix, its EQ, the button that opens its plugin chain and the To USB
-Aux port switch. The master card also shows the chain at a glance; the
+Aux port switch, and in Arrange mode the mix's handle, above the card or
+over the strip's name. The master card also shows the chain at a glance; the
 master strip shows one lamp per plugin, lit in the alert colour when a
 plugin fails, and its bypass switches are in the chain window. An upright
 master strip stands those keys in a column beside its fader, so it is no
@@ -1769,8 +1789,12 @@ sections below:
 In Arrange mode a channel has one handle. It is on the input rack's strip
 while the rack shows, otherwise on the first bank's strip, never once per
 bank. A drop still sends the new channel order to the daemon and the
-strips move when it has saved it, as the channel tiles do. Mixes are
-reordered in the layout editor while the submixer shows banks.
+strips move when it has saved it, as the channel tiles do. A mix's
+handle is on its master, once, since two banks never show one mix. It
+carries the mix as the classic mix tile's and a matrix column head's
+handles do, so a drop or an arrow key moves the mix in the mixer's one
+order, and a mix that keeps its place has none. A mix no bank shows has no
+handle until it is picked into a bank; the layout editor moves it too.
 
 #### The mix matrix
 

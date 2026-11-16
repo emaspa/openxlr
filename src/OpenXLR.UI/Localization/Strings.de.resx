@@ -2511,6 +2511,15 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="BankPickerTip" xml:space="preserve">
     <value>Der Mix, den diese Bank zeigt. Jeder Mix steht in der Liste; wählst du einen, den eine andere Bank zeigt, tauschen die beiden. Die Wahl wird für diesen Skin gespeichert und ändert nie die Reihenfolge des Mixers.</value>
   </data>
+  <data name="BankVolumeKeyName" xml:space="preserve">
+    <value>Kanallautstärken</value>
+  </data>
+  <data name="BankVolumeTip" xml:space="preserve">
+    <value>Zeigt in dieser Bank die eigene Lautstärke jedes Kanals, die alle Sends des Kanals gemeinsam lauter oder leiser macht. Die Wahl wird für diesen Skin gespeichert.</value>
+  </data>
+  <data name="BankVolumeMeterTip" xml:space="preserve">
+    <value>Der eigene Pegel des Kanals, vor seiner Lautstärke</value>
+  </data>
   <data name="BankSendName" xml:space="preserve">
     <value>{0}, Send an {1}</value>
   </data>

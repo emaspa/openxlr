@@ -330,7 +330,100 @@ internal static partial class SkinLayoutWindowTests
             Assert.Equal(model.Channels.Count(c => c.IsEditable), handles.Length);
             Assert.All(handles, h => Assert.Contains(rack, h.GetVisualAncestors()));
             Assert.Equal(handles.Length, handles.Select(h => h.Tag).Distinct().Count());
+            // Each bank's master strip carries its mix's handle, bound as the
+            // classic mix tile's and the matrix column's are; a mix that keeps
+            // its place has none.
+            Button[] mixHandles = MixHandles(window);
+            Assert.Equal(banks.Banks.Select(b => b.Mix!).Where(m => m.IsEditable).Cast<object?>(), mixHandles.Select(h => h.Tag));
+            Assert.Equal(2, mixHandles.Length);
+            foreach (Button mixHandle in mixHandles)
+            {
+                Border master = mixHandle.GetVisualAncestors().OfType<Border>().First(b => b.Name == "BankMaster");
+                Assert.Same(((BankMasterViewModel)master.DataContext!).Mix, mixHandle.Tag);
+                Assert.Same(Part(master, SkinStripParts.Identity), mixHandle.Parent);
+                Assert.Equal(Localizer.Format("MoveItem", ((MixViewModel)mixHandle.Tag!).Name), AutomationProperties.GetName(mixHandle));
+                AssertInside(mixHandle, master);
+                AssertPartsApart(master);
+            }
+            model.Mixes.Single(m => m.Id == "chat").Kind = "monitor";
+            Layout(window, 1040, 1200);
+            Assert.Equal(new object?[] { model.Mixes.Single(m => m.Id == "stream") }, MixHandles(window).Select(h => h.Tag));
+            model.Mixes.Single(m => m.Id == "chat").Kind = "virtualMic";
             Arrange(window, false);
+            Assert.Empty(MixHandles(window));
+
+            // The volume key ahead of the picker turns the bank into every
+            // channel's own volume: no master, a fader per channel on its
+            // volume, the channel's own mute where it has one, the meter
+            // named for what it reads. The choice is kept like a mix's.
+            ToggleButton volumeKey = VolumeKey(Banks(window)[0]);
+            Assert.Equal(Localizer.Text("BankVolumeKeyName"), AutomationProperties.GetName(volumeKey));
+            Assert.Equal(Localizer.Text("Volume"), volumeKey.Content);
+            Assert.False(volumeKey.IsChecked);
+            Assert.True(volumeKey.TranslatePoint(default, window)!.Value.X < Pickers(window)[0].TranslatePoint(default, window)!.Value.X,
+                "the volume key stands ahead of the dropdown");
+            PressKey(volumeKey);
+            Layout(window, 1040, 1200);
+            Assert.True(volumeKey.IsChecked);
+            Assert.True(banks.Banks[0].ShowsVolume);
+            Assert.Equal([MixerPresentationViewModel.VolumeChoice, "chat"], banks.Selection);
+            Assert.Equal([MixerPresentationViewModel.VolumeChoice, "chat"], UiSettings.Load().SkinBanksFor("banks", 1));
+            Assert.Null(Pickers(window)[0].SelectedItem);
+            Assert.DoesNotContain(Banks(window)[0].GetVisualDescendants().OfType<Border>(), b => b.Name == "BankMaster");
+            Assert.Single(Banks(window)[1].GetVisualDescendants().OfType<Border>(), b => b.Name == "BankMaster");
+            ChannelViewModel gameChannel = model.Channels.Single(c => c.Id == "game");
+            double[] sendLevels = [.. gameChannel.Sends.Select(s => s.Level)];
+            Border gameVolumeCell = BankCells(window)[0].Single(b => ((BankCellViewModel)b.DataContext!).Channel.Id == "game");
+            Slider gameVolume = gameVolumeCell.GetVisualDescendants().OfType<Slider>().Single();
+            Assert.Equal(Localizer.Format("ChannelVolumeName", "Game"), AutomationProperties.GetName(gameVolume));
+            Assert.Equal(gameChannel.VolumeTip, ToolTip.GetTip(gameVolume));
+            Assert.Equal(1, gameVolume.Value);
+            Assert.Equal(Localizer.Text("BankVolumeMeterTip"),
+                ToolTip.GetTip((Control)gameVolumeCell.GetVisualDescendants().OfType<LevelMeter>().First().Parent!));
+            gameVolume.Value = 0.4;
+            Assert.Equal(0.4, gameChannel.Volume);
+            Assert.Equal(sendLevels, gameChannel.Sends.Select(s => s.Level));
+            Assert.Equal("40%", Part(gameVolumeCell, SkinStripParts.Value).GetVisualDescendants().OfType<TextBlock>().First().Text);
+            // A state from the daemon moves the fader with it, once the fader's own move is answered.
+            SliderSync.FlushPending();
+            SliderSync.ReleaseTouchGuards();
+            gameChannel.ApplyFromDaemon(JsonNode.Parse("""{"id":"game","name":"Game","volume":0.6,"linkedSends":false,"levels":{"monitor":1,"stream":1}}""")!);
+            Layout(window, 1040, 1200);
+            Assert.Equal(0.6, gameVolume.Value, 3);
+            // An application channel's mutes are its sends', so its volume
+            // has none; XLR 1's is the interface's input mute, as on its matrix row.
+            Assert.False(Part(gameVolumeCell, SkinStripParts.Mute).GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Classes.Contains("mute")).IsVisible);
+            // The volume view has no send to link, so no Link chip, though the daemon offers it.
+            Assert.True(gameChannel.HasLinkedSends);
+            Assert.False(gameVolumeCell.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == "BankLinkSends").IsVisible);
+            Border xlr1VolumeCell = BankCells(window)[0].Single(b => ((BankCellViewModel)b.DataContext!).Channel.Id == "xlr1");
+            ToggleButton xlr1Mute = Part(xlr1VolumeCell, SkinStripParts.Mute).GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Classes.Contains("mute"));
+            Assert.True(xlr1Mute.IsEffectivelyVisible);
+            Assert.Equal(Localizer.Text("TheDeviceMutesThisInputForAbout13"), ToolTip.GetTip(xlr1Mute));
+            Assert.False(model.Mute);
+            xlr1Mute.IsChecked = true;
+            Assert.True(model.Mute);
+            Assert.All(model.Channels.Single(c => c.Id == "xlr1").Sends, s => Assert.False(s.Muted));
+            xlr1Mute.IsChecked = false;
+            Assert.False(model.Mute);
+            // The other bank still shows its mix's sends.
+            Assert.All(BankCells(window)[1], c => Assert.NotNull(((BankCellViewModel)c.DataContext!).Send));
+            // Every channel has its strip, scrolling sideways inside the bank as the sends do.
+            Assert.Equal(model.Channels.Count(c => c.DisplayVisible), BankCells(window)[0].Length);
+            foreach (Border cell in BankCells(window)[0]) AssertPartsApart(cell);
+            Capture(window, "skin-layout-banks-volume-1040");
+            // Picking a mix takes the bank back to that mix and its master.
+            Pickers(window)[0].SelectedItem = model.Mixes.Single(m => m.Id == "stream");
+            Layout(window, 1040, 1200);
+            Assert.False(VolumeKey(Banks(window)[0]).IsChecked);
+            Assert.Equal(["stream", "chat"], banks.Selection);
+            Assert.Equal(["stream", "chat"], UiSettings.Load().SkinBanksFor("banks", 1));
+            Assert.Single(Banks(window)[0].GetVisualDescendants().OfType<Border>(), b => b.Name == "BankMaster");
+            Assert.True(BankCells(window)[0].Single(b => ((BankCellViewModel)b.DataContext!).Channel.Id == "game")
+                .GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == "BankLinkSends").IsEffectivelyVisible,
+                "back on a mix, the bank shows the Link chip again");
+            Assert.Same(gameChannel.Sends.Single(s => s.MixId == "stream"),
+                ((BankCellViewModel)BankCells(window)[0].Single(b => ((BankCellViewModel)b.DataContext!).Channel.Id == "game").DataContext!).Send);
 
             MixerPopOutWindowTests.CheckBanks(window, model);
 
@@ -371,6 +464,15 @@ internal static partial class SkinLayoutWindowTests
             // dropdown's pick, trading places with the bank that showed it.
             Assert.Empty(Pickers(window));
             ToggleButton[][] keys = [.. lists.Select(BankKeys)];
+            // The volume key leads each row of keys, in the bank.
+            foreach (Border list in lists)
+            {
+                ToggleButton key = VolumeKey(list);
+                AssertInside(key, list);
+                Assert.True(key.TranslatePoint(default, list)!.Value.X < BankKeys(list)[0].TranslatePoint(default, list)!.Value.X,
+                    "the volume key stands ahead of the mixes' keys");
+                Assert.False(key.IsChecked);
+            }
             Assert.All(keys, row => Assert.Equal(BankFixtureMixes, row.Select(k => ((BankChoiceViewModel)k.DataContext!).Mix.Id)));
             Assert.All(keys, row => Assert.Equal(["Monitor A", "Monitor B", "Stream", "Chat", "Aux"], row.Select(k => AutomationProperties.GetName(k))));
             Assert.Equal(Localizer.Format("BankPickerName", 2),
@@ -457,6 +559,15 @@ internal static partial class SkinLayoutWindowTests
     /// <summary>The keys of a bank's picker drawn as keys, in the mixer's order.</summary>
     internal static ToggleButton[] BankKeys(Border bank) =>
         [.. bank.GetVisualDescendants().OfType<ToggleButton>().Where(k => k.Name == "BankKey" && k.IsEffectivelyVisible)];
+
+    /// <summary>The key ahead of a bank's picker that shows every channel's own volume.</summary>
+    internal static ToggleButton VolumeKey(Border bank) =>
+        bank.GetVisualDescendants().OfType<ToggleButton>().Single(k => k.Name == "BankVolumeKey" && k.IsEffectivelyVisible);
+
+    /// <summary>The Arrange handles shown on the banks' masters, first bank first.</summary>
+    private static Button[] MixHandles(Window window) =>
+        [.. Banks(window).SelectMany(b => b.GetVisualDescendants().OfType<Button>())
+            .Where(b => b.Classes.Contains("reorderHandle") && b.Tag is MixViewModel && b.IsEffectivelyVisible)];
 
     /// <summary>A press as the key takes one: it flips its own state, then raises Click.</summary>
     private static void PressKey(ToggleButton key)

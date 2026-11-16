@@ -255,7 +255,9 @@ In the SUBMIXER tiles the Volume row sits above the sends. In an input
 rack it is under the gain, the Aux In level or the Line In gain. In a mix
 matrix row head it is a second fader under the gain or the level, and the
 row is as tall as the two faders need; a row without a gain, such as a
-bound XLR 1, shows only the volume. While you move a row's volume fader,
+bound XLR 1, shows only the volume. In mix banks, the **Volume** key at the
+start of a bank's picker turns that bank's faders into the channels'
+volumes ([Mix banks](#mix-banks)). While you move a row's volume fader,
 the volume shows as a percentage in the row's readout, or over the fader on
 a row without one, until one second after you let go. Against an older daemon that gives
 application and capture channels a volume and the hardware inputs none,
@@ -267,7 +269,8 @@ each send row sits at the same height in every tile.
 the **Link** chip at the start of its sends. In the SUBMIXER tiles it sits
 after the Volume fader, above the first send; in a mix matrix it sits after
 the volume fader in the row head, before the row's first cell; in mix banks
-it sits over or beside each send's mute. The chip lights up and every send
+it sits over or beside each send's mute, and a bank showing the channels'
+volumes has none. The chip lights up and every send
 of the channel takes the level of its first mix. From then on, moving any
 of the channel's sends moves all of them, on a Deck dial, in the terminal
 mixer or over the API too, and one undo puts all of them back. The mutes
@@ -3494,11 +3497,25 @@ the banks start on the mixes the skin names. When a bank's mix is deleted,
 the bank moves on to the next mix. The compact and mini views apply in the
 banks too.
 
+The picker starts with a **Volume** key. Press it and the bank shows every
+channel's own [volume](#channel-volume) in place of a mix, with no master.
+Each fader sets its channel's volume, and the meter beside it shows the
+channel before its volume. The mute under it is the channel's own where
+the channel has one: the interface's mute on the strip that carries the
+microphone, an additional interface's mute, or a capture input's source
+mute. An application channel has no mute there, since its mutes are its
+sends. Only one bank shows the volumes at a time; pressing the key on
+another bank trades the two, as a mix does. The choice is remembered with
+the bank's mixes, and picking a mix takes the bank back to it.
+
 Choosing a bank's mix changes no level, mute or route, and the channel
 and mix order stays the mixer layout's. In Arrange mode each channel has
 one handle, on its strip in the input rack while the rack shows,
 otherwise on the first bank, and the daemon saves a move as it saves any
-other. While banks show, reorder mixes in the layout editor. A meter
+other. Each mix a bank shows has its handle on that bank's master; drag it
+onto another master's handle, or use the arrow keys, to move the mix in
+the mixer's order. A mix no bank shows has no handle until you pick it
+into a bank, or you can move it in the layout editor. A meter
 beside a send is the channel's own level, before the send.
 
 Channel and mix tiles follow the mixer layout's one order, the same one
@@ -3672,8 +3689,9 @@ the application, so a package brings them with it:
 - **Hi-Fi**, a 1980s separates stack: brushed black faceplates, blue
   display meters, backlit keys and glowing lamps, with INPUTS and
   APPLICATIONS on the left and three mix banks stacked on the right, each
-  with a row of keys to pick its mix. A channel's icon turns red while it
-  is muted in that mix. Choosing it opens the UI at 1668 by 1174, or as
+  with a row of keys to pick its mix or every channel's volume. A
+  channel's icon turns red while it is muted in that mix, or while its own
+  mute is on in the volume view. Choosing it opens the UI at 1668 by 1174, or as
   large as a smaller screen allows; resize it as you like after that;
 - **Hi-Fi Amber**, the same with an amber display;
 - **Hi-Fi Classic**, the same with a green display whose meters turn
