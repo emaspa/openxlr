@@ -369,15 +369,15 @@ internal static class TouchControlsWindowTests
         Dispatcher.UIThread.MainLoop(stop.Token);
     }
 
+    /// <summary>
+    /// Resize as the user would and wait until the X server has answered. A
+    /// fixed wait let a slow server apply the size after the fader had been
+    /// scrolled into view at the old width: a skin whose sections scroll
+    /// sideways then had the fader past the window's edge, and the drag
+    /// pressed nothing.
+    /// </summary>
     private static void Layout(Window window, double width, double height)
-    {
-        window.PlatformImpl!.GetType().GetMethod("Resize", [typeof(Size), typeof(WindowResizeReason)])!
-            .Invoke(window.PlatformImpl, [new Size(width, height), WindowResizeReason.User]);
-        using var stop = new CancellationTokenSource();
-        DispatcherTimer.RunOnce(stop.Cancel, TimeSpan.FromMilliseconds(60));
-        Dispatcher.UIThread.MainLoop(stop.Token);
-        Pump(window);
-    }
+        => WindowLayoutTests.Layout(window, width, height);
 
     private static void Pump(Window window) { Dispatcher.UIThread.RunJobs(); window.UpdateLayout(); }
 }
