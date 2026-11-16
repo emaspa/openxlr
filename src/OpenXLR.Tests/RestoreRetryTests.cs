@@ -130,6 +130,38 @@ public sealed class RestoreRetryTests
     }
 
     [Fact]
+    public void AGivenUpRestoreNamesTheUnitByModelOnTheTimeline()
+    {
+        // An additional interface keeps its settings under its instance id,
+        // which the timeline, part of the diagnostics archive, never shows.
+        const string instance = "0fd9:00a6:AAY3H5481241GS";
+        WithConfigDir(() =>
+        {
+            DeviceStateStore.SaveLast(instance, Saved);
+            var dock = new FlakyDock { MuteFailures = int.MaxValue };
+            var time = new ManualTime();
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance,
+                new ConfigurationBuilder().Build(), () => [dock], time: time);
+            manager.SetSessionStorageId(instance);
+            manager.SweepOnce();
+
+            manager.RestoreLastState();
+            for (int i = 0; i < DeviceManager.RestoreAttempts; i++)
+            {
+                time.Advance(DeviceManager.RestoreRetryDelay);
+                manager.SweepOnce();
+            }
+
+            Assert.Equal(DeviceManager.RestoreAttempts, dock.MuteAttempts);
+            string entry = Assert.Single(manager.Timeline.Snapshot().Events,
+                e => e.Text.StartsWith("restoring the last settings", StringComparison.Ordinal)).Text;
+            Assert.StartsWith($"restoring the last settings of {dock.Info.DisplayName} was given up", entry, StringComparison.Ordinal);
+            Assert.DoesNotContain("AAY3H5481241GS", entry, StringComparison.Ordinal);
+            manager.SuspendSession();
+        });
+    }
+
+    [Fact]
     public void ARestoreThatKeepsFailingIsGivenUpAndPersistenceResumes()
     {
         WithConfigDir(() =>

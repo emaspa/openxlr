@@ -2821,7 +2821,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>The input's EQ, on this computer at the head of the input before the plugins. Lit while it is on, red when it cannot run. Opens the editor.</value>
   </data>
   <data name="EqButtonTipMix" xml:space="preserve">
-    <value>The mix's EQ, on this computer after its plugins and before its outputs. Lit while it is on, red when it cannot run. Opens the editor.</value>
+    <value>The mix's EQ, on this computer before its plugins and its outputs. Lit while it is on, red when it cannot run. Opens the editor.</value>
   </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>{0} EQ, on</value>
@@ -3262,13 +3262,13 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>Duck on the {0}'s own processor. It listens to its keys as the unit hears them, its own inputs before USB, so before the EQ in software, the inserts and any gate on this computer. A noise gate or suppressor on a microphone does not stop it ducking on noise. It lowers the audio as the unit plays it on its outputs, after everything on this computer. If a gate on a key should stop false triggers, choose this computer.</value>
   </data>
   <data name="DuckingKeysProcessingSoftwareTip" xml:space="preserve">
-    <value>Duck on this computer. Each key is heard after its EQ, inserts and Sound Check loop, before its volume and sends, so a gate on a microphone stops false triggers. The chosen channels dip inside each mix, before that mix's own plugins and latency delay. The unit's own ducking is switched off.</value>
+    <value>Duck on this computer. Each key is heard after its EQ, inserts and Mic setup's loop, before its volume and sends, so a gate on a microphone stops false triggers. The chosen channels dip inside each mix, before that mix's own plugins and latency delay. The unit's own ducking is switched off.</value>
   </data>
   <data name="DuckingKeysStatusOnUnit" xml:space="preserve">
     <value>On, running on the {0}'s own processor. It hears its keys on the unit, ahead of every gate and plugin on this computer, and lowers the chosen channels on the unit's outputs.</value>
   </data>
   <data name="DuckingKeysStatusOnComputer" xml:space="preserve">
-    <value>On, running on this computer. It hears {0} after any EQ, inserts and Sound Check loop, and lowers the chosen channels inside each mix, before the mix's own plugins.</value>
+    <value>On, running on this computer. It hears {0} after any EQ, inserts and Mic setup's loop, and lowers the chosen channels inside each mix, before the mix's own plugins.</value>
   </data>
   <data name="DuckingKeysListMore" xml:space="preserve">
     <value>{0}, {1}</value>
@@ -3873,7 +3873,7 @@ The Wave XLR Pro UCM profile remains a manual host setup. Install LV2 plugins fr
     <value>DeepFilterNet</value>
   </data>
   <data name="NoiseRemovalDeepFilterNetTip" xml:space="preserve">
-    <value>Cleaner on keyboards, changing noise and some room echo. Uses more of the processor and adds about 50 to 60 ms of delay.</value>
+    <value>Cleaner on keyboards, changing noise and some room echo. Uses more of the processor and adds about 50 to 85 ms of delay, more with larger PipeWire buffers.</value>
   </data>
   <data name="NoiseRemovalStrength" xml:space="preserve">
     <value>Strength</value>

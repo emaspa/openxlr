@@ -3694,7 +3694,7 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>DeepFilterNet</value>
   </data>
   <data name="NoiseRemovalDeepFilterNetTip" xml:space="preserve">
-    <value>Mas malinis sa keyboard, pabagu-bagong ingay at kaunting alingawngaw ng kuwarto. Mas malakas gumamit ng processor at nagdadagdag ng mga 50 hanggang 60 ms na delay.</value>
+    <value>Mas malinis sa keyboard, pabagu-bagong ingay at kaunting alingawngaw ng kuwarto. Mas malakas gumamit ng processor at nagdadagdag ng mga 50 hanggang 85 ms na delay, mas mahaba kapag mas malaki ang buffer ng PipeWire.</value>
   </data>
   <data name="NoiseRemovalStrength" xml:space="preserve">
     <value>Lakas</value>

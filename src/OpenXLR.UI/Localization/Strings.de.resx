@@ -2791,7 +2791,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Der EQ des Eingangs, auf diesem Computer am Anfang des Eingangs vor den Plugins. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
   </data>
   <data name="EqButtonTipMix" xml:space="preserve">
-    <value>Der EQ des Mixes, auf diesem Computer nach seinen Plugins und vor seinen Ausgängen. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
+    <value>Der EQ des Mixes, auf diesem Computer vor seinen Plugins und seinen Ausgängen. Leuchtet, solange er an ist, rot, wenn er nicht laufen kann. Öffnet den Editor.</value>
   </data>
   <data name="EqButtonNameOn" xml:space="preserve">
     <value>{0} EQ, an</value>
@@ -3423,7 +3423,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>DeepFilterNet</value>
   </data>
   <data name="NoiseRemovalDeepFilterNetTip" xml:space="preserve">
-    <value>Sauberer bei Tastaturen, wechselnden Geräuschen und etwas Raumhall. Braucht mehr Prozessorleistung und fügt etwa 50 bis 60 ms Verzögerung hinzu.</value>
+    <value>Sauberer bei Tastaturen, wechselnden Geräuschen und etwas Raumhall. Braucht mehr Prozessorleistung und fügt etwa 50 bis 85 ms Verzögerung hinzu, mehr bei größeren PipeWire-Puffern.</value>
   </data>
   <data name="NoiseRemovalStrength" xml:space="preserve">
     <value>Stärke</value>

@@ -3694,7 +3694,7 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>DeepFilterNet</value>
   </data>
   <data name="NoiseRemovalDeepFilterNetTip" xml:space="preserve">
-    <value>Чистији на тастатурама, променљивом шуму и мало одјека собе. Троши више процесора и додаје око 50 до 60 ms кашњења.</value>
+    <value>Чистији на тастатурама, променљивом шуму и мало одјека собе. Троши више процесора и додаје око 50 до 85 ms кашњења, више са већим PipeWire баферима.</value>
   </data>
   <data name="NoiseRemovalStrength" xml:space="preserve">
     <value>Јачина</value>

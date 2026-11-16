@@ -3694,7 +3694,7 @@ Kamot gihapon nga host setup ang Wave XLR Pro UCM profile. I-install ang mga LV2
     <value>DeepFilterNet</value>
   </data>
   <data name="NoiseRemovalDeepFilterNetTip" xml:space="preserve">
-    <value>Mas limpyo sa keyboard, nag-usab-usab nga kasaba ug gamay nga lanog sa kwarto. Mogamit og mas daghang processor ug modugang og mga 50 hangtod 60 ms nga delay.</value>
+    <value>Mas limpyo sa keyboard, nag-usab-usab nga kasaba ug gamay nga lanog sa kwarto. Mogamit og mas daghang processor ug modugang og mga 50 hangtod 85 ms nga delay, mas taas kon mas dako ang buffer sa PipeWire.</value>
   </data>
   <data name="NoiseRemovalStrength" xml:space="preserve">
     <value>Kusog</value>

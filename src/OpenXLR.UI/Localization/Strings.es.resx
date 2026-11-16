@@ -3342,7 +3342,7 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>DeepFilterNet</value>
   </data>
   <data name="NoiseRemovalDeepFilterNetTip" xml:space="preserve">
-    <value>Más limpio con teclados, ruido cambiante y algo de eco de la sala. Usa más procesador y añade unos 50 a 60 ms de retardo.</value>
+    <value>Más limpio con teclados, ruido cambiante y algo de eco de la sala. Usa más procesador y añade unos 50 a 85 ms de retardo, más con búferes de PipeWire mayores.</value>
   </data>
   <data name="NoiseRemovalStrength" xml:space="preserve">
     <value>Intensidad</value>
