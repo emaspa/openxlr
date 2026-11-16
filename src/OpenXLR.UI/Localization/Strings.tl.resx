@@ -2067,6 +2067,9 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
   <data name="MixerWaitingForAudioServer" xml:space="preserve">
     <value>Hinihintay ng mixer ang audio server, na hindi sumagot noong nagsimula ang daemon. Lilitaw ito rito kapag sumagot ang server, nang hindi kailangang mag-restart.</value>
   </data>
+  <data name="MixerRebuildingAfterAudioServer" xml:space="preserve">
+    <value>Binubuo muli ang mixer dahil nag-restart ang audio server o nawalan ito ng isa sa mga device nito. Lilitaw ito rito kapag sumagot ang server, nang hindi kailangang mag-restart.</value>
+  </data>
   <data name="SubmixerIsOffTurnItOnInOptions" xml:space="preserve">
     <value>Naka-off ang submixer. Paganahin ito sa Mga opsyon para sa channel bawat app, mix, virtual microphone at insert; hardware lang ang kinokontrol ng OpenXLR.</value>
   </data>

@@ -288,12 +288,23 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>What the empty SUBMIXER tile says: the reasons differ.</summary>
     public string MixerPlaceholder => !DaemonConnected
         ? OlderDaemonRunning ? Localizer.Text("OlderDaemonRunningSentence") : Localizer.Text("DaemonNotRunningSentence")
-        : MixerWaiting ? Localizer.Text("MixerWaitingForAudioServer")
+        : MixerWaiting ? MixerRebuilding ? Localizer.Text("MixerRebuildingAfterAudioServer") : Localizer.Text("MixerWaitingForAudioServer")
         : Localizer.Text("SubmixerIsOffTurnItOnInOptions");
 
     private bool _mixerWaiting;
-    /// <summary>The submixer is on, but the audio server did not answer when the daemon built it.</summary>
+    /// <summary>
+    /// The submixer is on, but its graph is not built: the audio server did
+    /// not answer when the daemon built it, or the graph was lost and is
+    /// being built again.
+    /// </summary>
     public bool MixerWaiting { get => _mixerWaiting; private set { if (Set(ref _mixerWaiting, value)) Raise(nameof(MixerPlaceholder)); } }
+
+    private bool _mixerRebuilding;
+    /// <summary>
+    /// The wait is a rebuild: the audio server restarted, or lost one of the
+    /// mixer's devices, under a built graph. False from an older daemon.
+    /// </summary>
+    public bool MixerRebuilding { get => _mixerRebuilding; private set { if (Set(ref _mixerRebuilding, value)) Raise(nameof(MixerPlaceholder)); } }
 
     private bool _deviceConnected;
     /// <summary>The primary interface is driven; the header's LED says this and nothing else.</summary>
@@ -1230,6 +1241,7 @@ public sealed partial class MainViewModel : ViewModelBase
             ClockProblem = !CardProfileProblem && Clock is { MicResampled: true };
             ApplyClockChoice(node["mixer"]);
             MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
+            MixerRebuilding = MixerWaiting && (node["mixerRebuilding"]?.GetValue<bool>() ?? false);
             DaemonConnected = true;
             DaemonVersion = node["daemonVersion"]?.GetValue<string>();
             DeviceConnected = node["connected"]?.GetValue<bool>() ?? false;

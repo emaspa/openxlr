@@ -40,6 +40,7 @@ public sealed class MixerStartupRetryTests
             Assert.True(fixture.Service.Initialized.IsCompleted);
             Assert.False(fixture.Service.Built);
             Assert.True(fixture.Service.WaitingForAudio);
+            Assert.False(fixture.Service.RebuildingGraph);
             Assert.Contains("waiting for the audio server", fixture.Service.GraphWarning);
             Assert.Null(fixture.Service.Snapshot());
             Assert.Contains("waiting for the audio server", fixture.Service.Apply(new Command { Cmd = "setMixMuted", Mix = "monitor" }));
@@ -141,6 +142,7 @@ public sealed class MixerStartupRetryTests
             Assert.True(SpinWait.SpinUntil(() => fixture.Refusals() >= 3, TimeSpan.FromSeconds(10)), "the graph was not built again");
 
             Assert.True(fixture.Service.WaitingForAudio);
+            Assert.True(fixture.Service.RebuildingGraph);
             Assert.Contains("still being built", fixture.Service.GraphWarning);
             Assert.Contains("still being built", fixture.Service.Apply(new Command
             {
@@ -156,6 +158,7 @@ public sealed class MixerStartupRetryTests
             Assert.True(SpinWait.SpinUntil(() => fixture.Service.Built && !fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)),
                 "the graph was not built again once the server answered");
             Assert.Null(fixture.Service.GraphWarning);
+            Assert.False(fixture.Service.RebuildingGraph);
             Assert.Equal(0.6, fixture.Service.ExportScene()!.MixVolumes["monitor"]);
             Assert.True(fixture.Mixer.MonitorMuted);
             // The forgotten modules' ids belong to other clients now: none is unloaded.
@@ -428,6 +431,37 @@ public sealed class MixerStartupRetryTests
 
         Apply("""{"connected":false,"mixer":null}""");
         Assert.Equal(OpenXLR.UI.Localization.Localizer.Text("SubmixerIsOffTurnItOnInOptions"), model.MixerPlaceholder);
+    }
+
+    [Fact]
+    public async Task TheUISaysARebuildApartFromTheWaitAtStartup()
+    {
+        await using var client = new OpenXLR.UI.DaemonClient();
+        var model = new OpenXLR.UI.MainViewModel(client);
+        void Apply(string json) => typeof(OpenXLR.UI.MainViewModel)
+            .GetMethod("Apply", BindingFlags.Instance | BindingFlags.NonPublic, [typeof(JsonNode)])!
+            .Invoke(model, [JsonNode.Parse(json)]);
+        string waiting = OpenXLR.UI.Localization.Localizer.Text("MixerWaitingForAudioServer");
+        string rebuilding = OpenXLR.UI.Localization.Localizer.Text("MixerRebuildingAfterAudioServer");
+        Assert.NotEqual(waiting, rebuilding);
+
+        Apply("""{"connected":false,"mixer":null,"mixerWaiting":true,"mixerRebuilding":true}""");
+        Assert.Equal(rebuilding, model.MixerPlaceholder);
+        var raised = new List<string?>();
+        model.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        // The same wait at startup, and from a daemon without the field.
+        Apply("""{"connected":false,"mixer":null,"mixerWaiting":true,"mixerRebuilding":false}""");
+        Assert.Equal(waiting, model.MixerPlaceholder);
+        Assert.Contains(nameof(model.MixerPlaceholder), raised);
+        Apply("""{"connected":false,"mixer":null,"mixerWaiting":true,"mixerRebuilding":true}""");
+        Apply("""{"connected":false,"mixer":null,"mixerWaiting":true}""");
+        Assert.Equal(waiting, model.MixerPlaceholder);
+
+        // A rebuild flag without the wait says nothing of its own.
+        Apply("""{"connected":false,"mixer":null,"mixerRebuilding":true}""");
+        Assert.Equal(OpenXLR.UI.Localization.Localizer.Text("SubmixerIsOffTurnItOnInOptions"), model.MixerPlaceholder);
+        Assert.False(model.MixerRebuilding);
     }
 
     private sealed class Fixture : IDisposable

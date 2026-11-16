@@ -5052,8 +5052,9 @@ diagnostics** in Options and open an issue with the archive.
   another program or dropped by the server near its open-file limit (see
   [5.8](#open-files)). The daemon keeps running and
   builds the mixer again from your saved settings as soon as the server
-  takes new devices. Mixer controls answer again once
-  the mixer is back. If the warning
+  takes new devices. Meanwhile the UI's mixer area says the mixer is being
+  built again, rather than that the server did not answer at startup.
+  Mixer controls answer again once the mixer is back. If the warning
   stays, check the audio server as above.
 
 <a name="missing-plugins"></a>
