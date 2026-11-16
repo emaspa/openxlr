@@ -2130,6 +2130,9 @@
   <data name="ToUSBAuxPort" xml:space="preserve">
     <value>Ка USB Aux порту</value>
   </data>
+  <data name="MatrixAuxPortChip" xml:space="preserve">
+    <value>USB</value>
+  </data>
   <data name="TrayOnly" xml:space="preserve">
     <value>Само системска палета</value>
   </data>

@@ -2236,6 +2236,9 @@ Select the interface OpenXLR drives</value>
   <data name="ToUSBAuxPort" xml:space="preserve">
     <value>To USB Aux port</value>
   </data>
+  <data name="MatrixAuxPortChip" xml:space="preserve">
+    <value>USB</value>
+  </data>
   <data name="TrayOnly" xml:space="preserve">
     <value>Tray only</value>
   </data>

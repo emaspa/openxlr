@@ -2188,6 +2188,9 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="ToUSBAuxPort" xml:space="preserve">
     <value>Alla porta USB Aux</value>
   </data>
+  <data name="MatrixAuxPortChip" xml:space="preserve">
+    <value>USB</value>
+  </data>
   <data name="TrayOnly" xml:space="preserve">
     <value>Solo vassoio</value>
   </data>

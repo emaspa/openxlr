@@ -304,7 +304,7 @@ its way to a monitor mix. Noise removal, the voice changer and plugins that
 work in blocks add the most. On an interface without a direct monitor, such
 as the first XLR Dock, you hear that delay in your headphones. Each monitor
 mix has a **Dry** chip at the top right of its head in the mix matrix,
-opposite its name, and beside 150% on its strip in the other layouts. Grey
+opposite its name, and beside 150% on its master in every other layout. Grey
 means off. Click it and it turns green, and that monitor mix now hears
 XLR 1, XLR 2 and every microphone capture input before their effects, so
 you hear your voice raw and earlier. While you move the monitor's fader the
@@ -718,7 +718,8 @@ On a Wave XLR Pro (firmware 1.0.14 or later) and a Wave XLR MK.2 (firmware
 interface's own processing. It sits with the input's switches: next to
 Compressor in the INPUTS card, in the input rack and under **Mic** in a mix
 matrix row. On the Pro, XLR 1 and XLR 2 each have one, and Line In has one
-next to its **Level Lock**. Turn it on when you want OpenXLR's EQ,
+next to its **Level Lock**, and in a mix matrix a **Raw Capture** button in
+its row's name column. Turn it on when you want OpenXLR's EQ,
 compressor, noise removal and plugins to work on the microphone as the
 preamp gives it, rather than after the interface's low cut, EQ, compressor,
 expander and Voice Tune.
@@ -1430,7 +1431,9 @@ assignments remain readable and editable.
    Pro as a plain USB audio device.
 2. In the SUBMIXER card, set the sends into the Aux mix: typically your
    microphone and the game, without the second computer's own chat.
-3. Tick "To USB Aux port" on the Aux mix. The interface's audio stream
+3. Turn on **To USB Aux port** on the Aux mix's master. In Broadcast and
+   Wave it is the **USB** chip on the Aux column's name line, which turns
+   green while it is on. The interface's audio stream
    restarts once, which interrupts playback for a moment; the device
    only picks up the new routing at stream start. If the Pro is
    replugged, or the link to the port comes up incomplete, the next
@@ -2377,7 +2380,7 @@ outputs, as a microphone's EQ comes before its plugins, so a limiter in
 the mix's chain also catches what the EQ boosts.
 
 - Open it with **EQ** over the mix's **FX**: in the matrix column head,
-  and in the mix strips of the other layouts. **EQ** turns green while the
+  and on the mix's master in every other layout. **EQ** turns green while the
   EQ runs and red when it cannot run. The editor is named after the mix and
   has no **Where the EQ runs** switch, and its header shows **Software
   processing**.
@@ -3682,8 +3685,10 @@ empty cell there.
 The head at the start of each row carries the channel's icon and name and
 what INPUTS would show for it. XLR 1 and XLR 2 have their mute, their gain
 with the meter under it, **FX**, which opens their plugin chain, and over it
-**EQ**, which opens their [EQ editor](#microphone-eq); the gain lock and
-phantom power's settling time still apply. Beside the name,
+**EQ**, which opens their [EQ editor](#microphone-eq). Where the interface
+has the gain lock, XLR 1's **Lock** sits at the end of its gain, and while
+it is on neither gain moves; phantom power's settling time still applies.
+Beside the name,
 **Mic** opens the switches INPUTS shows next to the mute: Low Cut,
 Expander, Voice Tune, Phantom, ClipGuard, Compressor and
 [Raw Capture](#raw-capture), the ones your interface has, with the Voice Tune strength while Voice Tune is on. On an
@@ -3703,7 +3708,9 @@ capture channel that carries the interface's microphone has **Mic** too,
 and a strip bound to an additional interface has that interface's
 switches. Aux In has its level and **Lock**, Line In its gain and **Lock**, and both
 show the level or gain in the name column the same way
-([readout](#gain-readout)). Each of them also has its [volume](#channel-volume),
+([readout](#gain-readout)). On a unit that offers
+[Raw Capture](#raw-capture) on Line In, its row has a **Raw Capture** button
+in the name column, green while it is on, with the gain under it. Each of them also has its [volume](#channel-volume),
 a second fader under the gain or the level, and the row grows to hold
 both. An application or capture channel has its volume, with its meter
 under it. While you move the volume fader of a row with no readout, the
@@ -3717,7 +3724,9 @@ master level and **FX**, which opens the mix's plugin chain. **FX** is
 green while the chain is processing and red when its plugins are all
 bypassed or failed; an empty chain keeps the plain button. Over **FX**,
 **EQ** opens the mix's [output EQ](#output-eq), which comes before its
-plugins. While you move a column's master, and for a second after, its
+plugins. On a Wave XLR Pro the Aux mix's name line has a **USB** chip, its
+**To USB Aux port** switch, grey while off and green while the mix goes to
+the port ([USB Aux](#usb-aux)). While you move a column's master, and for a second after, its
 volume shows at the right end of the name line, opposite the mix's name.
 
 HEADPHONES and MONITOR share the row above the matrix: the headphone

@@ -2174,6 +2174,9 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="ToUSBAuxPort" xml:space="preserve">
     <value>Al puerto USB Aux</value>
   </data>
+  <data name="MatrixAuxPortChip" xml:space="preserve">
+    <value>USB</value>
+  </data>
   <data name="TrayOnly" xml:space="preserve">
     <value>Solo bandeja</value>
   </data>

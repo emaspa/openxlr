@@ -305,6 +305,44 @@ public sealed class MixMatrixTests
     }
 
     [Fact]
+    public void LineInsRawCaptureIsItsProcessingPartWhereTheUnitTakesIt()
+    {
+        var model = new MainViewModel(new DaemonClient());
+        model.CapLineInput = true;
+        ApplyMixer.Invoke(model, [JsonNode.Parse("""
+            {"channels":[{"id":"line","name":"Line In","hardware":true},{"id":"aux","name":"Aux In","hardware":true}],
+             "mixes":[{"id":"monitor","name":"Monitor A","kind":"monitor"}]}
+            """)]);
+        using var matrix = new MixMatrixViewModel(model);
+        MatrixRowViewModel line = matrix.Rows.Single(r => r.Channel.Id == "line");
+        Assert.Equal(InputStripKind.LineIn, line.Kind);
+        var raised = new List<string?>();
+        line.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        // A unit without raw capture on Line In: no part.
+        Assert.False(line.ShowsProcessing);
+        Assert.False(line.ShowsLineInRawButton);
+
+        // With it: the switch itself, never the Mic button, and never on Aux In.
+        typeof(MainViewModel).GetProperty(nameof(MainViewModel.CapLineInRawCapture))!.SetValue(model, true);
+        Assert.True(line.ShowsProcessing);
+        Assert.True(line.ShowsLineInRawButton);
+        Assert.False(line.ShowsSwitchesButton);
+        Assert.False(line.ShowsOwnClockButton);
+        Assert.Contains(nameof(MatrixRowViewModel.ShowsLineInRawButton), raised);
+        // It stands in the name column, not among the source controls.
+        Assert.DoesNotContain(SkinMatrixParts.Processing, line.Spec.Parts);
+        Assert.False(matrix.Rows.Single(r => r.Channel.Id == "aux").ShowsProcessing);
+
+        // A skin that hides the part leaves it out.
+        matrix.Configure(SkinMatrixOptions.Default with
+        {
+            RowHead = new SkinMatrixPartOptions(SkinMatrixParts.RowHead, [SkinMatrixParts.Processing], SkinLabelStyle.Text),
+        });
+        Assert.False(matrix.Rows.Single(r => r.Channel.Id == "line").ShowsLineInRawButton);
+    }
+
+    [Fact]
     public void AMonitorMixsChipIsItsDrySwitchAndShowsTheVolumeWhileTheMasterMoves()
     {
         var model = new MainViewModel(new DaemonClient());

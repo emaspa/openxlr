@@ -74,6 +74,7 @@ public sealed class WindowLayoutTests
                 OlderDaemonWindowTests.Check();
                 DaemonGoneWindowTests.Check();
                 HistoryButtonsWindowTests.Check();
+                MixControlParityWindowTests.Check();
                 var vm = new MainViewModel(new DaemonClient());
                 main.DataContext = vm;
                 typeof(MainViewModel).GetMethod("ApplyMixer", BindingFlags.Instance | BindingFlags.NonPublic)!

@@ -1790,7 +1790,8 @@ Each row starts with the channel's head: its icon and name, then the same
 controls the INPUTS panel shows for the channel, under the same rules. XLR 1
 and XLR 2 have their hardware gain, with the meter under it, their mute,
 which waits while phantom power settles, and the button that opens their
-plugin chain. The gain lock still disables the gain. At the end of the name
+plugin chain. Where the interface has the gain lock, XLR 1's **Lock** sits
+at the end of its gain's line, and the lock still disables the gain. At the end of the name
 column a **Mic** button opens a flyout with the switches INPUTS shows beside
 the mute: low cut, expander, Voice Tune, phantom power, ClipGuard and the
 compressor, each where the interface has it, with the Voice Tune strength
@@ -1805,6 +1806,9 @@ the interface's microphone has the button too, with that input's switches,
 and a strip carrying an additional interface's input has that interface's
 switches. Aux In has its level
 and level lock and Line In its gain and level lock, each read out in the name column.
+On a unit that takes raw capture on Line In, Line In's row has a **Raw
+Capture** button at the end of its name column, lettered in `Ox.Led.On`
+while it is on, with the readout under it.
 Every channel has its own volume, which scales every send
 in its row. On XLR 1, XLR 2, Aux In and Line In it is a second fader under the gain
 or the level, the meter under the gain, and that row is as tall as the two
@@ -1820,7 +1824,11 @@ interface with two XLR inputs.
 Each column has a head: the mix's icon and name, an outputs line, a thin
 line in the mix's own colour when the layout editor gave it one, and a row
 of controls with the mix's master level, its mute and the button that opens
-its plugin chain. While the master moves, and for a second after, the mix's
+its plugin chain. The name line also holds the switches of the mix itself:
+a monitor mix's **Dry**, the Wave XLR Pro's maximizer as **Max** while the
+unit builds the mix, and on the Aux mix, where the interface has the USB
+Aux port, a **USB** chip that sends the mix to the port. Like **Dry** it is
+grey while off and green while on. While the master moves, and for a second after, the mix's
 volume shows at the right end of the name line, in the same chip a row head
 uses, drawn over the move handle so the head keeps its size. The outputs line says how many outputs ticked in MONITOR
 hear the mix, alone or summed with the other monitor mix. When none does it
@@ -1855,12 +1863,12 @@ cell's are `mute`, `fader` and `value`.
 
 | Matrix part | Where | What it is |
 |---|---|---|
-| `identity` | row head, column head | the channel's or the mix's icon and name. It cannot be hidden. In a row head it is the name column, on the left unless `parts` puts it last |
+| `identity` | row head, column head | the channel's or the mix's icon and name. It cannot be hidden. In a row head it is the name column, on the left unless `parts` puts it last. In a column head it is the name line, which also holds the mix's **Dry**, **Max** and **USB** chips where the mix has them |
 | `binding` | row head | XLR 1's or XLR 2's input binding as a line under the name in the name column, wherever `parts` puts it: a light that is on while the feed is linked and the interface's jack or the source's name. The name and this line are one target that opens the binding dialog, and its tooltip says why the strip is silent. A capture input draws the same line for its source and opens the dialog's capture form |
 | `meter` | row head | the channel's meter as a part of its own. Under the faders it is the gain's track instead, so a channel with gain draws it there |
-| `gain` | row head | the input's hardware gain, Aux In's level and level lock, or Line In's gain and level lock, with the channel's own volume as a second fader under it; a channel without a gain shows its volume alone. A capture channel carrying the interface's microphone shows the interface's gain over its volume |
+| `gain` | row head | the input's hardware gain with XLR 1's gain lock where the interface has one, Aux In's level and level lock, or Line In's gain and level lock, with the channel's own volume as a second fader under it; a channel without a gain shows its volume alone. A capture channel carrying the interface's microphone shows the interface's gain over its volume |
 | `mute` | row head, column head, cell | the input's hardware mute, the mix's mute, or the send's mute in the column's mix. A capture channel carrying the interface's microphone has the interface's mute, and a capture input with a gain of its own has its source's mute |
-| `processing` | row head | the **Mic** button that opens the input's switches in a flyout. It is lettered in `Ox.Led.On` while a switch is on, and its lamp lights while phantom power is on. It stands at the end of the name column, wherever `parts` puts it, so the source controls keep their room. The flyout also holds a capture input's **Own clock** switch, which lights the button while it is on; when that switch is all the input has, the part is an **Own clock** button that turns it on and off, with no flyout. A row whose input has no switch does not draw it, nor does a channel that is not a capture input and carries no interface's input. A skin that lists every other part and not this one still gets it |
+| `processing` | row head | the **Mic** button that opens the input's switches in a flyout. It is lettered in `Ox.Led.On` while a switch is on, and its lamp lights while phantom power is on. It stands at the end of the name column, wherever `parts` puts it, so the source controls keep their room. The flyout also holds a capture input's **Own clock** switch, which lights the button while it is on; when that switch is all the input has, the part is an **Own clock** button that turns it on and off, with no flyout. On Line In the part is a **Raw Capture** button that turns Line In's raw capture on and off, where the unit takes it. A row whose input has no switch does not draw it, nor does a channel that is not Line In or a capture input and carries no interface's input. A skin that lists every other part and not this one still gets it |
 | `effects` | row head, column head | the button that opens the input's or the mix's plugin chain, including a capture input whose daemon reports `chainWidth`. On XLR 1 and XLR 2 the **EQ** button, which opens the microphone's EQ editor, stands over it in the same part, as the signal meets them, so the row grows to hold both and the source controls keep their width |
 | `master` | column head | the mix's master level as a short fader |
 | `outputs` | column head | the outputs line |

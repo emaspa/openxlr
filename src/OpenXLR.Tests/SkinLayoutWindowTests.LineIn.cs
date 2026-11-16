@@ -196,6 +196,18 @@ internal static partial class SkinLayoutWindowTests
                 Assert.True(lineLock.IsEffectivelyVisible, where);
                 AssertInside(lineLock, RowHead(window, "line"));
             }
+            // A unit that takes raw capture on Line In: the switch at the end of the name column, the readout under it.
+            PropertyInfo rawCap = typeof(MainViewModel).GetProperty(nameof(MainViewModel.CapLineInRawCapture))!;
+            rawCap.SetValue(model, true);
+            foreach (double width in new[] { 640d, 1040, 2560 })
+            {
+                Layout(window, width, 1400);
+                MatrixRowViewModel row = matrix.Rows.Single(r => r.Channel.Id == "line");
+                Assert.True(row.ShowsLineInRawButton, $"at {width}");
+                CheckProcessingPlace(RowHead(window, "line"), row, $"with raw capture in the matrix at {width}");
+            }
+            rawCap.SetValue(model, false);
+            Layout(window, 1040, 1400);
             Border lineHead = RowHead(window, "line");
             Slider matrixVolume = lineHead.GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "MatrixVolume");
             TextBlock matrixReadout = lineHead.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "MatrixReadout");

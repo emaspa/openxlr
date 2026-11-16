@@ -544,6 +544,13 @@ public partial class MainWindow : Window
             InsertWindows.OpenChain(TopLevel.GetTopLevel((Control)sender!) as Window ?? this, mix.Inserts, $"mix:{mix.Id}");
     }
 
+    /// <summary>A classic mix tile's EQ button: open the mix's EQ editor.</summary>
+    private void OnMixEq(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is MixViewModel { Eq: { CanOpen: true } eq })
+            EqWindows.Show(TopLevel.GetTopLevel((Control)sender!) as Window ?? this, eq);
+    }
+
     private void OnInsertUp(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is InsertViewModel ins) ins.Owner.Move(ins, -1);
