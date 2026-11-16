@@ -86,6 +86,79 @@ public sealed partial class MonitorVolumeIntegrationTests
         }
     }
 
+    /// <summary>
+    /// A combine leg linked crossed, left into the mix's right and right into
+    /// its left, as a restarted WirePlumber can link one, is made again by
+    /// reloading its channel's sink, and the new leg is linked side to side.
+    /// The legs into the other mixes count as healthy throughout.
+    /// </summary>
+    [MonitorPipeWireFact]
+    public void ACrossedCombineLegComesBackLinkedSideToSide()
+    {
+        const string leg = "output.OpenXLR_ch_music_OpenXLR_mix_stream";
+        var pw = new PipeWireAdapter();
+        using var registry = pw.WatchGraph();
+        using var mixer = new Mixer(pw) { LegMissingSweeps = 2 };
+        try
+        {
+            mixer.Build(new MixerConfig
+            {
+                Channels = [new("music", "Music")],
+                Mixes = [new("monitor", "Monitor", MixKind.Monitor), new("stream", "Stream", MixKind.VirtualMic)],
+            });
+            string[] sideToSide = [$"{leg}:output_FL>OpenXLR_mix_stream:playback_FL", $"{leg}:output_FR>OpenXLR_mix_stream:playback_FR"];
+            WaitForRecovery(() => { mixer.EnsureCellLevels(); return PortLinks(leg).SequenceEqual(sideToSide); });
+            IReadOnlyList<string> reloaded = [];
+            for (int i = 0; i < 3; i++)
+            {
+                mixer.EnsureCellLevels(out _, out reloaded);
+                Assert.Empty(reloaded);
+            }
+
+            foreach (string side in new[] { "FL", "FR" })
+                ProcessRunner.Run("pw-link", ["-d", $"{leg}:output_{side}", $"OpenXLR_mix_stream:playback_{side}"]);
+            foreach ((string from, string to) in new[] { ("FL", "FR"), ("FR", "FL") })
+            {
+                ProcessResult linked = ProcessRunner.Run("pw-link", [$"{leg}:output_{from}", $"OpenXLR_mix_stream:playback_{to}"]);
+                Assert.True(linked.Ok, linked.Stderr);
+            }
+            WaitForRecovery(() => PortLinks(leg).SequenceEqual([$"{leg}:output_FL>OpenXLR_mix_stream:playback_FR", $"{leg}:output_FR>OpenXLR_mix_stream:playback_FL"]));
+
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                mixer.EnsureCellLevels(out _, out reloaded);
+                return reloaded.Count > 0;
+            }, TimeSpan.FromSeconds(5)), "the crossed leg was not noticed");
+            Assert.Equal(["music"], reloaded);
+            WaitForRecovery(() => { mixer.EnsureCellLevels(); return PortLinks(leg).SequenceEqual(sideToSide); });
+            for (int i = 0; i < 4; i++)
+            {
+                mixer.EnsureCellLevels(out _, out reloaded);
+                Assert.Empty(reloaded);
+            }
+        }
+        finally { pw.TearDown(); }
+    }
+
+    /// <summary>Each link out of the node named <paramref name="node"/>, as "node:port>node:port", sorted.</summary>
+    private static string[] PortLinks(string node)
+    {
+        using JsonDocument graph = PipeWireSnapshot.Parse(ProcessRunner.Run("pw-dump", []).Stdout);
+        JsonElement[] items = [.. graph.RootElement.EnumerateArray()];
+        Dictionary<uint, string> nodes = items.Where(item => item.GetProperty("type").GetString() == "PipeWire:Interface:Node")
+            .ToDictionary(item => item.GetProperty("id").GetUInt32(),
+                item => item.GetProperty("info").GetProperty("props").TryGetProperty("node.name", out var name) ? name.GetString() ?? "" : "");
+        Dictionary<uint, string> ports = items.Where(item => item.GetProperty("type").GetString() == "PipeWire:Interface:Port")
+            .ToDictionary(item => item.GetProperty("id").GetUInt32(),
+                item => item.GetProperty("info").GetProperty("props").TryGetProperty("port.name", out var name) ? name.GetString() ?? "" : "");
+        return [.. items.Where(item => item.GetProperty("type").GetString() == "PipeWire:Interface:Link")
+            .Select(item => item.GetProperty("info"))
+            .Where(info => nodes.GetValueOrDefault(info.GetProperty("output-node-id").GetUInt32()) == node)
+            .Select(info => $"{node}:{ports.GetValueOrDefault(info.GetProperty("output-port-id").GetUInt32())}>"
+                + $"{nodes.GetValueOrDefault(info.GetProperty("input-node-id").GetUInt32())}:{ports.GetValueOrDefault(info.GetProperty("input-port-id").GetUInt32())}")
+            .Order(StringComparer.Ordinal)];
+    }
+
     /// <summary>The node.name of the node whose object.serial is <paramref name="serial"/>.</summary>
     private static string NodeWithSerial(int serial)
     {

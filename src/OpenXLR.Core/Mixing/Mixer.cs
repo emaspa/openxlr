@@ -4173,15 +4173,16 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     {
         var held = new List<string>();
         if (_legIndex.Count == 0) return held;
-        (IReadOnlyDictionary<int, (int Percent, bool Muted)> legs, IReadOnlySet<int> unlinked) = _pw.CombineLegs();
+        (IReadOnlyDictionary<int, (int Percent, bool Muted)> legs, IReadOnlySet<int> mislinked) = _pw.CombineLegs();
         foreach ((string cell, int index) in _legIndex.ToList())
         {
             if (_pendingCells.Contains(cell) || !_cells.Contains(cell)) continue;
             int bar = cell.IndexOf('|', StringComparison.Ordinal);
             if (bar <= 0) continue;
             string channel = cell[..bar], mix = cell[(bar + 1)..];
-            // A leg nothing links plays into no mix; see RestoreLostLegsLocked.
-            if (unlinked.Contains(index)) missing.Add(channel);
+            // A leg nothing links plays into no mix, and a leg linked crossed
+            // plays it with left and right swapped; see RestoreLostLegsLocked.
+            if (mislinked.Contains(index)) missing.Add(channel);
             if (!legs.TryGetValue(index, out (int Percent, bool Muted) leg))
             {
                 missing.Add(channel);

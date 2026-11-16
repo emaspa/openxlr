@@ -531,35 +531,84 @@ public sealed class PipeWireAdapter
 
     /// <summary>
     /// The level and mute of every OpenXLR combine leg, by sink-input index,
-    /// and the indices of the legs no link leaves: one registry read, no helper.
+    /// and the indices of the legs that play into no mix or into the wrong
+    /// sides of one: one registry read, no helper.
     /// </summary>
-    public (IReadOnlyDictionary<int, (int Percent, bool Muted)> Levels, IReadOnlySet<int> Unlinked) CombineLegs()
+    public (IReadOnlyDictionary<int, (int Percent, bool Muted)> Levels, IReadOnlySet<int> Mislinked) CombineLegs()
     {
         JsonElement[] objects = GraphObjects();
-        return (CombineLegLevels(objects), UnlinkedCombineLegs(objects));
+        return (CombineLegLevels(objects), MislinkedCombineLegs(objects));
     }
 
-    internal static IReadOnlySet<int> UnlinkedCombineLegs(IEnumerable<JsonElement> objects)
+    internal static IReadOnlySet<int> MislinkedCombineLegs(byte[] json) => MislinkedCombineLegs(ParseObjects(json));
+
+    /// <summary>
+    /// The sink-input indices of the combine legs no link leaves, and of those
+    /// with a link from one channel position into another, such as FL into
+    /// FR. A restarted WirePlumber makes the ports of the mix sinks and the
+    /// legs again, PipeWire hands the freed port ids back in the other order,
+    /// so left and right trade ids, and WirePlumber links by the ids it last
+    /// saw: a step behind, it links a leg with its sides swapped. A mono
+    /// port, an AUX port and a port without a position pair with anything,
+    /// and a side channel with the rear one on its side, as WirePlumber
+    /// pairs them.
+    /// </summary>
+    internal static IReadOnlySet<int> MislinkedCombineLegs(IEnumerable<JsonElement> objects)
     {
         var legs = new Dictionary<uint, int>();   // node id -> serial
-        var linked = new HashSet<uint>();
+        var channels = new Dictionary<uint, string>();   // port id -> audio.channel
+        var links = new List<(uint Node, uint From, uint To)>();
         foreach (JsonElement o in objects)
         {
             if (!o.TryGetProperty("type", out JsonElement t) || !o.TryGetProperty("info", out JsonElement info)
                 || info.ValueKind != JsonValueKind.Object) continue;
             if (t.ValueEquals("PipeWire:Interface:Link"))
             {
-                if (info.TryGetProperty("output-node-id", out JsonElement from) && from.TryGetUInt32(out uint node)) linked.Add(node);
+                if (info.TryGetProperty("output-node-id", out JsonElement from) && from.TryGetUInt32(out uint node))
+                    links.Add((node, PortId(info, "output-port-id"), PortId(info, "input-port-id")));
                 continue;
             }
-            if (!t.ValueEquals("PipeWire:Interface:Node") || !o.TryGetProperty("id", out JsonElement id) || !id.TryGetUInt32(out uint nodeId)
-                || !info.TryGetProperty("props", out JsonElement props)) continue;
+            if (!o.TryGetProperty("id", out JsonElement id) || !id.TryGetUInt32(out uint objectId)
+                || !info.TryGetProperty("props", out JsonElement props) || props.ValueKind != JsonValueKind.Object) continue;
+            if (t.ValueEquals("PipeWire:Interface:Port"))
+            {
+                if (props.TryGetProperty("audio.channel", out JsonElement c) && c.ValueKind == JsonValueKind.String)
+                    channels[objectId] = c.GetString()!;
+                continue;
+            }
+            if (!t.ValueEquals("PipeWire:Interface:Node")) continue;
             string? name = props.TryGetProperty("node.name", out JsonElement n) ? n.GetString() : null;
             if (name is null || !name.StartsWith("output.OpenXLR_", StringComparison.Ordinal)) continue;
             if (!props.TryGetProperty("media.class", out JsonElement m) || m.GetString() != "Stream/Output/Audio") continue;
-            if (Serial(props) is int serial) legs[nodeId] = serial;
+            if (Serial(props) is int serial) legs[objectId] = serial;
         }
-        return legs.Where(leg => !linked.Contains(leg.Key)).Select(leg => leg.Value).ToHashSet();
+        var linked = new HashSet<uint>();
+        var crossed = new HashSet<uint>();
+        foreach ((uint node, uint from, uint to) in links)
+        {
+            linked.Add(node);
+            if (channels.TryGetValue(from, out string? output) && channels.TryGetValue(to, out string? input)
+                && !SamePosition(output, input)) crossed.Add(node);
+        }
+        return legs.Where(leg => !linked.Contains(leg.Key) || crossed.Contains(leg.Key)).Select(leg => leg.Value).ToHashSet();
+
+        static uint PortId(JsonElement info, string key)
+            => info.TryGetProperty(key, out JsonElement port) && port.TryGetUInt32(out uint value) ? value : uint.MaxValue;
+    }
+
+    /// <summary>
+    /// Whether a link between ports at these two channel positions keeps
+    /// the audio on its side: the same position, a side channel and the rear
+    /// one on its side, or a port that has no place of its own (mono, AUX,
+    /// unknown) on either end.
+    /// </summary>
+    internal static bool SamePosition(string output, string input)
+    {
+        if (output == input || Unplaced(output) || Unplaced(input)) return true;
+        return (output, input) is ("SL", "RL") or ("RL", "SL") or ("SR", "RR") or ("RR", "SR");
+
+        static bool Unplaced(string channel)
+            => channel is "" or "MONO" or "UNK" or "NA" || channel.StartsWith("AUX", StringComparison.Ordinal);
     }
 
     internal static IReadOnlyDictionary<int, (int Percent, bool Muted)> CombineLegLevels(byte[] json)
