@@ -946,7 +946,7 @@
           "type": "number",
           "minimum": 56,
           "maximum": 400,
-          "description": "the width of a row head's name column, which holds the name, the binding line under it, the **Mic** button and the gain under it, or on SFX's row its **Sounds** button"
+          "description": "the width of a row head's name column, which holds the name, the binding line under it, the **Mic** button and the gain under it"
         },
         "Ox.Matrix.CellWidth": {
           "type": "number",

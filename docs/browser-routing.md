@@ -25,8 +25,8 @@ activate the tab or PWA as usual. Select the volume button beside
 its channel picker. The level takes effect once the companion routes that
 tab. You can adjust two routed tabs independently even when they play
 into the same channel. A volume change leaves the capture running.
-Chromium's application control in **Manage** sets the shared browser
-level, including installed web apps. The tab control adjusts each
+Chromium's volume control in APPLICATIONS or **Manage** sets the shared
+browser level, including installed web apps. The tab control adjusts each
 captured tab relative to that shared level. If all tabs are quiet, check
 the shared browser level in **Manage** or the desktop volume controls.
 
@@ -35,7 +35,8 @@ as the daemon confirms the change.
 
 Turn on **Remember volume for this website** to use the same level for
 future tabs on that origin. This is separate from remembering a channel.
-Without it, the edit applies to this tab until it closes or changes origin.
+Without it, the edit applies to this tab until it closes, changes origin
+or the companion's connection to OpenXLR ends.
 **Reset** clears the tab's edit. When the volume is remembered, it clears
 the website's saved level. The browser's normal playback level applies
 when there is no volume preference. Update the browser extension and
@@ -182,10 +183,11 @@ Chrome has no Cebuano, so a browser set to it shows English.
    companion immediately stops the temporary microphone stream and neither
    records nor forwards it.
 3. Pick a channel in the tab's row in the Browser tabs window or in the
-   popup. Check Remember website to save that origin's default. A
-   tab-only choice leaves the
-   site's existing default for other tabs intact. Forget website removes
-   the saved default and returns that tab to Browser default.
+   popup. Check Remember website, Remember for this website in the popup,
+   to save that origin's default. A tab-only choice leaves the
+   site's existing default for other tabs intact. Forget website, Forget
+   website default in the popup, removes the saved default and returns
+   that tab to Browser default.
 4. Press Activate in the tab's row in the Browser tabs window, or return
    to the audio tab, open the companion and press Activate this tab. A PWA
    without a toolbar can use the extension action shortcut, initially
@@ -280,18 +282,18 @@ this reduced list. Title-only changes are coalesced to the latest title on
 a one-second timer; identical lists do not trigger state broadcasts.
 Navigation, tab additions and removals, capture and error changes are
 published immediately. The daemon keeps live tab ids and titles
-in memory and saves only remembered origin-to-channel defaults in machine
-settings, outside profiles. A manually collected diagnostic archive
+in memory and saves only the remembered website channels and volumes, by
+origin, in machine settings, outside profiles. A manually collected diagnostic archive
 includes the current tab list without its titles. It keeps the origin of
 each tab routed to a channel and masks the origin of tabs left at the
 browser default. Its copy of `mixer.json` includes the remembered website
-defaults. Review it before sharing.
+channels and volumes. Review it before sharing.
 No tab audio is sent through the control API or stored by the companion.
 
 The host accepts only tab registration, channel assignment and the browser
-output preference. Towards the browser it passes the daemon's state and
-OpenXLR's requests to activate a tab, each for a tab id and origin the
-companion itself registered. It authenticates using the existing local daemon client
+output preference. Towards the browser it passes the daemon's state, its
+own error messages and OpenXLR's requests to activate a tab, each request
+for a tab id and origin the companion itself registered. It authenticates using the existing local daemon client
 and does not expose unrelated daemon state to the browser.
 Web pages cannot call this host through the extension.
 

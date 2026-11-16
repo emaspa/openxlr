@@ -75,7 +75,8 @@ lengths Wave Link uses, not proven block sizes.
 Byte 2 bit 0 switches the whole equalizer on and off. On the same byte,
 bit 4 (0x10) set means ClipGuard off and bit 2 (0x04) is the unit's gain
 lock, as Wave Link wrote them on a Wave XLR MK.2 on 1.0.15. OpenXLR's
-ClipGuard write keeps the EQ bit and clears the gain lock.
+ClipGuard write keeps the EQ bit and leaves the gain lock set only while
+OpenXLR's own gain lock is on.
 
 Bytes 18 to 37 hold four bands of five bytes each, at 18, 23, 28 and 33.
 The layout is the same on both devices:

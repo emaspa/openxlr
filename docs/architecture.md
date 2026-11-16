@@ -5,6 +5,8 @@ flowchart TD
     UI["Avalonia UI / OpenDeck"] -->|"authenticated WebSocket"| Daemon["OpenXLR daemon"]
     Scripts["Scripts / tools"] -->|"authenticated HTTP or WebSocket"| Daemon
     Clients["Terminal mixer / Omarchy plugin"] -->|"authenticated WebSocket"| Daemon
+    Companion["Chromium companion"] -->|"native messaging"| BrowserHost["Browser host: the UI binary"]
+    BrowserHost -->|"authenticated WebSocket"| Daemon
     UI -->|"D-Bus or compositor tool"| Desktop["Desktop portal: global shortcuts; compositor: focused process"]
     Daemon -->|"gdbus: matching audio process keys"| UI
     Daemon --> Core["Core: device control, mixer, profiles"]
@@ -12,7 +14,7 @@ flowchart TD
     Core --> ALSA["amixer: first XLR Dock controls"]
     Core --> Graph["PipeWire modules and port links"]
     Core --> Catalog["lilv: LV2 catalogue"]
-    Core --> Host["Native helper: LV2, CLAP, VST3 and built-in stages (EQ, noise removal and voice changer, ducking, soundboard player, Sound Check, level)"]
+    Core --> Host["Native helper: LV2, CLAP, VST3 and built-in stages (EQ, noise removal, compressor, expander and voice changer, ducking, soundboard player, clock bridge, Sound Check, level)"]
     Host <-->|"audio ports"| Graph
     Host --> Bridge["Optional yabridge / Wine: Windows plugins"]
 ```
@@ -58,6 +60,11 @@ flowchart TD
   Omarchy 4's bar. Like OpenDeck it uses the client-only `openxlr-control`
   adapter for the Unix WebSocket and the documented commands;
   [omarchy.md](omarchy.md) has its limits.
+- The Chromium companion, `browser/chromium/`, is a browser extension. The
+  browser starts the UI's binary as its native messaging host, which
+  accepts that one extension id, connects to the daemon as a client and
+  passes on tab registrations, channel choices and the browser output
+  setting only; [browser-routing.md](browser-routing.md) has the rest.
 - `OpenXLR.Core` contains device backends, the PipeWire adapter, mixer,
   application matching, plugin catalogues and profile storage. The native
   host processes plugin audio without passing samples through managed code.
@@ -83,11 +90,22 @@ modules or custom drivers:
   any channel being reloaded. The default layout's 10 channels and 5
   mixes are 15 sinks, plus a post sink per virtual microphone, and no
   loopback processes.
-- A microphone with the EQ in software, noise removal or the voice
-  changer on gets one native stage, `OpenXLR_eq_<id>`, at the head of its
-  route, before the low cut, ClipGuard and inserts. The same process runs
-  RNNoise or DeepFilterNet ahead of the EQ and the voice changer after it.
-  A unit that runs the EQ itself gets no stage for the EQ alone.
+- A microphone with the EQ in software, noise removal, the compressor or
+  expander in software or the voice changer on gets one native stage,
+  `OpenXLR_eq_<id>`, at the head of its route, before the low cut,
+  ClipGuard and inserts. The same process runs RNNoise or DeepFilterNet
+  and the expander ahead of the EQ, and the compressor and the voice
+  changer after it. A unit that runs the EQ itself gets no stage for the
+  EQ alone. A capture input on a stereo pair gets the same stage on two
+  channels, with the EQ alone.
+- A capture input on its own clock gets a clock bridge, one
+  `openxlr-lv2-host bridge` process with two nodes. `OpenXLR_bridge_<id>_in`
+  takes the device's ports and runs in the device's graph,
+  `OpenXLR_bridge_<id>` gives the audio to the channel in the mixer's
+  graph, and the two meet only in the helper's ring buffer, where a
+  delay-locked loop and a resampler correct the drift. The device is
+  linked to the bridge alone, since PipeWire puts linked nodes in one
+  graph. See [own clock](api.md#own-clock).
 - Core's internal ducking plan can send selected cells through a hidden
   null sink per mix, `OpenXLR_mix_<id>.duck`, and a native stereo stage,
   `OpenXLR_duck_<id>`. The bus matches the combine pattern and grows a leg
@@ -310,12 +328,16 @@ reopened after 2 s, doubling on each further failure up to 32 s.
 src/            .NET solution: Core (device + mixer), Daemon, UI, Tui, Probe, Tests
 browser/        the Chromium tab routing companion and its native host manifest
 native/         optional C/C++ plugin host, vendored interface headers, noise removal
-                (RNNoise under rnnoise/, DeepFilterNet's Rust wrapper under deepfilter/), tests
+                (RNNoise under rnnoise/, DeepFilterNet's Rust wrapper under deepfilter/),
+                the voice changer's Signalsmith Stretch under signalsmith/, tests
 plugin/         the OpenDeck (Stream Deck) plugin
 docs/           this documentation, protocol write-up, capture guides
 tools/          proprobe.py, a standalone Python probe for the vendor protocol,
-                and the CI checks (versions, locked restores, the OpenAPI
-                document's shape, the rpm recipe's %files)
+                the CI checks (versions, locked restores, the OpenAPI
+                document's shape, the rpm recipe's %files), the generators for
+                the Deck's skins, icons and segment font, the Omarchy meter
+                table, the EQ reference and the starter sounds, and the
+                browser companion's packager
 packaging/      systemd unit, the PipeWire and pipewire-pulse open-file drop-ins, udev rule,
                 WirePlumber rules, UCM profile, rpm and nix packaging, OpenDeck patches,
                 the Omarchy bar plugin and its enable command, the GNOME Shell

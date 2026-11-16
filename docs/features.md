@@ -326,7 +326,8 @@ physical gain dial.
   [`setVoiceChanger`](api.md#voice-changer) control it, and it is saved
   with the mixer and in profiles.
 - Hear it dry: a Dry chip on each monitor mix, at the top right of its
-  head in the mix matrix and beside 150% on its strip, grey while off and
+  head in the mix matrix and beside 150% on its master in every other
+  layout, grey while off and
   green while on, with the volume in its place while the fader moves.
   Once on, that monitor mix hears the microphones before their software
   effects, so your own voice arrives earlier, while the other monitor
@@ -351,8 +352,9 @@ physical gain dial.
   chain the mixer gave up on stays off. Four listening curves come with it
   as built-in profiles: Voices forward, Footsteps, Bass boost and Soft
   treble, each only cutting. Opened from **EQ** over a mix's **FX** in
-  the matrix head and the mix strips, and in the terminal mixer's Outputs
-  tab; Deck keys and dials drive it; saved with the mixer under `mixEq`
+  the matrix head and on the mix's master in every other layout, and in
+  the terminal mixer's Outputs tab; Deck keys and dials drive it; saved
+  with the mixer under `mixEq`
   and in profiles, where an older profile leaves it alone. The Wave XLR
   Pro's zero-latency path stays on, and in hardware mixing the EQ of each
   mix the unit builds is held off with a tooltip and kept for software
@@ -458,7 +460,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   bound to a webcam or USB microphone without a gain control still has a
   level, and a strip with plugins has one after them. The UI draws it
   in the channel tiles, in the input rack and in the mix matrix's row
-  heads, under the gain on a hardware row; the terminal mixer and the
+  heads, under the gain on a hardware row, and mix banks show it behind
+  the Volume key of a bank's picker; the terminal mixer and the
   OpenDeck dials change it too. The Wave XLR Pro's zero-latency headphone
   path takes its level from it, and the UI marks the channel it carries
 - Linked sends: a Link chip at the start of each channel's sends keeps the
@@ -541,7 +544,10 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   card or a strip. Every bank has a picker listing
   every mix that is not hidden, a dropdown or a row of keys as the skin
   chooses; your pick is kept per skin, and a bank whose mix is deleted
-  moves to the next one. Channel and mix order stay the layout's. See
+  moves to the next one. The picker starts with a Volume key, which turns
+  one bank's faders into the channels' own volumes with no master. Each
+  master carries its mix's Arrange handle, so a drag or an arrow key moves
+  the mix in the layout's order. Channel and mix order stay the layout's. See
   [Templates](skins.md#templates) and [Mix banks](manual.md#mix-banks)
 - Skins can draw MONITOR as a one-row toolbar that keeps every output and
   its feed in its picker, APPLICATIONS as a list for a narrow column or as
@@ -565,6 +571,10 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   with no readout), and
   column heads the mix's master, mute, chain and how many outputs hear it
   (the volume opposite the name while the master moves).
+  XLR 1's gain ends with the gain lock where the interface has one. On a
+  Wave XLR Pro, Line In's row has a **Raw** button for raw capture and the
+  Aux column's name line a **USB** chip that sends the mix to the USB Aux
+  port.
   A skin orders and hides the parts of the heads and cells. See
   [The mix matrix](skins.md#the-mix-matrix)
 - The Broadcast skin, shipped with the application: the submixer as a mix
@@ -577,7 +587,7 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
 - Broadcast Amber and Broadcast Blue: Broadcast with orange or blue
   meters, lamps, checked keys and links. See [Skins](skins.md)
 - Compact Desk: a dark matrix skin with a bounded headphone column, a
-  monitor toolbar that grows with the window, wider names and faders, and
+  monitor toolbar that grows with the UI, wider names and faders, and
   application tiles wrapping across the page with readable names. Restart, version and About
   stay in the header's overflow menu. See [Skins](skins.md)
 - Nyan Pink: dark plum surfaces, pink faders and cyan details, keeping the
@@ -596,7 +606,7 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   grey faders and green meters. HEADPHONES and MONITOR's toolbar side by
   side above the mix matrix, INPUTS hidden until Arrange mode shows it, and
   APPLICATIONS in columns of up to four under the matrix, spreading across
-  a wide window. Its palette also
+  the UI when it is wide. Its palette also
   reaches the terminal, Deck and bar through the shared skin palettes. See
   [Skins](skins.md)
 - A compact view with one chosen channel strip, and a mini view with that
@@ -905,7 +915,9 @@ runs that insert instead, one insert at a time, and its saved choice stays
 as it was. Without the helper the insert shows the refusal. The helper
 scans CLAP/VST3 bundles in separate processes and caches their descriptions
 until the bundle or the helper itself changes, so an updated helper reads
-every installed bundle once.
+every installed bundle once. While a rescan runs, the mixer and the picker
+keep the catalogue they had, and each bundle is remembered as soon as it
+is read.
 
 Each insert's controls show the latency its plugin reports, or that it gave
 none. For a plugin in the native host they also show the delay measured on
@@ -1025,7 +1037,11 @@ scale menu instead of border resizing. LSP editors default to software
 rendering to avoid freezes during large drags. Display loss and stalled
 editor controls are handled without rebuilding a healthy audio instance;
 a crash of the plugin process interrupts its chain. Repeated chain failures
-stop automatic retries after three failures in five minutes. See
+stop automatic retries after three failures in five minutes. A CLAP plugin
+that asks for a restart, or a VST3 plugin that asks to be reloaded, is
+switched off and on again inside its process, with its settings and an open
+editor kept, and a non-finite input sample reaches a plugin or the ducking
+stage as silence; neither counts toward that limit. See
 [plugin editors](manual.md#plugin-editors) for recovery and renderer settings.
 
 The submixer can be switched off in Options. The daemon then controls
@@ -1120,7 +1136,9 @@ marked to recall on connect: at daemon start, after a replug or power
 cycle, or when switching to that device. Interfaces using OpenXLR's connect-time
 restoration (Wave XLR, the first XLR Dock) get their last settings back
 on every fresh connect without a profile, and can be reset to the
-firmware defaults recorded after a power cycle. A daemon start keeps a
+firmware defaults recorded after a power cycle. A restore that fails
+partway is tried again a second later, three attempts in all, and nothing
+is saved over the remembered settings meanwhile. A daemon start keeps a
 mute and a lower headphone level someone set on an interface that
 stayed plugged in. The Wave XLR Pro, which
 keeps its own settings, can be reset to OpenXLR's baseline instead:
@@ -1153,7 +1171,9 @@ headphone volume, the crossfade and each desktop output's volume (up to
 150%, pressing toggles its mute) is a dial target, and one dial can
 hold several targets cycled by tap or press. A turn leads locally: the
 dial steps from its own value, sends a burst as one command per 80 ms,
-and the daemon's echo cannot pull it back while the turn is warm.
+and the daemon's echo cannot pull it back while the turn is warm. A turn
+the daemon refuses, such as a gain turn while the gain lock is on, goes
+back to the daemon's value.
 Each dial saves a step per tick of 1, 3, 5 or 10 in its gain or level
 control's units: dB for gains and hardware levels, percentage points for
 faders and crossfade. Default retains each control's original step, and
@@ -1169,7 +1189,8 @@ lock, switching the monitor output to a specific device, and cycling
 an output's feed through Monitor A, Monitor B, Monitor A+B and then every other mix, an
 output's volume in 5% steps and its mute (red while muted), the enforced
 system output, routing the focused application to a channel, the
-next member of an exclusive group, ducking on or off on any device, a
+next member of an exclusive group, linking or unlinking a channel's
+sends, ducking on or off on any device, a
 channel as a ducking key or not, and
 loading an EQ profile on a microphone or a mix, lit while its EQ holds
 that profile, and undo and redo. An undo or redo key names the step it
@@ -1178,7 +1199,9 @@ pending dial turn before the undo. Each key
 can pick its icon, and a typed title replaces the built-in label. A key or
 dial on a channel or mix shows the icon and colour that channel or mix was
 given in the layout editor, unless the key has its own icon; a group key
-shows its heard member's.
+shows its heard member's. A key keeps its target while the daemon is
+offline or the thing it names is gone: the inspector lists it as
+Unavailable, and changing the key's icon or press mode leaves it alone.
 
 The property inspector's Microphone controls group offers channel gain,
 mute, phantom power, low cut and ClipGuard targets for primary and additional
@@ -1298,6 +1321,11 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   fill, warning and hot colours along its scale. Light skins use their own
   colours for the selection and cap lettering. `--skin <id>` tries one for a single run.
   A terminal without true colour gets xterm-256 colours
+- While the daemon is gone the tabs keep the last values it sent, the
+  header reads "offline, showing the last known state" with the
+  connection's status, and a key that would change something says on the
+  bottom line that it was not sent. A refused change shows the daemon's
+  reason there, and a message the terminal cannot read is skipped
 - It draws its own cells rather than taking a widget toolkit, so it adds no
   dependency to any package. A frame writes only the cells that changed
 
@@ -1363,7 +1391,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   Other desktops keep a range per control.
 
 - The control API validates every command before the mixer sees it and
-  answers with an error instead of ignoring it. The Unix socket checks Linux peer credentials
+  answers with an error instead of ignoring it. A command that fails
+  inside the daemon is answered with an error too, and the connection
+  stays open. The Unix socket checks Linux peer credentials
   before any HTTP or WebSocket data is read; clients are rate-limited
   and browser pages from other origins are refused; see
   [api.md](api.md). The same commands are served over HTTP at `/api/v1`
@@ -1401,6 +1431,16 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   one failing helper leaves the rest to run, and the failure is logged
   once. A level meter whose `parec` exits starts again with a backoff
   from 1 to 30 s
+- `mixer.json` survives a crash or a bad edit: each save reaches the disk
+  before it replaces the old file and keeps that file as `mixer.json.bak`,
+  which the daemon reads when `mixer.json` is missing or cannot be parsed.
+  A single wrong value drops that entry and not the file, and top-level
+  keys a newer release wrote are kept ([mixer-layout.md](mixer-layout.md))
+- When the daemon refuses a change, or a command fails inside it, the UI
+  shows the daemon's reason above the sections for eight seconds and the
+  controls go back to the values the daemon holds. While the UI is not
+  connected, the input, headphone and monitor sections and the mixer are
+  greyed out and every meter drops to zero
 - Text size: five settings from 80% to 120% in Options under Appearance.
   The change reaches open windows immediately and is saved in `ui.json`.
 - Skins: every surface, label, indicator, meter, fader and control in the

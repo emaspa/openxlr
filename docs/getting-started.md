@@ -85,7 +85,9 @@ how these virtual microphones work.
 - Play audio and follow **Flow** from the app or microphone to its
   channel, then to the mix and output. Check the channel meter, the send
   level and mute in the mix, and the output selected under **Monitor**.
-- If OpenXLR cannot connect to the native user service, check its status.
+- If OpenXLR cannot connect to the native user service, the header reads
+  **Daemon not running** and the input, headphone and monitor sections and
+  the mixer are greyed. Check the service's status.
 
   ```sh
   systemctl --user status openxlr-daemon

@@ -44,8 +44,9 @@ The device, profile and mixer resources are parts of the same snapshot
 `/state` returns, with the same field names; two requests may see two
 different moments. Channel and mix ids are exact and case-sensitive. Insert
 chains are keyed as in the state: an XLR or capture input channel id, or `mix:<id>`, so
-`/api/v1/inserts/mix:monitor` reads Monitor A's chain. While the mixer is off
-every mixer resource answers 503; with the mixer running an unknown id
+`/api/v1/inserts/mix:monitor` reads Monitor A's chain. While the mixer is off,
+or its graph is not built (the state's `mixerWaiting`), every mixer resource
+answers 503; with the mixer running an unknown id
 answers 404, and so does a channel without a chain. A chain the state holds
 with no inserts in it reads as `[]`. A profile directory that cannot be read
 leaves `profiles` empty and is reported in the state's `warning`.
@@ -133,12 +134,17 @@ selects both devices. Give the speakers `monitor` and leave the headset on
 headset. An empty sum is invalid; remove the device from `devices` to
 stop its monitor feed. Feeds are saved in mixer settings and profiles;
 `monitorFeeds` in the mixer state holds per-output exceptions from the
-default monitor mix. The Pro's own jacks share one feed even when listed
-as separate selected outputs.
+default monitor mix. Each of the Wave XLR Pro's jacks, listed as separate
+selected outputs, takes a feed of its own; jacks that play the same feed
+share one mix on the unit.
 `{"cmd":"setChannelVolume","channel":"game","value":0.5}` sets the Game
 channel's own volume, which scales every send of the channel at once, and
 `GET /api/v1/channels/game` reads it back as `volume`. Every channel takes
 one, `xlr1`, `xlr2`, `aux` and `line` included.
+`{"cmd":"setLinkedSends","channel":"game","value":true}` links the Game
+channel's sends, so `setLevel` on one of them writes every mix (see
+[linked sends](api.md#linked-sends)); the same read reports it as
+`linkedSends`.
 `{"cmd":"setCaptureGain","channel":"brio","value":36}` sets a capture input's
 gain to +36 dB, its source's volume, and `GET /api/v1/channels/brio` reads it
 back as `captureGain` with its range and whether it is the device's own
@@ -225,8 +231,9 @@ reads `device` and the numbers are the ones the unit holds;
 `{"cmd":"setDynamicsProcessing","channel":"xlr1","value":"software"}` moves
 both to this computer and `"value":"device"` back to the unit (see
 [where they run](api.md#where-the-compressor-and-expander-run)). Their
-levels go out only on the WebSocket's meters, after `watchDynamics`, and
-only while software runs them.
+levels go out only on the WebSocket's meters, after `watchDynamics`, while
+software runs them or a unit that reports them does
+(`capabilities.dynamicsMeters`).
 [Ducking](api.md#ducking) is one setup on any device:
 `{"cmd":"setDucking","value":{"enabled":true,"channels":["music","game"],"mixes":["monitor"],"amount":"high"}}`
 lowers Music and Game in Monitor A by 24 dB while XLR 1 is loud, and
@@ -288,7 +295,7 @@ on the events route without a WebSocket upgrade; 401 a request under `/api/v1` w
 403 foreign Origin; 404 unknown resource id; 408 body-read deadline; 413
 body over 64 KiB; 415 wrong Content-Type; 429 budget exhausted, or another
 HTTP command or command-backed read in flight; 503 mixer resource while the
-mixer is off, and every state read (`/state`, `/devices`, `/profiles` and the
+mixer is off or its graph is not built, and every state read (`/state`, `/devices`, `/profiles` and the
 mixer resources) while the state cannot be built, as while the audio server
 is away, with an `error` message giving the reason. Chunked bodies have the
 same 64 KiB cap and five-second
