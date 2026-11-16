@@ -603,6 +603,12 @@ function toggleValue(target, inst) {
   // and leave the deck face out of sync with the audible graph.
   if (target === "softClipGuard")
     return mixer()?.softClipGuardAvailable === true ? mixer()?.softClipGuard ?? false : null;
+  // Lit while every send of the channel plays at one level; grey for a
+  // channel that is gone and on a daemon that does not report the link.
+  if (target.startsWith("sendlink:")) {
+    const channel = chOf(target.slice(9));
+    return typeof channel?.linkedSends === "boolean" ? channel.linkedSends : null;
+  }
   if (target.startsWith("focus:")) {
     const channel = chOf(target.slice(6));
     return channel && !channel.hardware && !channel.captureSource ? false : null;
@@ -718,6 +724,7 @@ function toggleLabel(target, inst) {
   }
   if (target.startsWith("focus:")) return `Focus\n${channelName(mixer(), target.slice(6))}`;
   if (target.startsWith("duckkey:")) return `Duck key\n${channelName(mixer(), target.slice(8))}`;
+  if (target.startsWith("sendlink:")) return `Link sends\n${channelName(mixer(), target.slice(9))}`;
   if (target.startsWith("inschain|")) return `${chainShort(target.slice(9))}\nInserts`;
   if (isProfileTarget(target)) return `Profile\n${target.slice(8)}`;
   if (target === "auxPort") return "Aux\nPort";
@@ -1118,6 +1125,12 @@ function onKeyDown(context, inst, inMultiAction = false) {
     keyCommands.enqueue(context, payload);
   }
   else if (t.startsWith("focus:")) keyCommands.enqueue(context, { cmd: "routeFocusedApp", channel: t.slice(6) });
+  else if (t.startsWith("sendlink:")) {
+    // A send turn still waiting goes first: linking takes every send to
+    // the level of the channel's first mix, as the daemon has it.
+    flushDialTurns();
+    keyCommands.enqueue(context, { cmd: "setLinkedSends", channel: t.slice(9), value: !cur });
+  }
   else if (t.startsWith("group:")) keyCommands.enqueue(context, { cmd: "cycleExclusiveGroup", group: t.slice(6) });
   else if (t.startsWith("insert|")) {
     const [, ch, id] = t.split("|");
