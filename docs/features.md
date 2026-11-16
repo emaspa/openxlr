@@ -461,14 +461,15 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
   heads, under the gain on a hardware row; the terminal mixer and the
   OpenDeck dials change it too. The Wave XLR Pro's zero-latency headphone
   path takes its level from it, and the UI marks the channel it carries
-- Linked sends: a Link chip at the start of each channel's sends keeps
-  the channel at one level in every mix. Linking takes the first mix's
-  level. Moving any send then moves them all, from the UI, a Deck dial,
-  the terminal mixer or the API, and one undo puts them back. The
-  terminal mixer links or unlinks the selected channel with `l`. The mutes
-  stay per mix, the Aux mix and hidden mixes are linked too, and a mix
-  added while linked starts at the linked level. Saved with the mixer and
-  in profiles (`setLinkedSends`, see [Linked sends](manual.md#linked-sends))
+- Linked sends: a Link chip at the start of each channel's sends keeps the
+  channel at one level in every mix. Linking takes the first mix's level.
+  Moving any send then moves them all, from the UI, a Deck dial, the
+  terminal mixer or the API, and one undo puts them back. The terminal
+  mixer links or unlinks the selected channel with `l`, and a Deck key per
+  channel links or unlinks it and lights while linked. The mutes stay per
+  mix, the Aux mix and hidden mixes are linked too, and a mix added while
+  linked starts at the linked level. Saved with the mixer and in profiles
+  (`setLinkedSends`, see [Linked sends](manual.md#linked-sends))
 - Ducking on every device: one to eight keys (microphones, Aux In, Line
   In or application channels) lower chosen channels in chosen mixes while
   the loudest of them is loud,

@@ -92,6 +92,13 @@ export function layoutChoices(mixer, devices = [], eqProfiles = []) {
     items: channels.map((channel) => option(
       `sendmute:${channel.id}:${mix.id}`, `${channel.name} in ${mix.name}`)),
   });
+  // Each channel's linked sends, as a key that links or unlinks them. A
+  // daemon that does not report the link offers none.
+  const linkable = channels.filter((channel) => typeof channel.linkedSends === "boolean");
+  if (linkable.length) toggleGroups.push({
+    id: "layout-linked-sends", label: "Linked sends",
+    items: linkable.map((channel) => option(`sendlink:${channel.id}`, `${channel.name}: link sends`)),
+  });
   // Each channel that can key ducking, as a key that adds it to the keys or takes it out.
   const keyable = channels.filter(canKeyDucking);
   if (keyable.length) toggleGroups.push({
@@ -198,7 +205,7 @@ export function targetAppearance(mixer, target) {
   if (typeof target !== "string") return { icon: "", path: null, colour: null };
   let item;
   if (/^(mixmute|mixvol):/.test(target)) item = mixer?.mixes?.find(m => m.id === target.split(":")[1]);
-  else if (/^(sendmute|send|focus|duckkey|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|eq|eqband|eqtype|eqfreq|eqgain|eqq|voice|eqprofile):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
+  else if (/^(sendmute|send|sendlink|focus|duckkey|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|eq|eqband|eqtype|eqfreq|eqgain|eqq|voice|eqprofile):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
   else if (target.startsWith("group:")) {
     const open = openGroupMember(mixer, mixer?.exclusiveGroups?.find(g => g.id === target.slice(6)));
     item = open === null ? undefined : mixer?.channels?.find(c => c.id === open);

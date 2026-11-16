@@ -270,17 +270,20 @@ each send row sits at the same height in every tile.
 <a name="linked-sends"></a>
 **Linked sends.** To keep a channel at the same level in every mix, click
 the **Link** chip at the start of its sends. In the SUBMIXER tiles it sits
-after the Volume fader, above the first send; in a mix matrix it sits after
-the volume fader in the row head, before the row's first cell; in mix banks
-it sits over or beside each send's mute, and a bank showing the channels'
-volumes has none. The chip lights up and every send
-of the channel takes the level of its first mix. From then on, moving any
-of the channel's sends moves all of them, on a Deck dial, in the terminal
-mixer or over the API too, and one undo puts all of them back. The mutes
-stay per mix, so you can still keep a linked channel out of one mix, and
-the channel's Volume works as before. Click the chip again to unlink. No
-level changes, and each send moves on its own again. In the [terminal
-mixer](#terminal), `l` on a channel's strip links or unlinks it.
+after the Volume fader, above the first send; in a mix matrix it sits
+after the volume fader in the row head, before the row's first cell; in
+mix banks it sits over or beside each send's mute, and a bank showing the
+channels' volumes has none. The chip lights up and every send of the
+channel takes the level of its first mix. From then on, moving any of the
+channel's sends moves all of them, on a Deck dial, in the terminal mixer
+or over the API too, and one undo puts all of them back. The mutes stay
+per mix, so you can still keep a linked channel out of one mix, and the
+channel's Volume works as before. Click the chip again to unlink. No level
+changes, and each send moves on its own again. In the [terminal
+mixer](#terminal), `l` on a channel's strip links or unlinks it. A Deck
+key set to the channel under **Linked sends**, such as **Music: link
+sends**, lights while the channel is linked, and a press links or unlinks
+it.
 
 Every mix counts, the Aux mix and hidden mixes included, and the first mix
 is the first in the layout's order even when it is hidden. A mix you add
@@ -4704,7 +4707,10 @@ channel, such as **Voice Chat keys ducking**, makes that channel a ducking
 key or stops it being one: it lights while the channel is a key, a press
 adds it to the keys or takes it out, and a channel that becomes a key
 stops being lowered. A press that would take out the last key, or add a
-ninth, only flashes an alert. A key's icon can be chosen in its settings, and a
+ninth, only flashes an alert. Under **Linked sends**, a key per channel
+links or unlinks the channel's [sends](#linked-sends) and lights while
+they are linked; a daemon that does not report the link offers none.
+A key's icon can be chosen in its settings, and a
 title typed there replaces the built-in label. An icon name the plugin does
 not know shows the target's default icon. A key or dial whose target is a
 channel or a mix with an icon or colour from the layout editor
