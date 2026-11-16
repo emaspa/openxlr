@@ -450,9 +450,6 @@
   <data name="ConnectionLostUnconfirmed" xml:space="preserve">
     <value>Connection lost; the change could not be confirmed.</value>
   </data>
-  <data name="ContributorsAndCredits" xml:space="preserve">
-    <value>Contributors and credits</value>
-  </data>
   <data name="Controls" xml:space="preserve">
     <value>Controls</value>
   </data>

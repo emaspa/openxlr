@@ -410,9 +410,6 @@
   <data name="ConnectionLostUnconfirmed" xml:space="preserve">
     <value>Naputol ang koneksyon; hindi makumpirma ang pagbabago.</value>
   </data>
-  <data name="ContributorsAndCredits" xml:space="preserve">
-    <value>Mga kontribyutor at pagkilala</value>
-  </data>
   <data name="Controls" xml:space="preserve">
     <value>Mga control</value>
   </data>

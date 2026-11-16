@@ -410,9 +410,6 @@
   <data name="ConnectionLostUnconfirmed" xml:space="preserve">
     <value>Веза је прекинута; измена није потврђена.</value>
   </data>
-  <data name="ContributorsAndCredits" xml:space="preserve">
-    <value>Сарадници и заслуге</value>
-  </data>
   <data name="Controls" xml:space="preserve">
     <value>Контроле</value>
   </data>
