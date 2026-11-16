@@ -2067,6 +2067,9 @@
   <data name="MixerWaitingForAudioServer" xml:space="preserve">
     <value>Миксер чека звучни сервер, који није одговорио при покретању сервиса. Појавиће се овде чим сервер одговори, без поновног покретања.</value>
   </data>
+  <data name="MixerRebuildingAfterAudioServer" xml:space="preserve">
+    <value>Миксер се поново гради јер се звучни сервер поново покренуо или изгубио један од својих уређаја. Појавиће се овде чим сервер одговори, без поновног покретања.</value>
+  </data>
   <data name="SubmixerIsOffTurnItOnInOptions" xml:space="preserve">
     <value>Подмиксер је искључен. Укључи га у Опцијама за канале по апликацији, миксеве, виртуелне микрофоне и ефекте; OpenXLR тренутно контролише само хардвер.</value>
   </data>

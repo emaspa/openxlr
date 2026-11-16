@@ -192,7 +192,7 @@ written above it; false on every other model), `lowImpedance`,
 `auxLevelDb`, `auxLevelLock`, `lineInGainDb` (the Line In's gain in dB as the unit reads it back, 0 to `lineInGainMaxDb` once OpenXLR has written it and up to 80 on a unit set higher elsewhere, on a model with `lineInput`; absent on every other model), `lineInLevelLock` (the Line In's level lock, on a model with `lineInput`: while true the unit ignores Line In gain writes through its ALSA control, so the desktop mixer and other applications cannot move the gain, while `lineInGain` still applies; absent on every other model), `clipGuardAndMixRead` (true on the original Wave XLR, whose `clipGuard` and `crossfade` are read from its config block; absent on every other model and in a saved state or profile from before OpenXLR read them, whose recall leaves the unit's ClipGuard and crossfade as they are), `unitGainLock` (the unit's own gain lock as the unit reads it back, block 0x0004 byte 2 bit 0x04, on a model with `hardwareGainLock`: while true the unit ignores gain written through its ALSA control, so the desktop mixer and WirePlumber's restore cannot move the gain, while `gain` still applies; the daemon sets it while `gainLocked` is true and clears it while it is false, at every connect too; absent on every other model and left out of saved settings and profiles), `micConnected` and `headphonesConnected` (read only: whether a microphone is plugged into the unit's XLR jack and headphones into its headphone jack, block 0x0006 byte 0 bits 0 and 1, read with each poll on the Wave XLR MK.2 from firmware 1.0.15; `rawCapture`, `rawCapture2` and `lineInRawCapture` (XLR 1, XLR 2 and Line In sent to the computer before the unit's processing, as the unit reads it back, on a model with `rawCapture` and the input, see [raw capture](#raw-capture); absent on every other model, on older firmware and after a read of the block failed, model and input and left out of saved settings and profiles), plus the daemon-stamped `gainLocked`,
 `phantomSettling`, `phantomSettling2`, `phantomSettleSeconds` and
 `phantomSettleSeconds2`, and `led`, the unit's LEDs as it reads them back on a model with `ledRing`, see [LED ring](#led-ring); absent on every other model and left out of saved settings and profiles), `ducking` (present whenever the daemon runs, see [ducking](#ducking)),
-`mixer`, `mixerWaiting`, `devices`, `profiles`, `activeProfile`, `recallOnConnect`,
+`mixer`, `mixerWaiting`, `mixerRebuilding`, `devices`, `profiles`, `activeProfile`, `recallOnConnect`,
 `eqProfiles` and `eqProfileProblem` (see [EQ profiles](#eq-profiles)) and
 `detected` (`usbId`, `name`, `active` for every attached interface; `usbId`
 is the unit's instance id, see [additional interface state](#additional-interface-state))
@@ -640,9 +640,11 @@ the build unloads what is left of it by name, as it does after a crash. The
 new one is restored from `mixer.json` with the startup backoff, the first
 attempt after 2 seconds. Meanwhile `mixer` is null,
 `mixerWaiting` is true and `warning` says the mixer is still being built
-after the audio server restarted or lost one of its devices. Mixer
-commands are refused with that sentence, and a profile recalled meanwhile
-is applied as above.
+after the audio server restarted or lost one of its devices. The state
+also carries `mixerRebuilding` true, which tells this wait apart from the
+one at startup. It is false whenever `mixerWaiting` is false, and absent
+from an older daemon. Mixer commands are refused with that sentence, and
+a profile recalled meanwhile is applied as above.
 
 ### Channel volume
 

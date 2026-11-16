@@ -379,6 +379,12 @@ public sealed record StateMessage
     /// audio server did not answer at startup; the daemon keeps retrying.
     /// </summary>
     [JsonPropertyName("mixerWaiting")] public bool MixerWaiting { get; init; }
+    /// <summary>
+    /// True while <see cref="MixerWaiting"/> is a lost graph's rebuild, after
+    /// the audio server restarted or lost one of the mixer's devices, rather
+    /// than a startup build it did not answer.
+    /// </summary>
+    [JsonPropertyName("mixerRebuilding")] public bool MixerRebuilding { get; init; }
 
     /// <summary>
     /// Every selectable sink and source in the graph, real or virtual, so

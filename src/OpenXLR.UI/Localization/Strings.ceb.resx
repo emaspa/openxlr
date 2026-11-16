@@ -2067,6 +2067,9 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="MixerWaitingForAudioServer" xml:space="preserve">
     <value>Gihulat sa mixer ang audio server, nga wala motubag sa pagsugod sa daemon. Makita kini dinhi kon motubag ang server, nga dili kinahanglan mag-restart.</value>
   </data>
+  <data name="MixerRebuildingAfterAudioServer" xml:space="preserve">
+    <value>Gitukod pag-usab ang mixer kay nag-restart ang audio server o nawala ang usa sa mga device niini. Makita kini dinhi kon motubag ang server, nga dili kinahanglan mag-restart.</value>
+  </data>
   <data name="SubmixerIsOffTurnItOnInOptions" xml:space="preserve">
     <value>Naka-off ang submixer. I-enable kini sa Mga opsyon alang sa channel matag app, mix, virtual nga mikropono ug insert; hardware ra ang gikontrol sa OpenXLR.</value>
   </data>

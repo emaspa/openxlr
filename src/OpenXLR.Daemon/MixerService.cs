@@ -2279,6 +2279,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>Whether a failed startup build, or a lost graph's rebuild, is being retried.</summary>
     public bool WaitingForAudio { get { lock (_sceneGate) return _waitingForAudio; } }
 
+    /// <summary>Whether the wait is a lost graph's rebuild rather than a startup build the audio server did not answer.</summary>
+    public bool RebuildingGraph { get { lock (_sceneGate) return _waitingForAudio && ReferenceEquals(_waitingWarning, RebuildWarning); } }
+
     private const string WaitingWarning = "The mixer is waiting for the audio server (pipewire-pulse), which did not answer when the daemon started; it is built as soon as the server answers.";
     private const string RebuildWarning = "The mixer is still being built after the audio server (pipewire-pulse) restarted or lost one of its devices; it is back as soon as the server answers.";
 

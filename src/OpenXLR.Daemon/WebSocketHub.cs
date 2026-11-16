@@ -112,6 +112,7 @@ public sealed partial class WebSocketHub
             Mixer = _mixer.Snapshot(),
             Ducking = _mixer.Ducking(),
             MixerWaiting = _mixer.WaitingForAudio,
+            MixerRebuilding = _mixer.RebuildingGraph,
             Devices = _mixer.Devices(),
             Profiles = profiles,
             RecallOnConnect = recall,
@@ -162,6 +163,7 @@ public sealed partial class WebSocketHub
         DaemonVersion = OpenXLR.Daemon.DaemonVersion.Current,
         Warning = string.Join(" ", new[] { _devices.Warning, $"The daemon could not read its full state: {failure}" }.Where(w => w is not null)),
         MixerWaiting = _mixer.SubmixerEnabled,
+        MixerRebuilding = _mixer.RebuildingGraph,
         History = History.State(),
     };
 

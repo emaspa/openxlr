@@ -49,7 +49,10 @@ meter a window keeps asking for, shows once and then only after half a
 minute without it. While the UI is not connected to the daemon, the
 header reads "Daemon not running" and the input, headphone and monitor
 sections and the mixer are greyed out. They take no input, and every meter
-drops to zero. Everything comes back as soon as the UI connects again.
+drops to zero, the ones in Mic setup and the compressor and expander
+windows included. Everything comes back as soon as the UI connects again.
+The meters also drop to zero while the daemon has no mixer, as when it
+builds the mixer again after the audio server restarted.
 
 The gear in the header opens Options in its own window, so you can keep
 using the mixer while adjusting settings. Pressing the gear again brings
@@ -5059,8 +5062,9 @@ diagnostics** in Options and open an issue with the archive.
   another program or dropped by the server near its open-file limit (see
   [5.8](#open-files)). The daemon keeps running and
   builds the mixer again from your saved settings as soon as the server
-  takes new devices. Mixer controls answer again once
-  the mixer is back. If the warning
+  takes new devices. Meanwhile the UI's mixer area says the mixer is being
+  built again, rather than that the server did not answer at startup.
+  Mixer controls answer again once the mixer is back. If the warning
   stays, check the audio server as above.
 
 <a name="missing-plugins"></a>

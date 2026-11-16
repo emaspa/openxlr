@@ -144,6 +144,7 @@ public sealed partial class MainViewModel : ViewModelBase
             CancelMonitorSelectionEdit();
             CancelMonitorMicrophoneEdit();
             ZeroMeters();
+            _meterFrameLogged = false;
             // The next daemon answers for itself: its own last state, its own banner.
             _appliedState = null;
             StateUnreadable = false;
@@ -233,14 +234,19 @@ public sealed partial class MainViewModel : ViewModelBase
         if (DaemonConnected) ShowNotice(error, ErrorNoticeHold);
     }
 
-    /// <summary>The daemon is gone: every meter falls to zero rather than holding its last level.</summary>
+    /// <summary>
+    /// The daemon is gone, or its mixer is: every meter falls to zero rather
+    /// than holding its last level, Mic setup's and the compressor and
+    /// expander windows' included.
+    /// </summary>
     private void ZeroMeters()
     {
         var silent = new JsonObject();
         Ducking.ApplyMeters(silent);
         Soundboard.ApplyMeters(silent);
-        foreach (ChannelViewModel channel in Channels) { channel.MeterL = 0; channel.MeterR = 0; }
+        foreach (ChannelViewModel channel in Channels) { channel.MeterL = 0; channel.MeterR = 0; channel.Dynamics?.DropLevels(); }
         foreach (MixViewModel mix in Mixes) { mix.MeterL = 0; mix.MeterR = 0; mix.MaximizerReduction = 0; }
+        foreach (MicSetupViewModel setup in MicSetups()) setup.DropLevel();
     }
 
     // --- connection / device identity ---
@@ -288,12 +294,23 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>What the empty SUBMIXER tile says: the reasons differ.</summary>
     public string MixerPlaceholder => !DaemonConnected
         ? OlderDaemonRunning ? Localizer.Text("OlderDaemonRunningSentence") : Localizer.Text("DaemonNotRunningSentence")
-        : MixerWaiting ? Localizer.Text("MixerWaitingForAudioServer")
+        : MixerWaiting ? MixerRebuilding ? Localizer.Text("MixerRebuildingAfterAudioServer") : Localizer.Text("MixerWaitingForAudioServer")
         : Localizer.Text("SubmixerIsOffTurnItOnInOptions");
 
     private bool _mixerWaiting;
-    /// <summary>The submixer is on, but the audio server did not answer when the daemon built it.</summary>
+    /// <summary>
+    /// The submixer is on, but its graph is not built: the audio server did
+    /// not answer when the daemon built it, or the graph was lost and is
+    /// being built again.
+    /// </summary>
     public bool MixerWaiting { get => _mixerWaiting; private set { if (Set(ref _mixerWaiting, value)) Raise(nameof(MixerPlaceholder)); } }
+
+    private bool _mixerRebuilding;
+    /// <summary>
+    /// The wait is a rebuild: the audio server restarted, or lost one of the
+    /// mixer's devices, under a built graph. False from an older daemon.
+    /// </summary>
+    public bool MixerRebuilding { get => _mixerRebuilding; private set { if (Set(ref _mixerRebuilding, value)) Raise(nameof(MixerPlaceholder)); } }
 
     private bool _deviceConnected;
     /// <summary>The primary interface is driven; the header's LED says this and nothing else.</summary>
@@ -1230,6 +1247,7 @@ public sealed partial class MainViewModel : ViewModelBase
             ClockProblem = !CardProfileProblem && Clock is { MicResampled: true };
             ApplyClockChoice(node["mixer"]);
             MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
+            MixerRebuilding = MixerWaiting && (node["mixerRebuilding"]?.GetValue<bool>() ?? false);
             DaemonConnected = true;
             DaemonVersion = node["daemonVersion"]?.GetValue<string>();
             DeviceConnected = node["connected"]?.GetValue<bool>() ?? false;
@@ -1325,6 +1343,8 @@ public sealed partial class MainViewModel : ViewModelBase
             ApplyDevices(node["devices"], node["mixer"]);
             ApplyWaveInterfaces(node["waveInterfaces"]);
             ApplyMixer(node["mixer"]);
+            // No graph, no meters: a lost graph's last frame would otherwise stay on every meter.
+            if (node["mixer"] is not JsonObject) ZeroMeters();
             ApplyStreams(node["mixer"]);
             ApplyBrowserTabs(node["mixer"]);
             ApplyAppRouting(node["mixer"]);
@@ -1625,8 +1645,28 @@ public sealed partial class MainViewModel : ViewModelBase
         foreach (AudioDeviceItem d in fresh) target.Add(d);
     }
 
-    /// <summary>Route each peak to its channel strip or mix.</summary>
+    /// <summary>A meters frame failed on this connection and was logged; the next failure is not.</summary>
+    private bool _meterFrameLogged;
+
+    /// <summary>
+    /// Take a meters frame on the UI thread. A frame that throws, as one
+    /// from a daemon of another version could, is dropped: the first on a
+    /// connection is logged, and the meters keep what they showed until a
+    /// frame applies.
+    /// </summary>
     private void ApplyMeters(JsonNode levels)
+    {
+        try { ApplyMeterFrame(levels); }
+        catch (Exception ex)
+        {
+            if (_meterFrameLogged) return;
+            _meterFrameLogged = true;
+            UiErrors.Log("a meters frame could not be applied and was dropped; later failures on this connection are not logged", ex);
+        }
+    }
+
+    /// <summary>Route each peak to its channel strip or mix; a level that is not a finite number reads as silence.</summary>
+    private void ApplyMeterFrame(JsonNode levels)
     {
         if (levels is not JsonObject obj) return;
         Ducking.ApplyMeters(obj);
@@ -1641,8 +1681,8 @@ public sealed partial class MainViewModel : ViewModelBase
             double l = 0, r = 0;
             if (kv.Value is JsonArray arr && arr.Count >= 2)
             {
-                l = arr[0]?.GetValue<double>() ?? 0;
-                r = arr[1]?.GetValue<double>() ?? 0;
+                l = MeterLevel(arr[0]);
+                r = MeterLevel(arr[1]);
             }
             if (kv.Key.StartsWith("ch:", StringComparison.Ordinal))
             {
@@ -1676,6 +1716,9 @@ public sealed partial class MainViewModel : ViewModelBase
                 MicSetupOf(kv.Key[5..])?.ApplyPosition(position);
         }
     }
+
+    private static double MeterLevel(JsonNode? node)
+        => node is JsonValue v && v.TryGetValue(out double d) && double.IsFinite(d) ? d : 0;
 
     /// <summary>Every microphone's Mic setup: XLR 1's, XLR 2's and each mono capture input's.</summary>
     internal IEnumerable<MicSetupViewModel> MicSetups()

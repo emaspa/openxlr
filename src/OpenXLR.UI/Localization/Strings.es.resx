@@ -2111,6 +2111,9 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="MixerWaitingForAudioServer" xml:space="preserve">
     <value>El mezclador espera al servidor de audio, que no respondió al iniciarse el demonio. Aparecerá aquí en cuanto el servidor responda; no hace falta reiniciar nada.</value>
   </data>
+  <data name="MixerRebuildingAfterAudioServer" xml:space="preserve">
+    <value>El mezclador se está construyendo de nuevo porque el servidor de audio se reinició o perdió uno de sus dispositivos. Aparecerá aquí en cuanto el servidor responda; no hace falta reiniciar nada.</value>
+  </data>
   <data name="SubmixerIsOffTurnItOnInOptions" xml:space="preserve">
     <value>El submezclador está desactivado. Actívalo en Opciones para disponer de canales por aplicación, mezclas, micrófonos virtuales e inserciones; OpenXLR solo está controlando el hardware.</value>
   </data>

@@ -577,6 +577,16 @@ public sealed class MicDynamicsViewModel : ViewModelBase
     internal void CheckLevels()
     {
         if (_levelsAt == long.MinValue && _rawAt == long.MinValue || HasLevels) return;
+        DropLevels();
+    }
+
+    /// <summary>
+    /// The levels stop showing now rather than once they are late: the
+    /// daemon or its mixer went away, and no frame is coming.
+    /// </summary>
+    internal void DropLevels()
+    {
+        if (_levelsAt == long.MinValue && _rawAt == long.MinValue) return;
         _levelsAt = _rawAt = long.MinValue;
         _inputDb = _outputDb = -120;
         _reductionDb = 0;
@@ -737,6 +747,13 @@ public sealed class ChannelDynamicsViewModel : ViewModelBase
             Compressor.ChannelName = value;
             Raise(nameof(ButtonName));
         }
+    }
+
+    /// <summary>Both processors' levels stop showing at once: no frame is coming.</summary>
+    internal void DropLevels()
+    {
+        Expander.DropLevels();
+        Compressor.DropLevels();
     }
 
     public bool IsLit => Expander.IsLit || Compressor.IsLit;
