@@ -448,9 +448,6 @@
   <data name="ConnectionLostUnconfirmed" xml:space="preserve">
     <value>Verbindung verloren. Die Änderung konnte nicht bestätigt werden.</value>
   </data>
-  <data name="ContributorsAndCredits" xml:space="preserve">
-    <value>Mitwirkende und Danksagung</value>
-  </data>
   <data name="Controls" xml:space="preserve">
     <value>Regler</value>
   </data>
