@@ -40,7 +40,10 @@ public sealed class ExternalLinkTests
     {
         string dir = Directory.CreateTempSubdirectory("openxlr-link-").FullName;
         string log = Path.Combine(dir, "log");
-        string opener = ExecutableScript.Write(Path.Combine(dir, "opener"), $"printf '%s\\n' \"$1\" >> '{log}'\n");
+        // The line is written beside the log and renamed onto it, so the log appears with its
+        // line in it: a shell redirect creates the file before printf writes, and the test,
+        // waiting only for the file, could read it empty.
+        string opener = ExecutableScript.Write(Path.Combine(dir, "opener"), $"printf '%s\\n' \"$1\" > '{log}.part' && mv '{log}.part' '{log}'\n");
         string prev = ExternalLink.Opener;
         const string Link = "https://github.com/emaspa/openxlr/blob/main/docs/manual.md#skins";
         try
