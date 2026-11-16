@@ -210,7 +210,11 @@ internal sealed class App
             return;
         }
 
-        if (Current.Handle(key, this)) return;
+        // A key whose change went nowhere says so, rather than doing nothing.
+        long unsent = Link.Unsent;
+        bool handled = Current.Handle(key, this);
+        if (Link.Unsent != unsent) Say(DaemonLink.NotConnected);
+        if (handled) return;
 
         if (key.Is('q')) { Stop(); return; }
         if (!typing && key.Is('?')) { _help = true; return; }
@@ -371,7 +375,12 @@ internal sealed class App
         // channel that carries the input, wherever the layout put it.
         Snapshot? state = Link.State;
         screen.Text(3, bottom - 10, "INTERFACE", theme.TextMuted, theme.Card);
-        if (state is not null && state.Connected)
+        if (!Link.Connected)
+        {
+            // The last state's gains and meters are not live without the daemon.
+            screen.Text(3, bottom - 8, "No daemon", theme.TextMuted, theme.Card);
+        }
+        else if (state is not null && state.Connected)
         {
             int inputs = Math.Min(2, Math.Max(1, state.Count("xlrInputs")));
             for (int i = 0; i < inputs; i++)
@@ -408,16 +417,22 @@ internal sealed class App
         screen.Text(1, 0, "OpenXLR", theme.TextPrimary, theme.Card, bold: true);
         // The lamp is the interface's connection; a microphone bound to a
         // strip shows its own state on the strip and on the Inputs tab.
-        string device = state?.Device is { } descriptor && state.Connected
-            ? $"{descriptor.Vendor} {descriptor.Model}"
-            : state is null ? "waiting for the daemon" : "no interface";
-        bool live = state is not null && state.Connected;
+        // Without the daemon the last state stays on screen, but the header
+        // says what the link is doing instead of naming a device and a
+        // version that are no longer live.
+        bool linked = Link.Connected;
+        string device = state is null ? "waiting for the daemon"
+            : !linked ? "offline, showing the last known state"
+            : state.Device is { } descriptor && state.Connected ? $"{descriptor.Vendor} {descriptor.Model}"
+            : "no interface";
+        bool live = linked && state is not null && state.Connected;
         Widgets.Lamp(screen, 10, 0, live, theme, theme.Card, alert: state is not null && !live);
-        string right = state?.DaemonVersion is { Length: > 0 } version ? $"v{version}" : Link.Status;
+        string right = linked && state?.DaemonVersion is { Length: > 0 } version ? $"v{version}" : Link.Status;
         int rightX = Math.Max(12, screen.Width - right.Length - 2);
         screen.Text(12, 0, device, theme.TextDetail, theme.Card, maxWidth: Math.Max(0, rightX - 14));
         screen.Text(rightX, 0, right, theme.TextSecondary, theme.Card);
-        string? warning = Link.Notice ?? state?.Warning ?? state?.Mixer.LayoutWarning ?? state?.Device?.Note;
+        string? warning = Link.Notice
+            ?? (linked ? state?.Warning ?? state?.Mixer.LayoutWarning ?? state?.Device?.Note : null);
         if (warning is { Length: > 0 })
             screen.TextPad(1, 1, warning, screen.Width - 2, theme.TextWarning, theme.Window);
     }
