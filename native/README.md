@@ -91,7 +91,16 @@ PipeWire, display or installed plugin.
 `make -C native test-vst3` checks VST3 parameter queue indices, attribute
 identifiers and buffers, the component-state memory stream, and that the
 plugin is asked for its latency at activation and after `kLatencyChanged`
-only, however often the host reads the figure. Invalid
+only, however often the host reads the figure. A plugin that asks to be
+reloaded (`kReloadComponent`, or `kIoChanged` with a new bus layout) is
+reloaded in place in the order VST3 sets: the audio thread lets go before
+the plugin is touched, processing stops before deactivation, setup and bus
+arrangements happen while inactive, the plugin is never processed while
+inactive, a parameter edit made meanwhile reaches it afterwards, and its new
+latency is read. A request made during the activation that answers one is
+absorbed, and a plugin that will not activate again fails the helper
+without being called. The test runs 500 reloads with the audio on a thread
+of its own. Invalid
 lengths, seek modes and arithmetic overflow are rejected without changing
 stream contents. Reads at or beyond EOF return zero bytes; a later write
 fills the skipped bytes with zeroes. Empty binary attributes are supported.
@@ -393,9 +402,9 @@ can still interrupt that insert's chain.
 - A VST3 plugin that reports a latency change keeps running: the host asks
   for the new figure and reports it, without reactivating the plugin, so a
   plugin that only settles a new figure on reactivation goes on reporting
-  the old one. Only a
-  reload or a changed bus layout (`kReloadComponent`, `kIoChanged`) ends the
-  process for a fresh one.
+  the old one. A plugin that asks to be reloaded or reports a changed bus
+  layout (`kReloadComponent`, `kIoChanged`) is deactivated and activated
+  again in the same process, as described under VST3 below.
 
 ## Session environment
 
@@ -1200,8 +1209,29 @@ instance, and a plugin whose default is neither width gets a fresh
 instance for the second. The answer is the plugin's `widths` in the
 catalogue, so a plugin that reports stereo and accepts mono, as the
 Elgato effects do, is offered on the mono inputs, and one that refuses
-both widths is offered nowhere instead of failing at load. The
-interface headers are vendored under `vst3/` (MIT, VST 3.8.1); only their
+both widths is offered nowhere instead of failing at load.
+
+A VST3 plugin that asks to be reloaded (`restartComponent` with
+`kReloadComponent`, or `kIoChanged` when its buses changed) gets that in
+place, not a new process. The handler only sets a flag, from whichever
+thread the plugin calls it on. On the next tick the main thread asks the
+audio thread to let go, and on its next block the audio thread stops
+calling the plugin and plays silence from then on. On the tick after that
+the main thread calls `setProcessing(false)` and `setActive(false)`. If
+the main buses no longer carry the chain's width, it asks for that width
+again through `setBusArrangements`, and it switches on the main buses
+alone. Then it calls `setupProcessing` with the same rate and block size,
+`setActive(true)` and `setProcessing(true)`, and reads the latency again,
+which goes out as a `latency` line like any change. The block after that
+calls the plugin again. The instance, its controller and an open editor stay the same, so
+parameters and state are kept without a `getState` and `setState` round
+trip, and a parameter edit made meanwhile reaches the processor on the
+first block after. A request made during that activation is answered by
+it. A node with no cycles running holds the request until audio comes
+back. A plugin that will not take the chain's width or activate again
+ends the helper like any other failure, and is not called while inactive.
+
+The interface headers are vendored under `vst3/` (MIT, VST 3.8.1); only their
 inline parts are used, so nothing of the SDK is compiled. Windows VST3
 plugins arrive through yabridge as ordinary bundles. The optional
 [OpenXLR companion](../packaging/yabridge/README.md) supplies matching

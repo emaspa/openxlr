@@ -493,6 +493,9 @@ struct Fd {
 class ComponentHandler;
 class PlugFrame;
 
+// Where an in-place reload stands; see vst3_reload.
+enum { RESTART_NONE, RESTART_HOLD, RESTART_HELD };
+
 struct Vst3 {
   Host *h = nullptr;
   void *library = nullptr;
@@ -532,6 +535,9 @@ struct Vst3 {
   Fd fds[MAX_FDS];
   bool stopping_run_loop = false;
   std::atomic<bool> restart_requested{false}, values_changed{false};
+  // How far an in-place reload has got: the main thread moves NONE to HOLD
+  // and HELD to NONE, the audio thread HOLD to HELD.
+  std::atomic<int> restart{RESTART_NONE};
   // The plugin's latency, read at activation and again only after the
   // plugin signals kLatencyChanged, so the tick never asks it in between.
   uint32 latency = 0;
@@ -563,7 +569,8 @@ class ComponentHandler final : public IComponentHandler,
     // A latency change needs no reload: the figure is asked for again on
     // the next tick and reported, and the processor keeps running. Plugins
     // that size their lookahead on activation report one every time they
-    // start.
+    // start. A reload or a new bus layout is done in place on the main
+    // thread (vst3_reload); this may be called from any thread.
     if (flags & (RestartFlags::kReloadComponent | RestartFlags::kIoChanged))
       v_->restart_requested = true;
     if (flags & RestartFlags::kParamValuesChanged)
@@ -966,6 +973,29 @@ bool accepts_width(Vst3 *v, unsigned width) {
          main_bus_channels(v, kOutput) == (int)width;
 }
 
+// Ask for the chain's width and switch on the main buses alone, before an
+// activation. A plugin that can take the width says so, and the catalogue
+// was told the same answer when the bundle was scanned. A reload asks
+// again, since a plugin that changed its buses wants to be told anew.
+bool arrange_buses(Host *h, Vst3 *v) {
+  if (!accepts_width(v, host_channels(h))) {
+    fputs("the plugin's main buses do not match the chain's channels\n",
+          stderr);
+    return false;
+  }
+  // Only the main buses carry audio; everything else stays off.
+  v->main_in = main_bus(v, kInput);
+  v->main_out = main_bus(v, kOutput);
+  for (BusDirection direction : {kInput, kOutput})
+    for (int32 i = 0; i < v->component->getBusCount(kAudio, direction); ++i)
+      v->component->activateBus(kAudio, direction, i,
+                                i == (direction == kInput ? v->main_in : v->main_out));
+  for (BusDirection direction : {kInput, kOutput})
+    for (int32 i = 0; i < v->component->getBusCount(kEvent, direction); ++i)
+      v->component->activateBus(kEvent, direction, i, false);
+  return true;
+}
+
 void release_plugin(Vst3 *v) {
   if (v->component_point && v->controller_point) {
     v->component_point->disconnect(v->controller_point);
@@ -1008,27 +1038,12 @@ bool vst3_load(Host *h, char **arguments) {
   }
   if (!open_module(v, arguments[0]) || !instantiate(v, cid))
     return false;
-  // Ask for the chain's width; a plugin that can take it says so, and the
-  // catalogue was told the same answer when the bundle was scanned.
-  if (!accepts_width(v, host_channels(h))) {
-    fputs("the plugin's main buses do not match the chain's channels\n",
-          stderr);
+  if (!arrange_buses(h, v))
     return false;
-  }
   if (v->processor->canProcessSampleSize(kSample32) != kResultTrue) {
     fputs("the plugin cannot process 32-bit audio\n", stderr);
     return false;
   }
-  // Only the main buses carry audio; everything else stays off.
-  v->main_in = main_bus(v, kInput);
-  v->main_out = main_bus(v, kOutput);
-  for (BusDirection direction : {kInput, kOutput})
-    for (int32 i = 0; i < v->component->getBusCount(kAudio, direction); ++i)
-      v->component->activateBus(kAudio, direction, i,
-                                i == (direction == kInput ? v->main_in : v->main_out));
-  for (BusDirection direction : {kInput, kOutput})
-    for (int32 i = 0; i < v->component->getBusCount(kEvent, direction); ++i)
-      v->component->activateBus(kEvent, direction, i, false);
 
   int32 count = v->controller->getParameterCount();
   v->in_changes.reserve((size_t)count);
@@ -1077,8 +1092,8 @@ bool vst3_load(Host *h, char **arguments) {
   // scanner already assumes. Creating a view here only to release it again
   // is not a harmless question: a plugin can leave a callback to that view
   // behind, and Elgato EQ 1.3.0 ends its process with a pure virtual call on
-  // the activation that follows. The daemon never activates twice in one
-  // process, so a view created after activation is the only kind it sees.
+  // the activation that follows. So no view is created before the first
+  // activation; one opened later stays through a reload (vst3_reload).
   host_set_has_editor(h, true);
   return true;
 }
@@ -1179,6 +1194,9 @@ bool vst3_activate(Host *h) {
   v->data.outputs = v->out_buses.data();
   v->data.inputParameterChanges = &v->in_changes;
   v->data.outputParameterChanges = &v->out_changes;
+  // A reload asked for before or during this activation is answered by it,
+  // not by another one after it, which could go round for ever.
+  v->restart_requested = false;
   return true;
 }
 
@@ -1221,6 +1239,18 @@ void vst3_process(Host *h, uint32_t frames, float *const *in,
                   float *const *out) {
   Vst3 *v = of(h);
   unsigned channels = host_channels(h);
+  // A reload is under way: let go of the plugin and play silence until the
+  // main thread has activated it again. The plugin is not called at all
+  // meanwhile, and the main thread waits for this block before it touches
+  // the plugin or the buffers below.
+  int restart = v->restart.load();
+  if (restart != RESTART_NONE) {
+    if (restart == RESTART_HOLD)
+      v->restart = RESTART_HELD;
+    for (unsigned i = 0; i < channels; ++i)
+      memset(out[i], 0, frames * sizeof(float));
+    return;
+  }
   for (unsigned i = 0; i < channels; ++i) {
     v->in_ptrs[i] = in[i];
     v->out_ptrs[i] = out[i];
@@ -1284,10 +1314,42 @@ void vst3_process(Host *h, uint32_t frames, float *const *in,
 
 // --- main thread --------------------------------------------------------------
 
+// The reload the plugin asked for (kReloadComponent, or kIoChanged for a
+// new bus layout), one step per tick, in place rather than in a new
+// process. First the audio thread is asked to let go; on its next block it
+// stops calling the plugin and plays silence. Once it has, the plugin is
+// stopped and deactivated, asked for the chain's width again with its main
+// buses switched on, set up with the same rate and block size, and
+// activated and started again, which reads its latency anew for the tick to
+// report like any change. The block after that calls the plugin again. The
+// instance, its controller and an open editor are the same ones throughout,
+// so the plugin keeps its parameters and state without a round trip. A node
+// with no cycles running holds the request until audio comes back, since
+// nothing can say the audio thread is not about to call the plugin. A
+// plugin that will not take the width or activate again ends the helper,
+// and is never called while inactive.
+void vst3_reload(Host *h, Vst3 *v) {
+  int state = v->restart.load();
+  if (state == RESTART_NONE) {
+    if (v->restart_requested.exchange(false) && v->active)
+      v->restart = RESTART_HOLD;
+    return;
+  }
+  if (state != RESTART_HELD)
+    return;
+  vst3_deactivate(h);
+  if (!arrange_buses(h, v) || !vst3_activate(h)) {
+    // Still held, so the audio thread never calls the inactive plugin.
+    host_fail(h, "the plugin did not activate again after asking to be reloaded");
+    return;
+  }
+  v->restart = RESTART_NONE;
+  fputs("trace: the plugin asked to be reloaded and was activated again\n", stderr);
+}
+
 void vst3_main_thread(Host *h) {
   Vst3 *v = of(h);
-  if (v->restart_requested.exchange(false))
-    host_fail(h, "the plugin asked to be reloaded");
+  vst3_reload(h, v);
   bool refresh = v->values_changed.exchange(false);
   for (Record *r : v->records) {
     // The daemon speaks plain values; the processor takes normalised ones.

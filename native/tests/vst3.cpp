@@ -5,6 +5,8 @@
 #include <limits>
 #include <cerrno>
 #include <fcntl.h>
+#include <pthread.h>
+#include <time.h>
 #include <unistd.h>
 
 extern "C" Host *test_host_new(void);
@@ -266,8 +268,9 @@ static void attributes() {
   assert(memcmp(data, "abc", size) == 0);
 }
 
-// What a plugin may ask of the host after activation. Only a changed
-// component or bus layout costs the process; a new latency figure does not.
+// What a plugin may ask of the host after activation. A changed component
+// or bus layout asks for a reload, done in place (see reload_in_place); a
+// new latency figure does not need one.
 static void restart() {
   Vst3 v;
   ComponentHandler handler(&v);
@@ -462,12 +465,320 @@ static void bypass_parameter() {
   puts("PASS: a VST3 bypass parameter starts at processing and follows only the plugin's editor");
 }
 
+// A plugin that is its own component and processor, takes a mono chain
+// although it starts out stereo, and asks to be reloaded from its process
+// call or from inside its own activation. Its checks fail if the host ever
+// calls it in an order VST3 does not allow: set up, arranged or given buses
+// while active, deactivated while processing, processed while inactive or
+// stopped. The states and counts are atomics because the threaded part of
+// the test calls it from two threads, as the host does.
+class ReloadPlugin final : public IComponent, public IAudioProcessor {
+ public:
+  IComponentHandler *handler = nullptr;
+  std::atomic<bool> active{false}, processing{false}, aux{false};
+  std::atomic<int32> width{2}, ask_in_process{0}, ask_in_activate{0};
+  std::atomic<unsigned> activations{0}, deactivations{0}, setups{0},
+      arranged{0}, starts{0}, stops{0}, processed{0}, asked{0};
+  std::atomic<uint32> latency{256};
+  tresult activate_result = kResultOk;
+  int32 max_block = 0;
+  double rate = 0;
+  // The points one parameter got in the last process call.
+  ParamID watched = 5;
+  int32 points = 0;
+  ParamValue value = -1;
+
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  HOST_OWNED_REFCOUNT()
+  tresult PLUGIN_API initialize(FUnknown *) override { return kResultOk; }
+  tresult PLUGIN_API terminate() override { return kResultOk; }
+  tresult PLUGIN_API getControllerClassId(TUID) override { return kNotImplemented; }
+  tresult PLUGIN_API setIoMode(IoMode) override { return kResultOk; }
+  int32 PLUGIN_API getBusCount(MediaType type, BusDirection direction) override {
+    if (type != kAudio) return 0;
+    return direction == kInput && aux ? 2 : 1;
+  }
+  tresult PLUGIN_API getBusInfo(MediaType type, BusDirection direction,
+                                int32 index, BusInfo &info) override {
+    if (type != kAudio || index < 0 || index >= getBusCount(type, direction))
+      return kInvalidArgument;
+    info = BusInfo();
+    info.mediaType = kAudio;
+    info.direction = direction;
+    info.channelCount = index == 0 ? width.load() : 1;
+    info.busType = index == 0 ? kMain : kAux;
+    return kResultOk;
+  }
+  tresult PLUGIN_API getRoutingInfo(RoutingInfo &, RoutingInfo &) override { return kNotImplemented; }
+  tresult PLUGIN_API activateBus(MediaType, BusDirection, int32, TBool) override {
+    assert(!active);
+    return kResultOk;
+  }
+  tresult PLUGIN_API setActive(TBool state) override {
+    assert(!processing);
+    if (!state) {
+      assert(active);
+      active = false;
+      ++deactivations;
+      return kResultOk;
+    }
+    assert(!active);
+    if (activate_result != kResultOk) return activate_result;
+    active = true;
+    ++activations;
+    if (int32 flags = ask_in_activate.load()) handler->restartComponent(flags);
+    return kResultOk;
+  }
+  tresult PLUGIN_API setState(IBStream *) override { return kResultOk; }
+  tresult PLUGIN_API getState(IBStream *) override { return kResultOk; }
+
+  tresult PLUGIN_API setBusArrangements(SpeakerArrangement *inputs, int32 ins,
+                                        SpeakerArrangement *outputs,
+                                        int32 outs) override {
+    assert(!active && ins == 1 && outs == 1 && inputs[0] == outputs[0]);
+    width = inputs[0] == SpeakerArr::kMono ? 1 : 2;
+    ++arranged;
+    return kResultOk;
+  }
+  tresult PLUGIN_API getBusArrangement(BusDirection, int32,
+                                       SpeakerArrangement &) override {
+    return kResultOk;
+  }
+  tresult PLUGIN_API canProcessSampleSize(int32) override { return kResultOk; }
+  uint32 PLUGIN_API getLatencySamples() override {
+    ++asked;
+    return latency;
+  }
+  tresult PLUGIN_API setupProcessing(ProcessSetup &setup) override {
+    assert(!active);
+    max_block = setup.maxSamplesPerBlock;
+    rate = setup.sampleRate;
+    ++setups;
+    return kResultOk;
+  }
+  tresult PLUGIN_API setProcessing(TBool state) override {
+    assert(active && processing != (bool)state);
+    processing = state;
+    ++(state ? starts : stops);
+    return kResultOk;
+  }
+  tresult PLUGIN_API process(ProcessData &data) override {
+    assert(active && processing);
+    ++processed;
+    // Every bus it reports has an entry with buffers of its width.
+    assert(data.numInputs == getBusCount(kAudio, kInput));
+    for (int32 b = 0; b < data.numInputs; ++b) {
+      assert(data.inputs[b].numChannels == (b == 0 ? width.load() : 1));
+      for (int32 c = 0; c < data.inputs[b].numChannels; ++c)
+        assert(data.inputs[b].channelBuffers32[c]);
+    }
+    AudioBusBuffers &in = data.inputs[0], &out = data.outputs[0];
+    for (int32 c = 0; c < out.numChannels; ++c)
+      for (int32 n = 0; n < data.numSamples; ++n)
+        out.channelBuffers32[c][n] = in.channelBuffers32[c][n] * 2;
+    points = 0;
+    IParameterChanges *changes = data.inputParameterChanges;
+    for (int32 i = 0; changes && i < changes->getParameterCount(); ++i) {
+      IParamValueQueue *queue = changes->getParameterData(i);
+      if (queue->getParameterId() != watched) continue;
+      int32 offset;
+      points = queue->getPointCount();
+      queue->getPoint(0, offset, value);
+    }
+    if (int32 flags = ask_in_process.exchange(0)) {
+      // A new bus layout: a sidechain appears and the main buses fall back
+      // to stereo, so the host has to ask for its width again.
+      if (flags & RestartFlags::kIoChanged) {
+        aux = true;
+        width = 2;
+      }
+      handler->restartComponent(flags);
+    }
+    return kResultOk;
+  }
+  uint32 PLUGIN_API getTailSamples() override { return 0; }
+};
+
+// One mono block of 0.25 in; true when the plugin's answer came out, false
+// when the block was silence.
+static bool reload_block(Host *h) {
+  float in[64], out[64];
+  float *ins[] = {in}, *outs[] = {out};
+  for (unsigned n = 0; n < 64; ++n) in[n] = .25f, out[n] = -1;
+  vst3_process(h, 64, ins, outs);
+  bool silent = true, answered = true;
+  for (unsigned n = 0; n < 64; ++n) {
+    silent &= out[n] == 0;
+    answered &= out[n] == .5f;
+  }
+  assert(silent != answered);
+  return answered;
+}
+
+struct ReloadRun {
+  Host *h;
+  ReloadPlugin *plugin;
+  unsigned until;  // run until the plugin has been activated this often
+  std::atomic<bool> done{false};
+  unsigned answered = 0;
+};
+
+static void *reload_audio(void *data) {
+  auto *run = static_cast<ReloadRun *>(data);
+  for (unsigned block = 0; run->plugin->activations < run->until; ++block) {
+    if (block % 50 == 0) run->plugin->ask_in_process = RestartFlags::kReloadComponent;
+    run->answered += reload_block(run->h);
+  }
+  run->done = true;
+  return nullptr;
+}
+
+// The plugin asks to be reloaded while it runs. The host does it in place:
+// the audio thread lets go and plays silence, the main thread stops,
+// deactivates, arranges, sets up, activates and starts it again with the
+// same instance, the new latency is read, and the next block is processed.
+// The helper never fails, and the plugin's parameters are neither lost nor
+// sent again.
+static void reload_in_place() {
+  Host *h = test_audio_host_new(1);
+  Vst3 v;
+  ReloadPlugin plugin;
+  ComponentHandler handler(&v);
+  plugin.handler = &handler;
+  v.h = h;
+  v.component = &plugin;
+  v.processor = &plugin;
+  v.in_changes.reserve(1);
+  v.out_changes.reserve(1);
+  host_set_impl(h, &v);
+  // One control whose daemon value is already in step, so the tick leaves
+  // the controller alone and the test needs none.
+  Record record;
+  record.id = plugin.watched;
+  record.ctl = host_add_control(h, "5", 0, 1, .5f, false, &record);
+  record.readonly = false;
+  record.normalized_desired = .5;
+  record.normalized_observed = .5;
+  record.last_sent = .5;
+  record.last_plain = .5f;
+  record.seen = true;
+  v.records.push_back(&record);
+
+  // Loading: the stereo plugin is asked for a mono arrangement once.
+  assert(arrange_buses(h, &v) && vst3_activate(h));
+  assert(plugin.arranged == 1 && plugin.width == 1 && plugin.setups == 1);
+  assert(plugin.max_block == (int32)MAX_FRAMES && plugin.rate == 48000);
+  assert(reload_block(h) && plugin.processed == 1 && plugin.starts == 1);
+  assert(held_latency(&v) == 256 && plugin.asked == 1);
+
+  plugin.ask_in_process = RestartFlags::kReloadComponent;
+  assert(reload_block(h));  // the block that asked is still answered
+  plugin.latency = 512;
+  vst3_main_thread(h);  // asks the audio thread to let go
+  assert(v.restart == RESTART_HOLD && plugin.deactivations == 0 && plugin.stops == 0);
+  // With no block run since, the audio thread may still be about to call
+  // the plugin, so ticks wait for it however many go by.
+  for (int tick = 0; tick < 5; ++tick) {
+    vst3_main_thread(h);
+    assert(v.restart == RESTART_HOLD && plugin.deactivations == 0 && plugin.stops == 0);
+  }
+  assert(!reload_block(h) && v.restart == RESTART_HELD);
+  assert(!reload_block(h) && plugin.processed == 2);  // held: not called
+  record.normalized_desired = .75;  // an edit while held waits for the plugin
+  vst3_main_thread(h);  // stops, deactivates, sets up, activates, starts
+  assert(v.restart == RESTART_NONE && plugin.active && plugin.processing);
+  assert(plugin.stops == 1 && plugin.deactivations == 1);
+  assert(plugin.setups == 2 && plugin.activations == 2 && plugin.starts == 2);
+  assert(plugin.arranged == 1 && plugin.width == 1);  // still mono: not asked again
+  assert(held_latency(&v) == 512 && plugin.asked == 2);
+  assert(reload_block(h) && plugin.processed == 3);
+  assert(plugin.points == 1 && plugin.value == .75);
+  for (int tick = 0; tick < 10; ++tick) {
+    vst3_main_thread(h);
+    assert(reload_block(h) && plugin.points == 0);  // nothing sent again
+  }
+  assert(plugin.activations == 2 && plugin.asked == 2);
+  assert(!test_host_audio_failed(h));
+
+  // A new bus layout: the sidechain gets a bus entry of its own, and the
+  // main buses are asked for the chain's width again.
+  plugin.ask_in_process = RestartFlags::kIoChanged;
+  assert(reload_block(h));
+  vst3_main_thread(h);
+  assert(!reload_block(h));
+  vst3_main_thread(h);
+  assert(plugin.activations == 3 && plugin.arranged == 2 && plugin.width == 1);
+  assert(v.in_buses.size() == 2 && v.data.numInputs == 2);
+  assert(reload_block(h) && !test_host_audio_failed(h));
+
+  // A request made inside the activation that answers one is answered by
+  // it, not by a reload after it, which would go round for ever.
+  plugin.ask_in_process = plugin.ask_in_activate = RestartFlags::kReloadComponent;
+  assert(reload_block(h));
+  vst3_main_thread(h);
+  assert(!reload_block(h));
+  vst3_main_thread(h);
+  assert(plugin.activations == 4 && plugin.deactivations == 3);
+  for (int tick = 0; tick < 10; ++tick) {
+    vst3_main_thread(h);
+    assert(reload_block(h));
+  }
+  assert(plugin.activations == 4 && !test_host_audio_failed(h));
+  plugin.ask_in_activate = 0;
+
+  // The same with the audio on a thread of its own, as in the host: the
+  // plugin asks every 50 blocks while the main thread ticks, for 500
+  // reloads. Its own checks fail if it is ever called out of order.
+  unsigned before = plugin.activations;
+  ReloadRun run;
+  run.h = h;
+  run.plugin = &plugin;
+  run.until = before + 500;
+  pthread_t audio;
+  assert(pthread_create(&audio, nullptr, reload_audio, &run) == 0);
+  while (!run.done) {
+    vst3_main_thread(h);
+    struct timespec pause = {0, 100000};
+    nanosleep(&pause, nullptr);
+  }
+  assert(pthread_join(audio, nullptr) == 0);
+  // Finish a reload the last blocks asked for, with audio on this thread.
+  for (int tick = 0; tick < 3; ++tick) {
+    vst3_main_thread(h);
+    reload_block(h);
+  }
+  assert(v.restart == RESTART_NONE && !v.restart_requested);
+  assert(reload_block(h) && run.answered > 0);
+  assert(plugin.activations >= before + 500 && !test_host_audio_failed(h));
+
+  // A plugin that will not activate again ends the helper, and stays held
+  // so the audio thread never calls it while inactive.
+  plugin.activate_result = kResultFalse;
+  plugin.ask_in_process = RestartFlags::kReloadComponent;
+  assert(reload_block(h));
+  vst3_main_thread(h);
+  assert(!reload_block(h));
+  unsigned processed = plugin.processed;
+  vst3_main_thread(h);
+  assert(test_host_audio_failed(h) && !plugin.active && !v.active);
+  assert(!reload_block(h) && plugin.processed == processed);
+  vst3_deactivate(h);  // shutdown has nothing left to switch off
+  assert(plugin.deactivations == plugin.activations);
+  host_set_impl(h, nullptr);
+  test_audio_host_free(h);
+  puts("PASS: a VST3 plugin that asks to be reloaded is reactivated in place and keeps processing");
+}
+
 int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "processing")) processing_failure();
   if (argc == 1 || !strcmp(argv[1], "parameters")) parameters();
   if (argc == 1 || !strcmp(argv[1], "stream")) stream();
   if (argc == 1 || !strcmp(argv[1], "attributes")) attributes();
   if (argc == 1 || !strcmp(argv[1], "restart")) restart();
+  if (argc == 1 || !strcmp(argv[1], "reload")) reload_in_place();
   if (argc == 1 || !strcmp(argv[1], "latency")) latency();
   if (argc == 1 || !strcmp(argv[1], "teardown")) teardown();
   if (argc == 1 || !strcmp(argv[1], "own-block")) own_block_setup();

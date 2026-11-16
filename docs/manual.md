@@ -4284,6 +4284,13 @@ open, and the new latency. A restart like this does not count toward the
 restart limit. The journal says "the plugin asked for a restart and
 was activated again" each time.
 
+A VST3 plugin may ask its host to reload it, or say that its inputs and
+outputs changed. The plugin host answers both in place. It switches the
+plugin off and on again with the same short silence, and the plugin
+carries on with the same settings, the same editor and its new latency.
+This does not count toward the restart limit either. The journal says
+"the plugin asked to be reloaded and was activated again" each time.
+
 A VST3 scan that says the original Windows plugin is missing usually means
 its yabridge wrapper still exists under `~/.vst3/yabridge`, but the source
 file was moved or deleted. The wrapper is a bridge, not a copy of the
