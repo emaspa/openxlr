@@ -424,7 +424,7 @@ public sealed class ProfileStartupTests
                 Assert.True(SpinWait.SpinUntil(() => hub.Snapshot().ActiveProfile == "Saved", TimeSpan.FromSeconds(10)));
                 Assert.Equal("Saved", hub.Snapshot().ActiveProfile);
                 Assert.Equal(55, dock.Gain);
-                Assert.Equal(0.25, mixer.ExportScene()!.MixVolumes["monitor"]);
+                Assert.Equal(0.25, mixer.ExportScene().Scene!.MixVolumes["monitor"]);
             }
             finally { await mixer.StopAsync(CancellationToken.None); }
         }
@@ -502,7 +502,7 @@ public sealed class ProfileStartupTests
                 StateMessage state = hub.Snapshot();
                 Assert.False(state.MixerWaiting);
                 Assert.DoesNotContain("waiting for the audio server", state.Warning ?? "");
-                Assert.Equal(0.25, mixer.ExportScene()!.MixVolumes["monitor"]);
+                Assert.Equal(0.25, mixer.ExportScene().Scene!.MixVolumes["monitor"]);
                 Assert.Equal("Saved", state.ActiveProfile);
                 Assert.NotEmpty(OwnModules());
             }

@@ -999,7 +999,10 @@ public sealed partial class WebSocketHub
             switch (cmd.Cmd)
             {
                 case "saveProfile":
-                    OpenXLR.Core.MixerScene? scene = _mixer.ExportScene();
+                    (OpenXLR.Core.MixerScene? scene, string? refused) = _mixer.ExportScene();
+                    // A mixer being built holds no scene worth keeping, and a
+                    // profile saved without it would drop the user's mix.
+                    if (refused is not null) return refused;
                     // With no interface connected a profile is the mixer scene
                     // alone, so it needs a running mixer.
                     bool generic = devId == GenericProfileId;

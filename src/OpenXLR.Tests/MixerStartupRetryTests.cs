@@ -57,7 +57,7 @@ public sealed class MixerStartupRetryTests
             Assert.False(fixture.Service.WaitingForAudio);
             Assert.Null(fixture.Service.GraphWarning);
             Assert.NotNull(fixture.Service.Snapshot());
-            Assert.Equal(0.25, fixture.Service.ExportScene()!.MixVolumes["monitor"]);
+            Assert.Equal(0.25, fixture.Service.ExportScene().Scene!.MixVolumes["monitor"]);
             Assert.True(Volatile.Read(ref changes) >= 2, "clients were not told the graph is up");
         }
         finally { await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30)); }
@@ -159,7 +159,7 @@ public sealed class MixerStartupRetryTests
                 "the graph was not built again once the server answered");
             Assert.Null(fixture.Service.GraphWarning);
             Assert.False(fixture.Service.RebuildingGraph);
-            Assert.Equal(0.6, fixture.Service.ExportScene()!.MixVolumes["monitor"]);
+            Assert.Equal(0.6, fixture.Service.ExportScene().Scene!.MixVolumes["monitor"]);
             Assert.True(fixture.Mixer.MonitorMuted);
             // The forgotten modules' ids belong to other clients now: none is unloaded.
             Assert.DoesNotContain(fixture.Calls()[lostAt..], call => call.StartsWith("unload-module ", StringComparison.Ordinal));
@@ -280,6 +280,34 @@ public sealed class MixerStartupRetryTests
         public CancellationToken ApplicationStopped => CancellationToken.None;
         public void StopApplication() => _stop.Cancel();
         public void Dispose() => _stop.Dispose();
+    }
+
+    [Fact]
+    public async Task NoProfileSceneIsExportedUntilTheBuildHasEnded()
+    {
+        var port = new FailingDuckingPort();
+        using var fixture = new Fixture(port, _ => port.Thrown > 0 ? TimeSpan.FromHours(1) : TimeSpan.FromMilliseconds(20));
+        (MixerScene? Scene, string? Refused) during = (null, "not asked");
+        port.DuringBuild = () => during = fixture.Service.ExportScene();
+
+        await fixture.Service.StartAsync(CancellationToken.None);
+        try
+        {
+            // Waiting for the audio server: there is no mixer to export.
+            (MixerScene? scene, string? refused) = fixture.Service.ExportScene();
+            Assert.Null(scene);
+            Assert.Contains("waiting for the audio server", refused);
+
+            port.Fail = true;
+            fixture.Answer();
+            Assert.True(SpinWait.SpinUntil(() => port.Thrown > 0 && fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)));
+            // Part way through the attempt the graph existed and held the
+            // settings, but the build had not ended and was then torn down.
+            Assert.Null(during.Scene);
+            Assert.Contains("still being built", during.Refused);
+            Assert.Contains("waiting for the audio server", fixture.Service.ExportScene().Refused);
+        }
+        finally { await fixture.Service.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(30)); }
     }
 
     /// <summary>A ducking port that makes the build fail after the settings are applied.</summary>
