@@ -351,6 +351,7 @@ public sealed partial class MainViewModel
         {
             ChannelViewModel? carrier = Channels.FirstOrDefault(c => c.Id == setup.Channel);
             setup.ObserveInput(carrier);
+            setup.InMixer = HasMixer && carrier is not null;
             setup.Unit = carrier?.ShownUnitInput is 1 or 2 ? UnitInputOf(carrier.ShownUnitInput) : null;
             setup.ExtraUnit = carrier?.ExtraUnitInput;
             setup.ProDirect = CapOutputRouting && carrier?.ShownUnitInput == 1;
