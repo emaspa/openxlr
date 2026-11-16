@@ -3707,7 +3707,7 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>DeepFilterNet</value>
   </data>
   <data name="NoiseRemovalDeepFilterNetTip" xml:space="preserve">
-    <value>Più pulito su tastiere, rumori che cambiano e un po' di eco della stanza. Usa più processore e aggiunge circa da 50 a 60 ms di ritardo.</value>
+    <value>Più pulito su tastiere, rumori che cambiano e un po' di eco della stanza. Usa più processore e aggiunge circa da 50 a 85 ms di ritardo, di più con buffer di PipeWire più grandi.</value>
   </data>
   <data name="NoiseRemovalStrength" xml:space="preserve">
     <value>Intensità</value>
