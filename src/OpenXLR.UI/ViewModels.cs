@@ -1123,7 +1123,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public bool RenamedSinceStart { get => _renamedSinceStart; private set => Set(ref _renamedSinceStart, value); }
 
     private string _layoutWarning = "";
-    /// <summary>pipewire-pulse near its open-file limit, or empty; shown in the layout editor.</summary>
+    /// <summary>pipewire-pulse or PipeWire near its open-file limit, or empty; shown in the layout editor.</summary>
     public string LayoutWarning { get => _layoutWarning; private set => Set(ref _layoutWarning, value); }
 
     // --- layout editing: the daemon answers after the new layout is saved ---

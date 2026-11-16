@@ -140,10 +140,13 @@ modules or custom drivers:
 - pipewire-pulse hosts all of these modules and inherits systemd's
   default limit of 1024 open files; every combine stream and meter costs
   it a few. The daemon refuses an addition without headroom and the
-  packages install a drop-in raising the limit. When pipewire-pulse
-  restarts it takes every module with it and reuses their ids, so the
-  daemon forgets the graph without unloading anything and exits with
-  code 75 for systemd to start it afresh.
+  packages install a drop-in raising the limit. PipeWire itself has the
+  same default and holds a buffer and an event descriptor for every node
+  and port; a WirePlumber restart near that limit leaves every stream
+  unlinked, so the packages raise it too. When pipewire-pulse restarts
+  it takes every module with it and reuses their ids, so the daemon
+  forgets the graph without unloading anything and builds it again in
+  place.
 - Filter chains (the software low cut and ClipGuard, and LV2
   inserts left on the default backend) are `filter-chain` nodes, each held by a
   long-lived `pw-cli -m` process for the life of the chain; their
@@ -313,7 +316,7 @@ docs/           this documentation, protocol write-up, capture guides
 tools/          proprobe.py, a standalone Python probe for the vendor protocol,
                 and the CI checks (versions, locked restores, the OpenAPI
                 document's shape, the rpm recipe's %files)
-packaging/      systemd unit, the pipewire-pulse open-file drop-in, udev rule,
+packaging/      systemd unit, the PipeWire and pipewire-pulse open-file drop-ins, udev rule,
                 WirePlumber rules, UCM profile, rpm and nix packaging, OpenDeck patches,
                 the Omarchy bar plugin and its enable command, the GNOME Shell
                 focus extension, the Flatpak and PPA recipes, the soundboard's

@@ -308,8 +308,8 @@ public sealed partial record MixerState
     public bool RenamedSinceStart { get; init; }
 
     /// <summary>
-    /// pipewire-pulse close to its open-file limit (see the manual, 5.8), or
-    /// null. Shown in the layout editor, where the next addition would hit it.
+    /// pipewire-pulse or PipeWire close to its open-file limit (see the
+    /// manual, 5.8), or null. Shown in the layout editor, where the next addition would hit it.
     /// </summary>
     public string? LayoutWarning { get; init; }
 }

@@ -1386,7 +1386,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   not answer at 2, 4, 8 and 16 s and
   then every 30 s while the state warns that the mixer is waiting, and
   refuses to grow the layout when pipewire-pulse has no open-file
-  headroom left; the packages raise that limit with a systemd drop-in.
+  headroom left; the packages raise that limit with a systemd drop-in,
+  and PipeWire's own with another, since a WirePlumber restart near
+  PipeWire's default limit leaves every stream unlinked.
   It also holds every sink it created at full volume and unmuted, since
   a desktop applet or the session manager can turn one down and quietly
   cut the mixes it feeds. A WirePlumber restart needs no daemon restart:

@@ -828,6 +828,9 @@ public sealed class PipeWireAdapter
         return legs;
     }
 
+    /// <summary>Where the open-file checks read processes; a test points it at a fake tree.</summary>
+    internal string ProcRoot { get; init; } = "/proc";
+
     /// <summary>
     /// pipewire-pulse's open files against its soft limit, or null when the
     /// process or its /proc entries cannot be read. Every combine leg, meter
@@ -835,21 +838,32 @@ public sealed class PipeWireAdapter
     /// systemd's default soft limit of 1024 is reached with a few extra
     /// channels or mixes; past it the server drops nodes at random.
     /// </summary>
-    public (int Used, int Limit)? PulseFileUsage()
+    public (int Used, int Limit)? PulseFileUsage() => FileUsage("pipewire-pulse");
+
+    /// <summary>
+    /// The PipeWire server's own open files against its soft limit, or null.
+    /// It holds a buffer and an event descriptor for every node and port, and
+    /// a WirePlumber restart makes it hand all of them over again; with the
+    /// graph built near systemd's default of 1024 the handover runs out of
+    /// descriptors and WirePlumber links nothing at all.
+    /// </summary>
+    public (int Used, int Limit)? CoreFileUsage() => FileUsage("pipewire");
+
+    private (int Used, int Limit)? FileUsage(string comm)
     {
         try
         {
             // Our own session's server: the one running as our user. On a
-            // shared machine another user's pipewire-pulse is not ours to
-            // read, and would answer for the wrong session if it were.
-            string? uid = ProcUid("/proc/self");
+            // shared machine another user's server is not ours to read, and
+            // would answer for the wrong session if it were.
+            string? uid = ProcUid(Path.Combine(ProcRoot, "self"));
             if (uid is null) return null;
-            foreach (string dir in Directory.EnumerateDirectories("/proc"))
+            foreach (string dir in Directory.EnumerateDirectories(ProcRoot))
             {
                 if (!Path.GetFileName(dir).All(char.IsAsciiDigit)) continue;
                 try
                 {
-                    if (File.ReadAllText(Path.Combine(dir, "comm")).Trim() != "pipewire-pulse" || ProcUid(dir) != uid) continue;
+                    if (File.ReadAllText(Path.Combine(dir, "comm")).Trim() != comm || ProcUid(dir) != uid) continue;
                     int? limit = File.ReadLines(Path.Combine(dir, "limits"))
                         .Where(line => line.StartsWith("Max open files", StringComparison.Ordinal))
                         .Select(line => line[14..].Split(' ', StringSplitOptions.RemoveEmptyEntries))

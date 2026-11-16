@@ -22,13 +22,21 @@ public sealed partial class Mixer
     private const int FilesPerNode = 10;
     private const int FileReserve = 16;
 
-    /// <summary>The state warning when pipewire-pulse runs close to its limit, or null.</summary>
-    public string? PulseFileWarning()
+    /// <summary>
+    /// The layout warning when pipewire-pulse or PipeWire runs close to its
+    /// open-file limit, or null. pipewire-pulse is at risk from three
+    /// quarters of its limit, PipeWire from half of it: a WirePlumber
+    /// restart has it hand every node over again, and on PipeWire 1.6 a
+    /// graph holding 712 of 1024 ran out during that handover.
+    /// </summary>
+    public string? FileLimitWarning()
     {
-        if (_pw.PulseFileUsage() is not (int used, int limit)) return null;
-        return used * 4 >= limit * 3
-            ? $"pipewire-pulse has {used} of its {limit} open files in use; past the limit it drops audio nodes. Raise the limit with the pipewire-pulse drop-in OpenXLR installs and restart pipewire-pulse."
-            : null;
+        var warnings = new List<string>();
+        if (_pw.PulseFileUsage() is (int pulseUsed, int pulseLimit) && pulseUsed * 4 >= pulseLimit * 3)
+            warnings.Add($"pipewire-pulse has {pulseUsed} of its {pulseLimit} open files in use; past the limit it drops audio nodes. Raise the limit with the pipewire-pulse drop-in OpenXLR installs and restart pipewire-pulse.");
+        if (_pw.CoreFileUsage() is (int coreUsed, int coreLimit) && coreUsed * 2 >= coreLimit)
+            warnings.Add($"PipeWire has {coreUsed} of its {coreLimit} open files in use; a WirePlumber restart can then leave every stream unlinked. Raise the limit with the pipewire drop-in OpenXLR installs and log in again.");
+        return warnings.Count == 0 ? null : string.Join(" ", warnings);
     }
 
     /// <summary>Refuse a change that would push pipewire-pulse over its open-file limit.</summary>

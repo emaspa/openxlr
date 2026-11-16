@@ -297,20 +297,22 @@ persistent failure, use `systemctl --user reset-failed openxlr-daemon` followed
 by `systemctl --user start openxlr-daemon`. Manual launches without
 `NOTIFY_SOCKET` do not enable the watchdog.
 
-The packages raise pipewire-pulse's open-file limit with a systemd
-drop-in; a source install has to create it itself, or the daemon refuses
-to grow the mixer layout once the server nears systemd's default of 1024
-open files:
+The packages raise the open-file limits of PipeWire and pipewire-pulse
+with two systemd drop-ins. A source install has to create them itself.
+Without the pipewire-pulse one the daemon refuses to grow the mixer layout
+once the server nears systemd's default of 1024 open files; without the
+PipeWire one a WirePlumber restart can leave every stream unlinked:
 
 ```sh
-mkdir -p ~/.config/systemd/user/pipewire-pulse.service.d
+mkdir -p ~/.config/systemd/user/pipewire-pulse.service.d ~/.config/systemd/user/pipewire.service.d
 cp packaging/pipewire-pulse-openxlr.conf ~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf
+cp packaging/pipewire-openxlr.conf ~/.config/systemd/user/pipewire.service.d/openxlr.conf
 systemctl --user daemon-reload
-systemctl --user restart pipewire-pulse
+systemctl --user restart pipewire
 ```
 
-The restart takes OpenXLR's nodes with it; the daemon notices and
-builds them again without restarting. The manual's
+The restart takes pipewire-pulse, WirePlumber and OpenXLR's nodes with
+it; the daemon notices and builds them again without restarting. The manual's
 [open-files section](manual.md#open-files) has the background and the check.
 
 <a name="desktop-entry"></a>
@@ -395,6 +397,7 @@ cmp -s packaging/53-openxlr-wave3-capture-hold.conf ~/.config/wireplumber/wirepl
 cmp -s packaging/55-openxlr-wave3-mk2-playback.conf ~/.config/wireplumber/wireplumber.conf.d/55-openxlr-wave3-mk2-playback.conf && rm -- ~/.config/wireplumber/wireplumber.conf.d/55-openxlr-wave3-mk2-playback.conf
 cmp -s packaging/54-openxlr-owned-state.lua ~/.config/wireplumber/main.lua.d/54-openxlr-owned-state.lua && rm -- ~/.config/wireplumber/main.lua.d/54-openxlr-owned-state.lua
 cmp -s packaging/pipewire-pulse-openxlr.conf ~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf && rm -- ~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf
+cmp -s packaging/pipewire-openxlr.conf ~/.config/systemd/user/pipewire.service.d/openxlr.conf && rm -- ~/.config/systemd/user/pipewire.service.d/openxlr.conf
 sed "s|^Exec=openxlr\$|Exec=$PWD/src/OpenXLR.UI/bin/Release/net10.0/OpenXLR.UI|" packaging/openxlr.desktop | cmp -s - ~/.local/share/applications/openxlr.desktop && rm -- ~/.local/share/applications/openxlr.desktop
 sudo udevadm control --reload-rules
 systemctl --user daemon-reload
