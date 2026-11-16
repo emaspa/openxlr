@@ -119,3 +119,11 @@ test("host settings refresh legacy targets and ignore malformed or unrelated upd
   page.nodes.stepSize.change("5");
   assert.deepEqual(page.settings(), {target: "hp", targets: ["hp"], stepSize: 5});
 });
+
+test("the add button skips an unavailable entry", () => {
+  const page = inspector({targets: ["hp"]});
+  page.nodes.target.value = "send:gone:monitor";
+  page.nodes.target.selectedOptions = [{disabled: true, dataset: {}}];
+  page.nodes.add.onclick();
+  assert.equal(page.settings(), undefined);
+});
