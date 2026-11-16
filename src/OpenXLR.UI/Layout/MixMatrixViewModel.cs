@@ -118,7 +118,9 @@ public sealed class MixMatrixViewModel : ViewModelBase, IDisposable
     public static IReadOnlyCollection<string> RowPartsOf(InputStripKind kind) => kind switch
     {
         InputStripKind.Xlr1 or InputStripKind.Xlr2 => SkinMatrixParts.RowHead,
-        InputStripKind.AuxIn or InputStripKind.LineIn => [SkinStripParts.Identity, SkinStripParts.Meter, SkinStripParts.Gain],
+        InputStripKind.AuxIn => [SkinStripParts.Identity, SkinStripParts.Meter, SkinStripParts.Gain],
+        // Line In's processing part is its Raw Capture switch, where the unit takes it.
+        InputStripKind.LineIn => [SkinStripParts.Identity, SkinStripParts.Meter, SkinStripParts.Gain, SkinMatrixParts.Processing],
         // A capture channel's gain part holds its channel volume, under the
         // interface's gain while it carries the interface's microphone, which
         // also brings the interface's mute and switches. Its source and its
@@ -583,6 +585,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
             Unit is { HasSwitches: true } || ExtraUnit is { HasSwitches: true } || ShowsSoftware || ShowsNoise || ShowsDynamics || ShowsOwnClock,
         (InputStripKind.AuxIn, SkinStripParts.Gain) => Main.CapAuxInput || Channel.HasVolume,
         (InputStripKind.LineIn, SkinStripParts.Gain) => Main.CapLineInput || Channel.HasVolume,
+        (InputStripKind.LineIn, SkinMatrixParts.Processing) => Main.CapLineInRawCapture,
         (_, SkinStripParts.Gain) => CarriesUnit || CarriesExtraUnit || Channel.HasVolume || ShowsCaptureGain,
         (InputStripKind.Capture, SkinStripParts.Effects) => Channel.HasInserts && CapturePartOrdered(part),
         _ => true,
@@ -626,8 +629,9 @@ public sealed class MatrixRowViewModel : ViewModelBase
 
     /// <summary>
     /// The head draws the processing button, at the end of the name column:
-    /// the skin shows the part and the input the row carries has a switch, or
-    /// the row is XLR 1 with its software low cut or ClipGuard.
+    /// the skin shows the part and the input the row carries has a switch,
+    /// the row is XLR 1 with its software low cut or ClipGuard, or the row is
+    /// Line In on a unit that takes raw capture on it.
     /// </summary>
     public bool ShowsProcessing => Matrix.Options.RowHead.Shows(SkinMatrixParts.Processing)
         && MixMatrixViewModel.RowPartsOf(Kind).Contains(SkinMatrixParts.Processing) && Available(SkinMatrixParts.Processing);
@@ -652,8 +656,20 @@ public sealed class MatrixRowViewModel : ViewModelBase
     /// </summary>
     public bool OwnClockOnly => ShowsOwnClock && !CarriesUnit && !CarriesExtraUnit && !ShowsSoftware && !ShowsNoise && !ShowsDynamics;
 
-    /// <summary>The head draws the Mic button and its flyout: the processing part shows and holds more than the Own clock switch.</summary>
-    public bool ShowsSwitchesButton => ShowsProcessing && !OwnClockOnly;
+    /// <summary>
+    /// The head draws the Mic button and its flyout: the processing part
+    /// shows and holds more than the Own clock switch, on a row that is not
+    /// Line In.
+    /// </summary>
+    public bool ShowsSwitchesButton => ShowsProcessing && !OwnClockOnly && Kind != InputStripKind.LineIn;
+
+    /// <summary>
+    /// The head draws Line In's Raw Capture switch in the processing part's
+    /// place: the row is Line In, the unit takes raw capture on it and the
+    /// skin shows the part. The switch is all the part holds there, so it
+    /// is a button that turns it on and off, as a lone Own clock is.
+    /// </summary>
+    public bool ShowsLineInRawButton => ShowsProcessing && Kind == InputStripKind.LineIn;
 
     /// <summary>The head draws the Own clock button in the processing part's place: the part shows and the switch is all it holds.</summary>
     public bool ShowsOwnClockButton => ShowsProcessing && OwnClockOnly;
@@ -906,6 +922,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
         {
             case nameof(MainViewModel.CapAuxInput) when Kind == InputStripKind.AuxIn: RefreshSpec(); break;
             case nameof(MainViewModel.CapLineInput) when Kind == InputStripKind.LineIn: RefreshSpec(); break;
+            case nameof(MainViewModel.CapLineInRawCapture) when Kind == InputStripKind.LineIn: RaiseSwitches(); break;
             case nameof(MainViewModel.HasMixer): Raise(nameof(ShowsEq)); Raise(nameof(Tall)); Raise(nameof(ShowsNoise)); Raise(nameof(ShowsDynamics)); RaiseSwitches(); break;
             case nameof(MainViewModel.ShowSoftLowCut) or nameof(MainViewModel.ShowSoftClipGuard) when Kind == InputStripKind.Xlr1:
                 Raise(nameof(ShowsSoftware)); RaiseSwitches(); break;
@@ -977,6 +994,7 @@ public sealed class MatrixRowViewModel : ViewModelBase
         Raise(nameof(OwnClockOnly));
         Raise(nameof(ShowsSwitchesButton));
         Raise(nameof(ShowsOwnClockButton));
+        Raise(nameof(ShowsLineInRawButton));
     }
 
     private void OnSendsChanged(object? sender, NotifyCollectionChangedEventArgs e)

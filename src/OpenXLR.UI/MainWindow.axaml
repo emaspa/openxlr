@@ -1280,12 +1280,47 @@
                     <skin:LevelMeter Level="{Binding MeterR}" AutomationProperties.Name="{loc:Text Key=RightLevel}"/>
                   </StackPanel>
                   <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="{Binding VolumeRange.Maximum}" Value="{Binding Volume, Mode=TwoWay}"/>
-                  <Grid ColumnDefinitions="*,Auto">
+                  <Grid ColumnDefinitions="*,Auto,Auto">
                     <ToggleButton Content="{loc:Text Key=Mute}" Classes="mute" IsChecked="{Binding Muted, Mode=TwoWay}"/>
                     <ToggleButton Grid.Column="1" Content="150%" IsChecked="{Binding VolumeRange.Boost, Mode=TwoWay}"
                                   IsVisible="{Binding IsMonitor}" Margin="6,0,0,0"
                                   ToolTip.Tip="{loc:Text Key=AllowThisMonitorMixAbove100Up}"/>
+                    <!-- the monitor mix's dry switch, as the mix card and the matrix head have it -->
+                    <ToggleButton Grid.Column="2" Name="ClassicMixDry" Classes="dryChip" Content="{loc:Text Key=MonitorDry}" Padding="5,0" Margin="6,0,0,0"
+                                  VerticalAlignment="Stretch" IsChecked="{Binding MonitorDry, Mode=TwoWay}" IsVisible="{Binding HasMonitorDry}"
+                                  AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=MonitorDryName}}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
                   </Grid>
+                  <!-- the mix's EQ, before its plugins as the signal meets them -->
+                  <Button Name="ClassicMixEq" Content="{loc:Text Key=Eq}" HorizontalAlignment="Stretch" Classes="fx"
+                          Classes.fxOn="{Binding Eq.IsLit, FallbackValue=False}" Classes.fxOff="{Binding Eq.IsFaulty, FallbackValue=False}"
+                          HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixEq"
+                          IsVisible="{Binding HasEq}" IsEnabled="{Binding Eq.CanOpen, FallbackValue=False}" ToolTip.ShowOnDisabled="True"
+                          AutomationProperties.Name="{Binding Eq.ButtonName, FallbackValue=''}" ToolTip.Tip="{Binding Eq.ButtonTip, FallbackValue=''}"/>
+                  <!-- the Wave XLR Pro's maximizer, while hardware mixing builds the mix on the unit -->
+                  <Button Name="ClassicMixMaximizer" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding MaximizerOn}"
+                          HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}"
+                          IsVisible="{Binding ShowMaximizer}" IsEnabled="{Binding CanMaximize}" ToolTip.ShowOnDisabled="True"
+                          AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=MaximizerName}}" ToolTip.Tip="{Binding MaximizerTip}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <TextBlock Text="{loc:Text Key=Maximizer}"/>
+                      <TextBlock Text="{Binding MaximizerText}"/>
+                    </StackPanel>
+                    <Button.Flyout>
+                      <Flyout Placement="Bottom">
+                        <StackPanel Name="ClassicMixMaximizerPanel" Width="240" Spacing="6">
+                          <TextBlock Text="{loc:Text Key=MaximizerTitle}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}"/>
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <Slider Name="ClassicMixMaximizerAmount" Minimum="0" Maximum="100" SmallChange="1" LargeChange="10"
+                                    TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Maximizer, Mode=TwoWay}"
+                                    AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=MaximizerName}}"/>
+                            <skin:LitText Grid.Column="1" Text="{Binding MaximizerText}" Classes="val" VerticalAlignment="Center"/>
+                          </Grid>
+                          <skin:LitText Text="{Binding MaximizerReductionText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
+                          <TextBlock Text="{loc:Text Key=MaximizerTip}" Classes="h" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
                   <Button Content="{Binding Inserts.ButtonText}" HorizontalAlignment="Stretch" Classes="fx" Classes.fxOn="{Binding Inserts.IsProcessing}" Classes.fxOff="{Binding Inserts.IsOff}"
                           HorizontalContentAlignment="Center" Padding="8,4" FontSize="{DynamicResource UiText.FontSize12}" Click="OnMixInserts"
                           ToolTip.Tip="{Binding Inserts.ButtonTip}"/>
@@ -1322,7 +1357,7 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <ToggleButton Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding AuxPortEnabled, Mode=TwoWay}"
+                  <ToggleButton Name="ClassicMixAuxPort" Content="{loc:Text Key=ToUSBAuxPort}" IsChecked="{Binding AuxPortEnabled, Mode=TwoWay}"
                                 IsVisible="{Binding ShowAuxPortToggle}"
                                 ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
                 </StackPanel>

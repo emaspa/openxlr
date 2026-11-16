@@ -233,7 +233,7 @@ public static class SkinMatrixParts
     /// on and marked while phantom power is, that opens the INPUTS panel's
     /// low cut, expander, Voice Tune, phantom power, ClipGuard and compressor
     /// for the input the row carries, with XLR 1's software low cut and
-    /// ClipGuard, in a flyout.
+    /// ClipGuard, in a flyout. On Line In it is the Raw Capture switch itself.
     /// </summary>
     public const string Processing = "processing";
 

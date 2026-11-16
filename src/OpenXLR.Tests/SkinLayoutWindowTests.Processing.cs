@@ -180,7 +180,9 @@ internal static partial class SkinLayoutWindowTests
     /// </summary>
     internal static void CheckProcessingPlace(Border head, MatrixRowViewModel model, string where)
     {
-        Button? button = head.GetVisualDescendants().OfType<Button>().SingleOrDefault(b => b.Name == "MatrixProcessing" && b.IsEffectivelyVisible);
+        // The Mic button, or the lone switch that stands in its place: a capture input's Own clock or Line In's Raw Capture.
+        Button? button = head.GetVisualDescendants().OfType<Button>()
+            .SingleOrDefault(b => b.Name is "MatrixProcessing" or "MatrixOwnClockButton" or "MatrixLineInRaw" && b.IsEffectivelyVisible);
         Assert.True(model.ShowsProcessing == button is not null, $"{model.Channel.Id}: processing {model.ShowsProcessing}, drawn {button is not null} {where}");
         Border name = head.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "MatrixRowName");
         // The readout under the button: inside the name column and the head, below the button.

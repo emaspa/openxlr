@@ -234,6 +234,11 @@
                               Value="{Binding Main.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Main.GainLocked}"
                               AutomationProperties.Name="{Binding Main.UnitInput1.GainName}"/>
                     </layout:MeterFader>
+                    <!-- the gain lock at the end of the gain's line, as Line In's level lock is, while the head draws the interface's gain -->
+                    <ToggleButton Grid.Column="1" Name="MatrixGainLock" Classes="lock" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.GainLocked, Mode=TwoWay}"
+                                  IsVisible="{Binding Unit.ShowGainLock, FallbackValue=False}"
+                                  Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                                  AutomationProperties.Name="{loc:Text Key=LockInputGain}" ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
                     <!-- an additional interface's gain, while this row carries that interface's input -->
                     <layout:MeterFader ShowsMeter="{Binding MeterUnderFader}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center"
@@ -554,8 +559,16 @@
                              IsVisible="{Binding ShowsIcon}" AutomationProperties.Name="{Binding Channel.Name}" ToolTip.Tip="{Binding Channel.Name}"/>
                   <skin:LitText Grid.Column="2" Text="{Binding Channel.Name}" Classes="strip" Classes.layoutAccent="{Binding Channel.Appearance.HasColour}"
                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsVisible="{Binding ShowsName}" ToolTip.Tip="{Binding Channel.Name}"/>
-                  <!-- the gain, which reads the channel's volume while the volume fader moves and for a second after -->
-                  <skin:LitText Grid.Column="3" Grid.RowSpan="2" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                  <!-- Line In's one switch, Raw Capture, where the unit takes it: the switch itself at the end of the
+                       name column, lit while it is on, as a capture input's lone Own clock is; no flyout -->
+                  <Button Grid.Column="3" Name="MatrixLineInRaw" Classes="matrixProcessing fx" Classes.fxOn="{Binding Main.LineInRawCapture}"
+                          Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                          MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsLineInRawButton}" Click="OnToggleLineInRaw"
+                          Content="{loc:Text Key=RawCapture}" AutomationProperties.Name="{loc:Text Key=RawCapture}" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>
+                  <!-- the gain, which reads the channel's volume while the volume fader moves and for a second after;
+                       under the Raw Capture switch while that shows -->
+                  <skin:LitText Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"
+                                Classes.under="{Binding ShowsProcessing}" Classes.centred="{Binding !ShowsProcessing}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowsReadout}"
                                 AutomationProperties.Name="{Binding ReadoutName}" ToolTip.Tip="{Binding ReadoutName}"/>
                 </Grid>
@@ -699,6 +712,11 @@
                               Value="{Binding Unit.GainDb, Mode=TwoWay}" IsEnabled="{Binding !Unit.GainLocked, FallbackValue=False}"
                               AutomationProperties.Name="{Binding Unit.GainName}"/>
                     </layout:MeterFader>
+                    <!-- the gain lock at the end of the gain's line, as Line In's level lock is, while the head draws the interface's gain -->
+                    <ToggleButton Grid.Column="1" Name="MatrixUnitGainLock" Classes="lock" Content="{loc:Text Key=Lock}" IsChecked="{Binding Main.GainLocked, Mode=TwoWay}"
+                                  IsVisible="{Binding Unit.ShowGainLock, FallbackValue=False}"
+                                  Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
+                                  AutomationProperties.Name="{loc:Text Key=LockInputGain}" ToolTip.Tip="{loc:Text Key=GainLockTheDaemonRejectsEveryGainChange}"/>
                     <!-- an additional interface's gain, while this row carries that interface's input -->
                     <layout:MeterFader ShowsMeter="{Binding MeterUnderFader}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}" Mono="{Binding Channel.MonoMeter}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center"
@@ -894,6 +912,12 @@
                                       IsChecked="{Binding Mix.MonitorDry, Mode=TwoWay}" Content="{Binding DryChipText}"
                                       FontSize="{DynamicResource UiText.FontSize11}"
                                       AutomationProperties.Name="{Binding DryName}" ToolTip.Tip="{loc:Text Key=MonitorDryTip}"/>
+                        <!-- the Aux mix's USB Aux port switch, where the interface has the port: a chip like the
+                             dry switch, grey while off and green while on -->
+                        <ToggleButton Name="MatrixAuxPortChip" Classes="dryChip" Padding="5,0" VerticalAlignment="Center"
+                                      IsVisible="{Binding Mix.ShowAuxPortToggle}" IsChecked="{Binding Mix.AuxPortEnabled, Mode=TwoWay}"
+                                      Content="{loc:Text Key=MatrixAuxPortChip}" FontSize="{DynamicResource UiText.FontSize11}"
+                                      AutomationProperties.Name="{loc:Text Key=ToUSBAuxPort}" ToolTip.Tip="{loc:Text Key=SendThisMixToTheSecondComputerOn}"/>
                         <Button Name="MatrixColumnHandle" Classes="ghost reorderHandle" Classes.fixedPlace="{Binding HandleHidden}"
                                 Content="↔" Tag="{Binding Mix}"
                                 AutomationProperties.Name="{Binding Mix.Name, StringFormat={loc:Text Key=MoveItem}}"

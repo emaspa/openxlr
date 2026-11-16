@@ -2220,6 +2220,9 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="ToUSBAuxPort" xml:space="preserve">
     <value>Zum USB-Aux-Port</value>
   </data>
+  <data name="MatrixAuxPortChip" xml:space="preserve">
+    <value>USB</value>
+  </data>
   <data name="TrayOnly" xml:space="preserve">
     <value>Nur Tray</value>
   </data>

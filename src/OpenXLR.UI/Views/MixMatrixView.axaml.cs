@@ -106,6 +106,13 @@ public partial class MixMatrixView : UserControl
             row.Channel.OwnClock = !row.Channel.OwnClock;
     }
 
+    /// <summary>Line In's Raw Capture button: turn the switch on or off, as the INPUTS panel's toggle does.</summary>
+    private void OnToggleLineInRaw(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is MatrixRowViewModel { ShowsLineInRawButton: true } row)
+            row.Main.LineInRawCapture = !row.Main.LineInRawCapture;
+    }
+
     /// <summary>An input row's name and binding line: open its binding dialog.</summary>
     private void OnBinding(object? sender, RoutedEventArgs e)
     {

@@ -2130,6 +2130,9 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
   <data name="ToUSBAuxPort" xml:space="preserve">
     <value>Ngadto sa USB Aux port</value>
   </data>
+  <data name="MatrixAuxPortChip" xml:space="preserve">
+    <value>USB</value>
+  </data>
   <data name="TrayOnly" xml:space="preserve">
     <value>Tray ra</value>
   </data>
