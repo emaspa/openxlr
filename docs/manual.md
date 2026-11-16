@@ -6436,7 +6436,11 @@ comes back, the header shows the interface and the version again.
 When the daemon refuses a change, the bottom line shows its reason until the
 next key. The terminal skips a message it cannot read, for instance one from a
 daemon of another version, says so on the bottom line and keeps the
-connection.
+connection. A null where it expects a name, a list or a section reads as
+empty, and the tabs draw the rest of the state. If a tab still cannot be
+drawn, the header says **this tab could not be drawn** with the error
+under it, and the section keys still reach the other tabs. A key that fails
+the same way says so on the bottom line. Neither closes the terminal mixer.
 
 In Inputs, **Input EQ** lists each microphone and every capture
 input, on a mono port or a stereo pair. Open its **bands** row for the

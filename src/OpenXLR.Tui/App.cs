@@ -60,7 +60,9 @@ internal sealed class App
     /// <param name="appearanceMode">Material's saved mode.</param>
     /// <param name="skinOverride">True when <c>--skin</c> or <c>OPENXLR_SKIN</c> chose the skin, which holds Material dark.</param>
     /// <param name="time">The clock for temporary notices and feed confirmations.</param>
-    public App(DaemonLink link, Theme theme, string appearanceMode = AppearanceModes.System, bool skinOverride = false, TimeProvider? time = null)
+    /// <param name="views">The tabs, for a test; the nine sections otherwise.</param>
+    public App(DaemonLink link, Theme theme, string appearanceMode = AppearanceModes.System, bool skinOverride = false, TimeProvider? time = null,
+        IEnumerable<View>? views = null)
     {
         Time = time ?? TimeProvider.System;
         Link = link;
@@ -68,7 +70,7 @@ internal sealed class App
         AppearanceMode = AppearanceModes.Normalize(appearanceMode);
         _skinOverride = skinOverride;
         ApplyAppearance();
-        _views =
+        _views = views is not null ? [.. views] :
         [
             new MixerView(), new MatrixView(), new InputsView(), new OutputsView(), new AppsView(),
             new InsertsView(), new ProfilesView(), new OptionsView(), new SoundsView(),
@@ -96,6 +98,9 @@ internal sealed class App
     public bool FollowsSystem => !_skinOverride && _chosenTheme.Id == "default" && AppearanceMode == AppearanceModes.System;
 
     public bool Running { get; private set; } = true;
+
+    /// <summary>The last failure a frame or a key caught, for the tests; never cleared.</summary>
+    internal Exception? LastFailure { get; private set; }
 
     public int Tab { get; private set; }
 
@@ -212,7 +217,16 @@ internal sealed class App
 
         // A key whose change went nowhere says so, rather than doing nothing.
         long unsent = Link.Unsent;
-        bool handled = Current.Handle(key, this);
+        bool handled;
+        // A key that throws, on a state its tab did not expect, says so on
+        // the bottom line rather than closing the terminal mixer.
+        try { handled = Current.Handle(key, this); }
+        catch (Exception error)
+        {
+            LastFailure = error;
+            Say($"That key failed in {Current.Title}: {error.Message}");
+            return;
+        }
         if (Link.Unsent != unsent) Say(DaemonLink.NotConnected);
         if (handled) return;
 
@@ -303,8 +317,41 @@ internal sealed class App
         }
     }
 
-    /// <summary>Draws the whole screen: the header, the tabs, the current view and the bottom line.</summary>
+    /// <summary>
+    /// Draws the whole screen: the header, the tabs, the current view and the
+    /// bottom line. A frame that throws, on a state its tab did not expect,
+    /// is drawn again as the header, the tabs and the bottom line, with the
+    /// error on the header's second row, so the other tabs stay in reach and
+    /// the next state that draws brings the tab back.
+    /// </summary>
     public void Draw(Screen screen)
+    {
+        try { DrawFrame(screen); }
+        catch (Exception error)
+        {
+            LastFailure = error;
+            try { DrawFailed(screen, $"Could not draw {Current.Title}: {error.Message}"); }
+            catch (Exception) { }
+        }
+    }
+
+    /// <summary>The frame of a failed draw, which reads nothing of the state.</summary>
+    private void DrawFailed(Screen screen, string failure)
+    {
+        Theme theme = Theme;
+        screen.Clear(theme.Window);
+        screen.Fill(0, 0, screen.Width, 1, theme.Card);
+        screen.Text(1, 0, "OpenXLR", theme.TextPrimary, theme.Card, bold: true);
+        Widgets.Lamp(screen, 10, 0, false, theme, theme.Card, alert: true);
+        screen.Text(12, 0, "this tab could not be drawn", theme.TextDetail, theme.Card,
+            maxWidth: Math.Max(0, screen.Width - 14));
+        screen.TextPad(1, 1, failure, Math.Max(0, screen.Width - 2), theme.TextWarning, theme.Window);
+        if (screen.Height > 3) Tabs(screen);
+        Bottom(screen);
+        if (_help) Help(screen);
+    }
+
+    private void DrawFrame(Screen screen)
     {
         Theme theme = Theme;
         screen.Clear(theme.Window);

@@ -125,10 +125,11 @@ public sealed class TuiOfflineTests : IDisposable
     }
 
     [Theory]
-    [InlineData("""{"type":"state","mixer":null}""")]
-    [InlineData("""{"type":"state","mixer":{"channels":null,"mixes":[]}}""")]
+    [InlineData("""{"type":"state","mixer":[]}""")]
+    [InlineData("""{"type":"state","mixer":{"channels":{},"mixes":[]}}""")]
     [InlineData("""{"type":"state","connected":"maybe"}""")]
-    [InlineData("""{"type":"state","mixer":{"inserts":{"mic":null}}}""")]
+    [InlineData("""{"type":"state","mixer":{"inserts":{"mic":5}}}""")]
+    [InlineData("""{"type":"state","mixer":{"mixes":[{"id":"monitor","volume":null}]}}""")]
     public void AStateOfAnUnexpectedShapeIsSkippedAndTheLastOneKept(string message)
     {
         var link = new DaemonLink();
@@ -154,7 +155,7 @@ public sealed class TuiOfflineTests : IDisposable
             Interlocked.Increment(ref connections);
             await SocketTestServer.Receive(socket, stop); // state request
             await SocketTestServer.Send(socket, JsonNode.Parse(State)!, stop);
-            await SocketTestServer.Send(socket, new { type = "state", mixer = (object?)null }, stop);
+            await SocketTestServer.Send(socket, new { type = "state", connected = "maybe" }, stop);
             await SocketTestServer.Send(socket, new { type = "error", message = "Still here" }, stop);
             await SocketTestServer.Receive(socket, stop);
         });

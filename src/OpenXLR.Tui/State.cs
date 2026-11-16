@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace OpenXLR.Tui;
 
@@ -276,7 +277,7 @@ internal sealed record WaveInterfaceEntry
 
     public int Count(string capability) =>
         Capabilities?.TryGetValue(capability, out JsonElement value) == true && value.ValueKind == JsonValueKind.Number
-            ? value.GetInt32() : 0;
+            && value.TryGetInt32(out int count) ? count : 0;
 
     public bool Flag(string control) =>
         State?.TryGetValue(control, out JsonElement value) == true && value.ValueKind == JsonValueKind.True;
@@ -333,6 +334,7 @@ internal sealed record DuckingEntry
     {
         if (value.ValueKind == JsonValueKind.String) return (Array.IndexOf(words, value.GetString()), null);
         if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("attack", out JsonElement a) || !value.TryGetProperty("release", out JsonElement r)
+            || a.ValueKind != JsonValueKind.Number || r.ValueKind != JsonValueKind.Number
             || !a.TryGetInt32(out int attack) || !r.TryGetInt32(out int release)) return (-1, null);
         int at = Array.IndexOf(times, (attack, release));
         return at >= 0 ? (at, null) : (-1, $"{attack}/{release} ms");
@@ -851,7 +853,55 @@ internal sealed record Snapshot
     {
         PropertyNameCaseInsensitive = true,
         NumberHandling = JsonNumberHandling.AllowReadingFromString,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { KeepDefaultsForNulls } },
     };
+
+    /// <summary>
+    /// A null the daemon sends where this reader's type has none, such as a
+    /// channel's <c>levels</c> or a mix's <c>name</c>, keeps the field's
+    /// default, and a null inside a list or a map is left out. The drawing
+    /// code reads these fields as never null, as the types say, so a state
+    /// with a null deep inside still draws instead of throwing halfway
+    /// through a frame. A null where a number or a switch belongs still
+    /// fails the read, and the state is skipped.
+    /// </summary>
+    private static void KeepDefaultsForNulls(JsonTypeInfo info)
+    {
+        if (info.Kind != JsonTypeInfoKind.Object) return;
+        foreach (JsonPropertyInfo property in info.Properties)
+        {
+            if (property.Set is not { } set || property.PropertyType.IsValueType) continue;
+            bool nullable = property.IsSetNullable;
+            property.Set = (target, value) =>
+            {
+                if (value is null && !nullable) return;
+                set(target, WithoutNulls(value));
+            };
+        }
+    }
+
+    /// <summary>The list or map with its null entries removed, at every depth; anything else as it is.</summary>
+    private static object? WithoutNulls(object? value)
+    {
+        switch (value)
+        {
+            case System.Collections.IList { IsFixedSize: false } list:
+                for (int index = list.Count - 1; index >= 0; index--)
+                {
+                    if (list[index] is null) list.RemoveAt(index);
+                    else WithoutNulls(list[index]);
+                }
+                break;
+            case System.Collections.IDictionary map:
+                foreach (object key in map.Keys.Cast<object>().ToList())
+                {
+                    if (map[key] is null) map.Remove(key);
+                    else WithoutNulls(map[key]);
+                }
+                break;
+        }
+        return value;
+    }
 
     public static Snapshot? Parse(string json)
     {
@@ -1006,7 +1056,8 @@ internal sealed record Snapshot
 
     public int Count(string capability) =>
         Capabilities.TryGetValue(capability, out JsonElement value) && value.ValueKind == JsonValueKind.Number
-            ? value.GetInt32()
+            && value.TryGetInt32(out int count)
+            ? count
             : 0;
 
     public bool Flag(string control) =>
