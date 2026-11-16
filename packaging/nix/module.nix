@@ -65,6 +65,11 @@ in
     # few channels or mixes beyond the default layout and then drops nodes.
     systemd.user.services.pipewire-pulse.serviceConfig.LimitNOFILE = 65536;
 
+    # PipeWire itself holds a buffer and an event descriptor for every node
+    # and port; a WirePlumber restart hands them all over again, and at the
+    # default 1024 that runs out and WirePlumber links nothing.
+    systemd.user.services.pipewire.serviceConfig.LimitNOFILE = 65536;
+
     systemd.user.services.openxlr-daemon = {
       description = "OpenXLR audio daemon";
       after = [ "pipewire-pulse.service" "wireplumber.service" ];

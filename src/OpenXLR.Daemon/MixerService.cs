@@ -1292,11 +1292,12 @@ public sealed partial class MixerService : IHostedService, IDisposable
             if (changed) Changed?.Invoke();
             stop.ThrowIfCancellationRequested();
             Phase("output selectors", () => { SyncOutputSelectors(); return false; });
-            // Once a minute: is the PulseAudio server close to its
-            // open-file limit? Cheap (one /proc directory listing).
+            // Once a minute: is the PulseAudio server or PipeWire itself
+            // close to its open-file limit? Cheap (a /proc directory listing
+            // each).
             if (++_sweepCount % 60 == 1)
             {
-                string? warning = _mixer.PulseFileWarning();
+                string? warning = _mixer.FileLimitWarning();
                 if (warning != Volatile.Read(ref _resourceWarning))
                 {
                     if (warning is not null) _log.LogWarning("{msg}", warning);
@@ -2305,7 +2306,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>Why the mixer is not built although the submixer is on, or null.</summary>
     public string? GraphWarning { get { lock (_sceneGate) return _waitingForAudio ? _waitingWarning : null; } }
 
-    /// <summary>pipewire-pulse close to its open-file limit, or null.</summary>
+    /// <summary>pipewire-pulse or PipeWire close to its open-file limit, or null.</summary>
     public string? ResourceWarning => Volatile.Read(ref _resourceWarning);
 
     /// <summary>

@@ -5201,43 +5201,54 @@ reaches the limit, and past it the server drops nodes at random: sinks
 disappear, apps fall back to the default output, and the UI shows
 "Sink not found" errors from pactl.
 
-OpenXLR refuses to add a channel or mix when the server has no room left
-and says so in the editor, which also shows a note once the server is at
-three quarters of its limit. The fix is a systemd drop-in that raises the
-limit to 65536:
+PipeWire itself has the same default limit. It holds a buffer and an
+event descriptor for every node and port, so with OpenXLR's mixer built
+it sits at around 700 open files. When WirePlumber restarts, PipeWire
+hands every node over to it again, runs out of files halfway, and
+WirePlumber links nothing: every app, meter and microphone goes silent
+until WirePlumber is restarted once more. The journal shows it as
+`can't DUP fd` and `Too many open files` from `mod.protocol-native`.
 
-1. The deb and rpm packages install it as
-   `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf`; the NixOS
-   module sets the same service limit declaratively. On a
-   source checkout, or any install without it, create the file yourself:
+OpenXLR refuses to add a channel or mix when pipewire-pulse has no room
+left and says so in the editor. The editor also shows a note once
+pipewire-pulse is at three quarters of its limit, or PipeWire at half of
+its own. The fix is two systemd drop-ins that raise both limits to 65536:
+
+1. The deb and rpm packages install them as
+   `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` and
+   `/usr/lib/systemd/user/pipewire.service.d/openxlr.conf`; the NixOS
+   module sets the same service limits declaratively. On a
+   source checkout, or any install without them, create the files yourself:
 
    ```sh
-   mkdir -p ~/.config/systemd/user/pipewire-pulse.service.d
+   mkdir -p ~/.config/systemd/user/pipewire-pulse.service.d ~/.config/systemd/user/pipewire.service.d
    printf '[Service]\nLimitNOFILE=65536\n' > ~/.config/systemd/user/pipewire-pulse.service.d/openxlr.conf
+   printf '[Service]\nLimitNOFILE=65536\n' > ~/.config/systemd/user/pipewire.service.d/openxlr.conf
    ```
 
 2. Apply it, now or at your next login:
 
    ```sh
    systemctl --user daemon-reload
-   systemctl --user restart pipewire-pulse
+   systemctl --user restart pipewire
    ```
 
-   Restarting pipewire-pulse reconnects every PulseAudio client for a
-   moment and takes OpenXLR's nodes with it; the daemon notices within two
-   seconds and builds the graph again from the saved layout, without
-   restarting. It does the same when the server, short of files, drops
+   Restarting PipeWire restarts pipewire-pulse and WirePlumber with it.
+   Every app loses its audio for a moment and OpenXLR's nodes go too; the
+   daemon notices within two seconds and builds the graph again from the
+   saved layout, without restarting. It does the same when the server, short of files, drops
    one mix or virtual microphone, and a channel whose sink was dropped
    gets it back with its sends.
 
 3. Check:
 
    ```sh
-   systemctl --user show pipewire-pulse -p LimitNOFILESoft
+   systemctl --user show pipewire pipewire-pulse -p LimitNOFILESoft
    ```
 
-   It should say 65536. If it still says 1024 the file is not where systemd
-   looks; `systemctl --user cat pipewire-pulse` lists every file it read.
+   Both lines should say 65536. If one still says 1024 its file is not
+   where systemd looks; `systemctl --user cat pipewire` (or
+   `pipewire-pulse`) lists every file it read.
 
 <a name="quiet-mixes"></a>
 ### 5.9 The mixes are quieter than the microphone
@@ -5722,6 +5733,7 @@ settings. See
 | `~/.local/share/openxlr/skins/<id>/skin.json` | a skin you installed; system skins come from `$XDG_DATA_DIRS` ([skins.md](skins.md)) |
 | `openxlr-daemon.service` (systemd user unit) | the daemon; `journalctl --user -u openxlr-daemon` for its log |
 | `/usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf` | installed by the packages: raises pipewire-pulse's open-file limit ([section 5.8](#open-files)) |
+| `/usr/lib/systemd/user/pipewire.service.d/openxlr.conf` | installed by the packages: raises PipeWire's own open-file limit ([section 5.8](#open-files)) |
 | `/usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf`, `52-openxlr-mk1-capture-hold.conf`, `53-openxlr-wave3-capture-hold.conf` | installed by the packages: keep the capture of the XLR Dock, the original Wave XLR, the Wave:3 and the Wave:3 MK.2 running, and make it the audio clock off pro-audio ([section 5.2](#dock-silent)) |
 | `~/.config/wireplumber/wireplumber.conf.d/57-openxlr-clock.conf` | the audio clock picked in Options → Audio → AUDIO, written and deleted by the daemon; not in the Flatpak ([section 5.12](#garbled-mic)) |
 | `~/.config/wireplumber/wireplumber.conf.d/56-openxlr-clock.conf` | not installed: a rule you write by hand to make an interface the audio clock, the Flatpak's way ([section 5.12](#garbled-mic)) |

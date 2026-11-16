@@ -72,6 +72,7 @@ jobs:
           test -f /usr/share/wireplumber/wireplumber.conf.d/55-openxlr-wave3-mk2-playback.conf
           test -f /usr/lib/systemd/user/openxlr-daemon.service
           test -f /usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf
+          test -f /usr/lib/systemd/user/pipewire.service.d/openxlr.conf
 
       - name: Checksums
         run: cd dist && sha256sum openxlr-*.rpm > SHA256SUMS-rpm.txt && cat SHA256SUMS-rpm.txt

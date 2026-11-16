@@ -167,7 +167,7 @@ sudo udevadm control --reload-rules
 ```
 
 The optional [Pro UCM profile](../packaging/ucm/README.md) remains a manual
-host step. Flatpak cannot raise the host pipewire-pulse open-file limit or
+host step. Flatpak cannot raise the host PipeWire and pipewire-pulse open-file limits or
 grant unlimited memory locking. Large layouts and bridged Windows plugins
 remain better suited to distro packages. Removing the app leaves manually
 installed host files in place. Remove only the exact files you installed,

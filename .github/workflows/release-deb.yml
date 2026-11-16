@@ -53,6 +53,7 @@ jobs:
           dpkg -c dist/openxlr_*.deb > contents.txt
           for f in usr/lib/systemd/user/openxlr-daemon.service \
                    usr/lib/systemd/user/pipewire-pulse.service.d/openxlr.conf \
+                   usr/lib/systemd/user/pipewire.service.d/openxlr.conf \
                    usr/lib/udev/rules.d/70-openxlr.rules \
                    usr/lib/openxlr/daemon/openxlr-lv2-host \
                    usr/bin/openxlr usr/bin/openxlr-daemon; do

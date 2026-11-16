@@ -167,6 +167,8 @@ install -Dm644 openxlr-daemon.service \
     %{buildroot}%{_userunitdir}/openxlr-daemon.service
 install -Dm644 packaging/pipewire-pulse-openxlr.conf \
     %{buildroot}%{_userunitdir}/pipewire-pulse.service.d/openxlr.conf
+install -Dm644 packaging/pipewire-openxlr.conf \
+    %{buildroot}%{_userunitdir}/pipewire.service.d/openxlr.conf
 
 install -Dm644 packaging/openxlr.desktop \
     %{buildroot}%{_datadir}/applications/openxlr.desktop
@@ -248,6 +250,7 @@ MSG
 %{_datadir}/wireplumber/wireplumber.conf.d/55-openxlr-wave3-mk2-playback.conf
 %{_userunitdir}/openxlr-daemon.service
 %{_userunitdir}/pipewire-pulse.service.d/openxlr.conf
+%{_userunitdir}/pipewire.service.d/openxlr.conf
 %{_datadir}/applications/openxlr.desktop
 %{_datadir}/icons/hicolor/*/apps/openxlr.*
 %{_datadir}/openxlr/
