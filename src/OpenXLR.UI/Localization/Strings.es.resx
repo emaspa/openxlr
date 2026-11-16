@@ -507,6 +507,9 @@
   <data name="DaemonRestartedSubmixerOn" xml:space="preserve">
     <value>Demonio reiniciado con el submezclador activado.</value>
   </data>
+  <data name="DaemonStateUnreadableNote" xml:space="preserve">
+    <value>El demonio (v{0}) ha enviado un estado que esta ventana (v{1}) no puede leer; los controles muestran el último estado que pudo leer. Reinicia el demonio para ejecutar la versión instalada.</value>
+  </data>
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>El demonio es v{0}; esta ventana es v{1}. Reinicia el demonio para ejecutar la versión instalada.</value>
   </data>

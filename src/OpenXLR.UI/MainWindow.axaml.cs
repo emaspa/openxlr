@@ -62,7 +62,7 @@ public partial class MainWindow : Window
         _vm.Soundboard.LibraryReported += fresh => _desktopKeys.SetClips(_vm.Soundboard.Clips.Select(c =>
             new DesktopKeys.SoundClip(c.Id, c.Name, c.Mode, c.Seconds, c.Loop, c.Playing)), fresh);
         // A glitch marked from a desktop key shows above the mixer, as Ctrl+G's does.
-        _desktopKeys.GlitchMarked += text => Dispatcher.UIThread.Post(() => _vm.ShowGlitchNotice(text));
+        _desktopKeys.GlitchMarked += text => Dispatcher.UIThread.Post(() => _vm.ShowNotice(text));
         _ = _desktopKeys.StartAsync();
         DataContext = _vm;
         SetupHistory();

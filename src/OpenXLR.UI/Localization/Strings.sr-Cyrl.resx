@@ -494,6 +494,9 @@
   <data name="DaemonRestartedSubmixerOn" xml:space="preserve">
     <value>Сервис је поново покренут с укљученим подмиксером.</value>
   </data>
+  <data name="DaemonStateUnreadableNote" xml:space="preserve">
+    <value>Сервис (v{0}) је послао стање које овај прозор (v{1}) не може да прочита; контроле приказују последње прочитано стање. Поново покрени сервис да користиш инсталирану верзију.</value>
+  </data>
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>Сервис је v{0}; овај прозор је v{1}. Поново покрени сервис да користиш инсталирану верзију.</value>
   </data>

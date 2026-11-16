@@ -494,6 +494,9 @@
   <data name="DaemonRestartedSubmixerOn" xml:space="preserve">
     <value>Na-restart ang daemon nga naka-on ang submixer.</value>
   </data>
+  <data name="DaemonStateUnreadableNote" xml:space="preserve">
+    <value>Nagpadala ang daemon (v{0}) og state nga dili mabasa niining window (v{1}); gipakita sa mga kontrol ang katapusang state nga nabasa. I-restart ang daemon aron gamiton ang na-install nga bersyon.</value>
+  </data>
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>v{0} ang daemon; v{1} kining window. I-restart ang daemon aron gamiton ang na-install nga bersyon.</value>
   </data>

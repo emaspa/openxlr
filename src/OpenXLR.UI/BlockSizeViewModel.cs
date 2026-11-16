@@ -35,7 +35,7 @@ public sealed partial class MainViewModel
     private async Task SetBlockSizeAsync(int? frames)
     {
         string? error = await _client.SetBlockSizeAsync(frames);
-        if (error is not null) Status = error;
+        if (error is not null) ReportError(error);
     }
 
     /// <summary>A block of <paramref name="frames"/> at 48 kHz, with its length in milliseconds.</summary>

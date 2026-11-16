@@ -532,6 +532,9 @@
   <data name="DaemonRestartedSubmixerOn" xml:space="preserve">
     <value>Daemon mit aktiviertem Submixer neu gestartet.</value>
   </data>
+  <data name="DaemonStateUnreadableNote" xml:space="preserve">
+    <value>Der Daemon (v{0}) hat einen Zustand gesendet, den dieses Fenster (v{1}) nicht lesen kann; die Regler zeigen den letzten lesbaren Zustand. Starte den Daemon neu, um die installierte Version zu verwenden.</value>
+  </data>
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>Der Daemon ist v{0}, dieses Fenster v{1}. Starte den Daemon neu, um die installierte Version zu verwenden.</value>
   </data>

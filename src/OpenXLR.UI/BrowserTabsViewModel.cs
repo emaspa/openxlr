@@ -39,7 +39,7 @@ public sealed partial class MainViewModel
         Set(ref _preserveBrowserOutputs, _reportedPreserveBrowserOutputs, nameof(PreserveBrowserOutputs));
         if (error is not null)
         {
-            Status = error;
+            ReportError(error);
         }
         foreach (BrowserTabViewModel tab in BrowserTabs) tab.SetCanEdit(_preserveBrowserOutputs);
         Raise(nameof(CanSetBrowserRouting)); Raise(nameof(PreserveBrowserOutputs));
@@ -69,7 +69,7 @@ public sealed partial class MainViewModel
             if (session.Length != 32 || !session.All(Uri.IsHexDigit) || id < 0 || !seen.Add((session, id))) continue;
             if (!existing.TryGetValue((session, id), out BrowserTabViewModel? tab))
             {
-                tab = new(session, id, _client.AssignBrowserTabAsync, error => Status = error, _client.ActivateBrowserTabAsync,
+                tab = new(session, id, _client.AssignBrowserTabAsync, ReportError, _client.ActivateBrowserTabAsync,
                     setVolume: _client.SetBrowserTabVolumeAsync);
                 BrowserTabs.Add(tab);
             }

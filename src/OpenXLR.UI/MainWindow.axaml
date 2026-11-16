@@ -352,9 +352,10 @@
     <StackPanel Name="ApplicationNotices">
     <TextBlock Text="{Binding DaemonRestart.Status}" Classes="h" TextWrapping="Wrap"
                Margin="0,0,0,8" IsVisible="{Binding DaemonRestart.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-    <!-- a glitch just marked with Ctrl+G or from Options, for a few seconds -->
-    <TextBlock Name="GlitchNotice" Text="{Binding GlitchNotice}" Classes="h" TextWrapping="Wrap"
-               Margin="0,0,0,8" IsVisible="{Binding GlitchNotice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+    <!-- for a few seconds: a glitch just marked with Ctrl+G or from Options,
+         or what the daemon refused or failed to do -->
+    <TextBlock Name="MainNotice" Text="{Binding Notice}" Classes="h" TextWrapping="Wrap"
+               Margin="0,0,0,8" IsVisible="{Binding Notice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
     <!-- a card profile without a microphone input and a microphone resampled
          to another device's clock are the warnings with a manual section of
          their own; the card profile wins when both are there -->
@@ -428,8 +429,10 @@
           <TextBlock Text="{loc:Text Key=INPUTS}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
       <!-- The hardware panel, or a skin's input rack in its place: one of the
-           two shows, both bound to the same properties. -->
-      <Panel>
+           two shows, both bound to the same properties. Greyed while the
+           daemon is not connected, as the headphones, the monitor and the
+           mixer are: nothing there reaches a unit without it. -->
+      <Panel Name="InputsPanel" IsEnabled="{Binding ControlsEnabled}">
       <views:InputRackView Name="InputRack" IsVisible="False"/>
       <StackPanel Name="HardwarePanel" Classes="dev" Spacing="4">
 
@@ -919,7 +922,7 @@
           ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
           <TextBlock Text="{loc:Text Key=HEADPHONES}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
-      <StackPanel Classes="dev" Spacing="4">
+      <StackPanel Name="HeadphonesPanel" Classes="dev" Spacing="4" IsEnabled="{Binding ControlsEnabled}">
         <Grid Name="HeadphoneControls" Grid.IsSharedSizeScope="True">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -999,18 +1002,24 @@
                     ToolTip.Tip="{loc:Text Key=DragToAnotherSectionArrowKeysMove}"/>
             <TextBlock Text="{loc:Text Key=MONITOR}" Classes="h" VerticalAlignment="Center"/>
             <ToggleButton Name="MonitorMute" Content="{loc:Text Key=Mute}" Classes="mute"
-                          IsChecked="{Binding MonitorMuted, Mode=TwoWay}"
+                          IsChecked="{Binding MonitorMuted, Mode=TwoWay}" IsEnabled="{Binding ControlsEnabled}"
                           Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
                           AutomationProperties.Name="{loc:Text Key=MuteMonitoring}" ToolTip.Tip="{loc:Text Key=MuteMonitoringTip}"/>
             <ToggleButton Name="OutputBoost" Content="150%" IsChecked="{Binding OutputVolumeRange.Boost, Mode=TwoWay}"
-                          IsEnabled="{Binding !MonitorVolumeLocked}"
                           Padding="8,1" FontSize="{DynamicResource Ox.Label.FontSize}" MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" VerticalAlignment="Center"
-                          ToolTip.Tip="{loc:Text Key=AllowOutputVolumeAbove100UpTo}"/>
+                          ToolTip.Tip="{loc:Text Key=AllowOutputVolumeAbove100UpTo}">
+              <ToggleButton.IsEnabled>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="ControlsEnabled"/>
+                  <Binding Path="!MonitorVolumeLocked"/>
+                </MultiBinding>
+              </ToggleButton.IsEnabled>
+            </ToggleButton>
             <TextBlock Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center" Margin="0,-1,0,0" Cursor="Help"
                        ToolTip.Tip="{loc:Text Key=MonitorOutputRoutingTip}"/>
           </WrapPanel>
         </Expander.Header>
-      <StackPanel Classes="dev" Spacing="4">
+      <StackPanel Name="MonitorPanel" Classes="dev" Spacing="4" IsEnabled="{Binding ControlsEnabled}">
         <TextBlock Name="MonitorMicrophonePausePendingNote" Text="{loc:Text Key=MicrophonePausePendingNote}"
                    Classes="warn" TextWrapping="Wrap" IsVisible="{Binding MicrophonePausePending}"/>
         <Grid Name="MonitorControls" ColumnDefinitions="Auto,*,20,Auto,*,64" SizeChanged="OnMonitorSizeChanged">
@@ -1212,7 +1221,8 @@
       <ContentControl Name="MixerHost" HorizontalContentAlignment="Stretch">
       <!-- The panel Pop out moves: the channel tiles below, or a skin's mix
            banks in their place (Views/MixerPanel.axaml). -->
-      <views:MixerPanel Name="MixerPanel">
+      <!-- greyed while the daemon is not connected; it carries the binding into its own window -->
+      <views:MixerPanel Name="MixerPanel" IsEnabled="{Binding ControlsEnabled}">
       <views:MixerPanel.Header>
       <StackPanel>
         <TextBlock Text="{Binding MixerPlaceholder}" TextWrapping="Wrap"
