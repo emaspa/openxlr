@@ -211,7 +211,7 @@ public sealed partial class HistoryPolicyTests
     }
 
     [Fact]
-    public void ASendMuteComparesTheWholeExclusiveGroupAndAFaderOnlyItsCell()
+    public void ASendMuteComparesTheWholeExclusiveGroupAndAFaderItsChannelsSends()
     {
         HistoryTarget mute = HistoryPolicy.TargetOf(new Command { Cmd = "setChannelMuted", Channel = "xlr1", Mix = "monitor" },
             _ => ["xlr1", "xlr2"], _ => [])!;
@@ -222,7 +222,18 @@ public sealed partial class HistoryPolicyTests
             _ => [], _ => [])!;
         Assert.Equal([SceneField.Level], fader.Fields);
         Assert.True(fader.Keep(new(SceneField.Level, "xlr1|monitor")));
-        Assert.False(fader.Keep(new(SceneField.Level, "xlr1|stream")));
+        // A linked channel's fader moves every send of the channel; an
+        // unlinked one moves one, and a step holds only what moved.
+        Assert.True(fader.Keep(new(SceneField.Level, "xlr1|stream")));
+        Assert.False(fader.Keep(new(SceneField.Level, "xlr10|monitor")));
+        Assert.False(fader.Keep(new(SceneField.Level, "xlr2|monitor")));
+
+        HistoryTarget link = HistoryPolicy.TargetOf(new Command { Cmd = "setLinkedSends", Channel = "xlr1" }, _ => [], _ => [])!;
+        Assert.Equal([SceneField.LinkedSends, SceneField.Level], link.Fields);
+        Assert.True(link.Keep(new(SceneField.LinkedSends, "xlr1")));
+        Assert.False(link.Keep(new(SceneField.LinkedSends, "xlr2")));
+        Assert.True(link.Keep(new(SceneField.Level, "xlr1|stream")));
+        Assert.False(link.Keep(new(SceneField.Level, "xlr2|stream")));
     }
 
     [Fact]

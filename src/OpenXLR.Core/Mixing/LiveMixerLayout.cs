@@ -92,6 +92,7 @@ public sealed partial class Mixer
                 _config = _config with { Channels = [.. _config.Channels, channel] };
                 _combineModules[id] = module;
                 _channelVolume.Remove(id);   // a new channel starts at full volume
+                _linkedSends.Remove(id);     // and with its sends apart
                 foreach (MixDefinition mix in _config.Mixes)
                 {
                     string cell = Cell(id, mix.Id);
@@ -258,6 +259,7 @@ public sealed partial class Mixer
             _eqErrors.Remove(id);
             _restarts.Forget(EqKey(id));
             _channelVolume.Remove(id);
+            _linkedSends.Remove(id);
             bool loaded = _combineModules.Remove(id, out uint module);
             // Before the unload, which can fail: a removed key must not stay
             // in the plan, and its stages go before their key input does.
@@ -319,8 +321,10 @@ public sealed partial class Mixer
                 foreach (ChannelDefinition ch in _config.Channels)
                 {
                     string cell = Cell(ch.Id, id);
+                    // A linked channel's send starts at the level its other sends hold.
+                    double level = LinkedLevelLocked(ch.Id) ?? 1.0;
                     _cells.Add(cell);
-                    _levels[cell] = 1.0;
+                    _levels[cell] = level;
                     _muted.Add(cell);
                 }
                 if (!WaitForLegsLocked([.. _combineModules.Values], [mix.SinkName]))

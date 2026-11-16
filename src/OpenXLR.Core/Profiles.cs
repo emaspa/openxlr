@@ -110,6 +110,14 @@ public sealed record MixerScene
     /// </summary>
     public Dictionary<string, bool>? CaptureOwnClock { get; init; }
 
+    /// <summary>
+    /// Whether each channel's sends are linked, by channel; absent in older
+    /// profiles, which leave every link as it is. A recall links or unlinks
+    /// each channel named here and brings a linked channel's sends to the
+    /// level of its first mix.
+    /// </summary>
+    public Dictionary<string, bool>? LinkedSends { get; init; }
+
     /// <summary>The ducking setup without machine processing. Absent in older profiles, which leave it alone.</summary>
     public DuckingScene? Ducking { get; init; }
 }

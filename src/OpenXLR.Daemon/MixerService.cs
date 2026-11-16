@@ -1784,6 +1784,11 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     _mixer.SetChannelVolume(cmd.Channel, cmd.Value.GetDouble());
                     SyncOutputSelectors();   // the Pro's hardware mic paths play at the send's level
                     break;
+                case "setLinkedSends":
+                    if (cmd.Channel is null) return "setLinkedSends: need 'channel'";
+                    _mixer.SetLinkedSends(cmd.Channel, cmd.Value.GetBoolean());
+                    SyncOutputSelectors();   // linking moves sends, and the Pro's hardware mic paths play at the send's level
+                    break;
                 case "setCaptureGain":
                     // The source keeps its own volume, as PipeWire saves it;
                     // nothing goes into mixer.json.

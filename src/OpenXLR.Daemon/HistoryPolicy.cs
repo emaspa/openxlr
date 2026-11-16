@@ -53,6 +53,7 @@ internal static class HistoryPolicy
     private static readonly string[] Recorded =
     [
         "setLevel", "setChannelVolume", "setMixVolume", "setChannelMuted", "setMixMuted", "cycleExclusiveGroup",
+        "setLinkedSends",
         "setEq", "setEqEnabled", "setEqBand", "loadEqProfile",
         "setNoiseRemoval", "setVoiceChanger", "setCompressor", "setExpander",
         "setLowCutHz", "setSoftClipGuard", "setMonitorDry", "setDucking",
@@ -117,7 +118,7 @@ internal static class HistoryPolicy
 
     /// <summary>The kinds a step can have, one per recorded category, as the state names them.</summary>
     internal static readonly IReadOnlyList<string> Kinds =
-        ["sendLevel", "channelVolume", "mixVolume", "sendMute", "mixMute", "exclusiveGroup",
+        ["sendLevel", "channelVolume", "mixVolume", "sendMute", "mixMute", "exclusiveGroup", "linkedSends",
             "eq", "mixEq", "noiseRemoval", "voiceChanger", "compressor", "expander", "lowCut", "clipGuard", "monitorDry", "ducking",
             "insertParam", "insertBypass", "insertName", "insertChain", .. DeviceHistory.Kinds];
 
@@ -133,11 +134,15 @@ internal static class HistoryPolicy
     {
         switch (cmd.Cmd)
         {
+            // Every send of the channel, since a linked channel's level goes
+            // to all of them; an unlinked one moves one send, and a step
+            // holds only the values that moved.
             case "setLevel" when cmd.Channel is { } channel && cmd.Mix is { } mix:
-            {
-                string cell = Cell(channel, mix);
-                return new("sendLevel", channel, mix, null, [SceneField.Level], key => key.Key == cell);
-            }
+                return new("sendLevel", channel, mix, null, [SceneField.Level], key => ChannelOf(key.Key) == channel);
+            // The link and the sends linking brought to one level.
+            case "setLinkedSends" when cmd.Channel is { } channel:
+                return new("linkedSends", channel, null, null, [SceneField.LinkedSends, SceneField.Level],
+                    key => key.Field == SceneField.LinkedSends ? key.Key == channel : ChannelOf(key.Key) == channel);
             case "setChannelVolume" when cmd.Channel is { } channel:
                 return new("channelVolume", channel, null, null, [SceneField.ChannelVolume], key => key.Key == channel);
             case "setMixVolume" when cmd.Mix is { } mix:
@@ -212,6 +217,7 @@ internal static class HistoryPolicy
             "sendMute" => $"{Channel()} mute in {Mix()}",
             "mixMute" => $"{Mix()} mute",
             "exclusiveGroup" => $"{Group()} switch",
+            "linkedSends" => $"{Channel()} linked sends",
             "eq" => $"{Channel()} EQ",
             "mixEq" => $"{Mix()} EQ",
             "noiseRemoval" => $"{Channel()} noise removal",
@@ -229,8 +235,6 @@ internal static class HistoryPolicy
             _ => DeviceHistory.LabelOf(target, layout) ?? target.Kind,
         };
     }
-
-    private static string Cell(string channel, string mix) => $"{channel}|{mix}";
 
     /// <summary>A step on one insert chain: a channel's, or a mix's under <c>mix:&lt;id&gt;</c>.</summary>
     private static HistoryTarget Chain(string kind, string key)

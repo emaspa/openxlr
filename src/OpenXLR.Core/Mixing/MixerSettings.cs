@@ -87,6 +87,12 @@ public sealed record MixerSettings
     /// <summary>"channel|mix" entries that are muted.</summary>
     public List<string> ChannelMuted { get; init; } = [];
 
+    /// <summary>
+    /// Channel ids whose sends are linked (<c>setLinkedSends</c>): every send
+    /// of the channel plays at one level. A channel absent here is not linked.
+    /// </summary>
+    public List<string> LinkedSends { get; init; } = [];
+
     /// <summary>Single monitor output from older files; superseded by MonitorOutputs.</summary>
     public string? MonitorOutput { get; init; }
 

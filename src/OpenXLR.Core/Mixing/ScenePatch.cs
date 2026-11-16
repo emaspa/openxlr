@@ -41,6 +41,8 @@ public enum SceneField
     Ducking,
     /// <summary>One insert chain, keyed by its chain key (a channel id or <c>mix:&lt;id&gt;</c>); an <see cref="InsertChain"/>.</summary>
     Inserts,
+    /// <summary>Whether a channel's sends are linked, keyed by channel id; a boolean.</summary>
+    LinkedSends,
 }
 
 /// <summary>
@@ -177,9 +179,12 @@ public sealed partial class Mixer
     /// Write a sparse patch under one hold of the mixer lock. Each entry is
     /// written only where the live value is still its expected value; one
     /// that already holds its target counts as done, and any other is left
-    /// alone. Volumes and levels go first, then the mutes that close, then
-    /// those that open, so unmuting a member of an exclusive group closes
-    /// its peers as a command would: the group never has two members heard.
+    /// alone. The links of channels go first, then volumes and levels, then
+    /// the mutes that close, then those that open, so unmuting a member of
+    /// an exclusive group closes its peers as a command would: the group
+    /// never has two members heard. A level on a channel that is linked
+    /// once the links are written goes to every send of the channel, as
+    /// <c>setLevel</c> would.
     /// Only the sends the patch touches are written to the audio server. A
     /// processing setting is written through its command's setter.
     /// The caller pushes the hardware paths, the state and the save.
@@ -207,6 +212,7 @@ public sealed partial class Mixer
             int Order(int i) => entries[i].Key.Field switch
             {
                 SceneField.ChannelMuted or SceneField.MixMuted => entries[i].Target is true ? 1 : 2,
+                SceneField.LinkedSends => -1,
                 _ => 0,
             };
             foreach (int i in writes.OrderBy(Order))
@@ -235,7 +241,7 @@ public sealed partial class Mixer
     private IEnumerable<SceneKey> KeysLocked(SceneField field) => field switch
     {
         SceneField.Level or SceneField.ChannelMuted => _cells.Select(cell => new SceneKey(field, cell)),
-        SceneField.ChannelVolume => _config.Channels.Select(c => new SceneKey(field, c.Id)),
+        SceneField.ChannelVolume or SceneField.LinkedSends => _config.Channels.Select(c => new SceneKey(field, c.Id)),
         SceneField.MixVolume or SceneField.MixMuted or SceneField.MixEq => _config.Mixes.Select(m => new SceneKey(field, m.Id)),
         SceneField.Eq => _config.Channels.Where(CarriesEq).Select(c => new SceneKey(field, c.Id)),
         SceneField.NoiseRemoval or SceneField.VoiceChanger or SceneField.Compressor or SceneField.Expander
@@ -254,6 +260,7 @@ public sealed partial class Mixer
         SceneField.Level => _cells.Contains(key.Key) ? _levels.GetValueOrDefault(key.Key, 0.0) : null,
         SceneField.ChannelMuted => _cells.Contains(key.Key) ? _muted.Contains(key.Key) : null,
         SceneField.ChannelVolume => HasChannelVolumeLocked(key.Key) ? ChannelVolumeLocked(key.Key) : null,
+        SceneField.LinkedSends => HasChannelVolumeLocked(key.Key) ? _linkedSends.Contains(key.Key) : null,
         SceneField.MixVolume => _config.Mixes.Any(m => m.Id == key.Key) && _mixVolume.TryGetValue(key.Key, out double volume) ? volume : null,
         SceneField.MixMuted => _config.Mixes.Any(m => m.Id == key.Key) ? _mixMuted.Contains(key.Key) : null,
         SceneField.Eq => CarriesEqLocked(key.Key) ? EqLocked(key.Key) : null,
@@ -284,8 +291,19 @@ public sealed partial class Mixer
         switch (key.Field)
         {
             case SceneField.Level:
-                _levels[key.Key] = Math.Clamp((double)value, 0, 1);
-                cells.Add(key.Key);
+            {
+                string channel = key.Key[..key.Key.IndexOf('|', StringComparison.Ordinal)];
+                if (_linkedSends.Contains(channel)) StoreLinkedLevelLocked(channel, (double)value, cells);
+                else
+                {
+                    _levels[key.Key] = Math.Clamp((double)value, 0, 1);
+                    cells.Add(key.Key);
+                }
+                break;
+            }
+            case SceneField.LinkedSends:
+                // The flag alone: the levels a step changed with it are entries of their own.
+                if (value is true) _linkedSends.Add(key.Key); else _linkedSends.Remove(key.Key);
                 break;
             case SceneField.ChannelVolume:
                 _channelVolume[key.Key] = Math.Clamp((double)value, 0, 1);

@@ -555,6 +555,7 @@ public sealed partial class WebSocketHub
             case "setLevel":
             case "setChannelMuted":
             case "setChannelVolume":
+            case "setLinkedSends":
             case "setCaptureGain":
             case "setCaptureMuted":
             case "setCaptureOwnClock":

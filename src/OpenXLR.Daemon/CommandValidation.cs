@@ -290,6 +290,12 @@ public static class CommandValidation
                 if (TooLong(cmd.Channel, 36) || !layout.HasChannel(cmd.Channel))
                     return $"setChannelVolume: unknown channel '{Short(cmd.Channel)}'";
                 return Finite(cmd, "value");
+            case "setLinkedSends":
+                if (cmd.Channel is null) return "setLinkedSends: need 'channel'";
+                if (TooLong(cmd.Channel, 36) || !layout.HasChannel(cmd.Channel))
+                    return $"setLinkedSends: unknown channel '{Short(cmd.Channel)}'";
+                return cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? null : "setLinkedSends: value must be a boolean";
             case "setCaptureGain":
                 if (cmd.Channel is null || TooLong(cmd.Channel, 36) || !layout.HasCaptureChannel(cmd.Channel))
                     return "setCaptureGain: need a capture input channel";

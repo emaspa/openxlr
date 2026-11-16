@@ -233,6 +233,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `levels` | `channel\|mix` to send level |
 | `channelVolumes` | channel id to its own volume, 0 to 1, the hardware inputs included; an absent channel is at 100% |
 | `channelMuted` | `channel\|mix` cells whose send is muted |
+| `linkedSends` | channel ids whose sends are linked, so every mix gets one level; see [api.md](api.md#linked-sends). A name that is not a channel of the layout is skipped, and a linked channel whose sends differ takes its first mix's level on load. `setLinkedSends` writes it. A profile carries it too |
 | `monitorOutputs` | the selected outputs, in order; the first one is what `@monitor` resolves to |
 | `monitorOutput` | the older single selection, read only when `monitorOutputs` is empty |
 | `monitorFeeds` | output to feed, see [Output feeds](#output-feeds) |

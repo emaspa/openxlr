@@ -1713,6 +1713,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 Levels = new Dictionary<string, double>(_levels),
                 ChannelVolumes = ExportChannelVolumesLocked(),
                 ChannelMuted = [.. _muted],
+                LinkedSends = ExportLinkedSendsLocked(),
                 MonitorOutputs = [.. _monitorOutputs],
                 MonitorMuted = _monitorMuted,
                 MonitorMuteMicrophones = _monitorMuteMicrophones,
@@ -1824,6 +1825,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             RestoreHardwareMixingLocked(s);
             // The maximizer amounts are the model's alone, read whether or not the mixer runs.
             RestoreMaximizersLocked(s.MixMaximizer);
+            // The links are the layout's, kept whether or not the mixer runs.
+            RestoreLinkedSendsLocked(s.LinkedSends);
             if (!_built) { SyncDuckingLocked(); return; }
             if (_config.RepairedMonitorMix is { } repaired)
             {
@@ -1849,6 +1852,8 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             RecallChannelVolumesLocked(s.ChannelVolumes, s.Levels.Keys);
             RecallMutes(_muted, _cells, s.Levels.Keys, s.ChannelMuted);
             NormalizeExclusiveGroupsLocked();
+            // A hand edit may hold a linked channel's sends apart.
+            AlignLinkedSendsLocked();
 
             foreach ((string identity, string channelId) in StreamMatcher.MigrateOverrides(s.AppOverrides))
                 Matcher.SetOverride(identity, _config.ResolveApplicationChannel(channelId));
@@ -2013,6 +2018,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 MixEq = SceneMixEqLocked(),
                 CaptureGains = SceneCaptureGainsLocked(),
                 CaptureOwnClock = SceneCaptureOwnClockLocked(),
+                LinkedSends = SceneLinkedSendsLocked(),
                 Ducking = DuckingSetupLocked().ToScene(),
             };
         }
@@ -2078,6 +2084,10 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // A profile carries mutes, not groups: one that opens two members
             // of a group closes that group.
             NormalizeExclusiveGroupsLocked();
+            // The links it names; a channel it leaves linked, or one a profile
+            // saved before the link left alone, gets its sends brought together.
+            RecallLinkedSendsLocked(s.LinkedSends);
+            AlignLinkedSendsLocked();
 
             ReapplyMixesLocked(_config.Mixes);
 
@@ -3358,13 +3368,21 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
-    /// <summary>Level of one channel in one mix (0..1).</summary>
+    /// <summary>
+    /// Level of one channel in one mix (0..1). On a channel whose sends are
+    /// linked the level goes to every send of the channel at once.
+    /// </summary>
     public void SetLevel(string channelId, string mixId, double level)
     {
         lock (_gate)
         {
             string cell = Cell(channelId, mixId);
             if (!_cells.Contains(cell)) return;
+            if (_linkedSends.Contains(channelId))
+            {
+                WriteLinkedLevelLocked(channelId, level);
+                return;
+            }
             _levels[cell] = Math.Clamp(level, 0.0, 1.0);
             ApplyCellLocked(channelId, mixId);
         }
@@ -3873,6 +3891,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     BindingWarning = BindingWarningLocked(c),
                     UnitInput = unitInputs.GetValueOrDefault(c.Id),
                     Volume = ChannelVolumeLocked(c.Id),
+                    LinkedSends = _linkedSends.Contains(c.Id),
                     CaptureGain = CaptureGainLocked(c, unitInputs),
                     OwnClock = c.CaptureSource is null ? null : CaptureClockStateLocked(c),
                     Eq = CarriesEq(c) ? EqStateLocked(c.Id, unitInputs) : null,
