@@ -5147,8 +5147,10 @@ seconds instead of stalling the daemon; the device is dropped and
 reconnected after 10 seconds, and the fault is recorded. The USB
 library runs in a small helper process of its own (the daemon binary
 started with `--usb-helper`), which is killed and started again on such
-a hang, so nothing stays stuck inside the daemon. After three hangs in
-one run the daemon stops driving that interface and says so under the
+a hang, so nothing stays stuck inside the daemon. A hang while a profile
+is recalled, or while the last settings are restored on connect, is handled
+the same way, and the restore is tried again once the interface is back.
+After three hangs in one run the daemon stops driving that interface and says so under the
 UI's header, while the submixer and any other interface keep
 working. Unplug the interface and plug it back in, or restart the
 daemon, to try again. A helper whose device could not be opened at all

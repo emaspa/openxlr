@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,31 +13,235 @@ namespace OpenXLR.Tests;
 [Collection("xdg-config")]
 public sealed class DeviceManagerHangTests
 {
-    /// <summary>A Wave XLR that hangs every read while <see cref="Hanging"/> is set.</summary>
+    /// <summary>
+    /// A Wave XLR that hangs every read while <see cref="Hanging"/> is set,
+    /// and the next <see cref="WriteHangs"/> writes of its gain or mute.
+    /// </summary>
     private sealed class FlakyDevice : IAudioDevice
     {
         public bool Hanging;
+        public int WriteHangs;
+        public bool Mute;
         public string? Note;
         public string? ConnectionNote => Note;
         public int Disposals;
         public void Dispose() => Disposals++;
         public int Connects, Hangs;
         public DeviceInfo Info { get; } = new("Elgato", "Wave XLR", 0x0fd9, 0x007d);
-        public DeviceCapabilities Capabilities { get; } = new() { Gain = true, Mute = true, HpVolume = true };
+        public DeviceCapabilities Capabilities { get; init; } = new() { Gain = true, Mute = true, HpVolume = true };
         public bool Connected { get; private set; }
         public void Connect() { Connects++; Connected = true; }
         public void Disconnect() => Connected = false;
+        /// <summary>The USB helper exited on its own: the transport is closed, nothing failed in a transfer.</summary>
+        public void HelperExits() => Connected = false;
         public DeviceState ReadState()
         {
-            if (!Hanging) return new DeviceState { GainDb = 40 };
+            if (!Hanging) return new DeviceState { GainDb = 40, Mute = Mute };
+            Hang();
+            return null!;
+        }
+        private void Hang()
+        {
             Hangs++;
             Connected = false;   // what a real transport does once the helper is killed
             throw new UsbHungException("USB control transfer did not return (test)");
         }
-        public void SetGainDb(int db) { } public void SetMute(bool on) { } public void SetLowCut(bool on) { }
+        private void Write(Action write)
+        {
+            if (WriteHangs > 0) { WriteHangs--; Hang(); }
+            write();
+        }
+        public void SetGainDb(int db) => Write(() => { });
+        public void SetMute(bool on) => Write(() => Mute = on);
+        public void SetLowCut(bool on) { }
         public void SetExpander(bool on) { } public void SetVoiceTune(bool on) { } public void SetVoiceTuneStrength(int v) { }
         public void SetHpVolumeDb(double db) { } public void SetLowImpedance(bool on) { } public void SetCrossfade(int v) { }
         public void SetPhantom(bool on) { } public void SetClipGuard(bool on) { } public void SetCompressor(bool on) { }
+    }
+
+    private static int HungCount(DeviceManager manager, IAudioDevice device)
+        => ((HungTransferPolicy)typeof(DeviceManager).GetField("_hung", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(manager)!).HungCount(device.Info.InstanceId);
+
+    private static void SetField(DeviceManager manager, string name, object? value)
+        => typeof(DeviceManager).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(manager, value);
+
+    private static void WithConfigDir(Action body)
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-hang-" + Guid.NewGuid().ToString("N"));
+        string? prev = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+        TimeSpan prevDelay = DeviceManager.HungReconnectDelay;
+        try { body(); }
+        finally
+        {
+            DeviceManager.HungReconnectDelay = prevDelay;
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", prev);
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void AHangDuringAProfileRecallBacksOffAndCountsTowardTheSetAside()
+    {
+        WithConfigDir(() =>
+        {
+            DeviceManager.HungReconnectDelay = TimeSpan.FromMilliseconds(200);
+            var device = new FlakyDevice();
+            var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [device]);
+            manager.SweepOnce();
+            Assert.True(manager.Snapshot().Connected);
+
+            for (int hang = 1; hang <= HungTransferPolicy.Limit; hang++)
+            {
+                device.WriteHangs = 1;
+                string? error = manager.ApplyProfile(new DeviceState { GainDb = 40, Mute = true }, restoring: true);
+                Assert.Contains("did not return", error);
+                Assert.Equal(hang, HungCount(manager, device));
+                // Dropped and disposed, as after a hang in the poll.
+                Assert.False(manager.Snapshot().Connected);
+                Assert.Equal(hang, device.Disposals);
+
+                int connects = device.Connects;
+                manager.SweepOnce();
+                Assert.Equal(connects, device.Connects);   // the hang backoff holds the reopen
+                Thread.Sleep(DeviceManager.HungReconnectDelay + TimeSpan.FromMilliseconds(100));
+                manager.SweepOnce();
+                Assert.Equal(hang < HungTransferPolicy.Limit ? connects + 1 : connects, device.Connects);
+            }
+            Assert.Contains("no longer driven", manager.Warning);
+            Assert.False(manager.Snapshot().Connected);
+        });
+    }
+
+    [Fact]
+    public void AHangDuringARestoreIsCountedAndTheRestoreIsTriedAgainAfterTheReconnect()
+    {
+        WithConfigDir(() =>
+        {
+            DeviceManager.HungReconnectDelay = TimeSpan.Zero;
+            DeviceStateStore.SaveLast("0fd9:007d", new DeviceState { GainDb = 40, Mute = true });
+            var device = new FlakyDevice { Capabilities = new() { Gain = true, Mute = true, HpVolume = true, RetainsSettings = false } };
+            var time = new ManualTime();
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [device], time: time);
+            manager.SweepOnce();
+
+            device.WriteHangs = 1;
+            Assert.Null(manager.RestoreLastState());
+            Assert.Equal(1, HungCount(manager, device));
+            Assert.False(manager.Snapshot().Connected);
+            Assert.Equal(1, device.Disposals);
+            Assert.True(manager.RestoreRetrying);
+
+            manager.SweepOnce();                        // reopened, the same unit
+            Assert.True(manager.Snapshot().Connected);
+            Assert.False(device.Mute);
+            time.Advance(DeviceManager.RestoreRetryDelay);
+            manager.SweepOnce();                        // the restore's next attempt
+            Assert.True(device.Mute);
+            Assert.False(manager.RestoreRetrying);
+            Assert.True(manager.Snapshot().State!.Mute);
+            manager.SuspendSession();
+        });
+    }
+
+    [Fact]
+    public void AHangReadingAUnitThatStayedPluggedInIsCountedAndTheRestoreWaits()
+    {
+        WithConfigDir(() =>
+        {
+            DeviceManager.HungReconnectDelay = TimeSpan.Zero;
+            DeviceStateStore.SaveLast("0fd9:007d", new DeviceState { GainDb = 40, Mute = true });
+            var device = new FlakyDevice { Capabilities = new() { Gain = true, Mute = true, HpVolume = true, RetainsSettings = false } };
+            var time = new ManualTime();
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [device], time: time);
+            manager.SweepOnce();
+            // The arrival of a unit that stayed on the bus, with no read of
+            // it yet: the restore reads what it holds first.
+            SetField(manager, "_unwatchedArrival", true);
+            SetField(manager, "_last", null);
+            device.Hanging = true;
+
+            Assert.Null(manager.RestoreLastState());
+            Assert.Equal(1, HungCount(manager, device));
+            Assert.False(manager.Snapshot().Connected);
+            Assert.True(manager.RestoreRetrying);
+
+            device.Hanging = false;
+            manager.SweepOnce();
+            time.Advance(DeviceManager.RestoreRetryDelay);
+            manager.SweepOnce();
+            Assert.True(device.Mute);
+            Assert.False(manager.RestoreRetrying);
+            manager.SuspendSession();
+        });
+    }
+
+    [Fact]
+    public void AHangReadingTheUnitForAResetIsCounted()
+    {
+        WithConfigDir(() =>
+        {
+            var device = new FlakyDevice();
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [device]);
+            manager.SweepOnce();
+            SetField(manager, "_last", null);
+            device.Hanging = true;
+
+            Assert.Contains("did not return", manager.ResetToDefaults());
+            Assert.Equal(1, HungCount(manager, device));
+            Assert.False(manager.Snapshot().Connected);
+            Assert.Equal(1, device.Disposals);
+        });
+    }
+
+    [Fact]
+    public void AHangInAnUndoStepWritesNothingMoreToTheDroppedUnit()
+    {
+        WithConfigDir(() =>
+        {
+            var device = new FlakyDevice { WriteHangs = 1 };
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [device]);
+            manager.SweepOnce();
+
+            IReadOnlyList<DevicePatchOutcome> outcomes = manager.ApplyPatch(device.Info.InstanceId,
+            [
+                new DevicePatchEntry(ControlNames.Gain, 40, 45),
+                new DevicePatchEntry(ControlNames.HpVolumeDb, 0.0, -10.0),
+            ]);
+            Assert.Equal([DevicePatchOutcome.Failed, DevicePatchOutcome.Gone], outcomes);
+            Assert.Equal(1, HungCount(manager, device));
+            Assert.False(manager.Snapshot().Connected);
+        });
+    }
+
+    [Fact]
+    public void ADeviceWhoseHelperExitedIsDisposedBeforeAnotherIsDriven()
+    {
+        WithConfigDir(() =>
+        {
+            var first = new FlakyDevice();
+            var second = new FlakyDevice();
+            var attached = new List<IAudioDevice> { first };
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance, new ConfigurationBuilder().Build(), () => [.. attached]);
+            manager.SweepOnce();
+            Assert.True(manager.Snapshot().Connected);
+
+            first.HelperExits();
+            attached[0] = second;
+            manager.SweepOnce();
+            Assert.Equal(1, first.Disposals);
+            Assert.Equal(0, HungCount(manager, first));   // not a hang
+            Assert.Equal(1, second.Connects);
+            Assert.True(manager.Snapshot().Connected);
+
+            // With nothing else attached, the closed device is still released.
+            second.HelperExits();
+            attached.Clear();
+            manager.SweepOnce();
+            Assert.Equal(1, second.Disposals);
+            Assert.False(manager.Snapshot().Connected);
+        });
     }
 
     /// <summary>A device that opens and then answers every read badly.</summary>
