@@ -42,6 +42,7 @@ internal static class SavedMixerValidation
             Levels = Levels(settings.Levels, "levels", notes),
             ChannelVolumes = Levels(settings.ChannelVolumes, "channelVolumes", notes),
             ChannelMuted = Entries(settings.ChannelMuted, "channelMuted", notes),
+            LinkedSends = Entries(settings.LinkedSends, "linkedSends", notes),
             MonitorOutputs = Entries(settings.MonitorOutputs, "monitorOutputs", notes),
             MonitorOutputMutes = MonitorOutputMutes(settings, notes),
             OutputVolumeLock = OutputLock(settings.OutputVolumeLock, notes),

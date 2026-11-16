@@ -698,6 +698,7 @@ public sealed class WindowLayoutTests
                 SkinLayoutWindowTests.Check();
                 MixerViewWindowTests.Check();
                 ChannelTileAlignmentWindowTests.Check();
+                LinkedSendsWindowTests.Check();
                 MixerPopOutWindowTests.Check(main);
                 // The arrange check opens its own window, with a real pointer
                 // on it; nothing else may sit in front.

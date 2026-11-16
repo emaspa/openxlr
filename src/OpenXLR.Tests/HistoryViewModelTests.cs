@@ -34,6 +34,7 @@ public sealed class HistoryViewModelTests
         Assert.Equal(Localizer.Format("HistorySendMute", "Music", "Stream"), model.Name(Step("sendMute", "music", "stream")));
         Assert.Equal(Localizer.Format("HistoryMixMute", "Monitor A"), model.Name(Step("mixMute", mix: "monitor")));
         Assert.Equal(Localizer.Format("HistoryExclusiveGroup", "Sources"), model.Name(Step("exclusiveGroup", group: "sources")));
+        Assert.Equal(Localizer.Format("HistoryLinkedSends", "Music"), model.Name(Step("linkedSends", "music")));
         // The processing kinds.
         Assert.Equal(Localizer.Format("HistoryEq", "XLR 1"), model.Name(Step("eq", "xlr1")));
         Assert.Equal(Localizer.Format("HistoryMixEq", "Stream"), model.Name(Step("mixEq", mix: "stream")));

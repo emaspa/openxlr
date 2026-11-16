@@ -2426,6 +2426,18 @@ Select the interface OpenXLR drives</value>
   <data name="HistoryExclusiveGroup" xml:space="preserve">
     <value>{0} switch</value>
   </data>
+  <data name="LinkSends" xml:space="preserve">
+    <value>Link</value>
+  </data>
+  <data name="LinkSendsName" xml:space="preserve">
+    <value>Link the sends of {0}</value>
+  </data>
+  <data name="HistoryLinkedSends" xml:space="preserve">
+    <value>{0} linked sends</value>
+  </data>
+  <data name="LinkSendsTip" xml:space="preserve">
+    <value>Link this channel's sends: every mix gets the same level, and moving one send moves them all. Linking takes the level of the first mix. Mutes stay per mix.</value>
+  </data>
   <data name="HistoryEq" xml:space="preserve">
     <value>{0} EQ</value>
   </data>

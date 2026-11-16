@@ -369,6 +369,12 @@ public sealed partial record ChannelStatus(string Id, string Name,
     public double? Volume { get; init; }
 
     /// <summary>
+    /// Every send of the channel plays at one level (<c>setLinkedSends</c>):
+    /// a level written to one send goes to all of them. Mutes stay per mix.
+    /// </summary>
+    public bool LinkedSends { get; init; }
+
+    /// <summary>
     /// A capture input's gain, its source's volume, and the source's own
     /// mute, on a source OpenXLR does not drive; null on every other channel,
     /// on a capture input that takes a Wave unit's input, and while the

@@ -2364,6 +2364,18 @@ Selecciona la interfaz que controla OpenXLR</value>
   <data name="HistoryExclusiveGroup" xml:space="preserve">
     <value>cambio en {0}</value>
   </data>
+  <data name="LinkSends" xml:space="preserve">
+    <value>Vincular</value>
+  </data>
+  <data name="LinkSendsName" xml:space="preserve">
+    <value>Vincular los envíos de {0}</value>
+  </data>
+  <data name="HistoryLinkedSends" xml:space="preserve">
+    <value>envíos vinculados de {0}</value>
+  </data>
+  <data name="LinkSendsTip" xml:space="preserve">
+    <value>Vincula los envíos de este canal: cada mezcla recibe el mismo nivel, y mover un envío los mueve todos. Al vincular se toma el nivel de la primera mezcla. El silencio sigue siendo de cada mezcla.</value>
+  </data>
   <data name="HistoryEq" xml:space="preserve">
     <value>EQ de {0}</value>
   </data>

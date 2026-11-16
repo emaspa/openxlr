@@ -2395,7 +2395,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
     public ChannelViewModel(DaemonClient client, string id, string name, IReadOnlyList<string> mixIds)
     {
         _client = client; Id = id; _name = name;
-        foreach (string mixId in mixIds) Sends.Add(new SendViewModel(client, id, mixId));
+        foreach (string mixId in mixIds) Sends.Add(new SendViewModel(client, id, mixId) { Owner = this });
     }
 
     private readonly DaemonClient _client;
@@ -2414,6 +2414,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
             Raise(nameof(CaptureMuteName));
             RefreshCaptureReadout();
             if (_showsVolumeReadout) Raise(nameof(ReadoutName));
+            Raise(nameof(LinkedSendsName));
             if (_eq is not null) _eq.ChannelName = value;
             if (_noise is not null) _noise.ChannelName = value;
             if (_dynamics is not null) _dynamics.ChannelName = value;
@@ -2688,6 +2689,50 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
         }
     }
     public string VolumeText => $"{_volume * 100:0}%";
+
+    private bool _hasLinkedSends;
+    /// <summary>The daemon reports the link for this channel; an older daemon does not, and no chip is drawn.</summary>
+    public bool HasLinkedSends { get => _hasLinkedSends; private set => Set(ref _hasLinkedSends, value); }
+
+    private bool _linkedSends;
+    private bool _applyingLink;
+    /// <summary>
+    /// Every send of the channel plays at one level. Switching it sends
+    /// setLinkedSends at once; the next state confirms it, or puts it back
+    /// when the daemon refuses. While it is on, moving one send moves the
+    /// others here too, ahead of the daemon's state.
+    /// </summary>
+    public bool LinkedSends
+    {
+        get => _linkedSends;
+        set
+        {
+            if (!Set(ref _linkedSends, value) || _applyingLink || _detached || !_hasLinkedSends) return;
+            _ = _client.SetLinkedSendsAsync(Id, value);
+        }
+    }
+
+    /// <summary>The link chip's name for a screen reader.</summary>
+    public string LinkedSendsName => Localizer.Format("LinkSendsName", Name);
+
+    /// <summary>A send of this channel moved: on a linked channel the other sends show the same level.</summary>
+    internal void MirrorLinkedLevel(SendViewModel moved, double level)
+    {
+        if (!_linkedSends) return;
+        foreach (SendViewModel send in Sends)
+            if (!ReferenceEquals(send, moved)) send.ShowLinkedLevel(level);
+    }
+
+    private void ApplyLinkedSends(JsonNode? linked)
+    {
+        _applyingLink = true;
+        try
+        {
+            HasLinkedSends = linked is JsonValue;
+            LinkedSends = linked is JsonValue value && value.TryGetValue(out bool on) && on;
+        }
+        finally { _applyingLink = false; }
+    }
 
     // --- the gain readout of a strip that has one ---
 
@@ -2986,7 +3031,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
             if (position >= Sends.Count || Sends[position].MixId != mixId)
             {
                 SendViewModel? existing = Sends.FirstOrDefault(s => s.MixId == mixId);
-                if (existing is null) Sends.Insert(position, new SendViewModel(_client, Id, mixId));
+                if (existing is null) Sends.Insert(position, new SendViewModel(_client, Id, mixId) { Owner = this });
                 else Sends.Move(Sends.IndexOf(existing), position);
             }
             position++;
@@ -3035,6 +3080,7 @@ public sealed class ChannelViewModel : ViewModelBase, IHasId
                 : CaptureConnected ? Localizer.Format("CaptureConnectedPair", capturePair) : Localizer.Format("CaptureOfflinePair", capturePair);
         ApplyCaptureGain(n["captureGain"]);
         ApplyOwnClock(n["ownClock"]);
+        ApplyLinkedSends(n["linkedSends"]);
         double? volume = n["volume"]?.GetValue<double>();
         HasVolume = volume is not null;
         _applyingVolume = true;
@@ -3083,6 +3129,9 @@ public sealed class SendViewModel : ViewModelBase
     /// <summary>The channel whose send this is.</summary>
     internal string ChannelId => _channelId;
 
+    /// <summary>The channel that holds this send, which mirrors a move to its other sends while they are linked.</summary>
+    internal ChannelViewModel? Owner { get; init; }
+
     private string _mixName;
     /// <summary>The mix's display name for the row header (the id until the mixes are known).</summary>
     public string MixName { get => _mixName; set => Set(ref _mixName, value); }
@@ -3121,9 +3170,24 @@ public sealed class SendViewModel : ViewModelBase
                 string key = $"lvl:{_channelId}:{MixId}";
                 SliderSync.Touch(key);
                 SliderSync.SendInOrder(key, () => _ = _client.SetLevelAsync(_channelId, MixId, v));
+                Owner?.MirrorLinkedLevel(this, v);
             }
             Raise(nameof(LevelText));
         }
+    }
+
+    /// <summary>
+    /// Show the level another send of a linked channel moved to. The daemon
+    /// writes it to this send too, so nothing is sent; the key counts as
+    /// touched, so an older echo does not pull the fader back meanwhile.
+    /// </summary>
+    internal void ShowLinkedLevel(double level)
+    {
+        if (_detached) return;
+        SliderSync.Touch($"lvl:{_channelId}:{MixId}");
+        _applying = true;
+        try { Level = level; }
+        finally { _applying = false; }
     }
     public string LevelText => $"{_level * 100:0}";
 

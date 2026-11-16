@@ -2380,6 +2380,18 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="HistoryExclusiveGroup" xml:space="preserve">
     <value>scambio in {0}</value>
   </data>
+  <data name="LinkSends" xml:space="preserve">
+    <value>Collega</value>
+  </data>
+  <data name="LinkSendsName" xml:space="preserve">
+    <value>Collega le mandate di {0}</value>
+  </data>
+  <data name="HistoryLinkedSends" xml:space="preserve">
+    <value>mandate collegate di {0}</value>
+  </data>
+  <data name="LinkSendsTip" xml:space="preserve">
+    <value>Collega le mandate di questo canale: ogni mix riceve lo stesso livello, e muovere una mandata le muove tutte. Il collegamento prende il livello del primo mix. Il muto resta per ogni mix.</value>
+  </data>
   <data name="HistoryEq" xml:space="preserve">
     <value>EQ di {0}</value>
   </data>

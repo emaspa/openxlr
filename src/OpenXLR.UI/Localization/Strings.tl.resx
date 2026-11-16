@@ -2322,6 +2322,18 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
   <data name="HistoryExclusiveGroup" xml:space="preserve">
     <value>pagpapalit sa {0}</value>
   </data>
+  <data name="LinkSends" xml:space="preserve">
+    <value>I-link</value>
+  </data>
+  <data name="LinkSendsName" xml:space="preserve">
+    <value>I-link ang mga send ng {0}</value>
+  </data>
+  <data name="HistoryLinkedSends" xml:space="preserve">
+    <value>naka-link na mga send ng {0}</value>
+  </data>
+  <data name="LinkSendsTip" xml:space="preserve">
+    <value>I-link ang mga send ng channel na ito: pareho ang level sa bawat mix, at kapag ginalaw mo ang isang send, gagalaw silang lahat. Kinukuha ng pag-link ang level ng unang mix. Hiwalay pa rin ang mute ng bawat mix.</value>
+  </data>
   <data name="HistoryEq" xml:space="preserve">
     <value>EQ ng {0}</value>
   </data>

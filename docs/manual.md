@@ -262,6 +262,28 @@ application and capture channels a volume and the hardware inputs none,
 the hardware inputs leave an empty space where the Volume row would be, so
 each send row sits at the same height in every tile.
 
+<a name="linked-sends"></a>
+**Linked sends.** To keep a channel at the same level in every mix, click
+the **Link** chip at the start of its sends. In the SUBMIXER tiles it sits
+after the Volume fader, above the first send; in a mix matrix it sits after
+the volume fader in the row head, before the row's first cell; in mix banks
+it sits over or beside each send's mute. The chip lights up and every send
+of the channel takes the level of its first mix. From then on, moving any
+of the channel's sends moves all of them, on a Deck dial, in the terminal
+mixer or over the API too, and one undo puts all of them back. The mutes
+stay per mix, so you can still keep a linked channel out of one mix, and
+the channel's Volume works as before. Click the chip again to unlink. No
+level changes, and each send moves on its own again.
+
+Every mix counts, the Aux mix and hidden mixes included, and the first mix
+is the first in the layout's order even when it is hidden. A mix you add
+while a channel is linked starts that channel's send at the linked level,
+muted like every new send. On a Wave XLR Pro in [hardware
+mixing](#hardware-mixing) the unit follows every linked send. The link is
+saved with the mixer and in profiles; a profile saved before linked sends
+leaves the links as they are, and a recalled profile that holds a linked
+channel's sends apart brings them to its first mix's level.
+
 <a name="gain-readout"></a>
 Aux In, Line In and a capture input with a [gain](#capture-gain) each have
 a readout that shows the input's level or gain in dB: on the USB Aux in
@@ -444,7 +466,9 @@ instead.
 
 Undo covers these changes for now:
 
-- a send level, a channel volume and a mix volume;
+- a send level, a channel volume, a mix volume and a channel's
+  [link](#linked-sends); a fader on a linked channel is one step for all the
+  sends it moved, and undoing the link puts back the levels it changed;
 - a send mute and a mix mute, including the sends an exclusive group closed
   when you opened another member, which come back with the undo;
 - the interface's own controls when you set them in OpenXLR: the gain, the
