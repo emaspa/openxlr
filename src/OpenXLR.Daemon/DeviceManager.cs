@@ -1022,7 +1022,7 @@ public sealed partial class DeviceManager : BackgroundService
             try { last = DeviceStateStore.LoadLast(id); }
             catch (Exception ex) { last = null; _log.LogWarning("loading last settings of {dev}: {msg}", id, ex.Message); }
             if (last is null) { _restorePending = false; return null; }
-            return RestoreAttemptLocked(new PendingRestore(id, last, 1, 0, _unwatchedArrival));
+            return RestoreAttemptLocked(new PendingRestore(id, _device.Info.DisplayName, last, 1, 0, _unwatchedArrival));
         }
     }
 
@@ -1059,7 +1059,9 @@ public sealed partial class DeviceManager : BackgroundService
     /// <paramref name="KeepUnwatched"/> while what the unit holds has still to
     /// be read for <see cref="KeepUnwatchedChangesLocked"/>.
     /// </summary>
-    private sealed record PendingRestore(string Id, DeviceState Saved, int Attempt, long DueAt, bool KeepUnwatched = false);
+    // Id is where the settings are stored, an instance id for an additional
+    // interface; Name is the model, which is all the timeline may show.
+    private sealed record PendingRestore(string Id, string Name, DeviceState Saved, int Attempt, long DueAt, bool KeepUnwatched = false);
     private PendingRestore? _restoreRetry;
 
     /// <summary>Whether a restore on connect failed partway and is still being tried again. Read under the device lock.</summary>
@@ -1111,7 +1113,7 @@ public sealed partial class DeviceManager : BackgroundService
         _restorePending = false;
         _log.LogWarning("restoring the last settings of {dev} failed {limit} times and is given up: {err}",
             restore.Id, RestoreAttempts, err);
-        Timeline.Record(TimelineKind.Device, $"restoring the last settings of {restore.Id} was given up after {RestoreAttempts} attempts: {err}");
+        Timeline.Record(TimelineKind.Device, $"restoring the last settings of {restore.Name} was given up after {RestoreAttempts} attempts: {err}");
         return null;
     }
 
