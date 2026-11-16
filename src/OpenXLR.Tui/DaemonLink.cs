@@ -73,6 +73,17 @@ internal sealed class DaemonLink : IAsyncDisposable
     /// <summary>True between a successful authentication and the socket closing.</summary>
     public bool Connected { get; private set; }
 
+    /// <summary>The sentence for a change asked for while no daemon is connected.</summary>
+    public const string NotConnected = "Not sent: the daemon is not connected";
+
+    private long _unsent;
+
+    /// <summary>
+    /// Counts the commands asked for while no daemon was connected, which
+    /// went nowhere. The frame compares it around a key to say so.
+    /// </summary>
+    internal long Unsent => Interlocked.Read(ref _unsent);
+
     /// <summary>Changes when a connection ends, even if it reconnects before the next frame.</summary>
     internal long SessionRevision => Interlocked.Read(ref _sessionRevision);
 
@@ -253,9 +264,17 @@ internal sealed class DaemonLink : IAsyncDisposable
                 ? trace.History(_clock.Elapsed.TotalSeconds) : new double[MeterTrace.Samples];
     }
 
-    /// <summary>Sends one command object, as the API names them.</summary>
+    /// <summary>
+    /// Sends one command object, as the API names them. Without a daemon it
+    /// goes nowhere and is counted in <see cref="Unsent"/> instead.
+    /// </summary>
     public void Send(string command, Action<JsonObject>? fill = null)
     {
+        if (!Connected)
+        {
+            Interlocked.Increment(ref _unsent);
+            return;
+        }
         JsonObject body = new() { ["cmd"] = command };
         fill?.Invoke(body);
         string json = body.ToJsonString();
@@ -287,13 +306,15 @@ internal sealed class DaemonLink : IAsyncDisposable
         }
     }
 
-    private void UpdateChains(Snapshot snapshot)
+    private static (string Channel, string Id, string Kind, string Plugin)[] Chains(Snapshot snapshot) =>
+        snapshot.Mixer.Inserts.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .SelectMany(pair => pair.Value.Select(entry =>
+                (pair.Key, entry.Insert.Id, entry.Insert.Kind, entry.Insert.Plugin))).ToArray();
+
+    private void UpdateChains((string Channel, string Id, string Kind, string Plugin)[] chains)
     {
         lock (_pluginGate)
         {
-            var chains = snapshot.Mixer.Inserts.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .SelectMany(pair => pair.Value.Select(entry =>
-                    (pair.Key, entry.Insert.Id, entry.Insert.Kind, entry.Insert.Plugin))).ToArray();
             if (_chains.SequenceEqual(chains))
             {
                 if (_pluginsWanted) EnsurePlugins();
@@ -310,6 +331,12 @@ internal sealed class DaemonLink : IAsyncDisposable
     /// <param name="timeout">How long the daemon has to answer; 20 seconds unless the command takes longer.</param>
     public Task<string?> Request(string command, Action<JsonObject> fill, TimeSpan? timeout = null)
     {
+        // No daemon will answer, so the caller hears so now rather than after the timeout.
+        if (!Connected)
+        {
+            Interlocked.Increment(ref _unsent);
+            return Task.FromResult<string?>(NotConnected);
+        }
         string id = Guid.NewGuid().ToString("N");
         TaskCompletionSource<string?> result = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _requests[id] = result;
@@ -349,42 +376,57 @@ internal sealed class DaemonLink : IAsyncDisposable
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// Connects, reads until the session ends, and connects again, until the
+    /// link is disposed. Every failure of a session is caught, whatever its
+    /// type, so the loop never ends while the terminal runs, and
+    /// <see cref="Connected"/> is false whenever it does end.
+    /// </summary>
     private async Task PumpAsync()
     {
         int backoffSeconds = 1;
-        while (!_stopping.IsCancellationRequested)
+        try
         {
-            try
+            while (!_stopping.IsCancellationRequested)
             {
-                await SessionAsync().ConfigureAwait(false);
-                backoffSeconds = 1;
-            }
-            catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { return; }
-            catch (Exception error) when (error is WebSocketException or IOException or HttpRequestException or OperationCanceledException)
-            {
-                Status = "daemon not reachable";
-                // A failed connect, not a dropped session: say why if a reason is known.
-                if (!Connected && _probe is not null)
+                try
                 {
-                    DaemonPresence presence;
-                    try { presence = await _probe(_stopping.Token).ConfigureAwait(false); }
-                    catch (OperationCanceledException) { return; }
-                    catch (Exception probeError) when (probeError is IOException or System.Net.Sockets.SocketException) { presence = DaemonPresence.Reachable; }
-                    (Status, Notice) = presence switch
-                    {
-                        DaemonPresence.OlderDaemon => ("restart the daemon", DaemonProbe.Describe(presence)),
-                        DaemonPresence.OtherUser => ("socket refused", DaemonProbe.Describe(presence)),
-                        DaemonPresence.NotRunning => ("daemon not running", null),
-                        _ => ("daemon not reachable", null),
-                    };
+                    await SessionAsync().ConfigureAwait(false);
+                    backoffSeconds = 1;
                 }
-            }
+                catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { return; }
+                catch (Exception error)
+                {
+                    bool expected = error is WebSocketException or IOException or HttpRequestException or OperationCanceledException;
+                    Status = expected ? "daemon not reachable" : "connection failed";
+                    // A failed connect, not a dropped session: say why if a reason is known.
+                    if (!Connected && _probe is not null)
+                    {
+                        DaemonPresence presence;
+                        try { presence = await _probe(_stopping.Token).ConfigureAwait(false); }
+                        catch (OperationCanceledException) when (_stopping.IsCancellationRequested) { return; }
+                        catch (Exception) { presence = DaemonPresence.Reachable; }
+                        (Status, Notice) = presence switch
+                        {
+                            DaemonPresence.OlderDaemon => ("restart the daemon", DaemonProbe.Describe(presence)),
+                            DaemonPresence.OtherUser => ("socket refused", DaemonProbe.Describe(presence)),
+                            DaemonPresence.NotRunning => ("daemon not running", null),
+                            _ => (Status, null),
+                        };
+                    }
+                }
 
-            EndSession();
-            if (_stopping.IsCancellationRequested) return;
-            try { await Task.Delay(TimeSpan.FromSeconds(backoffSeconds), _stopping.Token).ConfigureAwait(false); }
-            catch (OperationCanceledException) { return; }
-            backoffSeconds = Math.Min(backoffSeconds * 2, 10);
+                EndSession();
+                if (_stopping.IsCancellationRequested) return;
+                try { await Task.Delay(TimeSpan.FromSeconds(backoffSeconds), _stopping.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { return; }
+                backoffSeconds = Math.Min(backoffSeconds * 2, 10);
+            }
+        }
+        finally
+        {
+            Connected = false;
+            if (_stopping.IsCancellationRequested) Status = "closed";
         }
     }
 
@@ -394,6 +436,8 @@ internal sealed class DaemonLink : IAsyncDisposable
         Interlocked.Increment(ref _sessionRevision);
         _channelRevisions.Clear();
         Connected = false;
+        // A session that ended with no reason given must not stay "connected" on the header.
+        if (Status is "connected" or "no interface") Status = "disconnected";
         foreach (var request in _requests.Values) request.TrySetResult("Disconnected from the daemon");
         lock (_pluginGate)
         {
@@ -402,7 +446,14 @@ internal sealed class DaemonLink : IAsyncDisposable
             Plugins = new Dictionary<(string, string), PluginEntry>();
             Choices = [];
         }
-        Changed?.Invoke();
+        Raise();
+    }
+
+    /// <summary>Tell the listeners something changed; a listener that throws cannot end the pump.</summary>
+    private void Raise()
+    {
+        try { Changed?.Invoke(); }
+        catch (Exception error) when (error is not OperationCanceledException) { }
     }
 
     private async Task SessionAsync()
@@ -448,6 +499,11 @@ internal sealed class DaemonLink : IAsyncDisposable
     /// <summary>Feeds one message in as if it had arrived, which is how the tests drive this.</summary>
     internal void Receive(string json) => Handle(json);
 
+    /// <summary>
+    /// One message from the daemon. A message this version cannot read, such
+    /// as one from a daemon of another version whose fields changed shape,
+    /// is skipped with a line at the bottom, and the link reads the next one.
+    /// </summary>
     private void Handle(string json)
     {
         string? type;
@@ -460,53 +516,50 @@ internal sealed class DaemonLink : IAsyncDisposable
         }
         catch (JsonException) { return; }
 
+        try { Dispatch(type, json); }
+        catch (Exception) { Skipped(type); }
+    }
+
+    private void Skipped(string? type)
+    {
+        LastError = $"Skipped a {type} message from the daemon that this version cannot read";
+        Raise();
+    }
+
+    private void Dispatch(string? type, string json)
+    {
         switch (type)
         {
             case "state":
-                if (Snapshot.Parse(json) is { } snapshot)
+                if (Snapshot.Parse(json) is not { } snapshot)
                 {
-                    // A mix's EQ is kept beside the channels' under "mix:" and its id.
-                    var eqs = snapshot.Mixer.Channels.Select(c => (Key: c.Id, c.Eq))
-                        .Concat(snapshot.Mixer.Mixes.Select(m => (Key: "mix:" + m.Id, m.Eq))).ToList();
-                    var channels = eqs.Select(e => e.Key).ToHashSet(StringComparer.Ordinal);
-                    foreach (string removed in _channelRevisions.Keys)
-                        if (!channels.Contains(removed)) _channelRevisions.TryRemove(removed, out _);
-                    foreach ((string key, EqEntry? eq) in eqs)
-                    {
-                        int bands = eq?.Bands?.Count ?? 0;
-                        _channelRevisions.AddOrUpdate(key,
-                            _ => (Interlocked.Increment(ref _nextChannelRevision), bands),
-                            (_, prior) => prior.Bands == bands ? prior : (Interlocked.Increment(ref _nextChannelRevision), bands));
-                    }
-                    Connected = true;
-                    State = snapshot;
-                    UpdateChains(snapshot);
-                    Status = snapshot.Connected ? "connected" : "no interface";
-                    Changed?.Invoke();
+                    Skipped(type);
+                    break;
                 }
+                ApplyState(snapshot);
                 break;
 
             case "meters":
                 ReadMeters(json);
-                Changed?.Invoke();
+                Raise();
                 break;
 
             case "error":
                 LastError = Message(json);
-                Changed?.Invoke();
+                Raise();
                 break;
 
             case "commandResult":
                 if (Message(json, "requestId") is { } id && _requests.TryRemove(id, out var request))
                 {
                     request.TrySetResult(Message(json, "error"));
-                    Changed?.Invoke();
+                    Raise();
                     break;
                 }
                 if (Message(json, "error") is { Length: > 0 } failure)
                 {
                     LastError = failure;
-                    Changed?.Invoke();
+                    Raise();
                 }
                 break;
 
@@ -523,7 +576,7 @@ internal sealed class DaemonLink : IAsyncDisposable
                     }
                     catch (JsonException) { LastError = "Could not read the plugin controls"; }
                 }
-                Changed?.Invoke();
+                Raise();
                 break;
 
             case "clipImport":
@@ -542,14 +595,41 @@ internal sealed class DaemonLink : IAsyncDisposable
                 catch (JsonException) { LastError = "Could not read the hardware mixing check"; }
                 // The answer is here; the commandResult that follows only closes the request.
                 CheckingMixing = false;
-                Changed?.Invoke();
+                Raise();
                 break;
 
             case "nativeEditorRulesChanged":
                 RefreshPlugins();
-                Changed?.Invoke();
+                Raise();
                 break;
         }
+    }
+
+    /// <summary>
+    /// Take a new state. Everything that reads into it comes first, so a state
+    /// that fails to read changes nothing and the last one stays.
+    /// </summary>
+    private void ApplyState(Snapshot snapshot)
+    {
+        // A mix's EQ is kept beside the channels' under "mix:" and its id.
+        var eqs = snapshot.Mixer.Channels.Select(c => (Key: c.Id, c.Eq))
+            .Concat(snapshot.Mixer.Mixes.Select(m => (Key: "mix:" + m.Id, m.Eq))).ToList();
+        var channels = eqs.Select(e => e.Key).ToHashSet(StringComparer.Ordinal);
+        var chains = Chains(snapshot);
+        foreach (string removed in _channelRevisions.Keys)
+            if (!channels.Contains(removed)) _channelRevisions.TryRemove(removed, out _);
+        foreach ((string key, EqEntry? eq) in eqs)
+        {
+            int bands = eq?.Bands?.Count ?? 0;
+            _channelRevisions.AddOrUpdate(key,
+                _ => (Interlocked.Increment(ref _nextChannelRevision), bands),
+                (_, prior) => prior.Bands == bands ? prior : (Interlocked.Increment(ref _nextChannelRevision), bands));
+        }
+        Connected = true;
+        State = snapshot;
+        UpdateChains(chains);
+        Status = snapshot.Connected ? "connected" : "no interface";
+        Raise();
     }
 
     private static string? Message(string json, string property = "message")

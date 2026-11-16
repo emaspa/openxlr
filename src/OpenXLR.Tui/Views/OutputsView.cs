@@ -33,7 +33,7 @@ internal sealed class OutputsView : View
 
     private void ToggleOutput(App app, Snapshot state, string name)
     {
-        if (!app.Link.Connected) return;
+        if (!app.Link.Connected) { app.Say(DaemonLink.NotConnected); return; }
         List<string> outputs = [.. SelectedOutputs(app, state)];
         if (!outputs.Remove(name)) outputs.Add(name);
         _pendingOutputs = outputs;
@@ -74,7 +74,8 @@ internal sealed class OutputsView : View
 
     private void CycleFeed(App app, string output, string label, int by)
     {
-        if (!app.Link.Connected || app.Link.State is not { } state) return;
+        if (!app.Link.Connected) { app.Say(DaemonLink.NotConnected); return; }
+        if (app.Link.State is not { } state) return;
         List<string> selected = SelectedOutputs(app, state);
         SyncPendingFeeds(app, state, selected);
         if (!selected.Contains(output)) return;

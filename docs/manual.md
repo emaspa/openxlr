@@ -6348,6 +6348,20 @@ The terminal retries when the daemon is unavailable or restarts. A connection
 that accepts the socket but never completes its handshake is abandoned after
 five seconds, so it cannot prevent the next attempt.
 
+While the daemon is gone, the tabs keep the last values it sent. The header
+no longer names the interface or the daemon's version. Its lamp turns to the
+alert colour and it reads **offline, showing the last known state**, with what
+the connection is doing at its right end, such as `daemon not running` or
+`connecting`. The sidebar says `No daemon` where the interface's gains were.
+A key that would change something, a fader step for one, sends nothing, and
+the bottom line says `Not sent: the daemon is not connected`. When the daemon
+comes back, the header shows the interface and the version again.
+
+When the daemon refuses a change, the bottom line shows its reason until the
+next key. The terminal skips a message it cannot read, for instance one from a
+daemon of another version, says so on the bottom line and keeps the
+connection.
+
 In Inputs, **Input EQ** lists each microphone and every capture
 input, on a mono port or a stereo pair. Open its **bands** row for the
 band editor. Up and Down select
