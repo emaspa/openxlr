@@ -149,7 +149,8 @@
     document.getElementById("add").onclick = () => {
       const sel = document.getElementById("target");
       const v = sel.value;
-      if (!v || !ws) return;
+      // The "Unavailable" entry names a control that is gone: nothing to add.
+      if (!v || sel.selectedOptions?.[0]?.disabled || !ws) return;
       // Insert controls carry {plugin, index} so the dial survives a chain
       // rebuild that hands the insert a new id.
       const meta = sel.selectedOptions[0]?.dataset.meta;

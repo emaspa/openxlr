@@ -3,6 +3,11 @@
 // the #target select, and saves on change. It also asks the plugin for the
 // list of physical output devices and appends them as a "Monitor output"
 // group, so a key can switch the monitor mix to a specific device.
+//
+// The key's target is only ever changed by a choice in the target list. The
+// list may not hold the saved target (the daemon is offline, or its output,
+// insert or profile is gone), and then it reads empty or shows the
+// "Unavailable" entry; a change of icon or press mode keeps the target.
 "use strict";
 
 let ws = null, piUuid = null, actionContext = null;
@@ -12,7 +17,7 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
   const actionInfo = JSON.parse(inActionInfo);
   actionContext = actionInfo.context;
   const settings = actionInfo.payload?.settings ?? {};
-  let wanted = settings.target;
+  let wanted = typeof settings.target === "string" ? settings.target : "";
 
   ws = new WebSocket("ws://localhost:" + inPort);
   ws.onopen = () => {
@@ -22,27 +27,28 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
     // A voice changer key's press mode, on the toggle page only.
     const modeSel = document.getElementById("voiceMode");
     const modeRow = document.getElementById("voice-mode-row");
-    const showMode = () => { if (modeRow) modeRow.hidden = !(sel.value || wanted || "").startsWith("voice:"); };
-    if (wanted) sel.value = wanted;
+    const showMode = () => { if (modeRow) modeRow.hidden = !wanted.startsWith("voice:"); };
+    selectTarget(sel, wanted);
     if (iconSel && settings.icon) iconSel.value = settings.icon;
     if (modeSel) modeSel.value = settings.voiceMode === "hold" ? "hold" : "toggle";
     showMode();
     const save = () => {
-      settings.target = sel.value;
-      wanted = sel.value;
+      settings.target = wanted;
       if (iconSel) settings.icon = iconSel.value;
       if (modeSel) settings.voiceMode = modeSel.value;
       showMode();
       // Insert options carry {plugin, index} so the key survives a chain
       // rebuild that hands the insert a new id.
       const opt = sel.selectedOptions[0];
-      if (opt?.dataset.meta) {
+      if (opt?.dataset.meta && opt.value === wanted) {
         settings.meta = settings.meta ?? {};
-        settings.meta[sel.value] = JSON.parse(opt.dataset.meta);
+        settings.meta[wanted] = JSON.parse(opt.dataset.meta);
       }
       ws.send(JSON.stringify({ event: "setSettings", context: piUuid, payload: settings }));
     };
-    sel.addEventListener("change", save);
+    // A choice in the list is the only way the target changes; it also drops
+    // the entry of a target that was unavailable.
+    sel.addEventListener("change", () => { wanted = sel.value; selectTarget(sel, wanted); save(); });
     iconSel?.addEventListener("change", save);
     modeSel?.addEventListener("change", save);
     // Ask the plugin for the live output-device list, the insert chains and
@@ -82,7 +88,7 @@ function fillGroup(id, title, items, wanted) {
     group.appendChild(opt);
   }
   sel.appendChild(group);
-  if (wanted) sel.value = wanted;
+  selectTarget(sel, wanted);
 }
 
 // The plugin sends the outputs again whenever they change, so both groups
@@ -90,7 +96,6 @@ function fillGroup(id, title, items, wanted) {
 function fillMonitors(outputs, wanted) {
   const sel = document.getElementById("target");
   if (!sel) return;
-  const selected = sel.value || wanted || "";
   document.getElementById("monitor-group")?.remove();
   document.getElementById("feed-group")?.remove();
   const group = document.createElement("optgroup");
@@ -118,7 +123,7 @@ function fillMonitors(outputs, wanted) {
   sel.appendChild(feeds);
   // A previously saved monitor target may not have existed as an <option>
   // until now, so re-apply the selection once the group is present.
-  if (selected) sel.value = selected;
+  selectTarget(sel, wanted);
 }
 
 window.connectElgatoStreamDeckSocket = connect;

@@ -138,7 +138,13 @@ function connectDaemon() {
       refreshAll();
     }
     else if (m.type === "commandResult") keyCommands.finish(m.requestId, !!m.error);
-    else if (m.type === "error") console.error("OpenXLR daemon:", m.message);
+    else if (m.type === "error") {
+      console.error("OpenXLR daemon:", m.message);
+      // A refused command leaves no echo to correct a dial that showed it:
+      // every dial goes back to what the daemon holds.
+      dropDialValues();
+      refreshAll();
+    }
   };
   socket.onclose = (e) => {
     if (daemon !== socket) return;
@@ -754,18 +760,20 @@ const isMuteLike = (t) =>
 // and solve it the same way (SliderSync): the turn leads locally. The local
 // value is what the next tick steps from and what the strip shows, the daemon
 // hears the first tick at once and a burst as one send per window, and its echo
-// cannot pull the dial back while the turn is still warm.
+// cannot pull the dial back while the turn is still warm. When the hold ends
+// the dial is drawn again from the daemon's value, so a turn the daemon
+// refused (a locked gain) does not stay on the strip.
 const DIAL_STEP_SIZES = new Set([1, 3, 5, 10]);
 const DIAL_SEND_MS = 80;    // trailing edge, as the window's sliders use
 const DIAL_HOLD_MS = 800;   // how long the local value outranks the echo
-const dialTurns = new Map();   // value key -> {value, at}
+const dialTurns = new Map();   // value key -> {value, at, expiry}
 const dialSends = new Map();   // value key -> {send, timer, at}
 
 function forgetEqTurn(target) {
   const entry = dialSends.get(target);
   if (entry?.timer) clearTimeout(entry.timer);
   dialSends.delete(target);
-  dialTurns.delete(target);
+  dropDialTurn(target);
 }
 function clearEqTurns(context = null) {
   for (const [target, entry] of dialSends)
@@ -813,7 +821,7 @@ function dialNow(key, remote) {
 // Take the turn's new value locally, and get it to the daemon: the first tick
 // goes out at once, the rest of a burst collapse into one send per window.
 function dialTurn(key, value, send) {
-  dialTurns.set(key, { value, at: Date.now() });
+  holdDialValue(key, value);
   const pending = dialSends.get(key);
   if (pending?.timer) { pending.send = send; return; }   // the edge sends the latest
   if (pending && Date.now() - pending.at < DIAL_SEND_MS) {
@@ -832,10 +840,35 @@ function dialTurn(key, value, send) {
   send();
 }
 
+// Hold the dial's local value, and redraw from the daemon's once the hold
+// ends, whether or not a broadcast came in meanwhile.
+function holdDialValue(key, value) {
+  dropDialTurn(key);
+  const turn = { value, at: Date.now(), expiry: null };
+  turn.expiry = setTimeout(() => {
+    if (dialTurns.get(key) === turn) dialTurns.delete(key);
+    refreshAll();
+  }, DIAL_HOLD_MS);
+  turn.expiry.unref?.();
+  dialTurns.set(key, turn);
+}
+
+function dropDialTurn(key) {
+  const turn = dialTurns.get(key);
+  if (turn?.expiry) clearTimeout(turn.expiry);
+  dialTurns.delete(key);
+}
+
+// Give every dial back to the daemon's values. Sends still waiting for their
+// window go out as they would.
+function dropDialValues() {
+  for (const key of [...dialTurns.keys()]) dropDialTurn(key);
+}
+
 function clearDialTurns() {
   for (const entry of dialSends.values()) if (entry.timer) clearTimeout(entry.timer);
   dialSends.clear();
-  dialTurns.clear();
+  dropDialValues();
 }
 
 // A recalled profile must follow earlier turns on this connection, and its

@@ -81,7 +81,9 @@ test("the inspector refills an empty monitor group and keeps the saved key", () 
   const all = node => [node, ...node.children.flatMap(all)];
   const document = {createElement: tag => new Element(tag), getElementById: id => all(select).find(node => node.id === id)};
   const context = vm.createContext({document, window: {}});
-  vm.runInContext(readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/pi.js", import.meta.url), "utf8"), context);
+  // As in the page, layout-options.js loads first.
+  for (const file of ["layout-options.js", "pi.js"])
+    vm.runInContext(readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/" + file, import.meta.url), "utf8"), context);
   const wanted = "monitor:alsa_output.headset";
   context.fillMonitors([], wanted);
   assert.deepEqual(document.getElementById("monitor-group").children, []);

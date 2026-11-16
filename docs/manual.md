@@ -4632,6 +4632,14 @@ channel or a mix with an icon or colour from the layout editor
 ([Appearance](#layout)) shows that icon and colour unless the key has its
 own icon chosen. An exclusive group key shows those of the member that is
 heard.
+A key keeps its target until you choose another in its settings. While
+OpenXLR is offline, or the output, insert, profile or channel the key names
+is gone, the settings list the target as Unavailable under its saved name.
+Changing the key's icon or press mode then leaves the target alone.
+A dial shows a turn at once, before OpenXLR confirms it. If OpenXLR refuses
+the change, such as a gain turn while the gain lock is on, the dial goes
+back to OpenXLR's value when the refusal arrives, or at most a second after
+the last tick.
 
 The property inspector's **Microphone controls** group follows channels
 instead. A gain dial stores `chgain:<channel>`; mute, phantom power, low cut
