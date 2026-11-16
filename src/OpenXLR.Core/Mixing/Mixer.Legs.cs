@@ -24,15 +24,18 @@ public sealed partial class Mixer
     /// leaves that send silent for good. A restarted WirePlumber links the
     /// whole graph again, and on a private PipeWire 1.6 with WirePlumber 0.5
     /// about every other restart logged one failed link and left that leg
-    /// unlinked; neither a later rescan nor a new node linked it.
+    /// unlinked; neither a later rescan nor a new node linked it. A restart
+    /// can also link a stereo leg crossed, left into right and right into
+    /// left, and nothing links it again either.
     ///
     /// <paramref name="missing"/> are the channels with a known leg the
-    /// registry did not show in this sweep or showed without a link, and
-    /// channels with a send waiting for a leg it never found. After
-    /// <see cref="LegMissingSweeps"/> sweeps in a row one pactl call reads
-    /// the legs again, since a leg can also be back under another index. A
-    /// channel still short of a linked leg has its sink reloaded, as a
-    /// rename does, which makes every leg again and puts its streams back; at
+    /// registry did not show in this sweep, showed without a link or showed
+    /// linked crossed, and channels with a send waiting for a leg it never
+    /// found. After <see cref="LegMissingSweeps"/> sweeps in a row one pactl
+    /// call reads the legs again, since a leg can also be back under another
+    /// index. A channel still short of a leg linked side to side has its sink
+    /// reloaded, as a rename does, which makes every leg again and puts its
+    /// streams back; at
     /// most <see cref="LegReloadLimit"/> times in <see cref="LegReloadWindow"/>.
     /// A send whose leg is still missing waits with the other pending sends.
     /// A channel left without a sink, by a reload whose sink could not be made
@@ -48,7 +51,7 @@ public sealed partial class Mixer
         List<string> due = [.. _legMissing.Where(e => e.Value >= LegMissingSweeps).Select(e => e.Key)];
         if (due.Count == 0) return [];
         DiscoverLegsLocked();
-        (IReadOnlyDictionary<int, (int Percent, bool Muted)> legs, IReadOnlySet<int> unlinked) = _pw.CombineLegs();
+        (IReadOnlyDictionary<int, (int Percent, bool Muted)> legs, IReadOnlySet<int> mislinked) = _pw.CombineLegs();
         var reloaded = new List<string>();
         long now = Environment.TickCount64;
         foreach (string id in due)
@@ -58,7 +61,7 @@ public sealed partial class Mixer
             string[] mixes = [.. _config.Mixes.Select(m => m.Id).Where(mix => _cells.Contains(Cell(id, mix)))];
             List<long> recent = _legReloads.TryGetValue(id, out List<long>? times) ? times : _legReloads[id] = [];
             recent.RemoveAll(at => now - at >= (long)LegReloadWindow.TotalMilliseconds);
-            if (mixes.All(mix => _legIndex.TryGetValue(Cell(id, mix), out int index) && legs.ContainsKey(index) && !unlinked.Contains(index))
+            if (mixes.All(mix => _legIndex.TryGetValue(Cell(id, mix), out int index) && legs.ContainsKey(index) && !mislinked.Contains(index))
                 || recent.Count >= LegReloadLimit)
             {
                 // Back and linked, maybe under another index, or reloaded

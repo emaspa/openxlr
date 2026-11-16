@@ -1391,8 +1391,9 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   a desktop applet or the session manager can turn one down and quietly
   cut the mixes it feeds. A WirePlumber restart needs no daemon restart:
   WirePlumber links what names a target again, the sweep links the
-  devices as after a replug, and a channel whose send stream ended or was
-  left unlinked has its sink reloaded, at most three times in ten minutes;
+  devices as after a replug, and a channel whose send stream ended, was
+  left unlinked or was linked with its left and right swapped has its sink
+  reloaded, at most three times in ten minutes;
   a channel sink unloaded from outside is made again. Each part of the
   one-second sweep runs on its own, so one strip that cannot be wired or
   one failing helper leaves the rest to run, and the failure is logged
