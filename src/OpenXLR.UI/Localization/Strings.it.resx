@@ -516,6 +516,9 @@
   <data name="DaemonRestartedSubmixerOn" xml:space="preserve">
     <value>Demone riavviato con il submixer attivo.</value>
   </data>
+  <data name="DaemonStateUnreadableNote" xml:space="preserve">
+    <value>Il demone (v{0}) ha inviato uno stato che questa finestra (v{1}) non sa leggere; i controlli mostrano l'ultimo stato letto. Riavvia il demone per eseguire la versione installata.</value>
+  </data>
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>Il demone è la v{0}; questa finestra è la v{1}. Riavvia il demone per eseguire la versione installata.</value>
   </data>

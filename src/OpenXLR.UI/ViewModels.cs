@@ -92,43 +92,14 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             // Taken on arrival: the state answers the sends made before it, not the ones the UI makes while it waits.
             long arrived = SliderSync.Now();
-            Dispatcher.UIThread.Post(() =>
-            {
-                Apply(node);
-                SliderSync.StateArrived(arrived);
-            });
+            // The client keeps this push's text on this thread just before it raises the event.
+            string? json = _client.LastStateJson;
+            Dispatcher.UIThread.Post(() => ApplyPush(node, json, arrived));
         };
-        _client.ConnectionChanged += up => Dispatcher.UIThread.Post(() =>
-        {
-            DaemonConnected = up;
-            DaemonRestart.ConnectionChanged(up);
-            if (!up)
-            {
-                DeviceConnected = false; RefreshBindings(); Status = Localizer.Text("StatusDaemonNotRunning");
-                ActiveProfile = null;
-                ResetWaveInterfaces();
-                ResetBrowserTabs();
-                History.Reset();
-                ResetAppRouting();
-                Soundboard.Reset();
-                VoiceChanger.Reset();
-                HardwareMixing.Reset();
-                LedRing.Reset();
-                ApplyHardwareMixingNotes();
-                _client.EqProfiles.Reset();
-                Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
-                foreach (MixViewModel mv in Mixes) mv.Inserts.ResetForNewConnection();
-                foreach (ChannelViewModel channel in Channels) channel.Inserts?.ResetForNewConnection();
-                foreach (MonitorOutputItem output in MonitorOutputs) output.CancelFeedEdit();
-                CancelMonitorSelectionEdit();
-                CancelMonitorMicrophoneEdit();
-            }
-            else { Inserts.EnsurePluginsLoaded(); Inserts2.EnsurePluginsLoaded(); }
-        });
-        _client.PresenceChanged += presence => Dispatcher.UIThread.Post(() =>
-            OlderDaemonRunning = presence == DaemonPresence.OlderDaemon);
+        _client.ConnectionChanged += up => Dispatcher.UIThread.Post(() => OnConnectionChanged(up));
+        _client.PresenceChanged += presence => Dispatcher.UIThread.Post(() => OnPresenceChanged(presence));
         OlderDaemonRunning = _client.Presence == DaemonPresence.OlderDaemon;
-        _client.ErrorReceived += msg => Dispatcher.UIThread.Post(() => Status = msg);
+        _client.ErrorReceived += msg => Dispatcher.UIThread.Post(() => OnDaemonError(msg));
         _client.NativeEditorRulesChanged += () => Dispatcher.UIThread.Post(() => InsertsViewModel.ReloadAll?.Invoke());
         var meters = new MeterUpdates(action => Dispatcher.UIThread.Post(action), ApplyMeters);
         _client.MetersReceived += meters.Publish;
@@ -145,10 +116,162 @@ public sealed partial class MainViewModel : ViewModelBase
         };
     }
 
+    /// <summary>The connection came up or went down. Gone, the panels grey and the meters fall to zero; back, the next state fills them again.</summary>
+    private void OnConnectionChanged(bool up)
+    {
+        if (up) { _wasConnected = true; DaemonAway = false; }
+        else if (_wasConnected) DaemonAway = true;
+        DaemonConnected = up;
+        DaemonRestart.ConnectionChanged(up);
+        if (!up)
+        {
+            DeviceConnected = false; RefreshBindings(); Status = Localizer.Text("StatusDaemonNotRunning");
+            ActiveProfile = null;
+            ResetWaveInterfaces();
+            ResetBrowserTabs();
+            History.Reset();
+            ResetAppRouting();
+            Soundboard.Reset();
+            VoiceChanger.Reset();
+            HardwareMixing.Reset();
+            LedRing.Reset();
+            ApplyHardwareMixingNotes();
+            _client.EqProfiles.Reset();
+            Inserts.ResetForNewConnection(); Inserts2.ResetForNewConnection();
+            foreach (MixViewModel mv in Mixes) mv.Inserts.ResetForNewConnection();
+            foreach (ChannelViewModel channel in Channels) channel.Inserts?.ResetForNewConnection();
+            foreach (MonitorOutputItem output in MonitorOutputs) output.CancelFeedEdit();
+            CancelMonitorSelectionEdit();
+            CancelMonitorMicrophoneEdit();
+            ZeroMeters();
+            // The next daemon answers for itself: its own last state, its own banner.
+            _appliedState = null;
+            StateUnreadable = false;
+        }
+        else { Inserts.EnsurePluginsLoaded(); Inserts2.EnsurePluginsLoaded(); }
+    }
+
+    // --- what the daemon pushes, and what it refuses ---
+
+    /// <summary>The text of the last state push that applied in full on this connection, or null.</summary>
+    private string? _appliedState;
+
+    /// <summary>
+    /// Apply a state push on the UI thread. A push that throws, as one from a
+    /// daemon of another version that changed a field's JSON type would, is
+    /// logged and kept out: the last push that applied is put back, so every
+    /// control shows the values it showed before, and the version banner
+    /// offers the restart. <paramref name="json"/> is the push's text.
+    /// </summary>
+    private void ApplyPush(JsonNode node, string? json, long arrived)
+    {
+        try
+        {
+            Apply(node);
+            _appliedState = json ?? node.ToJsonString();
+        }
+        catch (Exception ex)
+        {
+            UiErrors.Log("a daemon state could not be applied", ex);
+            ApplyLastState();
+            if (node is JsonObject state && state["daemonVersion"] is JsonValue version && version.TryGetValue(out string? text))
+                DaemonVersion = text;
+            StateUnreadable = true;
+        }
+        SliderSync.StateArrived(arrived);
+    }
+
+    /// <summary>
+    /// Put the last state that applied back on every control. With
+    /// <paramref name="releaseGuards"/> the faders the user just moved take it
+    /// too, since the daemon kept their values.
+    /// </summary>
+    private void ApplyLastState(bool releaseGuards = true)
+    {
+        if (_appliedState is not { } last) return;
+        if (releaseGuards) SliderSync.ReleaseTouchGuards();
+        try { Apply(JsonNode.Parse(last)!); }
+        catch (Exception ex) { UiErrors.Log("the last daemon state could not be applied again", ex); }
+    }
+
+    /// <summary>How long the same refusal stays quiet after it last came: a meter a window keeps asking for is refused every few seconds.</summary>
+    internal const long ErrorRepeatQuietMs = 30_000;
+
+    private string? _lastError;
+    private long _lastErrorAt;
+
+    /// <summary>
+    /// The daemon refused a command, or failed inside it, and said why with an
+    /// <c>error</c>. The sentence shows as the main window's notice, and the
+    /// controls go back to the daemon's last state: the error carries no
+    /// request id, and that state holds the values the daemon kept whichever
+    /// control asked. A mixer command's error is followed by a fresh state.
+    /// The same sentence again within <see cref="ErrorRepeatQuietMs"/> of the
+    /// last is a request a window repeats in the background: it shows no new
+    /// notice and leaves a fader the user is moving alone.
+    /// </summary>
+    private void OnDaemonError(string message)
+    {
+        long now = SliderSync.Now();
+        bool repeat = message == _lastError && now - _lastErrorAt < ErrorRepeatQuietMs;
+        _lastError = message;
+        _lastErrorAt = now;
+        if (repeat) Status = message;
+        else ReportError(message);
+        ApplyLastState(releaseGuards: !repeat);
+    }
+
+    /// <summary>
+    /// Say a refused change or a failed command in the main window's notice,
+    /// for <see cref="ErrorNoticeHold"/>. Without a connection the header
+    /// already says the daemon is not running, and a change that could not be
+    /// sent says nothing more.
+    /// </summary>
+    private void ReportError(string error)
+    {
+        Status = error;
+        if (DaemonConnected) ShowNotice(error, ErrorNoticeHold);
+    }
+
+    /// <summary>The daemon is gone: every meter falls to zero rather than holding its last level.</summary>
+    private void ZeroMeters()
+    {
+        var silent = new JsonObject();
+        Ducking.ApplyMeters(silent);
+        Soundboard.ApplyMeters(silent);
+        foreach (ChannelViewModel channel in Channels) { channel.MeterL = 0; channel.MeterR = 0; }
+        foreach (MixViewModel mix in Mixes) { mix.MeterL = 0; mix.MeterR = 0; mix.MaximizerReduction = 0; }
+    }
+
     // --- connection / device identity ---
 
     private bool _daemonConnected;
-    public bool DaemonConnected { get => _daemonConnected; private set { if (SetAndRaiseMismatch(ref _daemonConnected, value)) { Raise(nameof(StatusLine)); Raise(nameof(MixerPlaceholder)); Raise(nameof(CanEditLayout)); } } }
+    public bool DaemonConnected { get => _daemonConnected; private set { if (SetAndRaiseMismatch(ref _daemonConnected, value)) { Raise(nameof(StatusLine)); Raise(nameof(MixerPlaceholder)); Raise(nameof(CanEditLayout)); Raise(nameof(ControlsEnabled)); } } }
+
+    /// <summary>The client's connection came up at least once.</summary>
+    private bool _wasConnected;
+
+    private bool _daemonAway;
+    /// <summary>
+    /// The client lost its connection, or found no daemon it can talk to
+    /// before it ever had one. A client that only failed to connect, with no
+    /// probe to say why, says nothing about the daemon.
+    /// </summary>
+    private bool DaemonAway { get => _daemonAway; set { if (Set(ref _daemonAway, value)) Raise(nameof(ControlsEnabled)); } }
+
+    /// <summary>
+    /// Whether the input, headphone and monitor sections and the mixer take
+    /// input. False while the daemon is away, until the UI connects again:
+    /// the controls grey out, since nothing they send would arrive.
+    /// </summary>
+    public bool ControlsEnabled => DaemonConnected || !DaemonAway;
+
+    /// <summary>What the client's probe found: a daemon it cannot reach greys the controls too, before any connection.</summary>
+    private void OnPresenceChanged(DaemonPresence presence)
+    {
+        OlderDaemonRunning = presence == DaemonPresence.OlderDaemon;
+        if (presence != DaemonPresence.Reachable && !DaemonConnected) DaemonAway = true;
+    }
 
     private bool _olderDaemonRunning;
     /// <summary>
@@ -186,20 +309,27 @@ public sealed partial class MainViewModel : ViewModelBase
         : DeviceConnected ? DeviceName
         : Localizer.Text("NoDevice");
 
-    // --- the glitch marker ---
+    // --- the main window's notice ---
 
     /// <summary>How long the main window says a glitch was marked.</summary>
     public static readonly TimeSpan GlitchNoticeHold = TimeSpan.FromSeconds(4);
 
+    /// <summary>How long the main window says what the daemon refused or why a command failed.</summary>
+    public static readonly TimeSpan ErrorNoticeHold = TimeSpan.FromSeconds(8);
+
     /// <summary>Starts the notice's hold and calls back when it ends; tests run it by hand.</summary>
-    internal Func<TimeSpan, Action, IDisposable> StartGlitchNoticeHold { get; set; } =
+    internal Func<TimeSpan, Action, IDisposable> StartNoticeHold { get; set; } =
         (after, elapsed) => DispatcherTimer.RunOnce(elapsed, after);
 
-    private IDisposable? _glitchNoticeHold;
-    private string? _glitchNotice;
+    private IDisposable? _noticeHold;
+    private string? _notice;
 
-    /// <summary>The sentence that says a glitch was just marked, or why not; null once its hold ends.</summary>
-    public string? GlitchNotice { get => _glitchNotice; private set => Set(ref _glitchNotice, value); }
+    /// <summary>
+    /// The sentence the main window shows above the sections for a few
+    /// seconds: a glitch just marked, or why not, and what the daemon refused
+    /// or failed to do. Null once its hold ends.
+    /// </summary>
+    public string? Notice { get => _notice; private set => Set(ref _notice, value); }
 
     /// <summary>
     /// Mark a glitch on the daemon's timeline, from Options or Ctrl+G. The
@@ -211,16 +341,20 @@ public sealed partial class MainViewModel : ViewModelBase
         string at = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
         string? error = await _client.MarkGlitchAsync();
         string text = error is null ? Localizer.Format("GlitchMarkedAt", at) : Localizer.Format("GlitchNotMarked", error);
-        ShowGlitchNotice(text);
+        ShowNotice(text);
         return text;
     }
 
-    /// <summary>Show a glitch sentence above the mixer for <see cref="GlitchNoticeHold"/>: Ctrl+G's, or a desktop key's. On the UI thread.</summary>
-    public void ShowGlitchNotice(string text)
+    /// <summary>
+    /// Show a sentence above the sections for <paramref name="hold"/>, by
+    /// default <see cref="GlitchNoticeHold"/>: Ctrl+G's, a desktop key's or
+    /// the daemon's refusal. A newer sentence replaces the one showing. On the UI thread.
+    /// </summary>
+    public void ShowNotice(string text, TimeSpan? hold = null)
     {
-        _glitchNoticeHold?.Dispose();
-        GlitchNotice = text;
-        _glitchNoticeHold = StartGlitchNoticeHold(GlitchNoticeHold, () => GlitchNotice = null);
+        _noticeHold?.Dispose();
+        Notice = text;
+        _noticeHold = StartNoticeHold(hold ?? GlitchNoticeHold, () => Notice = null);
     }
 
     // --- hardware controls ---
@@ -722,7 +856,7 @@ public sealed partial class MainViewModel : ViewModelBase
         _pendingMonitorSelection = null;
         if (error is null) return;
         RestoreReportedMonitorSelection();
-        Status = error;
+        ReportError(error);
     }
 
     private void RestoreReportedMonitorSelection()
@@ -917,7 +1051,7 @@ public sealed partial class MainViewModel : ViewModelBase
         if (error is not null)
         {
             Set(ref _monitorMuteMicrophones, _reportedMonitorMuteMicrophones, nameof(MonitorMuteMicrophones));
-            Status = error;
+            ReportError(error);
         }
         _pendingMonitorMuteMicrophones = null;
     }
@@ -1043,7 +1177,7 @@ public sealed partial class MainViewModel : ViewModelBase
     /// one from before the control socket and this UI cannot connect to it.
     /// </summary>
     public bool DaemonVersionMismatch => DaemonConnected
-        ? (DaemonVersion ?? "") != AppVersion.Current
+        ? StateUnreadable || (DaemonVersion ?? "") != AppVersion.Current
         : OlderDaemonRunning;
 
     public string DaemonVersionNote =>
@@ -1051,7 +1185,18 @@ public sealed partial class MainViewModel : ViewModelBase
             ? Localizer.Format("OlderDaemonCannotConnectNote", AppVersion.Current)
         : DaemonVersion is null
             ? Localizer.Format("DaemonOlderVersionNote", AppVersion.Current)
+        : StateUnreadable
+            ? Localizer.Format("DaemonStateUnreadableNote", DaemonVersion, AppVersion.Current)
             : Localizer.Format("DaemonVersionNote", DaemonVersion, AppVersion.Current);
+
+    private bool _stateUnreadable;
+    /// <summary>
+    /// A state push from this connection's daemon could not be applied, so
+    /// the controls show the last one that could. The version banner then
+    /// offers the restart, whatever version the daemon reports, until the
+    /// connection goes.
+    /// </summary>
+    public bool StateUnreadable { get => _stateUnreadable; private set => SetAndRaiseMismatch(ref _stateUnreadable, value); }
 
     private string _daemonWarning = "";
     /// <summary>A condition the daemon wants the user to see (settings not being saved), or empty.</summary>
@@ -1073,16 +1218,18 @@ public sealed partial class MainViewModel : ViewModelBase
     private void Apply(JsonNode node)
     {
         _applying = true;
-        _client.EqProfiles.Apply(node);
-        DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
-        CardProfileProblem = node["cardProfile"]?["problem"] is JsonValue problem && problem.TryGetValue(out string? text) && text.Length > 0;
-        Clock = AudioClock.From(node["mixer"]);
-        // A card without a microphone input is the bigger problem and keeps its own button.
-        ClockProblem = !CardProfileProblem && Clock is { MicResampled: true };
-        ApplyClockChoice(node["mixer"]);
-        MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
+        // Everything inside the try: a push that throws must not leave the
+        // UI applying, which would keep every later change from being sent.
         try
         {
+            _client.EqProfiles.Apply(node);
+            DaemonWarning = node["warning"]?.GetValue<string>() ?? "";
+            CardProfileProblem = node["cardProfile"]?["problem"] is JsonValue problem && problem.TryGetValue(out string? text) && text.Length > 0;
+            Clock = AudioClock.From(node["mixer"]);
+            // A card without a microphone input is the bigger problem and keeps its own button.
+            ClockProblem = !CardProfileProblem && Clock is { MicResampled: true };
+            ApplyClockChoice(node["mixer"]);
+            MixerWaiting = node["mixerWaiting"]?.GetValue<bool>() ?? false;
             DaemonConnected = true;
             DaemonVersion = node["daemonVersion"]?.GetValue<string>();
             DeviceConnected = node["connected"]?.GetValue<bool>() ?? false;
@@ -1391,7 +1538,7 @@ public sealed partial class MainViewModel : ViewModelBase
         {
             var items = wanted.Select(w => MonitorOutputs.FirstOrDefault(output => output.Name == w.Name)
                 ?? new MonitorOutputItem(w.Name, w.Label, OnMonitorSelectionChanged, OnMonitorFeedChanged,
-                    w.Present, error => Status = error, OnMonitorIdleReleaseChanged)).ToList();
+                    w.Present, ReportError, OnMonitorIdleReleaseChanged)).ToList();
             // Adding or losing another device must not cancel this output's
             // pending feed edit or replace its open picker rows.
             foreach (MonitorOutputItem output in MonitorOutputs.Where(output => !items.Contains(output))) output.CancelFeedEdit();

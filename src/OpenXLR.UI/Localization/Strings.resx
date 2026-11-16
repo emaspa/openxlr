@@ -534,6 +534,9 @@
   <data name="DaemonRestartedSubmixerOn" xml:space="preserve">
     <value>Daemon restarted with the submixer on.</value>
   </data>
+  <data name="DaemonStateUnreadableNote" xml:space="preserve">
+    <value>The daemon (v{0}) sent a state this window (v{1}) cannot read; the controls show the last state it could read. Restart the daemon to run the installed version.</value>
+  </data>
   <data name="DaemonVersionNote" xml:space="preserve">
     <value>The daemon is v{0}; this window is v{1}. Restart the daemon to run the installed version.</value>
   </data>

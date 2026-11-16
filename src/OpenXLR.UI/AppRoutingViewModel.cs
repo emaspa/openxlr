@@ -22,7 +22,7 @@ public sealed partial class MainViewModel
         string? error = await _client.SetRouteAppsByDefaultAsync(enabled);
         if (version != _appRoutingVersion) return;
         _appRoutingPending = false;
-        if (error is not null) Status = error;
+        if (error is not null) ReportError(error);
         Raise(nameof(RouteAppsByDefault)); Raise(nameof(CanSetAppRouting));
     }
 

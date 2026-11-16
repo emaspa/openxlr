@@ -26,6 +26,9 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // An exception nothing caught is logged rather than ending the UI.
+            UiErrors.Install();
+
             // An earlier version wrote a user unit with a build-tree path on
             // packaged installs; fix it before the user has to notice.
             if (!FlatpakEnvironment.IsFlatpak && UiSettings.Load().StartDaemonAtLogin)

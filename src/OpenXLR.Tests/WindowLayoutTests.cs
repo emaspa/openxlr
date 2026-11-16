@@ -72,6 +72,7 @@ public sealed class WindowLayoutTests
                 LocalizationRenderingTests.Check();
                 BrowserTabsWindowTests.Check();
                 OlderDaemonWindowTests.Check();
+                DaemonGoneWindowTests.Check();
                 HistoryButtonsWindowTests.Check();
                 var vm = new MainViewModel(new DaemonClient());
                 main.DataContext = vm;

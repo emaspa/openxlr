@@ -41,6 +41,16 @@ The UI
 (`openxlr`) shows and changes what the daemon holds; closing it changes
 nothing.
 
+When the daemon refuses a change, or a command fails inside it, the UI
+shows the daemon's reason above the sections for a few seconds, in the
+same place as a [marked glitch](#glitch-marker). The control goes back to
+the value the daemon kept. A reason that comes again and again, as for a
+meter a window keeps asking for, shows once and then only after half a
+minute without it. While the UI is not connected to the daemon, the
+header reads "Daemon not running" and the input, headphone and monitor
+sections and the mixer are greyed out. They take no input, and every meter
+drops to zero. Everything comes back as soon as the UI connects again.
+
 The gear in the header opens Options in its own window, so you can keep
 using the mixer while adjusting settings. Pressing the gear again brings
 the same Options window forward, restoring it if minimized. Closing
@@ -3866,6 +3876,13 @@ talking to the old daemon and cannot reach the new one.
 When the UI can connect but the daemon is another version, it shows a
 banner naming the daemon's version and its own, with a Restart daemon
 button, and offers only the controls the old daemon reports.
+
+A daemon of another version may also send a state the UI cannot read, for
+example one that writes a value as text where the UI expects a number. The
+UI then keeps the values it showed before and shows the same banner, which
+says the daemon sent a state the UI cannot read. The UI keeps running. The
+banner stays until the connection drops, so restarting the daemon clears
+it.
 
 Releases before 0.3.0 served their clients on a loopback port with a
 token. Since 0.3.0 the daemon uses a private Unix socket instead, authenticated by

@@ -72,7 +72,7 @@ public sealed partial class MainViewModel
     private async Task SetAudioClockAsync(string? node)
     {
         string? error = await _client.SetAudioClockAsync(node);
-        if (error is not null) Status = error;
+        if (error is not null) ReportError(error);
     }
 
     /// <summary>The warning's action: the microphone's interface becomes the clock, restarted now or left for later.</summary>
@@ -81,7 +81,7 @@ public sealed partial class MainViewModel
         if (_clockActionNode is not { } node) return null;
         string? error = await _client.SetAudioClockAsync(node);
         if (error is null && restart) error = await RestartAudioAsync();
-        if (error is not null) Status = error;
+        if (error is not null) ReportError(error);
         return error;
     }
 
@@ -94,7 +94,8 @@ public sealed partial class MainViewModel
         try
         {
             string? error = await _client.RestartAudioServicesAsync();
-            Status = error ?? Localizer.Text("AudioRestarted");
+            if (error is null) Status = Localizer.Text("AudioRestarted");
+            else ReportError(error);
             return error;
         }
         finally
