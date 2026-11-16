@@ -255,6 +255,33 @@ public sealed class MicSetupModelTests
         Assert.Null(first.Eq);
     }
 
+    [Fact]
+    public async Task WhileTheMixerIsBuiltAgainTheGainIsNotSaidToBeMissing()
+    {
+        await using var client = new DaemonClient("ws://127.0.0.1:1/ws");
+        var main = new MainViewModel(client);
+        string Xlr1 = InputBindingModelTests.Xlr("xlr1", 0, InputBindingModelTests.Input(1));
+        JsonNode state = JsonNode.Parse(InputBindingModelTests.ProState(Xlr1))!;
+        CaptureInputWindowTests.Apply(main, state);
+        MicSetupViewModel setup = main.Inserts.MicSetup;
+        Assert.True(setup.HasGain);
+        Assert.False(setup.NoGain);
+
+        // The audio server went away: no channel carries the microphone
+        // until the mixer is back, which says nothing about its gain.
+        JsonNode rebuilding = state.DeepClone();
+        rebuilding["mixer"] = null;
+        rebuilding["mixerWaiting"] = true;
+        rebuilding["mixerRebuilding"] = true;
+        CaptureInputWindowTests.Apply(main, rebuilding);
+        Assert.False(setup.HasGain);
+        Assert.False(setup.NoGain);
+
+        CaptureInputWindowTests.Apply(main, state);
+        Assert.True(setup.HasGain);
+        Assert.False(setup.NoGain);
+    }
+
     // --- Suggest gain ---
 
     /// <summary>Five seconds of the 15 Hz meter: the same RMS and peak in every reading.</summary>

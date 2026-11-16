@@ -352,8 +352,19 @@ public sealed class MicSetupViewModel : ViewModelBase
         CheckRoom();
     }
 
+    private bool _inMixer;
+    /// <summary>
+    /// The mixer is up and holds this channel. While it is built again no
+    /// channel carries a unit, which says nothing about the microphone's gain.
+    /// </summary>
+    public bool InMixer
+    {
+        get => _inMixer;
+        internal set { if (Set(ref _inMixer, value)) Raise(nameof(NoGain)); }
+    }
+
     public bool HasGain => CarriesUnit || CarriesExtraUnit || _captureInput?.ShowsCaptureGain == true;
-    public bool NoGain => !HasGain;
+    public bool NoGain => _inMixer && !HasGain;
 
     // --- Position: the unit the microphone is on, tips for it, phantom power ---
 
@@ -1248,6 +1259,7 @@ public sealed class MicSetupViewModel : ViewModelBase
         Dynamics = null;
         Software = null;
         Inputs = null;
+        InMixer = false;
         RaiseButtons();
         RaiseSuggestion();
     }
