@@ -127,12 +127,10 @@ land at any time.
 
 ### Stability and hardware acceptance
 
-- [ ] Settings and the graph survive the daemon's own failures. Each of
+- [x] Settings and the graph survive the daemon's own failures. Each of
   these was found by reading the code, none by a user report, and each
   gets a test that fails before the fix:
-  - a plugin rescan or install no longer holds up the mixer. Today a
-    state read during the scan waits for it with the mixer locked, and a
-    long scan can end with the watchdog stopping the daemon;
+  - a plugin rescan or install no longer holds up the mixer;
   - `mixer.json` is written with a sync, carries a version, keeps keys a
     newer release wrote, keeps the previous file as a backup, and is
     never written from a mixer that is not built. A single wrong value
@@ -143,19 +141,16 @@ land at any time.
     start no longer unmutes a microphone or raises a headphone level
     that was changed on the unit while the daemon was stopped;
   - when pipewire-pulse restarts, the daemon builds its graph again in
-    place. Today it exits for systemd to start it, which the unit allows
-    three times in five minutes;
-  - a command that fails inside the daemon answers with an error. Today
-    some failures close the client's connection without a word;
+    place;
+  - a command that fails inside the daemon answers with an error;
   - the healing sweep notices a missing mix, post or virtual microphone
     node, a channel sink whose module could not be unloaded, and a meter
     whose reader exited, and one strip that cannot be wired no longer
     stops the rest of the sweep;
   - the native helper replaces a non-finite input sample with silence in
     every stage, and a CLAP plugin that asks for a restart gets one in
-    place. Today either ends the helper, and three in five minutes leave
-    the chain off.
-- [ ] A client says what went wrong. The UI shows the daemon's answer
+    place.
+- [x] A client says what went wrong. The UI shows the daemon's answer
   when it refuses a change, and greys the hardware panel and the mixer
   while it is not connected. The terminal mixer's header says when the
   daemon is gone. A Deck dial the daemon refused goes back to the value
@@ -226,9 +221,9 @@ land at any time.
 
 ### The mixer and its clients
 
-- [ ] The mix EQ, Dry and the Pro's Max on the classic layout, which the
-  default appearance and thirteen of the built-in skins use. Today they
-  are on the matrix and bank layouts, the terminal mixer and the API.
+- [x] The mix EQ, Dry and the Pro's Max on the classic layout, which the
+  default appearance and thirteen of the built-in skins use, as on the
+  matrix and bank layouts, the terminal mixer and the API.
 - [ ] Undo and redo, the rest: a profile load as one step in place of a
   barrier that clears the history; then monitor outputs and feeds, the
   output volume, renames, order and appearance; then a deleted channel or
