@@ -2412,6 +2412,18 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="HistoryExclusiveGroup" xml:space="preserve">
     <value>Wechsel in {0}</value>
   </data>
+  <data name="LinkSends" xml:space="preserve">
+    <value>Koppeln</value>
+  </data>
+  <data name="LinkSendsName" xml:space="preserve">
+    <value>Sends von {0} koppeln</value>
+  </data>
+  <data name="HistoryLinkedSends" xml:space="preserve">
+    <value>Gekoppelte Sends von {0}</value>
+  </data>
+  <data name="LinkSendsTip" xml:space="preserve">
+    <value>Koppelt die Sends dieses Kanals: Jeder Mix bekommt denselben Pegel, und wer einen Send bewegt, bewegt alle. Beim Koppeln gilt der Pegel des ersten Mixes. Die Stummschaltung bleibt je Mix.</value>
+  </data>
   <data name="HistoryEq" xml:space="preserve">
     <value>EQ von {0}</value>
   </data>

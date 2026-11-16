@@ -525,6 +525,9 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     public Task SetChannelVolumeAsync(string channel, double value)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setChannelVolume", ["channel"] = channel, ["value"] = value });
 
+    public Task SetLinkedSendsAsync(string channel, bool linked)
+        => SendAsync(new Dictionary<string, object> { ["cmd"] = "setLinkedSends", ["channel"] = channel, ["value"] = linked });
+
     public Task SetCaptureGainAsync(string channel, double gainDb)
         => SendAsync(new Dictionary<string, object> { ["cmd"] = "setCaptureGain", ["channel"] = channel, ["value"] = gainDb });
 

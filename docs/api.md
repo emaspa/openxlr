@@ -840,9 +840,8 @@ takes, so hardware mixing on the Wave XLR Pro follows every mix. The mutes
 stay per mix (`setChannelMuted`), and the channel volume stays the
 channel's own.
 
-Every mix counts: the Aux mix and a hidden mix are linked like the others,
-and the first mix is the first in the layout's order whether it is shown
-or hidden. A muted send keeps the linked level and stays silent, so Aux In
+Every mix counts, the Aux mix and a hidden mix included. The first mix is
+the first in the layout's order whether it is shown or hidden. A muted send keeps the linked level and stays silent, so Aux In
 and Line In stay out of the Aux mix while they are linked. A mix added
 while a channel is linked starts that channel's send at the linked level,
 muted like every new send.

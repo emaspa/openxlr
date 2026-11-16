@@ -49,12 +49,19 @@
               <Panel layout:StripPanel.Part="value">
                 <skin:LitText Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"/>
               </Panel>
-              <Panel layout:StripPanel.Part="mute">
+              <!-- the channel's link chip over the send's mute: a bank shows one send of the channel,
+                   and the chip links all of them -->
+              <StackPanel layout:StripPanel.Part="mute" Spacing="4" HorizontalAlignment="Center">
+                <ToggleButton Name="BankLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                              Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Center"
+                              MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" HorizontalContentAlignment="Center"
+                              IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                              AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
                               Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                               HorizontalAlignment="Center" AutomationProperties.Name="{Binding MuteName}"
                               ToolTip.Tip="{Binding MuteName}"/>
-              </Panel>
+              </StackPanel>
             </layout:StripPanel>
           </DockPanel>
         </Border>
@@ -92,11 +99,17 @@
               <Panel layout:StripPanel.Part="value" VerticalAlignment="Center" MinWidth="28">
                 <skin:LitText Text="{Binding Send.LevelText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}" HorizontalAlignment="Right"/>
               </Panel>
-              <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
+              <!-- the channel's link chip before the send's mute: a bank shows one send of the
+                   channel, and the chip links all of them -->
+              <StackPanel layout:StripPanel.Part="mute" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <ToggleButton Name="BankLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                              Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                              IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                              AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
                 <ToggleButton Classes="mute mutemini" IsChecked="{Binding Send.Muted, Mode=TwoWay}"
                               Padding="7,2" FontSize="{DynamicResource UiText.FontSize11}" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                               AutomationProperties.Name="{Binding MuteName}" ToolTip.Tip="{Binding MuteName}"/>
-              </Panel>
+              </StackPanel>
             </layout:StripPanel>
           </DockPanel>
         </Border>

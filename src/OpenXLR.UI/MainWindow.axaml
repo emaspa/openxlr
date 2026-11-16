@@ -1390,10 +1390,19 @@
                                      AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
                           <skin:LitText Grid.Column="2" Text="{Binding VolumeText}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"/>
                         </Grid>
-                        <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
-                                vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
-                                AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
-                                ToolTip.Tip="{Binding VolumeTip}"/>
+                        <!-- the link chip after the volume fader, where a send row has its mute,
+                             so it stands between the channel's own level and its sends -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                          <Slider vm:FaderInput.Step="0.01" Minimum="0" Maximum="1" Value="{Binding Volume, Mode=TwoWay}"
+                                  vm:FaderInput.IsAdjusting="{Binding VolumeAdjusting, Mode=OneWayToSource}"
+                                  AutomationProperties.Name="{Binding Name, StringFormat={loc:Text Key=ChannelVolumeName}}"
+                                  ToolTip.Tip="{Binding VolumeTip}" VerticalAlignment="Center"/>
+                          <ToggleButton Grid.Column="1" Name="ChannelLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                                        Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                        MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}" HorizontalContentAlignment="Center"
+                                        IsVisible="{Binding HasLinkedSends}" IsChecked="{Binding LinkedSends, Mode=TwoWay}"
+                                        AutomationProperties.Name="{Binding LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
+                        </Grid>
                       </StackPanel>
                       <ItemsControl Grid.Row="1" ItemsSource="{Binding Sends}">
                         <ItemsControl.ItemTemplate>

@@ -246,7 +246,7 @@
                   <!-- the channel's own volume, under the gain where the row has one, the meter under it
                        otherwise; while the Wave XLR Pro's direct path carries this channel to the jacks, a
                        mark says it reaches the mixes only -->
-                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
+                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
@@ -258,6 +258,11 @@
                     <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
+                    <!-- the link chip after the channel's volume, before the row's sends -->
+                    <ToggleButton Grid.Column="2" Name="MatrixLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                                  Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                  IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                                  AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
                   </Grid>
                 </StackPanel>
                 <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
@@ -391,7 +396,7 @@
                   <!-- the channel's own volume, under the gain where the row has one, the meter under it
                        otherwise; while the Wave XLR Pro's direct path carries this channel to the jacks, a
                        mark says it reaches the mixes only -->
-                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
+                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
@@ -403,6 +408,11 @@
                     <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
+                    <!-- the link chip after the channel's volume, before the row's sends -->
+                    <ToggleButton Grid.Column="2" Name="MatrixLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                                  Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                  IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                                  AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
                   </Grid>
                 </StackPanel>
                 <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">
@@ -493,7 +503,7 @@
                   <!-- the channel's own volume, under the gain where the row has one, the meter under it
                        otherwise; while the Wave XLR Pro's direct path carries this channel to the jacks, a
                        mark says it reaches the mixes only -->
-                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
+                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
@@ -505,6 +515,11 @@
                     <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
+                    <!-- the link chip after the channel's volume, before the row's sends -->
+                    <ToggleButton Grid.Column="2" Name="MatrixLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                                  Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                  IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                                  AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
                   </Grid>
                 </StackPanel>
               </layout:StripPanel>
@@ -568,7 +583,7 @@
                   <!-- the channel's own volume, under the gain where the row has one, the meter under it
                        otherwise; while the Wave XLR Pro's direct path carries this channel to the jacks, a
                        mark says it reaches the mixes only -->
-                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
+                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
@@ -580,6 +595,11 @@
                     <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
+                    <!-- the link chip after the channel's volume, before the row's sends -->
+                    <ToggleButton Grid.Column="2" Name="MatrixLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                                  Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                  IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                                  AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
                   </Grid>
                 </StackPanel>
               </layout:StripPanel>
@@ -701,7 +721,7 @@
                   <!-- the channel's own volume, under the gain where the row has one, the meter under it
                        otherwise; while the Wave XLR Pro's direct path carries this channel to the jacks, a
                        mark says it reaches the mixes only -->
-                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
+                  <Grid Name="MatrixVolumeLine" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" IsVisible="{Binding ShowsVolume}">
                     <layout:MeterFader ShowsMeter="{Binding VolumeShowsMeter}" LeftLevel="{Binding Channel.MeterL}" RightLevel="{Binding Channel.MeterR}" Mono="{Binding Channel.MonoMeter}"
                                        LeftName="{Binding LeftLevelName}" RightName="{Binding RightLevelName}" VerticalAlignment="Center">
                       <Slider Name="MatrixVolume" Classes="matrixFader" vm:FaderInput.Step="0.01" Minimum="0" Maximum="1"
@@ -713,6 +733,11 @@
                     <TextBlock Grid.Column="1" Name="MatrixVolumeNote" Text="&#x24D8;" Classes="h" FontSize="{DynamicResource UiText.FontSize12}" VerticalAlignment="Center"
                                Cursor="Help" IsVisible="{Binding Channel.DirectMonitored}" ToolTip.Tip="{Binding Channel.VolumeTip}"
                                AutomationProperties.Name="{loc:Text Key=ChannelVolumeMixesOnly}"/>
+                    <!-- the link chip after the channel's volume, before the row's sends -->
+                    <ToggleButton Grid.Column="2" Name="MatrixLinkSends" Classes="linkChip" Content="{loc:Text Key=LinkSends}"
+                                  Padding="5,1" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center"
+                                  IsVisible="{Binding Channel.HasLinkedSends}" IsChecked="{Binding Channel.LinkedSends, Mode=TwoWay}"
+                                  AutomationProperties.Name="{Binding Channel.LinkedSendsName}" ToolTip.Tip="{loc:Text Key=LinkSendsTip}"/>
                   </Grid>
                 </StackPanel>
                 <Panel layout:StripPanel.Part="mute" VerticalAlignment="Center">

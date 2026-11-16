@@ -215,6 +215,7 @@ public sealed class HistoryViewModel : ViewModelBase
             "sendMute" when channel is not null && mix is not null => Localizer.Format("HistorySendMute", channel, mix),
             "mixMute" when mix is not null => Localizer.Format("HistoryMixMute", mix),
             "exclusiveGroup" when group is not null => Localizer.Format("HistoryExclusiveGroup", group),
+            "linkedSends" when channel is not null => Localizer.Format("HistoryLinkedSends", channel),
             "eq" when channel is not null => Localizer.Format("HistoryEq", channel),
             "mixEq" when mix is not null => Localizer.Format("HistoryMixEq", mix),
             "noiseRemoval" when channel is not null => Localizer.Format("HistoryNoiseRemoval", channel),
