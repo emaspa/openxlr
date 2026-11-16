@@ -46,13 +46,15 @@ shows the daemon's reason above the sections for a few seconds, in the
 same place as a [marked glitch](#glitch-marker). The control goes back to
 the value the daemon kept. A reason that comes again and again, as for a
 meter a window keeps asking for, shows once and then only after half a
-minute without it. While the UI is not connected to the daemon, the
-header reads "Daemon not running" and the input, headphone and monitor
-sections and the mixer are greyed out. They take no input, and every meter
-drops to zero, the ones in Mic setup and the compressor and expander
-windows included. Everything comes back as soon as the UI connects again.
-The meters also drop to zero while the daemon has no mixer, as when it
-builds the mixer again after the audio server restarted.
+minute without it. A reason that is word for word the daemon's warning,
+as while the mixer is being built again, shows only as the warning. While
+the UI is not connected to the daemon, the header reads "Daemon not
+running" and the input, headphone and monitor sections and the mixer are
+greyed out. They take no input, and every meter drops to zero, the ones
+in Mic setup and the compressor and expander windows included. Everything
+comes back as soon as the UI connects again. The meters also drop to zero
+while the daemon has no mixer, as when it builds the mixer again after
+the audio server restarted.
 
 The gear in the header opens Options in its own window, so you can keep
 using the mixer while adjusting settings. Pressing the gear again brings
