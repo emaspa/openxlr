@@ -170,6 +170,67 @@ public sealed class DaemonErrorViewModelTests
         Assert.True(model.ControlsEnabled);
     }
 
+    private static void MeterFrame(MainViewModel model, string json) => Invoke(model, "ApplyMeters", JsonNode.Parse(json));
+
+    /// <summary>The state with XLR 1's compressor and expander on this computer, so its Dynamics windows have a model.</summary>
+    private static JsonObject StateWithDynamics()
+    {
+        JsonObject state = State();
+        JsonObject xlr1 = state["mixer"]!["channels"]!.AsArray().OfType<JsonObject>().Single(c => c["id"]!.GetValue<string>() == "xlr1");
+        xlr1["compressor"] = JsonNode.Parse("""
+            {"enabled":true,"threshold":-18,"ratio":3,"attack":5,"release":150,"knee":6,"makeup":0,"available":true,"error":null}
+            """);
+        xlr1["expander"] = JsonNode.Parse("""
+            {"enabled":true,"threshold":-50,"ratio":3,"range":24,"attack":1,"release":150,"hold":50,"available":true,"error":null}
+            """);
+        return state;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MicSetupAndTheDynamicsWindowsDropTheirMetersWithTheMainOnes(bool graphLost)
+    {
+        await using var client = new DaemonClient();
+        MainViewModel model = Model(client);
+        Push(model, StateWithDynamics());
+        WasConnected(model);
+        ChannelViewModel xlr1 = model.Channels.Single(c => c.Id == "xlr1");
+        ChannelDynamicsViewModel dynamics = xlr1.Dynamics!;
+        MicSetupViewModel setup = model.Inserts.MicSetup;
+        MeterFrame(model, """{"ch:xlr1":[0.7,0.5],"in:xlr1":[0.6,0.8,0],"comp:xlr1":[-12,6,-18],"exp:xlr1":[-12,0,-12]}""");
+        Assert.Equal(0.6, setup.InputLevel);
+        Assert.Equal(0.8, setup.InputPeak);
+        Assert.True(dynamics.Compressor.HasLevels);
+        Assert.True(dynamics.Compressor.InputLevel > 0);
+        Assert.True(dynamics.Compressor.ReductionLevel > 0);
+        Assert.True(dynamics.Expander.OutputLevel > 0);
+
+        if (graphLost)
+        {
+            // The audio server restarted: the daemon stays, its graph and its meter frames do not.
+            JsonObject lost = State();
+            lost["mixer"] = null;
+            lost["mixerWaiting"] = true;
+            lost["mixerRebuilding"] = true;
+            Push(model, lost);
+            Assert.True(model.DaemonConnected);
+        }
+        else Disconnect(model);
+
+        Assert.Equal(0, xlr1.MeterL);
+        Assert.Equal(0, setup.InputLevel);
+        Assert.Equal(0, setup.InputPeak);
+        foreach (MicDynamicsViewModel processor in new[] { dynamics.Compressor, dynamics.Expander })
+        {
+            Assert.False(processor.HasLevels);
+            Assert.Equal(0, processor.InputLevel);
+            Assert.Equal(0, processor.ReductionLevel);
+            Assert.Equal(0, processor.OutputLevel);
+            Assert.Equal(0, processor.History.Count);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

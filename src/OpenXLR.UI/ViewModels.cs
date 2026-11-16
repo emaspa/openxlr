@@ -233,14 +233,19 @@ public sealed partial class MainViewModel : ViewModelBase
         if (DaemonConnected) ShowNotice(error, ErrorNoticeHold);
     }
 
-    /// <summary>The daemon is gone: every meter falls to zero rather than holding its last level.</summary>
+    /// <summary>
+    /// The daemon is gone, or its mixer is: every meter falls to zero rather
+    /// than holding its last level, Mic setup's and the compressor and
+    /// expander windows' included.
+    /// </summary>
     private void ZeroMeters()
     {
         var silent = new JsonObject();
         Ducking.ApplyMeters(silent);
         Soundboard.ApplyMeters(silent);
-        foreach (ChannelViewModel channel in Channels) { channel.MeterL = 0; channel.MeterR = 0; }
+        foreach (ChannelViewModel channel in Channels) { channel.MeterL = 0; channel.MeterR = 0; channel.Dynamics?.DropLevels(); }
         foreach (MixViewModel mix in Mixes) { mix.MeterL = 0; mix.MeterR = 0; mix.MaximizerReduction = 0; }
+        foreach (MicSetupViewModel setup in MicSetups()) setup.DropLevel();
     }
 
     // --- connection / device identity ---
@@ -1337,6 +1342,8 @@ public sealed partial class MainViewModel : ViewModelBase
             ApplyDevices(node["devices"], node["mixer"]);
             ApplyWaveInterfaces(node["waveInterfaces"]);
             ApplyMixer(node["mixer"]);
+            // No graph, no meters: a lost graph's last frame would otherwise stay on every meter.
+            if (node["mixer"] is not JsonObject) ZeroMeters();
             ApplyStreams(node["mixer"]);
             ApplyBrowserTabs(node["mixer"]);
             ApplyAppRouting(node["mixer"]);

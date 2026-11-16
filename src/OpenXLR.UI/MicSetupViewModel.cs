@@ -1188,6 +1188,12 @@ public sealed class MicSetupViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// The daemon or its mixer went away and no frame is coming: the level
+    /// meters fall to zero. The clip light keeps what it caught.
+    /// </summary>
+    public void DropLevel() => InputLevel = InputPeak = 0;
+
     /// <summary>The meters' <c>take:</c> entry for this channel, while the take loops.</summary>
     public void ApplyPosition(JsonArray position)
     {
