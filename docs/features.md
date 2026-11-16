@@ -464,7 +464,8 @@ Built from PipeWire nodes, no kernel modules or custom drivers:
 - Linked sends: a Link chip at the start of each channel's sends keeps
   the channel at one level in every mix. Linking takes the first mix's
   level. Moving any send then moves them all, from the UI, a Deck dial,
-  the terminal mixer or the API, and one undo puts them back. The mutes
+  the terminal mixer or the API, and one undo puts them back. The
+  terminal mixer links or unlinks the selected channel with `l`. The mutes
   stay per mix, the Aux mix and hidden mixes are linked too, and a mix
   added while linked starts at the linked level. Saved with the mixer and
   in profiles (`setLinkedSends`, see [Linked sends](manual.md#linked-sends))

@@ -75,6 +75,14 @@ internal sealed record ChannelEntry
     /// daemon that gave volumes to application and capture channels only.
     /// </summary>
     public double? Volume { get; init; }
+
+    /// <summary>
+    /// Whether every send of the channel plays at one level, which
+    /// <c>setLinkedSends</c> switches; null from a daemon that predates
+    /// linked sends, which offers no link.
+    /// </summary>
+    public bool? LinkedSends { get; init; }
+
     public bool Hardware { get; init; }
     public string? CaptureSource { get; init; }
     public int CapturePair { get; init; }

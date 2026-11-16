@@ -576,6 +576,7 @@ internal sealed class App
             "          Space mute; -/+ five points; [/] one point.",
             "          r rename; n new channel; N new mic; c capture input.",
             "          M monitor mix; d delete; Ctrl+Left/Right reorder.",
+            "          l links a channel's sends at one level in every mix.",
             "Matrix    Up/Down channel; Left/Right mix; Space mute; -/+ [/] level.",
             "Inputs    Up/Down control; Left/Right or -/+ level; [/] fine.",
             "          Ctrl+Left/Right fine; Space toggle; Home/End limits.",
