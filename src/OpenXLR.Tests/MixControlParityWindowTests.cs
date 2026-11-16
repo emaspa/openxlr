@@ -235,7 +235,8 @@ internal static class MixControlParityWindowTests
 
         // Line In's Raw Capture: a press is the INPUTS toggle's write, the button lit while it is on.
         var raw = (Button)Shown(SkinLayoutWindowTests.RowHead(window, "line"), "MatrixLineInRaw")!;
-        Assert.Equal(Localizer.Text("RawCapture"), raw.Content);
+        Assert.Equal(Localizer.Text("Raw"), raw.Content);
+        Assert.Equal(Localizer.Text("RawCapture"), AutomationProperties.GetName(raw));
         Assert.Equal(Localizer.Text("LineInRawCaptureTip"), ToolTip.GetTip(raw));
         Assert.DoesNotContain("fxOn", raw.Classes);
         raw.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

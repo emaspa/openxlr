@@ -116,7 +116,7 @@
             <ToggleButton Content="{loc:Text Key=Phantom}" IsChecked="{Binding Unit.Phantom, Mode=TwoWay}" IsVisible="{Binding Unit.CapPhantom, FallbackValue=False}"/>
             <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding Unit.ClipGuard, Mode=TwoWay}" IsVisible="{Binding Unit.CapClipGuard, FallbackValue=False}"/>
             <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Unit.Compressor, Mode=TwoWay}" IsVisible="{Binding Unit.CapCompressor, FallbackValue=False}"/>
-            <ToggleButton Content="{loc:Text Key=RawCapture}" IsChecked="{Binding Unit.RawCapture, Mode=TwoWay}" IsVisible="{Binding Unit.CapRawCapture, FallbackValue=False}"
+            <ToggleButton Content="{loc:Text Key=Raw}" AutomationProperties.Name="{loc:Text Key=RawCapture}" IsChecked="{Binding Unit.RawCapture, Mode=TwoWay}" IsVisible="{Binding Unit.CapRawCapture, FallbackValue=False}"
                           ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
           </WrapPanel>
           <Grid Name="MatrixVoiceTuneStrength" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6" IsVisible="{Binding Unit.VoiceTune, FallbackValue=False}">
@@ -564,7 +564,7 @@
                   <Button Grid.Column="3" Name="MatrixLineInRaw" Classes="matrixProcessing fx" Classes.fxOn="{Binding Main.LineInRawCapture}"
                           Padding="5,2" FontSize="{DynamicResource UiText.FontSize11}" VerticalAlignment="Center" MinWidth="{DynamicResource Ox.Mixer.SmallControlMinSize}"
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsLineInRawButton}" Click="OnToggleLineInRaw"
-                          Content="{loc:Text Key=RawCapture}" AutomationProperties.Name="{loc:Text Key=RawCapture}" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>
+                          Content="{loc:Text Key=Raw}" AutomationProperties.Name="{loc:Text Key=RawCapture}" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>
                   <!-- the gain, which reads the channel's volume while the volume fader moves and for a second after;
                        under the Raw Capture switch while that shows -->
                   <skin:LitText Grid.Column="3" Name="MatrixReadout" Text="{Binding Readout}" Classes="val" FontSize="{DynamicResource UiText.FontSize11}"

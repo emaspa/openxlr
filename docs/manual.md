@@ -741,11 +741,11 @@ strip. A bound strip keeps its sends and send mutes everywhere.
 #### Record the microphone before the interface's processing
 
 On a Wave XLR Pro (firmware 1.0.14 or later) and a Wave XLR MK.2 (firmware
-1.0.15 or later), **Raw Capture** sends an input to the computer before the
-interface's own processing. It sits with the input's switches: next to
+1.0.15 or later), Raw Capture sends an input to the computer before the
+interface's own processing. Its switch is labelled **Raw**. It sits with the input's switches: next to
 Compressor in the INPUTS card, in the input rack and under **Mic** in a mix
 matrix row. On the Pro, XLR 1 and XLR 2 each have one, and Line In has one
-next to its **Level Lock**, and in a mix matrix a **Raw Capture** button in
+next to its **Level Lock**, and in a mix matrix a **Raw** button in
 its row's name column. Turn it on when you want OpenXLR's EQ,
 compressor, noise removal and plugins to work on the microphone as the
 preamp gives it, rather than after the interface's low cut, EQ, compressor,
@@ -1500,7 +1500,7 @@ and the first move brings it into range.
 and other applications from changing the Line In gain. While it is on,
 the unit ignores gain changes made through its ALSA control, and the
 Line In gain in OpenXLR still works. It is separate from Aux In's Level
-Lock, and a profile saves it. **Raw Capture**, under it, sends Line In to
+Lock, and a profile saves it. **Raw**, under it, sends Line In to
 the computer before the unit's ducking ([Raw capture](#raw-capture)).
 
 Like Aux In, Line In starts
@@ -3751,7 +3751,7 @@ and a strip bound to an additional interface has that interface's
 switches. Aux In has its level and **Lock**, Line In its gain and **Lock**, and both
 show the level or gain in the name column the same way
 ([readout](#gain-readout)). On a unit that offers
-[Raw Capture](#raw-capture) on Line In, its row has a **Raw Capture** button
+[Raw Capture](#raw-capture) on Line In, its row has a **Raw** button
 in the name column, green while it is on, with the gain under it. Each of them also has its [volume](#channel-volume),
 a second fader under the gain or the level, and the row grows to hold
 both. An application or capture channel has its volume, with its meter

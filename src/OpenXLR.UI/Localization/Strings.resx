@@ -1113,6 +1113,9 @@
   <data name="LevelLock" xml:space="preserve">
     <value>Level Lock</value>
   </data>
+  <data name="Raw" xml:space="preserve">
+    <value>Raw</value>
+  </data>
   <data name="RawCapture" xml:space="preserve">
     <value>Raw Capture</value>
   </data>

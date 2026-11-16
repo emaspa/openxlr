@@ -532,7 +532,7 @@
                 <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard, Mode=TwoWay}" IsVisible="{Binding CapClipGuard}"/>
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor, Mode=TwoWay}"
                               IsVisible="{Binding CapCompressor}"/>
-                <ToggleButton Name="RawCaptureToggle" Content="{loc:Text Key=RawCapture}" IsChecked="{Binding RawCapture, Mode=TwoWay}"
+                <ToggleButton Name="RawCaptureToggle" Content="{loc:Text Key=Raw}" AutomationProperties.Name="{loc:Text Key=RawCapture}" IsChecked="{Binding RawCapture, Mode=TwoWay}"
                               IsVisible="{Binding CapRawCapture}" ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
               </WrapPanel>
               <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune}">
@@ -698,7 +698,7 @@
                 <ToggleButton Content="{loc:Text Key=Phantom}"  IsChecked="{Binding Phantom2, Mode=TwoWay}"/>
                 <ToggleButton Content="{loc:Text Key=ClipGuard}" IsChecked="{Binding ClipGuard2, Mode=TwoWay}"/>
                 <ToggleButton Content="{loc:Text Key=Compressor}" IsChecked="{Binding Compressor2, Mode=TwoWay}"/>
-                <ToggleButton Name="RawCapture2Toggle" Content="{loc:Text Key=RawCapture}" IsChecked="{Binding RawCapture2, Mode=TwoWay}"
+                <ToggleButton Name="RawCapture2Toggle" Content="{loc:Text Key=Raw}" AutomationProperties.Name="{loc:Text Key=RawCapture}" IsChecked="{Binding RawCapture2, Mode=TwoWay}"
                               IsVisible="{Binding CapRawCapture2}" ToolTip.Tip="{loc:Text Key=RawCaptureTip}"/>
               </WrapPanel>
               <Grid ColumnDefinitions="Auto,*,64" IsVisible="{Binding VoiceTune2}">
@@ -792,7 +792,7 @@
           <skin:LitText Grid.Column="2" Name="LineInReadout" Text="{Binding LineInReadout}" Classes="val" VerticalAlignment="Center"
                         HorizontalAlignment="Right" AutomationProperties.Name="{Binding LineInReadoutName}" ToolTip.Tip="{Binding LineInReadoutName}"/>
           <ToggleButton Grid.Column="4" Name="LineInLock" Classes="lock" Content="{loc:Text Key=LevelLock}" IsChecked="{Binding LineInLevelLock, Mode=TwoWay}"/>
-          <ToggleButton Grid.Row="1" Grid.Column="1" Name="LineInRawToggle" Content="{loc:Text Key=RawCapture}" Margin="0,4,0,0"
+          <ToggleButton Grid.Row="1" Grid.Column="1" Name="LineInRawToggle" Content="{loc:Text Key=Raw}" AutomationProperties.Name="{loc:Text Key=RawCapture}" Margin="0,4,0,0"
                         IsChecked="{Binding LineInRawCapture, Mode=TwoWay}" IsVisible="{Binding CapLineInRawCapture}"
                         HorizontalAlignment="Left" ToolTip.Tip="{loc:Text Key=LineInRawCaptureTip}"/>
         </Grid>
