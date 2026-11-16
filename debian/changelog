@@ -1,3 +1,14 @@
+openxlr (0.9.0) resolute; urgency=medium
+
+  * Mixer: linked sends, one fader for a channel in every mix, with a Deck key
+  * Daemon: the mixer is rebuilt in place after a pipewire-pulse restart instead of the daemon restarting
+  * Daemon: a restore that fails partway is retried, and mixer.json keeps a backup and a version
+  * Daemon: mixer commands wait for the build, and errors are answered instead of closing the connection
+  * UI: greyed sections and a notice when the daemon is down or refuses a change
+  * Packaging: raise PipeWire's own open-file limit, so a WirePlumber restart no longer leaves streams unlinked
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Mon, 16 Nov 2026 20:22:46 +0000
+
 openxlr (0.8.1) resolute; urgency=medium
 
   * Deck: OpenDeck's icon editor no longer flickers or drops typing on OpenXLR dials and keys

@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.8.1
+Version: 0.9.0
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -257,6 +257,14 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Mon Nov 16 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.0-1
+- Mixer: linked sends, one fader for a channel in every mix, with a Deck key
+- Daemon: the mixer is rebuilt in place after a pipewire-pulse restart instead of the daemon restarting
+- Daemon: a restore that fails partway is retried, and mixer.json keeps a backup and a version
+- Daemon: mixer commands wait for the build, and errors are answered instead of closing the connection
+- UI: greyed sections and a notice when the daemon is down or refuses a change
+- Packaging: raise PipeWire's own open-file limit, so a WirePlumber restart no longer leaves streams unlinked
+
 * Sun Nov 15 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.8.1-1
 - Deck: OpenDeck's icon editor no longer flickers or drops typing on OpenXLR dials and keys
 - UI: Avalonia 12.1.6
