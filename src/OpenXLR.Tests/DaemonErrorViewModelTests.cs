@@ -231,6 +231,49 @@ public sealed class DaemonErrorViewModelTests
         }
     }
 
+    [Fact]
+    public async Task AMeterFrameThatCannotBeReadIsDroppedAndLoggedOncePerConnection()
+    {
+        var logged = new List<string>();
+        Action<string> write = UiErrors.Write;
+        UiErrors.Write = logged.Add;
+        try
+        {
+            await using var client = new DaemonClient();
+            MainViewModel model = Model(client);
+            Push(model, State());
+            WasConnected(model);
+            ChannelViewModel xlr1 = model.Channels.Single(c => c.Id == "xlr1");
+
+            // A level of the wrong kind, or out of range, reads as silence.
+            MeterFrame(model, """{"ch:xlr1":[0.7,0.5]}""");
+            MeterFrame(model, """{"ch:xlr1":["loud",1e400]}""");
+            Assert.Equal(0, xlr1.MeterL);
+            Assert.Equal(0, xlr1.MeterR);
+            Assert.Empty(logged);
+
+            // A frame that throws, here one naming a meter twice, is dropped
+            // and logged; the same again is not logged a second time.
+            const string twice = """{"ch:xlr1":[0.7,0.5],"ch:xlr1":[0.2,0.1]}""";
+            MeterFrame(model, twice);
+            MeterFrame(model, twice);
+            Assert.Single(logged);
+            Assert.Contains("a meters frame could not be applied", logged[0], StringComparison.Ordinal);
+            Assert.False(Applying(model));
+
+            // The next frame that reads applies.
+            MeterFrame(model, """{"ch:xlr1":[0.6,0.4]}""");
+            Assert.Equal(0.6, xlr1.MeterL);
+
+            // A new connection logs its own first failure.
+            Disconnect(model);
+            Push(model, State());
+            MeterFrame(model, twice);
+            Assert.Equal(2, logged.Count);
+        }
+        finally { UiErrors.Write = write; }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

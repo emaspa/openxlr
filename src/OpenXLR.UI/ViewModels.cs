@@ -144,6 +144,7 @@ public sealed partial class MainViewModel : ViewModelBase
             CancelMonitorSelectionEdit();
             CancelMonitorMicrophoneEdit();
             ZeroMeters();
+            _meterFrameLogged = false;
             // The next daemon answers for itself: its own last state, its own banner.
             _appliedState = null;
             StateUnreadable = false;
@@ -1644,8 +1645,28 @@ public sealed partial class MainViewModel : ViewModelBase
         foreach (AudioDeviceItem d in fresh) target.Add(d);
     }
 
-    /// <summary>Route each peak to its channel strip or mix.</summary>
+    /// <summary>A meters frame failed on this connection and was logged; the next failure is not.</summary>
+    private bool _meterFrameLogged;
+
+    /// <summary>
+    /// Take a meters frame on the UI thread. A frame that throws, as one
+    /// from a daemon of another version could, is dropped: the first on a
+    /// connection is logged, and the meters keep what they showed until a
+    /// frame applies.
+    /// </summary>
     private void ApplyMeters(JsonNode levels)
+    {
+        try { ApplyMeterFrame(levels); }
+        catch (Exception ex)
+        {
+            if (_meterFrameLogged) return;
+            _meterFrameLogged = true;
+            UiErrors.Log("a meters frame could not be applied and was dropped; later failures on this connection are not logged", ex);
+        }
+    }
+
+    /// <summary>Route each peak to its channel strip or mix; a level that is not a finite number reads as silence.</summary>
+    private void ApplyMeterFrame(JsonNode levels)
     {
         if (levels is not JsonObject obj) return;
         Ducking.ApplyMeters(obj);
@@ -1660,8 +1681,8 @@ public sealed partial class MainViewModel : ViewModelBase
             double l = 0, r = 0;
             if (kv.Value is JsonArray arr && arr.Count >= 2)
             {
-                l = arr[0]?.GetValue<double>() ?? 0;
-                r = arr[1]?.GetValue<double>() ?? 0;
+                l = MeterLevel(arr[0]);
+                r = MeterLevel(arr[1]);
             }
             if (kv.Key.StartsWith("ch:", StringComparison.Ordinal))
             {
@@ -1695,6 +1716,9 @@ public sealed partial class MainViewModel : ViewModelBase
                 MicSetupOf(kv.Key[5..])?.ApplyPosition(position);
         }
     }
+
+    private static double MeterLevel(JsonNode? node)
+        => node is JsonValue v && v.TryGetValue(out double d) && double.IsFinite(d) ? d : 0;
 
     /// <summary>Every microphone's Mic setup: XLR 1's, XLR 2's and each mono capture input's.</summary>
     internal IEnumerable<MicSetupViewModel> MicSetups()
