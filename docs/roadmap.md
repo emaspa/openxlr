@@ -243,6 +243,12 @@ land at any time.
 
 ### Devices
 
+- [ ] The Wave Neo, which has no backend yet. The maintainer has a unit
+  on the way, so the work starts on his desk: its USB identity and
+  descriptors, which protocol it speaks, its controls mapped from Wave
+  Link captures on Windows, then a backend. Each control is marked
+  verified in [hardware-support.md](hardware-support.md) once it passes
+  on the unit.
 - [ ] Last settings, the gain lock, LEDs and raw capture kept per unit,
   not per model, so a second unit of one model does not take the first
   one's values when it is picked.
@@ -267,8 +273,6 @@ land at any time.
   and how to update it, which today takes Wave Link on Windows or macOS.
 - [ ] The Pro's UCM profile upstreamed to alsa-ucm-conf once a second
   owner confirms the split.
-- [ ] The Wave Neo, which has no backend. It starts when an owner sends
-  a diagnostics archive and captures.
 
 ### Daemon and integrations
 
