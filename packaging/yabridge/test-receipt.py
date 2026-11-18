@@ -400,6 +400,22 @@ class BuildDirectoryTests(unittest.TestCase):
         self.assertIn(f"uid {self.uid + 1}", message)
         self.assertIn("could replace", message)
 
+    def test_package_build_checks_the_tree_and_not_its_parents(self):
+        # sbuild builds as buildd in /build/<package>, and /build belongs to sbuild.
+        output = self.root / "out"
+        output.mkdir(mode=0o700)
+        with self.owned_by(self.root, self.uid + 1):
+            self.assertEqual(output, bridge.build_directory(output, create=False, parents=False))
+            self.assertEqual(output / "new", bridge.build_directory(output / "new", create=True, parents=False))
+            # The package's own directories are still checked.
+            with self.owned_by(output, self.uid + 1):
+                with self.assertRaises(RuntimeError):
+                    bridge.build_directory(output, create=False, parents=False)
+            output.chmod(0o777)
+            with self.assertRaises(RuntimeError):
+                bridge.build_directory(output, create=False, parents=False)
+            output.chmod(0o700)
+
     def test_sudo_accepts_the_invoking_user_and_root_only(self):
         self.assertEqual({1000}, bridge.build_owners(1000, None))
         self.assertEqual({1000}, bridge.build_owners(1000, "0"))

@@ -56,7 +56,7 @@ def describe_owner(uid):
         return f"uid {uid}"
 
 
-def directory_refusal(path, owners):
+def directory_refusal(path, owners, parents=True):
     """Why another user could control what the build reads or writes at path, or None.
 
     path is a resolved path. The directory itself, when it exists, must be a
@@ -66,6 +66,11 @@ def directory_refusal(path, owners):
     does, so nobody else can rename or replace what sits below it. A group
     writable ancestor is accepted: package builders and user private groups
     both make those, and the group is the administrator's choice.
+
+    With parents false only the directory itself is checked. A package build
+    runs in a tree the package builder made for it, under directories that
+    belong to the builder's own account (sbuild's /build on Launchpad), not to
+    the user the build runs as.
     """
     wanted = " or ".join(describe_owner(uid) for uid in sorted(owners))
     if os.path.lexists(path):
@@ -80,7 +85,7 @@ def directory_refusal(path, owners):
         if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
             return (f"{path} can be written by other users (mode {stat.S_IMODE(info.st_mode):04o}). "
                     f"Run chmod go-w {path}, or choose a new directory.")
-    for parent in path.parents:
+    for parent in path.parents if parents else ():
         if not os.path.lexists(parent):
             continue
         info = os.lstat(parent)
@@ -96,7 +101,7 @@ def directory_refusal(path, owners):
     return None
 
 
-def build_directory(path, *, create, euid=None, sudo_uid=None):
+def build_directory(path, *, create, euid=None, sudo_uid=None, parents=True):
     """Resolve a --source or --output path and refuse one another user could control.
 
     On a shared machine another user can create a fixed path such as
@@ -111,7 +116,7 @@ def build_directory(path, *, create, euid=None, sudo_uid=None):
     if lexical.is_symlink():
         raise RuntimeError(f"Refusing build directory: {lexical} is a symbolic link. Pass a real directory you own.")
     resolved = lexical.resolve()
-    refusal = directory_refusal(resolved, owners)
+    refusal = directory_refusal(resolved, owners, parents)
     if refusal is None and create and not os.path.lexists(resolved):
         missing = []
         parent = resolved
@@ -125,7 +130,7 @@ def build_directory(path, *, create, euid=None, sudo_uid=None):
                 pass  # Checked below like any other existing directory.
             else:
                 directory.chmod(0o700)
-        refusal = directory_refusal(resolved, owners)
+        refusal = directory_refusal(resolved, owners, parents)
     if refusal is not None:
         raise RuntimeError("Refusing build directory: " + refusal)
     return resolved
@@ -514,6 +519,8 @@ def main():
     parser.add_argument("--manager", choices=("debian", "rpm", "arch", "nix", "manual"))
     parser.add_argument("--format", choices=("deb", "rpm", "arch", "srpm", "debian-source"))
     parser.add_argument("--jobs", type=int, default=2)
+    parser.add_argument("--package-build", action="store_true",
+                        help="the directories are a package builder's tree: check them, not their parents")
     args = parser.parse_args()
     if args.command == "receipt":
         source, output = args.source.resolve(), args.output.resolve()
@@ -521,8 +528,9 @@ def main():
         # Every step that reads the source or writes the output refuses a
         # directory another user could control, before it touches either.
         try:
-            source = build_directory(args.source, create=args.command == "prepare")
-            output = build_directory(args.output, create=args.command in ("build", "package", "source-archive"))
+            parents = not args.package_build
+            source = build_directory(args.source, create=args.command == "prepare", parents=parents)
+            output = build_directory(args.output, create=args.command in ("build", "package", "source-archive"), parents=parents)
         except RuntimeError as error:
             parser.exit(1, f"{parser.prog}: {error}\n")
     if args.command == "prepare": prepare(source)
