@@ -327,7 +327,7 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `setAppVolume` | `identity`, `value` | set a known application's playback volume from 0 to 1 on the desktop percentage scale, or clear it with `null`. Take the identity from `mixer.streams`; the level is saved under the key `assignApp` uses. The level is written to the application's playing streams before the command is acknowledged, up to eight of them and for a quarter of a second at most; the daemon writes the rest, and repeats a write the sound server refused, within the next sweeps, about a second each. Each stream the application starts later gets the level when it appears. `null` puts the playing streams back to 100% the same way. Saved in `mixer.json` with the next write, independent of routing and profiles. It is the stream volume the desktop shows, so a change made there or by the application replaces the saved level. The browser application level is shared by its playback streams, including captured tabs; tab levels apply separately |
 | `setBrowserTabVolume` | `session`, `tabId`, `site`, `value`, `remember` | volume from 0 to 1 for a tab whose companion reports `volumeSupported`. The origin must still match the tab. `remember:true` stores a site default independently of routing; `false` overrides only this tab until navigation or closure. `value:null` clears the specified override |
 | `assignBrowserTab` | `session`, `tabId`, `site`, `channel`, `remember` | select an application channel or `null` for browser default for a connected tab. Required `site` is the origin the caller saw; an assignment is refused if that tab has navigated to another origin. `remember` must be boolean; true saves the website origin preference, and `channel:null, remember:true` forgets it. False changes only this tab |
-| `activateBrowserTab` | `session`, `tabId`, `site` | ask the companion that registered a connected tab to bring it forward and start routing it, as its own Activate does. Refused unless `preserveBrowserOutputs` is on, `site` still matches the tab's origin, the tab has a channel, and it is neither capturing nor reporting an `activation`. Success means the request reached the companion, not that capture started; see [browser tabs](#browser-tabs) |
+| `activateBrowserTab` | `session`, `tabId`, `site` | ask the companion that registered a connected tab to bring it forward and start routing it, as its own Activate does, if the user activated that tab in the companion's popup in this browser session; otherwise the companion opens its popup on the tab. Refused unless `preserveBrowserOutputs` is on, `site` still matches the tab's origin, the tab has a channel, and it is neither capturing nor reporting an `activation`. Success means the request reached the companion, not that capture started; see [browser tabs](#browser-tabs) |
 | `setRouteAppsByDefault` | `value` | boolean only; automatic name rules for apps without an explicit assignment. True by default. False leaves them not managed by OpenXLR; explicit assignments still win. Saved in `mixer.json`, never recalled by a profile |
 | `setBlockSize` | `value` | `null`, or 256, 512 or 1024 frames, the sizes `mixer.blockSizes` lists; force the quantum of the graph OpenXLR runs in, or leave it to PipeWire with `null`. Saved in `mixer.json` before it is acknowledged, never recalled by a profile; see [block size](#block-size) |
 | `setPreserveBrowserOutputs` | `value` | boolean only; explicitly enable or disable preservation of Chromium-family playback outputs. Saved in `mixer.json`, never recalled by a profile. Registration alone does not enable it |
@@ -1881,17 +1881,19 @@ there is no heartbeat or persisted session id.
 A controller can ask for capture with `activateBrowserTab`. The daemon
 checks the tab as it does for `assignBrowserTab` and sends a
 `browserTabActivation` message with `tabId` and `site` to the companion's
-connection alone, since the session is that connection. The browser lets
-the companion capture a tab only after the user invoked the extension on
-that tab, by its toolbar button or keyboard shortcut, and that grant ends
-when the tab navigates. The companion brings the tab's
-window and the tab forward and starts it as its popup's Activate would.
-While it works on the request the tab reports `activation:"starting"`. If
-the browser still holds the grant, capture starts and `activation` is
-cleared. Otherwise the companion opens its popup on the tab where the
-browser allows that (`popup`); when it cannot, or a press in that popup
-is refused too, the tab reports `browser`, meaning the user has to invoke
-the extension on the tab and press Activate there. Any other failure clears
+connection alone, since the session is that connection. The companion
+brings the tab's window and the tab forward. While it works on the request
+the tab reports `activation:"starting"`. It starts capture, as its popup's
+Activate would, only for a tab where the user pressed Activate this tab in
+the popup during this browser session and that is still on the same
+origin. Stop routing or Stop all routing in the popup ends that for the
+tab, and so do closing it and navigating to another origin. The browser's own rule, capture
+only after the user invoked the extension on the tab, is looser, so the
+companion does not rely on it. When capture starts, `activation` is
+cleared. For any other tab the companion opens its popup on the tab where
+the browser allows that (`popup`); when it cannot, or a press in that
+popup is refused, the tab reports `browser`, meaning the user has to
+invoke the extension on the tab and press Activate there. Any other failure clears
 `activation` and sets the tab's `error`. The companion drops a request after
 two minutes, on navigation to another origin, when the tab closes or when
 `preserveBrowserOutputs` is turned off. A companion that predates this

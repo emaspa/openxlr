@@ -1445,11 +1445,12 @@ website. Until the companion reports a tab, the window says so under the
 option. Its Manual button opens the browser routing guide.
 Enable the option, choose a channel and press Activate in the tab's row.
 The button shows on a row with a channel that is not routed yet. The
-browser lets the companion take a tab's audio only after you clicked its
-toolbar icon or pressed its shortcut on that tab. Activate brings the tab
-forward and starts it when the browser still allows that. When it does
-not, the row tells you what to press in the browser, either Activate this
-tab in the popup the companion opens or the OpenXLR icon on the tab. See the
+companion takes a tab's audio only after you pressed Activate this tab in
+its popup on that tab. Activate in OpenXLR brings the tab forward and
+starts it again if you did that during this browser session and the tab
+is still on the same website. Otherwise the row tells you what to press
+in the browser, either Activate this tab in the popup the companion opens
+or the OpenXLR icon on the tab. See the
 [browser routing guide](browser-routing.md#choose-and-activate-a-tab).
 Remember website saves its origin's
 default across restarts. Browser permission must be granted again for
