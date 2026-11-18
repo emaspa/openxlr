@@ -420,22 +420,20 @@ public static class SkinReader
     }
 
     /// <summary>
-    /// The file a reference resolves to, or null when it is missing, is not a
-    /// regular file, or is a link whose target leaves the skin's folder. Run
-    /// when the skin is realized, since the folder can change under us.
+    /// The real path a reference leads to, or null when it is missing or
+    /// when, with every link along it followed, the skin's folder included, it
+    /// lands outside that folder. A linked folder inside the skin is followed
+    /// as the system follows it, so it cannot carry a name out of the skin.
+    /// Run when the skin is realized, since the folder can change under us.
     /// </summary>
-    internal static FileInfo? ResolveAsset(string directory, string relative)
+    internal static string? ResolveAsset(string directory, string relative)
     {
         try
         {
-            string root = Path.GetFullPath(directory);
-            var file = new FileInfo(Path.Combine(root, relative));
-            if (!file.Exists) return null;
-            // ResolveLinkTarget walks the whole chain; a plain file returns null.
-            FileSystemInfo resolved = file.ResolveLinkTarget(returnFinalTarget: true) ?? file;
-            string target = Path.GetFullPath(resolved.FullName);
-            return target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                ? new FileInfo(target) : null;
+            if (RegularFile.RealPath(directory) is not { } root
+                || RegularFile.RealPath(Path.Combine(directory, relative)) is not { } target)
+                return null;
+            return RegularFile.IsWithin(root, target) ? target : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
