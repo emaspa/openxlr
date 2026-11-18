@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.9.0
+Version: 0.9.1
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -257,6 +257,10 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Wed Nov 18 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.1-1
+- Pro: Line Out's level is a control, set in the HEADPHONES card under Phones 2, and kept by hardware mixing
+- Mixer: the phantom power lamp on a matrix row's Mic button shows only while phantom power is on
+
 * Mon Nov 16 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.0-1
 - Mixer: linked sends, one fader for a channel in every mix, with a Deck key
 - Daemon: the mixer is rebuilt in place after a pipewire-pulse restart instead of the daemon restarting

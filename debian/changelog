@@ -1,3 +1,10 @@
+openxlr (0.9.1) resolute; urgency=medium
+
+  * Pro: Line Out's level is a control, set in the HEADPHONES card under Phones 2, and kept by hardware mixing
+  * Mixer: the phantom power lamp on a matrix row's Mic button shows only while phantom power is on
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Wed, 18 Nov 2026 12:03:05 +0000
+
 openxlr (0.9.0) resolute; urgency=medium
 
   * Mixer: linked sends, one fader for a channel in every mix, with a Deck key
