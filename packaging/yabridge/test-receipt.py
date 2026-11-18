@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Companion inventory, staging contract and local publication regressions."""
+"""Companion build directories, inventory, staging contract and local publication regressions."""
 import hashlib
 import importlib.util
 import json
@@ -54,6 +54,10 @@ class ReceiptTests(unittest.TestCase):
         for name in bridge.FILES:
             (self.output / "native" / name).write_bytes(b"test binary")
         (self.output / "cargo/release/yabridgectl").write_bytes(b"controller")
+        # build.py refuses a source or output directory that others can write,
+        # which a umask of 002 would otherwise give these.
+        self.source.chmod(0o755)
+        self.output.chmod(0o755)
         self.stage_root = self.root / "stage"
         self.destination = self.root / "installed"
         self.destination.mkdir()
@@ -301,6 +305,161 @@ class ReceiptTests(unittest.TestCase):
             self.assertNotIn("__strip /usr/bin/true", recipe)
             self.assertIn("%global __os_install_post %{__os_install_post}", recipe)
             self.assertIn("--manager rpm", recipe)
+
+
+class BuildDirectoryTests(unittest.TestCase):
+    """Source and output directories another user could control are refused."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="openxlr-build-dirs-")
+        self.root = Path(self.temporary.name)
+        self.root.chmod(0o700)
+        self.uid = os.getuid()
+
+    def tearDown(self):
+        for path in self.root.rglob("*"):
+            if path.is_dir() and not path.is_symlink():
+                path.chmod(0o700)
+        self.temporary.cleanup()
+
+    def refused(self, path, **kwargs):
+        with self.assertRaises(RuntimeError) as refusal:
+            bridge.build_directory(path, create=kwargs.pop("create", False), **kwargs)
+        return str(refusal.exception)
+
+    def test_group_or_other_writable_directory_is_refused(self):
+        for mode in (0o770, 0o707, 0o777, 0o1777):
+            output = self.root / f"out-{mode:o}"
+            output.mkdir()
+            output.chmod(mode)
+            message = self.refused(output)
+            self.assertIn(str(output), message)
+            self.assertIn("chmod go-w", message)
+
+    def test_symbolic_link_is_refused_even_to_an_owned_directory(self):
+        real = self.root / "real"
+        real.mkdir(mode=0o700)
+        link = self.root / "link"
+        link.symlink_to(real, target_is_directory=True)
+        self.assertIn(str(link), self.refused(link))
+        self.assertIn(str(link), self.refused(link, create=True))
+
+    def test_missing_directory_is_created_private(self):
+        old_umask = os.umask(0o002)
+        try:
+            output = bridge.build_directory(self.root / "cache/openxlr-yabridge/build", create=True)
+        finally:
+            os.umask(old_umask)
+        self.assertEqual(self.root / "cache/openxlr-yabridge/build", output)
+        for path in (output, output.parent, output.parent.parent):
+            self.assertEqual(0o700, path.stat().st_mode & 0o7777, path)
+        self.assertEqual(output, bridge.build_directory(output, create=True))
+
+    def test_missing_directory_is_left_alone_without_create(self):
+        missing = self.root / "missing"
+        self.assertEqual(missing, bridge.build_directory(missing, create=False))
+        self.assertFalse(missing.exists())
+
+    def test_owned_private_directory_is_accepted(self):
+        for mode in (0o700, 0o755):
+            output = self.root / f"out-{mode:o}"
+            output.mkdir()
+            output.chmod(mode)
+            self.assertEqual(output, bridge.build_directory(output, create=False))
+            self.assertEqual(mode, output.stat().st_mode & 0o7777)
+
+    def owned_by(self, path, uid):
+        """Make path look owned by uid, since a test cannot chown without root."""
+        real_lstat = os.lstat
+        def lstat(name, *args, **kwargs):
+            result = real_lstat(name, *args, **kwargs)
+            if Path(name) == path:
+                fields = list(result)
+                fields[4] = uid
+                return os.stat_result(fields)
+            return result
+        return patch.object(bridge.os, "lstat", side_effect=lstat)
+
+    def test_directory_owned_by_someone_else_is_refused(self):
+        output = self.root / "out"
+        output.mkdir(mode=0o700)
+        with self.owned_by(output, self.uid + 1):
+            message = self.refused(output)
+            self.assertIn(str(output), self.refused(output, create=True))
+        self.assertIn(str(output), message)
+        self.assertIn(f"uid {self.uid + 1}", message)
+        self.assertIn("Another user may have created it first", message)
+
+    def test_parent_owned_by_someone_else_is_refused(self):
+        output = self.root / "out"
+        output.mkdir(mode=0o700)
+        with self.owned_by(self.root, self.uid + 1):
+            message = self.refused(output)
+        self.assertIn(str(self.root), message)
+        self.assertIn(f"uid {self.uid + 1}", message)
+        self.assertIn("could replace", message)
+
+    def test_sudo_accepts_the_invoking_user_and_root_only(self):
+        self.assertEqual({1000}, bridge.build_owners(1000, None))
+        self.assertEqual({1000}, bridge.build_owners(1000, "0"))
+        self.assertEqual({0}, bridge.build_owners(0, None))
+        self.assertEqual({0}, bridge.build_owners(0, ""))
+        self.assertEqual({0}, bridge.build_owners(0, "not a uid"))
+        self.assertEqual({0, 1000}, bridge.build_owners(0, "1000"))
+        output = self.root / "out"
+        output.mkdir(mode=0o700)
+        # Root through sudo from this user accepts this user's directory.
+        self.assertEqual(output, bridge.build_directory(output, create=False, euid=0, sudo_uid=str(self.uid)))
+        if self.uid != 0:
+            # Root without sudo, or sudo from another user, does not.
+            self.assertIn(f"uid {self.uid}", self.refused(output, euid=0, sudo_uid=""))
+            self.assertIn(f"uid {self.uid}", self.refused(output, euid=0, sudo_uid=str(self.uid + 1)))
+
+    def test_parent_any_user_can_write_needs_the_sticky_bit(self):
+        shared = self.root / "shared"
+        shared.mkdir()
+        shared.chmod(0o777)
+        message = self.refused(shared / "build", create=True)
+        self.assertIn(str(shared), message)
+        self.assertIn("sticky", message)
+        self.assertEqual([], list(shared.iterdir()))
+        # A private directory the user made inside a sticky one, as under /tmp.
+        shared.chmod(0o1777)
+        output = bridge.build_directory(shared / "build", create=True)
+        self.assertEqual(0o700, output.stat().st_mode & 0o7777)
+
+    def test_command_line_refuses_before_any_step_runs(self):
+        source = self.root / "source"
+        source.mkdir(mode=0o700)
+        output = self.root / "build"
+        output.mkdir()
+        output.chmod(0o777)
+        for command in ("build", "package", "stage", "source-archive"):
+            arguments = [sys.executable, str(HERE / "build.py"), command, "--source", str(source), "--output", str(output),
+                         "--destdir", str(self.root / "stage"), "--manager", "manual", "--prefix", "/usr/local", "--format", "deb"]
+            result = subprocess.run(arguments, capture_output=True, text=True)
+            self.assertEqual(1, result.returncode, command)
+            self.assertIn("Refusing build directory", result.stderr)
+            self.assertIn(str(output), result.stderr)
+            self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual([], list(output.iterdir()))
+        self.assertFalse((self.root / "stage").exists())
+        source.chmod(0o775)
+        result = subprocess.run([sys.executable, str(HERE / "build.py"), "prepare", "--source", str(source),
+                                 "--output", str(self.root / "fresh")], capture_output=True, text=True)
+        self.assertEqual(1, result.returncode)
+        self.assertIn(str(source), result.stderr)
+        self.assertEqual([], list(source.iterdir()))
+
+    def test_prepare_clones_into_the_empty_directory_it_created(self):
+        source = bridge.build_directory(self.root / "source", create=True)
+        calls = []
+        def run(arguments, **kwargs):
+            calls.append([str(argument) for argument in arguments])
+            raise subprocess.CalledProcessError(1, arguments)
+        with patch.object(bridge, "run", side_effect=run), self.assertRaises(subprocess.CalledProcessError):
+            bridge.prepare(source)
+        self.assertEqual(["git", "init", str(source)], calls[0])
 
 
 if __name__ == "__main__":

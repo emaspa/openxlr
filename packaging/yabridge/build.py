@@ -31,9 +31,108 @@ def run(args, cwd=None, **kwargs):
     return subprocess.run([str(a) for a in args], cwd=cwd, check=True, **kwargs)
 
 
+def build_owners(euid, sudo_uid):
+    """The uids that may own a source or output directory.
+
+    A build belongs to the user running it. Under sudo the effective uid is
+    root, and the directories are the ones the user who ran sudo built in, so
+    that user is accepted beside root. Root without sudo, which includes
+    fakeroot, accepts only root.
+    """
+    if euid != 0:
+        return {euid}
+    owners = {0}
+    if sudo_uid is not None and str(sudo_uid).isdigit():
+        owners.add(int(sudo_uid))
+    return owners
+
+
+def describe_owner(uid):
+    try:
+        import pwd
+        return f"{pwd.getpwuid(uid).pw_name} (uid {uid})"
+    except (ImportError, KeyError):
+        return f"uid {uid}"
+
+
+def directory_refusal(path, owners):
+    """Why another user could control what the build reads or writes at path, or None.
+
+    path is a resolved path. The directory itself, when it exists, must be a
+    real directory that one of owners owns and that neither group nor other
+    users can write. Every existing ancestor must belong to root or to one of
+    owners, and one that any user can write must carry the sticky bit, as /tmp
+    does, so nobody else can rename or replace what sits below it. A group
+    writable ancestor is accepted: package builders and user private groups
+    both make those, and the group is the administrator's choice.
+    """
+    wanted = " or ".join(describe_owner(uid) for uid in sorted(owners))
+    if os.path.lexists(path):
+        info = os.lstat(path)
+        if stat.S_ISLNK(info.st_mode):
+            return f"{path} is a symbolic link. Pass a real directory that {wanted} owns."
+        if not stat.S_ISDIR(info.st_mode):
+            return f"{path} is not a directory."
+        if info.st_uid not in owners:
+            return (f"{path} is owned by {describe_owner(info.st_uid)}, not by {wanted}. "
+                    "Another user may have created it first. Choose a new directory you own, for example under ~/.cache.")
+        if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            return (f"{path} can be written by other users (mode {stat.S_IMODE(info.st_mode):04o}). "
+                    f"Run chmod go-w {path}, or choose a new directory.")
+    for parent in path.parents:
+        if not os.path.lexists(parent):
+            continue
+        info = os.lstat(parent)
+        if stat.S_ISLNK(info.st_mode):
+            return f"{parent}, a parent of {path}, is a symbolic link. Pass the real path."
+        if info.st_uid not in owners | {0}:
+            return (f"{parent}, a parent of {path}, is owned by {describe_owner(info.st_uid)}, who could replace what is inside it. "
+                    "Choose a directory under one you own, for example under ~/.cache.")
+        if info.st_mode & stat.S_IWOTH and not info.st_mode & stat.S_ISVTX:
+            return (f"{parent}, a parent of {path}, can be written by any user and has no sticky bit "
+                    f"(mode {stat.S_IMODE(info.st_mode):04o}), so another user could replace what is inside it. "
+                    "Choose a directory under one you own, for example under ~/.cache.")
+    return None
+
+
+def build_directory(path, *, create, euid=None, sudo_uid=None):
+    """Resolve a --source or --output path and refuse one another user could control.
+
+    On a shared machine another user can create a fixed path such as
+    /tmp/yabridge-build first. The build would then run their Ninja rules, and
+    they could swap the built files before a sudo stage installs them. A
+    missing directory is created readable only by its owner when create is set.
+    """
+    euid = os.geteuid() if euid is None else euid
+    sudo_uid = os.environ.get("SUDO_UID") if sudo_uid is None else sudo_uid
+    owners = build_owners(euid, sudo_uid)
+    lexical = Path(os.path.abspath(path))
+    if lexical.is_symlink():
+        raise RuntimeError(f"Refusing build directory: {lexical} is a symbolic link. Pass a real directory you own.")
+    resolved = lexical.resolve()
+    refusal = directory_refusal(resolved, owners)
+    if refusal is None and create and not os.path.lexists(resolved):
+        missing = []
+        parent = resolved
+        while not os.path.lexists(parent):
+            missing.append(parent)
+            parent = parent.parent
+        for directory in reversed(missing):
+            try:
+                directory.mkdir(mode=0o700)
+            except FileExistsError:
+                pass  # Checked below like any other existing directory.
+            else:
+                directory.chmod(0o700)
+        refusal = directory_refusal(resolved, owners)
+    if refusal is not None:
+        raise RuntimeError("Refusing build directory: " + refusal)
+    return resolved
+
+
 def prepare(source):
-    if not source.exists():
-        source.mkdir(parents=True)
+    if not source.exists() or not any(source.iterdir()):
+        source.mkdir(parents=True, exist_ok=True)
         run(["git", "init", source])
         run(["git", "-C", source, "remote", "add", "origin", PIN["repository"]])
         run(["git", "-C", source, "fetch", "--depth=1", "origin", PIN["commit"]])
@@ -374,7 +473,16 @@ def main():
     parser.add_argument("--format", choices=("deb", "rpm", "arch", "srpm", "debian-source"))
     parser.add_argument("--jobs", type=int, default=2)
     args = parser.parse_args()
-    source, output = args.source.resolve(), args.output.resolve()
+    if args.command == "receipt":
+        source, output = args.source.resolve(), args.output.resolve()
+    else:
+        # Every step that reads the source or writes the output refuses a
+        # directory another user could control, before it touches either.
+        try:
+            source = build_directory(args.source, create=args.command == "prepare")
+            output = build_directory(args.output, create=args.command in ("build", "package", "source-archive"))
+        except RuntimeError as error:
+            parser.exit(1, f"{parser.prog}: {error}\n")
     if args.command == "prepare": prepare(source)
     elif args.command == "build": build(source, output, args.jobs)
     elif args.command in ("stage", "receipt"):
@@ -387,7 +495,7 @@ def main():
         if args.format is None: parser.error("package requires --format")
         package(source, output, args.format)
     dist = output / "dist"
-    if dist.exists():
+    if args.command not in ("prepare", "receipt") and dist.exists():
         (dist / "SHA256SUMS").write_text("".join(
             hashlib.sha256(file.read_bytes()).hexdigest() + "  " + file.name + "\n"
             for file in sorted(dist.iterdir()) if file.is_file() and file.name != "SHA256SUMS"))
