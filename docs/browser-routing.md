@@ -198,26 +198,35 @@ Chrome has no Cebuano, so a browser set to it shows English.
    another application owns it. Choosing a channel alone never starts
    capture.
 
-   The browser captures a tab only after you invoked the companion on it,
-   with its toolbar button or its shortcut, and forgets that when the tab
-   navigates. Activate in OpenXLR is not such a gesture, so it brings the
-   tab's window and the tab forward and tries. If the browser still holds
-   the grant from an earlier click, routing starts and the row's light
-   turns on. Otherwise the companion opens its popup on that tab, which
-   Chrome 127 and later allow, and the popup says OpenXLR asked to route
-   the tab; press Activate this tab there. If the browser refuses that
-   press too, or cannot open the popup, the popup or the row says to click
-   the OpenXLR icon on the tab or press the shortcut, then Activate this
-   tab. The row reads Starting in the browser while the companion works,
-   then names the step left for you, and clears when routing starts, when
-   the companion reports an error, or after two minutes.
+   The browser lets the companion capture a tab only after you invoked it
+   on that tab, with its toolbar button or its shortcut, and forgets that
+   when the tab moves to another website. The companion is stricter.
+   Activate in OpenXLR starts capture only on a tab where you pressed
+   Activate this tab in the popup during this browser session, and only
+   while the tab stays on that website. Such a tab comes forward with its
+   window, routing starts and the row's light turns on. Use this to start
+   a tab again after a daemon restart or after turning browser output
+   selection off and on. Stop routing or Stop all routing in the popup
+   takes this away from the tab, and so do closing the tab, moving it to
+   another website and closing the browser.
+
+   For any other tab the companion brings the tab forward and opens its
+   popup there, which Chrome 127 and later allow, and the popup says
+   OpenXLR asked to route the tab; press Activate this tab there. If the
+   browser refuses that press, or cannot open the popup, the popup or the
+   row says to click the OpenXLR icon on the tab or press the shortcut,
+   then Activate this tab. The row reads Starting in the browser while the
+   companion works, then names the step left for you, and clears when
+   routing starts, when the companion reports an error, or after two
+   minutes.
    An older companion ignores the request; the row then returns to its
    usual text after ten seconds.
 5. While active, channel changes in either place reroute that tab. Other
    active tabs keep their own channel. Stop, closing the tab, navigating
    to another origin, disabling browser output selection or losing the
    daemon connection releases the takeover. Normal browser playback can
-   then resume. Reconnection restores the list, not capture permission.
+   then resume. Reconnection restores the list but does not restart
+   capture.
 
 ### Active routes in the popup
 
@@ -243,7 +252,8 @@ choice after the connection returns.
 A same-origin page change keeps the tab's selection. A different origin
 uses its own saved default. A late assignment from the previous website is
 refused instead of changing the new website's routing. After restarting the
-browser, website defaults remain, but each tab needs activation again.
+browser, website defaults remain, but each tab needs Activate this tab in
+the popup again.
 Deleting a channel moves its remembered website defaults to the fallback
 application channel, just like application assignments. Tab-only choices
 for the deleted channel return to Browser default.
@@ -296,7 +306,10 @@ No tab audio is sent through the control API or stored by the companion.
 The host accepts only tab registration, channel assignment and the browser
 output preference. Towards the browser it passes the daemon's state, its
 own error messages and OpenXLR's requests to activate a tab, each request
-for a tab id and origin the companion itself registered. It authenticates using the existing local daemon client
+for a tab id and origin the companion itself registered. The companion
+starts capture for such a request only on a tab you activated in its popup,
+as step 4 of [Choose and activate a tab](#choose-and-activate-a-tab)
+describes. It authenticates using the existing local daemon client
 and does not expose unrelated daemon state to the browser.
 Web pages cannot call this host through the extension.
 

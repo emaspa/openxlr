@@ -30,8 +30,10 @@ tracking, and it does not sell or share data with anyone.
   that tab's audio. The extension plays it through
   the browser's own audio engine into the OpenXLR output you chose, on
   the same computer. The audio samples are not read by the extension's
-  code, recorded, stored or sent anywhere. Audio of tabs you have not
-  activated is never captured.
+  code, recorded, stored or sent anywhere. The extension captures a tab's
+  audio only after you pressed Activate this tab in the popup on that tab. Opening
+  the popup alone does not start it, and a request from OpenXLR starts it
+  only under the rule in [Where it goes](#where-it-goes).
 - **Audio output devices.** The extension lists the browser's audio
   outputs (their kind, name and browser device id) to find the output
   that matches the OpenXLR channel you chose.
@@ -59,11 +61,21 @@ installation on your computer. Those messages are:
 
 OpenXLR answers with its list of channels, the tabs' assignments and
 playback volumes, and an error text when it refuses a message or cannot
-reach its daemon, and passes on a request when you press Activate for a
-tab in OpenXLR. The
-extension then brings that tab forward and may open its popup there; the
-browser still captures the tab only after you invoked the extension on it. The
-extension sends no tab audio over this connection. What OpenXLR keeps of
+reach its daemon. It also passes on a request when you press Activate for
+a tab in OpenXLR. Any local program that controls OpenXLR can send that
+request too. The extension handles it like this:
+
+- If you pressed Activate this tab in the popup on that tab during this
+  browser session, and the tab is still on the same website, the
+  extension brings the tab forward and starts capture again.
+- For any other tab, it brings the tab forward and opens its popup there,
+  or the tab's row in OpenXLR says what to press. Nothing is captured until
+  you press Activate this tab.
+
+The first case ends for a tab when you close it, when it moves to another
+website, when you press Stop routing for it or Stop all routing in the
+popup, and when the browser closes. The extension sends no tab audio over
+this connection. What OpenXLR keeps of
 the tab list, including the website defaults it saves when you check
 Remember for this website, is described in
 [Browser tab routing](browser-routing.md#privacy-and-removal). OpenXLR
@@ -71,13 +83,15 @@ does not send it to any server either.
 
 ## What the extension stores
 
-The extension keeps one entry in the browser's local extension storage:
+The extension keeps one entry in the browser's local extension storage
+and one in its session storage, which the browser clears when it closes:
 
-| Key | Content |
-| --- | --- |
-| `deviceBindings` | For each OpenXLR channel the extension has routed to, the browser device id of the matching audio output. Entries for channels that no longer exist are removed. |
+| Key | Storage | Content |
+| --- | --- | --- |
+| `deviceBindings` | local | For each OpenXLR channel the extension has routed to, the browser device id of the matching audio output. Entries for channels that no longer exist are removed. |
+| `activatedTabs` | session | For each tab where you pressed Activate this tab, the browser's tab id and the tab's origin. An entry is removed when the tab closes, moves to another website or is stopped in the popup. |
 
-It stores no tab addresses, titles, history or audio.
+It stores no page paths, titles, history or audio.
 
 ## Browser permissions
 
@@ -86,7 +100,8 @@ It stores no tab addresses, titles, history or audio.
   invoke the action and choose to activate it.
 - `offscreen` keeps the browser's audio playback running with the popup
   closed.
-- `storage` remembers the output device bindings in this browser profile.
+- `storage` remembers the output device bindings in this browser profile,
+  and the tabs you activated until the browser closes.
 - `nativeMessaging` connects the extension to the local OpenXLR host.
 
 The extension uses the data exposed by these APIs for the routing and

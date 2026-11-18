@@ -26,6 +26,20 @@ const starts = new Map();
 const stops = new Map();
 const assignments = new Map();
 const requests = new Map();
+// Tabs the user activated in the popup in this browser session, by tab id,
+// with the origin they were on. Only these may start from OpenXLR's request.
+const activated = new Map();
+let activationWrite = Promise.resolve();
+const activationsLoaded = (async () => {
+  try {
+    const { activatedTabs: saved } = await chrome.storage.session.get('activatedTabs');
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
+    for (const [key, site] of Object.entries(saved)) {
+      const id = Number(key);
+      if (Number.isSafeInteger(id) && typeof site === 'string' && siteOf(site) === site) activated.set(id, site);
+    }
+  } catch { /* Without session storage only this worker's own activations count. */ }
+})();
 
 function updateBadge() {
   const count = [...captures.values()].filter(capture => capture.capturing).length;
@@ -66,6 +80,32 @@ function clearRequest(id) {
 
 function clearRequests() {
   for (const id of [...requests.keys()]) clearRequest(id);
+}
+
+function saveActivations() {
+  const activatedTabs = Object.fromEntries(activated);
+  const task = activationWrite.catch(() => {}).then(() => chrome.storage.session.set({ activatedTabs }));
+  activationWrite = task;
+  return task.catch(() => {});
+}
+
+/** Record the user's Activate this tab press for the tab on this origin. */
+async function markActivated(id, site) {
+  await activationsLoaded;
+  if (activated.get(id) === site) return;
+  activated.set(id, site);
+  await saveActivations();
+}
+
+/** Forget a press: the tab closed, left its origin, or the user stopped it in the popup. */
+async function forgetActivation(id) {
+  await activationsLoaded;
+  if (activated.delete(id)) await saveActivations();
+}
+
+async function wasActivated(id, site) {
+  await activationsLoaded;
+  return activated.get(id) === site;
 }
 
 function connect() {
@@ -205,6 +245,9 @@ async function refreshTabs() {
         if (liveSites.get(id) !== pending.site) clearAssignment(id);
       for (const [id, request] of requests)
         if (liveSites.get(id) !== request.site) clearRequest(id);
+      await activationsLoaded;
+      for (const [id, site] of activated)
+        if (liveSites.get(id) !== site) await forgetActivation(id);
       for (const [id, previous] of sites) {
         if (liveSites.get(id) !== previous) {
           await stopTab(id);
@@ -347,12 +390,16 @@ async function openPopup(windowId) {
   try { await chrome.action.openPopup({ windowId }); return true; } catch { return false; }
 }
 
+const NOT_ACTIVATED = Symbol('not activated in the popup');
+
 /**
  * OpenXLR's Activate for one tab: bring it forward and start it as the
- * popup's Activate would. Chrome captures only a tab the user invoked the
- * extension on, so without that grant the popup opens on the tab, or the
- * row in OpenXLR says what to do in the browser. The tab list reports the
- * stage as activation: starting, popup or browser.
+ * popup's Activate would, but only for a tab the user activated in the
+ * popup in this browser session, on the same origin. Chrome would capture
+ * any tab the user merely opened the popup on, so its grant alone is not
+ * enough. For any other tab the popup opens on the tab, or the row in
+ * OpenXLR says what to do in the browser. The tab list reports the stage
+ * as activation: starting, popup or browser.
  */
 async function activateRequest(message) {
   const id = message.tabId;
@@ -386,10 +433,13 @@ async function activateRequest(message) {
     if (!shown?.active || shown.incognito || siteOf(shown.url) !== request.site) throw new Error(t('changedWhileStarting'));
     // The popup may have picked up this request while Chrome was focusing the tab.
     if (starts.has(id)) return;
+    const pressed = await wasActivated(id, request.site);
+    if (!current() || starts.has(id)) return;
+    if (!pressed) throw NOT_ACTIVATED;
     await startCapture(id, request.site, shown);
   } catch (error) {
     if (!current()) return;
-    if (notInvoked(error)) {
+    if (error === NOT_ACTIVATED || notInvoked(error)) {
       const opened = await openPopup(tab.windowId);
       if (current()) request.stage = opened ? 'popup' : 'browser';
     } else {
@@ -430,7 +480,13 @@ async function handle(message) {
     case 'start': {
       const id = message.id;
       const request = requests.get(id);
-      try { return await startCapture(id, message.site); }
+      try {
+        const result = await startCapture(id, message.site);
+        // This is the user's own press in the popup. It lets OpenXLR start
+        // this tab again until it closes, leaves the origin or is stopped here.
+        if (captures.get(id)?.capturing) await markActivated(id, message.site);
+        return result;
+      }
       catch (error) {
         // An activation OpenXLR asked for: tell its row what happened. A
         // popup still showing an earlier website leaves the request alone.
@@ -446,9 +502,14 @@ async function handle(message) {
       }
     }
     case 'stop':
-      if (Number.isSafeInteger(message.id)) await stopTab(message.id);
+      if (Number.isSafeInteger(message.id)) await Promise.all([stopTab(message.id), forgetActivation(message.id)]);
       return null;
-    case 'stopAll': await stopAll(); return null;
+    case 'stopAll': {
+      await activationsLoaded;
+      const forgotten = [...activated.keys()].map(id => forgetActivation(id));
+      await Promise.all([stopAll(), ...forgotten]);
+      return null;
+    }
     case 'showTab': {
       const route = reportedTabs.get(message.id);
       if (!route || route.site !== message.site || !captures.get(message.id)?.capturing)
@@ -483,6 +544,10 @@ chrome.tabs.onCreated.addListener(scheduleRefresh);
 chrome.tabs.onActivated.addListener(scheduleRefresh);
 chrome.tabs.onUpdated.addListener((id, changes) => {
   const previous = assignments.get(id)?.site ?? starts.get(id)?.site ?? requests.get(id)?.site ?? sites.get(id);
+  // Chrome keeps its grant across same-origin pages, and so does the press.
+  if (changes.url) void activationsLoaded.then(async () => {
+    if (activated.has(id) && siteOf(changes.url) !== activated.get(id)) await forgetActivation(id);
+  }).catch(error => { bridgeError = errorText(error); });
   if (changes.url && previous && siteOf(changes.url) !== previous) {
     clearAssignment(id);
     clearRequest(id);
@@ -491,6 +556,7 @@ chrome.tabs.onUpdated.addListener((id, changes) => {
   if ('url' in changes || 'title' in changes || 'audible' in changes) scheduleRefresh();
 });
 function removeTab(id) {
+  void forgetActivation(id).catch(error => { bridgeError = errorText(error); });
   clearAssignment(id);
   clearRequest(id);
   if (captures.get(id)?.capturing || starts.has(id))
