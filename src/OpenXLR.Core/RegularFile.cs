@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 #if OPENXLR_UI
 namespace OpenXLR.UI;
@@ -62,6 +63,47 @@ internal static class RegularFile
     internal static bool IsSpecial(string path) =>
         OperatingSystem.IsLinux() && Inspect(path) is { } status && (status.Mode & 0xf000) != 0x8000;
 
+    /// <summary>
+    /// Open a regular file for reading, following links. The open does not
+    /// block, so a pipe or a device in the file's place is refused at once
+    /// instead of holding the caller, and the type is checked on the handle
+    /// that was opened rather than on a path that can change after a check.
+    /// </summary>
+    internal static SafeFileHandle OpenHandle(string path)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Require(path);
+            return File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        }
+        int fd = Open(path, ReadOnly | NonBlocking | CloseOnExec | NoControllingTerminal);
+        if (fd < 0)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            string message = $"Could not open {path}: {new Win32Exception(error).Message}";
+            throw error == AccessDenied ? new UnauthorizedAccessException(message) : new IOException(message);
+        }
+        var handle = new SafeFileHandle(fd, ownsHandle: true);
+        try
+        {
+            if (Inspect($"/proc/self/fd/{fd}") is not { } status || (status.Mode & 0xf000) != 0x8000)
+                throw new IOException($"{path} is not a regular file.");
+            return handle;
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    // Linux's values, the same on x86-64 and AArch64.
+    private const int ReadOnly = 0, NoControllingTerminal = 0x100, NonBlocking = 0x800, CloseOnExec = 0x80000;
+    private const int AccessDenied = 13;
+
+    [DllImport("libc", EntryPoint = "open", SetLastError = true)]
+    private static extern int Open([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
+
     /// <summary>Linux's fixed metadata layout, also used to own a control socket without following links.</summary>
     internal static LinuxFileStatus? Inspect(string path, bool noFollow = false)
     {
@@ -81,6 +123,44 @@ internal static class RegularFile
         if ((status.Mask & fields) != fields) throw new IOException($"Incomplete metadata for {path}.");
         return status;
     }
+
+    /// <summary>
+    /// Where a path leads once every link along it is followed, the way the
+    /// system follows them, or null when it leads nowhere. Nothing is opened
+    /// for reading, so a pipe or a device at the end does not block. Outside
+    /// Linux, the full path with its links left as they are.
+    /// </summary>
+    internal static string? RealPath(string path)
+    {
+        if (!OperatingSystem.IsLinux()) return Path.Exists(path) ? Path.GetFullPath(path) : null;
+        int fd = Open(path, PathOnly | CloseOnExec);
+        if (fd < 0)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            if (error is NoSuchEntry or NotADirectory) return null;
+            throw new IOException($"Could not resolve {path}: {new Win32Exception(error).Message}");
+        }
+        using var handle = new SafeFileHandle(fd, ownsHandle: true);
+        return RealPath(handle);
+    }
+
+    /// <summary>
+    /// The path an open handle names now, every link resolved, or null where
+    /// the system cannot say (outside Linux).
+    /// </summary>
+    internal static string? RealPath(SafeFileHandle handle) =>
+        OperatingSystem.IsLinux() ? new FileInfo($"/proc/self/fd/{handle.DangerousGetHandle()}").LinkTarget : null;
+
+    /// <summary>True when <paramref name="path"/> lies below <paramref name="root"/>, compared as written.</summary>
+    internal static bool IsWithin(string root, string path)
+    {
+        string prefix = root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar;
+        return path.StartsWith(prefix, StringComparison.Ordinal);
+    }
+
+    // Linux's values, the same on x86-64 and AArch64.
+    private const int PathOnly = 0x200000;
+    private const int NoSuchEntry = 2, NotADirectory = 20;
 
     // Linux's fixed statx UAPI layout is the same on every supported architecture.
     [StructLayout(LayoutKind.Explicit, Size = 256)]

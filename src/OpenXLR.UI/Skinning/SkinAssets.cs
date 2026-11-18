@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Microsoft.Win32.SafeHandles;
 
 namespace OpenXLR.UI.Skinning;
 
@@ -58,6 +59,8 @@ public sealed class SkinFolderAssets(string directory) : SkinAssets
 {
     public string Directory { get; } = directory;
 
+    // The name alone, when the document is read. Links, the folder's own
+    // included, are followed when the file is opened (see Open).
     protected override void CheckContained(string relative)
     {
         string full = Path.GetFullPath(Path.Combine(Directory, relative));
@@ -69,13 +72,28 @@ public sealed class SkinFolderAssets(string directory) : SkinAssets
     internal override Stream? Open(string relative)
     {
         if (SkinReader.ResolveAsset(Directory, relative) is not { } file) return null;
+        SafeFileHandle? handle = null;
         try
         {
-            // A pipe would block the open and a device never ends, so only a
-            // regular file is opened as an image.
-            return RegularFile.IsSpecial(file.FullName) ? null : file.OpenRead();
+            // A pipe would block an ordinary open and a device never ends, so
+            // only a regular file is opened, without waiting. The handle is
+            // checked again for where it really is, in case a link was put in
+            // place since the path was resolved.
+            handle = RegularFile.OpenHandle(file);
+            if (OperatingSystem.IsLinux()
+                && !(RegularFile.RealPath(Directory) is { } root && RegularFile.RealPath(handle) is { } opened
+                    && RegularFile.IsWithin(root, opened)))
+            {
+                handle.Dispose();
+                return null;
+            }
+            return new FileStream(handle, FileAccess.Read);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            handle?.Dispose();
+            return null;
+        }
     }
 }
 

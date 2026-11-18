@@ -667,6 +667,51 @@ public sealed class SkinPackageTests : IDisposable
         Assert.Null(SkinReader.ResolveAsset(folder, "gone.png"));
     }
 
+    /// <summary>
+    /// A link to a folder is followed as the system follows it, so a file
+    /// named through a linked folder that leads out of the skin is refused
+    /// as a linked file is, and is never opened. Links that stay inside the
+    /// skin work, and so does a skin folder that is itself a link.
+    /// </summary>
+    [Fact]
+    public void AFolderLinkOutOfTheSkinsFolderIsNotFollowed()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string outside = Path.Combine(_root, "outside");
+        Directory.CreateDirectory(Path.Combine(outside, "deeper"));
+        byte[] png = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
+        File.WriteAllBytes(Path.Combine(outside, "secret.png"), png);
+        File.WriteAllBytes(Path.Combine(outside, "deeper", "secret.png"), png);
+
+        string work = Path.Combine(_root, "work");
+        Directory.CreateDirectory(Path.Combine(work, "art"));
+        File.WriteAllBytes(Path.Combine(work, "art", "plate.png"), png);
+        Directory.CreateSymbolicLink(Path.Combine(work, "out"), outside);
+        Directory.CreateSymbolicLink(Path.Combine(work, "up"), "art/../..");
+        Directory.CreateSymbolicLink(Path.Combine(work, "art", "nested"), "../out/deeper");
+        File.CreateSymbolicLink(Path.Combine(work, "through.png"), "out/secret.png");
+        Directory.CreateSymbolicLink(Path.Combine(work, "pictures"), "art");
+        File.CreateSymbolicLink(Path.Combine(work, "alias.png"), "pictures/plate.png");
+        // The skin folder itself is a link into a working copy.
+        string folder = Path.Combine(_root, "installed");
+        Directory.CreateSymbolicLink(folder, work);
+        var assets = new SkinFolderAssets(folder);
+
+        foreach (string escape in new[] { "out/secret.png", "out/deeper/secret.png", "up/outside/secret.png", "art/nested/secret.png", "through.png" })
+        {
+            Assert.Null(SkinReader.ResolveAsset(folder, escape));
+            Assert.Null(assets.Open(escape));
+        }
+        foreach (string inside in new[] { "art/plate.png", "pictures/plate.png", "alias.png" })
+        {
+            Assert.NotNull(SkinReader.ResolveAsset(folder, inside));
+            using Stream stream = Assert.IsAssignableFrom<Stream>(assets.Open(inside));
+            Assert.Equal(png.Length, stream.Length);
+        }
+        // A folder is not an image.
+        Assert.Null(assets.Open("art"));
+    }
+
     // --- the window's outline ---
 
     private static SkinReadResult Window(string section) =>

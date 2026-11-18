@@ -1015,7 +1015,11 @@ The rules a `source` is held to:
 - it is a relative path inside the skin's folder, with forward slashes, no
   leading slash, no `.` or `..` segment, no colon and no URL. Nothing is
   ever fetched over the network;
-- a symbolic link whose target is outside the folder is not followed;
+- the file is inside the skin's folder once every link on the way to it
+  is followed. OpenXLR does not follow a link, to a file or to a folder,
+  that leads out of the skin's folder. Links that stay inside it work,
+  and the skin's folder may itself be a link, for a skin kept in its own
+  working copy;
 - the file is a regular file, never a pipe or a device;
 - the file is a PNG or a JPEG, at most 4 MB, at most 4096 pixels a side,
   and a skin's images together decode to at most 16 megapixels;
