@@ -20,6 +20,11 @@ namespace OpenXLR.Tests;
 [Collection("xdg-config")]
 public sealed class MixerStartupRetryTests
 {
+    // A wait that spans a whole graph build against the fake helpers. One
+    // build takes about 8 s on a desk and more than 10 s on one busy core,
+    // so 10 s failed on loaded runners while the daemon behaved.
+    private static readonly TimeSpan GraphBuild = TimeSpan.FromSeconds(30);
+
     [Fact]
     public void TheBackoffDoublesFromTwoSecondsAndStopsAtThirty()
     {
@@ -52,7 +57,7 @@ public sealed class MixerStartupRetryTests
             Assert.Null(fixture.Service.ApplyScene(new MixerScene { MixVolumes = new() { ["monitor"] = 0.25 } }));
 
             fixture.Answer();
-            await fixture.Service.BuildRetry.WaitAsync(TimeSpan.FromSeconds(10));
+            await fixture.Service.BuildRetry.WaitAsync(GraphBuild);
             Assert.True(fixture.Service.Built);
             Assert.False(fixture.Service.WaitingForAudio);
             Assert.Null(fixture.Service.GraphWarning);
@@ -107,7 +112,7 @@ public sealed class MixerStartupRetryTests
             Assert.Null(fixture.Service.ApplyScene(new MixerScene { MixVolumes = new() { ["monitor"] = 0.25 } }));
             port.Fail = true;
             fixture.Answer();
-            Assert.True(SpinWait.SpinUntil(() => port.Thrown > 0 && fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)));
+            Assert.True(SpinWait.SpinUntil(() => port.Thrown > 0 && fixture.Service.WaitingForAudio, GraphBuild));
             Assert.False(fixture.Service.Built);
 
             bool pending = fixture.Saver.Pending;
@@ -155,7 +160,7 @@ public sealed class MixerStartupRetryTests
             Assert.Equal(saved, File.ReadAllBytes(MixerSettings.DefaultPath));
 
             fixture.Answer();
-            Assert.True(SpinWait.SpinUntil(() => fixture.Service.Built && !fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)),
+            Assert.True(SpinWait.SpinUntil(() => fixture.Service.Built && !fixture.Service.WaitingForAudio, GraphBuild),
                 "the graph was not built again once the server answered");
             Assert.Null(fixture.Service.GraphWarning);
             Assert.False(fixture.Service.RebuildingGraph);
@@ -227,7 +232,7 @@ public sealed class MixerStartupRetryTests
             fixture.LoseNode(node);
             Assert.Equal([node], fixture.Mixer.MissingGraphNodes());
             Assert.True(SpinWait.SpinUntil(() => !fixture.Service.Built, TimeSpan.FromSeconds(10)), $"the lost {node} was not noticed");
-            Assert.True(SpinWait.SpinUntil(() => fixture.Service.Built && !fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)),
+            Assert.True(SpinWait.SpinUntil(() => fixture.Service.Built && !fixture.Service.WaitingForAudio, GraphBuild),
                 "the graph was not built again");
             Assert.True(fixture.Publishes(node));
             Assert.Equal(0, fixture.Mixer.MissingGraphNodes()?.Count);
@@ -306,7 +311,7 @@ public sealed class MixerStartupRetryTests
 
             port.Fail = true;
             fixture.Answer();
-            Assert.True(SpinWait.SpinUntil(() => port.Thrown > 0 && fixture.Service.WaitingForAudio, TimeSpan.FromSeconds(10)));
+            Assert.True(SpinWait.SpinUntil(() => port.Thrown > 0 && fixture.Service.WaitingForAudio, GraphBuild));
             // Part way through the attempt the graph existed and held the
             // settings, but the build had not ended and was then torn down.
             Assert.Null(during.Scene);
