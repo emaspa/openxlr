@@ -971,7 +971,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "whether a row's microphone switches button (**Mic**) shows the phantom power lamp: 1 shows it, 0 hides it. Phantom power is still shown in the button's switches and in Mic setup"
+          "description": "whether a row's microphone switches button (**Mic**) shows the phantom power lamp while phantom power is on: 1 shows it, 0 hides it. Phantom power is still shown in the button's switches and in Mic setup"
         },
         "Ox.Matrix.MutedBackground": {
           "$ref": "#/$defs/brush",

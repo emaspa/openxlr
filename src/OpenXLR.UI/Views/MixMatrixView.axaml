@@ -19,9 +19,10 @@
        Ox.* token. -->
 
   <UserControl.Styles>
-    <!-- The microphone switches button's phantom power lamp, on an input with phantom power.
-         A style rather than a binding, so a skin can hide it (Ox.Matrix.PhantomLamp). -->
-    <Style Selector="skin|StatusLed.noPhantom">
+    <!-- The microphone switches button's phantom power lamp, shown only while phantom power is on
+         or settling, so the button keeps its room the rest of the time. A style rather than a
+         binding, so a skin can hide it (Ox.Matrix.PhantomLamp). -->
+    <Style Selector="skin|StatusLed.phantomOff">
       <Setter Property="IsVisible" Value="False"/>
     </Style>
     <Style Selector="Border.matrixHead">
@@ -196,7 +197,7 @@
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.noPhantom="{Binding !HasPhantom}"
+                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.phantomOff="{Binding !PhantomOn}"
                                       AutomationProperties.AccessibilityView="Raw"/>
                       <TextBlock Text="{loc:Text Key=MatrixProcessing}" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -351,7 +352,7 @@
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.noPhantom="{Binding !HasPhantom}"
+                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.phantomOff="{Binding !PhantomOn}"
                                       AutomationProperties.AccessibilityView="Raw"/>
                       <TextBlock Text="{loc:Text Key=MatrixProcessing}" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -673,7 +674,7 @@
                           MinHeight="{DynamicResource Ox.Mixer.SmallControlMinSize}" IsVisible="{Binding ShowsSwitchesButton}"
                           AutomationProperties.Name="{Binding ProcessingName}" ToolTip.Tip="{loc:Text Key=MatrixProcessingTip}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.noPhantom="{Binding !HasPhantom}"
+                      <skin:StatusLed Name="MatrixPhantom" Kind="Power" IsOn="{Binding PhantomOn}" Classes.phantomOff="{Binding !PhantomOn}"
                                       AutomationProperties.AccessibilityView="Raw"/>
                       <TextBlock Text="{loc:Text Key=MatrixProcessing}" VerticalAlignment="Center"/>
                     </StackPanel>

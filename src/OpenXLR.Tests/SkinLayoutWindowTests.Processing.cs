@@ -55,8 +55,8 @@ internal static partial class SkinLayoutWindowTests
         Assert.Equal(xlr1.Channel.VolumeText, readout.Text);
         Assert.Single(hold.Handles).Elapse();
         Assert.Equal(model.GainText, readout.Text);
-        // The interface has phantom power, so its lamp is there, dark.
-        Assert.True(Phantom(button).IsEffectivelyVisible);
+        // Phantom power is off, so the lamp is not drawn and the button keeps its room.
+        Assert.False(Phantom(button).IsEffectivelyVisible);
         Assert.False(Phantom(button).IsOn);
 
         // The flyout holds the classic set beside the mute, and no mute: the head has its own.
@@ -103,6 +103,7 @@ internal static partial class SkinLayoutWindowTests
         button.Flyout!.Hide();
         Layout(window, 1040, 1400);
         Assert.True(Phantom(button).IsOn);
+        Assert.True(Phantom(button).IsEffectivelyVisible);
         Assert.Equal(((ISolidColorBrush)window.FindResource("Ox.Led.Alert")!).Color, ((ISolidColorBrush)Phantom(button).OnBrush!).Color);
         Assert.Equal(Localizer.Format("MatrixProcessingPhantomName", "XLR 1"), AutomationProperties.GetName(button));
 
@@ -139,6 +140,7 @@ internal static partial class SkinLayoutWindowTests
         button = ProcessingButton(window, "xlr1")!;
         Assert.DoesNotContain("fxOn", button.Classes);
         Assert.False(Phantom(button).IsOn);
+        Assert.False(Phantom(button).IsEffectivelyVisible);
         // Settling phantom power lights it too.
         model.PhantomSettling = true;
         Layout(window, 1040, 1400);

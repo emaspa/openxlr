@@ -3778,7 +3778,7 @@ is [Own clock](#own-clock) gets an **Own clock** button instead, which
 turns it on and off at a click and turns green while it is on; its
 tooltip shows the delay and the dropouts. They are the same controls as
 in INPUTS, so switching one here switches it there. **Mic** turns green while
-one of them is on or noise removal, the compressor or the expander runs, and its small lamp lights red while phantom power is on, so you can
+one of them is on or noise removal, the compressor or the expander runs, and a small red lamp appears in it while phantom power is on, so you can
 see both without opening it. Under **Mic** is the input's gain in dB. While
 you move the row's volume fader it shows the volume instead, as a
 percentage, and goes back to the gain one second after you let go. A

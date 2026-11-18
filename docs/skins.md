@@ -938,7 +938,7 @@ past the skin's maximum to fill the available width.
 | `Ox.Matrix.CellWidth` | number | 168 | 120 to 400 | the width of a cell, of a column head and of a row head's source controls |
 | `Ox.Matrix.CellMaxWidth` | number | 0 | 0 to 1000 | the width up to which matrix cells and source controls grow together; 0 keeps the base cell width |
 | `Ox.Matrix.RowHeight` | number | 40 | 28 to 120 | the height of a row: its head and every cell in it; a row whose head stacks a gain over the channel volume, or the **EQ** button over the chain's, is as tall as the two need, never less |
-| `Ox.Matrix.PhantomLamp` | number | 1 | 0 to 1 | whether a row's microphone switches button (**Mic**) shows the phantom power lamp: 1 shows it, 0 hides it. Phantom power is still shown in the button's switches and in Mic setup |
+| `Ox.Matrix.PhantomLamp` | number | 1 | 0 to 1 | whether a row's microphone switches button (**Mic**) shows the phantom power lamp while phantom power is on: 1 shows it, 0 hides it. Phantom power is still shown in the button's switches and in Mic setup |
 | `Ox.Matrix.MutedBackground` | brush | #40a03434 | | the background of a cell whose send is muted, when the matrix tints muted cells. Translucent by default, so the cell's own surface shows through as a red tint |
 | `Ox.Matrix.MutedForeground` | brush | #f6dede | | the lettering of a muted send's mute in a tinted cell |
 | `Ox.Matrix.MutedOpacity` | number | 0.5 | 0.1 to 1 | how far a muted send's fader and level fade when the matrix dims muted cells; the mute keeps its own colour |
@@ -1828,8 +1828,9 @@ them. They are the INPUTS panel's own buttons,
 bound to the same settings, so a click there does what it does in INPUTS.
 The mute is not repeated in the flyout, since the head has its own. **Mic**
 is lettered in `Ox.Led.On` while one of the switches is on, and carries the
-interface's phantom power lamp, lit in `Ox.Led.Alert` while phantom power is
-on or settling, so both show without opening it. A capture channel carrying
+interface's phantom power lamp, shown in `Ox.Led.Alert` only while phantom
+power is on or settling, so both show without opening it and the button is
+narrower the rest of the time. A capture channel carrying
 the interface's microphone has the button too, with that input's switches,
 and a strip carrying an additional interface's input has that interface's
 switches. Aux In has its level

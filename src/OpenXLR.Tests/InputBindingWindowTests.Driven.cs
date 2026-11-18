@@ -237,7 +237,9 @@ internal static partial class InputBindingWindowTests
             foreach ((string row, string classic) in new[] { ("xlr1", "InputControls"), ("promic2", "Input2Controls") })
             {
                 Button processing = SkinLayoutWindowTests.ProcessingButton(surface, row)!;
-                Assert.True(processing.GetVisualDescendants().OfType<StatusLed>().Single().IsEffectivelyVisible, row);
+                // The phantom power lamp is the unit's, drawn while its phantom power is on.
+                Assert.Equal(matrix.Rows.Single(r => r.Channel.Id == row).PhantomOn,
+                    processing.GetVisualDescendants().OfType<StatusLed>().Single().IsEffectivelyVisible);
                 ToggleButton[] switches = SkinLayoutWindowTests.OpenSwitches(surface, processing);
                 Assert.Equal(SkinLayoutWindowTests.ClassicSwitches(window, classic), switches.Select(SkinLayoutWindowTests.Lettering));
                 Assert.Equal(6, switches.Length);
