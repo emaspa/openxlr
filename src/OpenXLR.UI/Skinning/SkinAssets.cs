@@ -69,7 +69,12 @@ public sealed class SkinFolderAssets(string directory) : SkinAssets
     internal override Stream? Open(string relative)
     {
         if (SkinReader.ResolveAsset(Directory, relative) is not { } file) return null;
-        try { return file.OpenRead(); }
+        try
+        {
+            // A pipe would block the open and a device never ends, so only a
+            // regular file is opened as an image.
+            return RegularFile.IsSpecial(file.FullName) ? null : file.OpenRead();
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
     }
 }

@@ -263,7 +263,7 @@ internal static class SkinCatalog
                 if (!ValidId(id) || found.ContainsKey(id)) continue;
                 string file = Path.Combine(folder.FullName, "skin.json");
                 FileInfo info = new(file);
-                if (!info.Exists || info.Length > MaxFileBytes) continue;
+                if (!info.Exists || info.Length > MaxFileBytes || IsSpecial(file)) continue;
                 found[id] = Describe(id, () => ReadFile(file));
             }
         }
@@ -347,29 +347,20 @@ internal static class SkinCatalog
 
     private static string? ReadFile(string path)
     {
-        try
-        {
-            // The catalogue holds a reader, not a snapshot. Bound the opened
-            // file again and refuse growth while reading instead of allocating
-            // for whatever replaced it since the catalogue was built.
-            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 1);
-            long length = file.Length;
-            if (length > MaxFileBytes) return null;
-            byte[] bytes = new byte[(int)length + 1];
-            int count = 0;
-            while (count < bytes.Length)
-            {
-                int read = file.Read(bytes, count, bytes.Length - count);
-                if (read == 0) break;
-                count += read;
-            }
-            if (count > length) return null;
-            using var content = new MemoryStream(bytes, 0, count, writable: false);
-            using var reader = new StreamReader(content);
-            return reader.ReadToEnd();
-        }
+        // The catalogue holds a reader, not a snapshot. Check the file again
+        // and bound the read, growth included, instead of trusting whatever
+        // replaced it since the catalogue was built: a pipe would block the
+        // open and a device would never end.
+        try { return RegularFile.ReadText(path, (int)MaxFileBytes); }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>A skin.json that is not a regular file is skipped, as an oversized one is.</summary>
+    private static bool IsSpecial(string path)
+    {
+        try { return RegularFile.IsSpecial(path); }
+        catch (IOException) { return true; }
     }
 
     private static string? ReadResource(string resource)

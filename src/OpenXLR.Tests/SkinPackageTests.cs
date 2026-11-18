@@ -974,6 +974,97 @@ public sealed class SkinPackageTests : IDisposable
     }
 
     /// <summary>
+    /// A skin.json that is a pipe, or a link to a device that never ends, is
+    /// reported broken at once. The catalogue runs at every launch whatever skin
+    /// is chosen, so it must neither wait on the open nor read without end.
+    /// </summary>
+    [Theory]
+    [InlineData("pipe")]
+    [InlineData("device")]
+    public async Task ASkinDocumentThatIsNotARegularFileIsBrokenWithoutBeingRead(string kind)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string folder = Skin("home", "special", "{}");
+        string file = Path.Combine(folder, "skin.json");
+        SpecialFile.Make(file, kind);
+
+        (SkinEntry? entry, long allocated) = await SpecialFile.Promptly(file, kind, () =>
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            SkinEntry? read = SkinCatalog.Read(folder, "special", SkinOrigin.User);
+            return (read, GC.GetAllocatedBytesForCurrentThread() - before);
+        });
+
+        Assert.NotNull(entry);
+        Assert.False(entry.Usable);
+        Assert.Contains("not a regular file", Assert.Single(entry.Errors));
+        Assert.True(allocated < 1024 * 1024, $"{allocated} bytes allocated");
+    }
+
+    [Fact]
+    public async Task DiscoveryListsTheGoodSkinsBesideOnesThatAreNotRegularFiles()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        Skin("home", "mine", Doc(Tok("Ox.Text.Primary", "\"#111111\"")));
+        string pipe = Path.Combine(Skin("home", "piped", "{}"), "skin.json");
+        string device = Path.Combine(Skin("home", "endless", "{}"), "skin.json");
+        SpecialFile.Make(pipe, "pipe");
+        SpecialFile.Make(device, "device");
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
+        Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(_root, "none"));
+
+        IReadOnlyList<SkinEntry> found = await SpecialFile.Promptly(pipe, "pipe", SkinCatalog.Discover);
+
+        Assert.True(Assert.Single(found, e => e.Id == "mine").Usable);
+        Assert.False(Assert.Single(found, e => e.Id == "piped").Usable);
+        Assert.False(Assert.Single(found, e => e.Id == "endless").Usable);
+    }
+
+    [Fact]
+    public void AnOversizedSkinDocumentKeepsItsSizeMessage()
+    {
+        string folder = Skin("home", "large", new string(' ', SkinFormat.MaxDocumentBytes + 1));
+        SkinEntry entry = SkinCatalog.Read(folder, "large", SkinOrigin.User)!;
+        Assert.False(entry.Usable);
+        Assert.Equal($"skin.json is larger than the {SkinFormat.MaxDocumentBytes / 1024} KB limit.", Assert.Single(entry.Errors));
+    }
+
+    /// <summary>
+    /// A skin.json may be a link to a regular file, inside the folder or out of
+    /// it, as when a skin under development lives in its own repository. The
+    /// same limits apply to what it names.
+    /// </summary>
+    [Fact]
+    public void ASkinDocumentLinkedToARegularFileIsRead()
+    {
+        string source = Path.Combine(_root, "work", "skin.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+        File.WriteAllText(source, Doc(Tok("Ox.Text.Primary", "\"#123456\"")));
+        string folder = Path.Combine(_root, "home", "openxlr", "skins", "linked");
+        Directory.CreateDirectory(folder);
+        File.CreateSymbolicLink(Path.Combine(folder, "skin.json"), source);
+
+        SkinEntry entry = SkinCatalog.Read(folder, "linked", SkinOrigin.User)!;
+        Assert.True(entry.Usable);
+        Assert.Equal(Color.Parse("#123456"), ((SkinSolid)entry.Package.Tokens["Ox.Text.Primary"]).Color);
+    }
+
+    [Fact]
+    public async Task AnImageThatIsAPipeIsNotOpened()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string folder = Skin("home", "piped-art", "{}");
+        Directory.CreateDirectory(Path.Combine(folder, "art"));
+        string image = Path.Combine(folder, "art", "plate.png");
+        SpecialFile.Make(image, "pipe");
+        var assets = new SkinFolderAssets(folder);
+
+        Stream? stream = await SpecialFile.Promptly(image, "pipe", () => assets.Open("art/plate.png"));
+        Assert.Null(stream);
+    }
+
+
+    /// <summary>
     /// An installed skin carries its layout through the catalogue to the
     /// service the window reads. A refused layout reaches the same error list
     /// Options shows for a bad token, with its JSON path, and costs the skin

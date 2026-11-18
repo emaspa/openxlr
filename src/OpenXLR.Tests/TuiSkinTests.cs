@@ -304,6 +304,59 @@ public sealed class TuiSkinTests : IDisposable
         Assert.Contains(skins, skin => skin.Id == "opendeck" && skin.Name == "Deck");
     }
 
+    /// <summary>
+    /// A skin.json that is a pipe, or a link to a device that never ends, is
+    /// skipped as an oversized one is, without waiting on the open or reading
+    /// without end, and the good skins beside it are still listed.
+    /// </summary>
+    [Fact]
+    public async Task ASkinDocumentThatIsNotARegularFileIsSkipped()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        Skin("home", "mine", Doc("", "Mine"));
+        string pipe = Path.Combine(Skin("home", "piped", "{}"), "skin.json");
+        string device = Path.Combine(Skin("home", "endless", "{}"), "skin.json");
+        SpecialFile.Make(pipe, "pipe");
+        SpecialFile.Make(device, "device");
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
+        Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(_root, "empty"));
+
+        IReadOnlyList<Tui.SkinEntry> skins = await SpecialFile.Promptly(pipe, "pipe", SkinCatalog.Scan);
+
+        Assert.Contains(skins, skin => skin.Id == "mine" && skin.Name == "Mine");
+        Assert.DoesNotContain(skins, skin => skin.Id == "piped");
+        Assert.DoesNotContain(skins, skin => skin.Id == "endless");
+    }
+
+    /// <summary>
+    /// The catalogue keeps a reader, so a document replaced by a pipe or a
+    /// device after the scan reads as nothing, promptly and within the limit.
+    /// </summary>
+    [Theory]
+    [InlineData("pipe")]
+    [InlineData("device")]
+    public async Task ACataloguedDocumentReplacedByASpecialFileReadsAsNothing(string kind)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string folder = Skin("home", "changing", Doc("", "Changing"));
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
+        Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(_root, "empty"));
+        Tui.SkinEntry entry = Assert.Single(SkinCatalog.Scan(), skin => skin.Id == "changing");
+        string file = Path.Combine(folder, "skin.json");
+        SpecialFile.Make(file, kind);
+
+        (string? text, long allocated) = await SpecialFile.Promptly(file, kind, () =>
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            string? read = entry.Read();
+            return (read, GC.GetAllocatedBytesForCurrentThread() - before);
+        });
+
+        Assert.Null(text);
+        Assert.True(allocated < 1024 * 1024, $"{allocated} bytes allocated");
+    }
+
+
     [Fact]
     public void YourOwnCopyShadowsTheSystemOne()
     {
