@@ -73,6 +73,8 @@ jobs:
           node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
           python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
           node --test plugin/tests/*.test.mjs
+          python3 -I tools/deck-plugin.py --check
+          python3 tools/test-deck-plugin.py
 
       - name: Validate Chromium browser routing
         run: |
@@ -102,6 +104,9 @@ jobs:
 
       - name: CI test selection
         run: python3 tools/test-ci-test-scope.py
+
+      - name: Release assets go on a draft
+        run: python3 tools/test-release-attach.py
 
       - name: Lint shell scripts
         run: shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh tools/ci-test-scope.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service packaging/openxlr-control

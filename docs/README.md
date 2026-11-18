@@ -33,6 +33,8 @@ open `main`, so they can describe changes newer than the installed release.
   extension for GNOME Shell on Wayland.
 - [Installation receipts and doctor](installation.md): owned files, build
   identity and repair commands.
+- [Release assets](releases.md): what each release carries, which
+  workflow built it, and how to check a download.
 - [Flatpak](flatpak.md): the experimental Flatpak mode, its startup, logs
   and host setup.
 - [Source installation](install-from-source.md): prerequisites, native build,

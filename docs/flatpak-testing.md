@@ -33,7 +33,8 @@ tested bundle as the `openxlr-flatpak-x86_64` artifact, is switched off.
 Run `tools/test-flatpak.py` by hand before a release; the bundle on each
 release is built by hand ([flatpak-build.md](flatpak-build.md)) and
 installed with `flatpak install --user ./openxlr-<version>-x86_64.flatpak`
-after `sha256sum -c SHA256SUMS-flatpak.txt`. Keep the same manual host
+after `sha256sum -c SHA256SUMS-flatpak.txt`, which only guards against a
+damaged download, since the bundle has no attestation. Keep the same manual host
 setup and native-daemon precautions as a locally built Flatpak.
 
 The normal C# suite checks the Background portal on a private D-Bus session,

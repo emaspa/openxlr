@@ -1,12 +1,17 @@
 name: Release .deb
 
+# A pushed version tag builds the package and attaches it to the draft
+# release of that tag; the maintainer publishes the draft once every asset
+# is on it. Only the maintainer can push tags. A manual run builds the
+# package as an artifact and attaches nothing.
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 # The build job can only read. Writing to the release, and the provenance
-# attestation, happen in a second job that never runs the build tools.
+# attestation, happen in a second job that never runs the build tools; it
+# checks out only the script that attaches the files.
 # Actions are pinned to commit SHAs (the tag is in the comment).
 permissions:
   contents: read
@@ -29,8 +34,10 @@ jobs:
           /usr/bin/cargo --version
           /usr/bin/rustc --version
 
-      - name: Versions agree everywhere
-        run: tools/check-version.sh
+      - name: Versions agree everywhere, and with the tag
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: tools/check-version.sh ${TAG:+"$TAG"}
 
       - name: Run tests
         run: |
@@ -74,7 +81,7 @@ jobs:
             dist/SHA256SUMS-deb.txt
 
   publish:
-    if: github.event_name == 'release'
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -82,6 +89,13 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: script
+          sparse-checkout: tools/release-attach.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: openxlr-deb
@@ -92,9 +106,9 @@ jobs:
         with:
           subject-path: dist/*.deb
 
-      - name: Attach to release
+      - name: Attach to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
-          REPO: ${{ github.repository }}
-        run: gh release upload "$TAG" dist/*.deb dist/SHA256SUMS-deb.txt --repo "$REPO"
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: python3 -I script/tools/release-attach.py "$TAG" dist/*.deb dist/SHA256SUMS-deb.txt

@@ -61,7 +61,9 @@ On NixOS, set `services.openxlr.yabridgePackage` to the flake's
 `openxlr-yabridge` package.
 
 Every release also carries the packages themselves, next to a
-`SHA256SUMS-yabridge.txt` to check them against. The
+`SHA256SUMS-yabridge.txt` to check them against. They are uploaded by
+hand with no provenance attestation, so the checksum only guards against a
+damaged download ([release assets](../../docs/releases.md)). The
 [Optional Windows bridge workflow](https://github.com/emaspa/openxlr/actions/workflows/yabridge.yml)
 builds the same set from any branch, for review.
 

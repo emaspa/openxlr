@@ -1,8 +1,11 @@
 #!/bin/sh
 # The release version lives in several files that different packagers read.
 # They must all agree; CI runs this so a half-done bump fails before it is
-# tagged. Prints every location and exits nonzero on a mismatch.
+# tagged. Prints every location and exits nonzero on a mismatch. Given a
+# tag, as the release workflows do, the tag must name the same version.
+#   tools/check-version.sh [vX.Y.Z]
 set -eu
+tag=${1-}
 cd "$(dirname "$0")/.."
 props=$(sed -n 's/.*<Version>\([0-9.]*\)<\/Version>.*/\1/p' src/Directory.Build.props)
 plugin=$(sed -n 's/.*"Version": *"\([0-9.]*\)".*/\1/p' plugin/com.emaspa.openxlr.sdPlugin/manifest.json)
@@ -19,4 +22,11 @@ for v in "$plugin" "$browser" "$nix" "$spec" "$deb"; do
 done
 [ -n "$props" ] || status=1
 if [ $status -ne 0 ]; then echo "version mismatch: every file must say $props" >&2; fi
+if [ -n "$tag" ]; then
+    printf '%-31s %s\n' tag "$tag"
+    if [ "$tag" != "v$props" ]; then
+        echo "tag $tag does not name version $props" >&2
+        status=1
+    fi
+fi
 exit $status

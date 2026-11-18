@@ -29,6 +29,11 @@ for the `deck` user first with `passwd` if you never have.
    sha256sum -c SHA256SUMS-flatpak.txt
    ```
 
+   This only shows the download is not damaged. The bundle is built by
+   hand and has no provenance attestation, and the checksum file sits on
+   the same release, so it does not show who made the bundle
+   ([release assets](releases.md)).
+
 2. Install it for your user. Flatpak fetches the Freedesktop runtime from
    Flathub, so the first line makes Flathub available to your user:
 
