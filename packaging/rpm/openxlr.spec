@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.9.1
+Version: 0.9.2
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -257,6 +257,18 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Wed Nov 18 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.2-1
+- Windows plugin editors take clicks again on KWin 6.8.3: the plugin host shows the hidden Wine window again.
+- The LV2 catalogue is read by the plugin host in a scan of its own, and a bundle that crashes or stalls it is skipped.
+- Plugin host fixes for LV2 port kinds, CLAP port counts, CLAP editor requests and X errors on plugin threads.
+- Plugin and helper search paths keep only absolute entries.
+- The plugin host is built with hardening flags, and openxlr-yabridge revision 4 hardens the companion's plugin libraries.
+- The control socket directory and its parent are checked before use.
+- Skins cannot read outside their folder or stall the UI with a device or pipe.
+- The browser companion captures only tabs activated in its popup.
+- The Deck plugin drops a message it cannot use instead of exiting.
+- Release assets are built and attested from the tag before the release is published.
+
 * Wed Nov 18 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.1-1
 - Pro: Line Out's level is a control, set in the HEADPHONES card under Phones 2, and kept by hardware mixing
 - Mixer: the phantom power lamp on a matrix row's Mic button shows only while phantom power is on
