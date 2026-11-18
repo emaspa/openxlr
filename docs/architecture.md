@@ -242,8 +242,14 @@ modules or custom drivers:
 
 LV2 metadata is read through lilv in one helper process
 (`openxlr-lv2-host scan-lv2`), so the daemon never parses a bundle's Turtle
-files. The scan has a one-minute deadline and bounded output; when it
-fails the daemon keeps the LV2 catalogue it had. A build without the
+files. The scan has a one-minute deadline and bounded output. The helper
+names each bundle before reading it; when a bundle crashes or stalls it,
+the daemon runs it again with that bundle skipped, at most eight times and
+within 90 seconds in all. It remembers the bundle in the scan cache, keyed
+by the bundle's files and the helper, so later scans skip it until either
+changes or the user rescans. When no run completes the daemon keeps the LV2
+catalogue it had, or the plugins described before the failure when it had
+none. A build without the
 native helper reads LV2 metadata through lilv in the daemon. CLAP and VST3
 bundles are described in a helper process each, with bounded output and a
 cache invalidated by bundle changes. An optional managed bridge also keys that cache by its

@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -12,9 +14,11 @@ namespace OpenXLR.Core.Mixing;
 /// that in a helper process (<c>openxlr-lv2-host scan-lv2</c>), as CLAP and
 /// VST3 bundles are described: a bundle whose data crashes or stalls the
 /// parser costs that scan, with a deadline and a bound on what the helper
-/// may print, and the daemon keeps the catalogue it had. A build without
-/// the native host reads the bundles through lilv in this process, as every
-/// build did before the helper could.
+/// may print. The helper names each bundle before reading it, so the scan
+/// is run again without the bundle that crashed or stalled it, and that
+/// bundle is remembered and passed by until it changes or the user
+/// rescans. A build without the native host reads the bundles through lilv
+/// in this process, as every build did before the helper could.
 ///
 /// Only what an insert UI needs is read: names, audio port counts, the
 /// control ports with their ranges and hints, and the required features
@@ -24,11 +28,21 @@ namespace OpenXLR.Core.Mixing;
 public static class Lv2Catalog
 {
     // The last catalogue a scan completed. A scan that fails hands this back
-    // instead of an empty list, so one broken bundle installed since does
+    // instead of what it managed, so one broken bundle installed since does
     // not take every LV2 insert out of the picker.
     private static IReadOnlyList<PluginInfo>? _lastGood;
+    private static volatile bool _retryFailures;
     private static readonly Refreshable<IReadOnlyList<PluginInfo>> Scan = new(() =>
-        KeepLastGood(ref _lastGood, Collect(null, new PluginScanLogStore(PluginScanLogStore.DefaultDirectory))));
+        KeepLastGood(ref _lastGood, Collect(null, new PluginScanLogStore(PluginScanLogStore.DefaultDirectory),
+            new ScanCache(FailureDirectory), _retryFailures)));
+
+    /// <summary>
+    /// Where the bundles that crashed or stalled a scan are remembered, beside
+    /// the CLAP and VST3 descriptions and in the same form: each keyed by its
+    /// path with a stamp of its files and of the helper, so a changed bundle
+    /// or an updated helper is read again.
+    /// </summary>
+    internal static string FailureDirectory => Path.Combine(ScanCache.DefaultDirectory, "lv2");
 
     /// <summary>
     /// How long the helper may take. lilv reads a full LSP, x42 and Calf
@@ -36,6 +50,17 @@ public static class Lv2Catalog
     /// stuck in a bundle.
     /// </summary>
     internal static readonly TimeSpan ScanTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// What one catalogue may spend on the helper, its runs again without a
+    /// bad bundle included: one stalled bundle and a few crashes, never
+    /// minutes. A run started with less than <see cref="ScanTimeout"/> left
+    /// gets what is left, and its timing out says nothing about a bundle.
+    /// </summary>
+    internal static readonly TimeSpan ScanBudget = TimeSpan.FromSeconds(90);
+
+    /// <summary>Runs after the first, each without one more bundle that crashed or stalled the scan.</summary>
+    internal const int MaxRetries = 8;
 
     /// <summary>
     /// What the helper may print. A few hundred plugins with every LSP
@@ -76,7 +101,12 @@ public static class Lv2Catalog
     public static IReadOnlyList<PluginInfo> Plugins => Scan.Value;
 
     /// <summary>Scan again; until the new list is complete, readers get the old one.</summary>
-    public static void Refresh() => Scan.Refresh();
+    /// <param name="retryFailures">Read the bundles a previous scan could not, too.</param>
+    public static void Refresh(bool retryFailures = false)
+    {
+        _retryFailures = retryFailures;
+        Scan.Refresh();
+    }
 
     /// <summary>Kick the scan off without waiting for it.</summary>
     public static void Warm() => ThreadPool.QueueUserWorkItem(_ => { try { _ = Scan.Value; } catch (Exception) { } });
@@ -84,113 +114,176 @@ public static class Lv2Catalog
     public static PluginInfo? Find(string uri) => Plugins.FirstOrDefault(p => p.Plugin == uri);
 
     /// <summary>
-    /// A fresh scan outside the cached one, empty when it failed. With
-    /// <paramref name="lv2Path"/> only those directories are read (tests
-    /// point it at their own bundles); otherwise the LV2_PATH every LV2 host
-    /// is given, from <see cref="PluginSearchPaths.Lv2Path"/>, or lilv's
-    /// default when no folder was added.
+    /// A fresh scan outside the cached one: what it found, or what the
+    /// helper reported before it failed. With <paramref name="lv2Path"/>
+    /// only those directories are read (tests point it at their own
+    /// bundles); otherwise the LV2_PATH every LV2 host is given, from
+    /// <see cref="PluginSearchPaths.Lv2Path"/>, or lilv's default when no
+    /// folder was added. Nothing is remembered about failed bundles.
     /// </summary>
-    internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null) => Collect(lv2Path, logs: null) ?? [];
+    internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null) => Collect(lv2Path, logs: null).Plugins;
 
     /// <summary>
-    /// One scan, through the helper when it is installed, or null when the
-    /// helper failed. <paramref name="logs"/> keeps the output of a failed
-    /// attempt; the daemon's catalogue passes its store, a test none.
+    /// One catalogue's plugins, and whether a scan finished. One that did
+    /// not holds the plugins the helper described before it stopped.
     /// </summary>
-    internal static IReadOnlyList<PluginInfo>? Collect(string? lv2Path, PluginScanLogStore? logs)
+    internal sealed record Lv2Scan(IReadOnlyList<PluginInfo> Plugins, bool Complete);
+
+    /// <summary>
+    /// One scan, through the helper when it is installed. <paramref name="logs"/>
+    /// keeps the output of a failed attempt and <paramref name="failures"/>
+    /// the bundles that caused one; the daemon's catalogue passes its own,
+    /// a test its own or none.
+    /// </summary>
+    internal static Lv2Scan Collect(string? lv2Path, PluginScanLogStore? logs, ScanCache? failures = null,
+        bool retryFailures = false)
     {
         lv2Path ??= PluginSearchPaths.Lv2Path();
         if (NativePluginHost.HostInstalled)
-            return FromHelper(NativePluginHost.Executable, lv2Path, logs);
+            return FromHelper(NativePluginHost.Executable, lv2Path, logs, failures: failures, retryFailures: retryFailures);
         var evidence = new PluginScanDiagnostics.Capture("lv2");
         try
         {
             IReadOnlyList<PluginInfo> plugins = InProcess(lv2Path);
             evidence.Add(Searched(lv2Path), plugins.Count == 0 ? "no-plugins" : "ok", plugins: plugins.Count,
                 detail: "read in the daemon: the native host is not installed");
-            return plugins;
+            return new(plugins, true);
         }
         finally { evidence.Complete(); }
     }
 
     /// <summary>
-    /// What the daemon keeps: a completed scan, or after a failed one the
-    /// catalogue the last completed scan gave, empty when there was none.
+    /// What the daemon keeps: a completed scan; after one that did not
+    /// complete, the catalogue the last completed scan gave, or when there
+    /// was none (right after the daemon starts) the plugins the failed scan
+    /// did describe.
     /// </summary>
-    internal static IReadOnlyList<PluginInfo> KeepLastGood(ref IReadOnlyList<PluginInfo>? lastGood, IReadOnlyList<PluginInfo>? scanned)
+    internal static IReadOnlyList<PluginInfo> KeepLastGood(ref IReadOnlyList<PluginInfo>? lastGood, Lv2Scan scanned)
     {
-        if (scanned is null) return Volatile.Read(ref lastGood) ?? [];
-        Volatile.Write(ref lastGood, scanned);
-        return scanned;
+        if (!scanned.Complete) return Volatile.Read(ref lastGood) ?? scanned.Plugins;
+        Volatile.Write(ref lastGood, scanned.Plugins);
+        return scanned.Plugins;
     }
 
     /// <summary>
-    /// Run the helper and read its catalogue, or null when it crashed, ran
-    /// out of time, printed more than it may or printed something that is
-    /// not a catalogue. Each failure is recorded under <paramref name="kind"/>
-    /// in the scan diagnostics, which the daemon logs, with the bundle the
-    /// helper was reading when its phase markers name one.
+    /// Run the helper and read its catalogue. A run that crashed, ran out of
+    /// time, printed more than it may or printed something that is not a
+    /// catalogue is recorded under <paramref name="kind"/> in the scan
+    /// diagnostics, which the daemon logs, with the bundle the helper was
+    /// reading when its phase markers name one. That bundle is then left out
+    /// (<c>--skip</c>) and the helper run again, at most
+    /// <paramref name="maxRetries"/> times and within <paramref name="budget"/>
+    /// in all; <paramref name="failures"/> remembers it, and the bundles it
+    /// already holds are left out from the start unless
+    /// <paramref name="retryFailures"/>. When no run completes, the result
+    /// holds what the last one described before it stopped.
     /// </summary>
-    internal static IReadOnlyList<PluginInfo>? FromHelper(string executable, string? lv2Path,
+    internal static Lv2Scan FromHelper(string executable, string? lv2Path,
         PluginScanLogStore? logs, string kind = "lv2", TimeSpan? timeout = null,
-        int stdoutCap = OutputCapBytes, int stderrCap = ErrorCapBytes)
+        int stdoutCap = OutputCapBytes, int stderrCap = ErrorCapBytes, ScanCache? failures = null,
+        bool retryFailures = false, TimeSpan? budget = null, int maxRetries = MaxRetries)
     {
         // Nothing here may throw: the catalogue is read once and kept.
         var evidence = new PluginScanDiagnostics.Capture(kind);
         string searched = Searched(lv2Path);
+        TimeSpan deadline = timeout ?? ScanTimeout;
+        TimeSpan allowed = budget ?? ScanBudget;
+        long scanBegun = System.Diagnostics.Stopwatch.GetTimestamp();
+        IReadOnlyList<PluginInfo> partial = [];
         try
         {
-            DateTimeOffset startedAt = DateTimeOffset.UtcNow;
-            long begun = System.Diagnostics.Stopwatch.GetTimestamp();
-            ProcessResult scan;
-            try
-            {
-                scan = ProcessRunner.Run(executable, lv2Path is null ? ["scan-lv2"] : ["scan-lv2", lv2Path],
-                    timeout ?? ScanTimeout, stdoutCap: stdoutCap, stderrCap: stderrCap);
-            }
-            catch (Exception ex)
-            {
-                evidence.Add(searched, "start-error", detail: ex.Message);
-                return null;
-            }
-            int? exitCode = scan.ExitCode == -1 ? null : scan.ExitCode;
-            string? outcome = scan.Ok ? null : scan.TimedOut ? "timeout" : scan.Truncated ? "output-limit"
-                : scan.Incomplete ? "output-incomplete" : "scan-failed";
-            IReadOnlyList<PluginInfo>? plugins = null;
-            string? invalid = null;
-            if (outcome is null)
-            {
-                try { plugins = Parse(scan.Stdout); }
-                catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+            // The marker text of each bundle this scan leaves out.
+            var skips = new List<string>();
+            var leftOut = new HashSet<string>(StringComparer.Ordinal);
+            if (failures is not null && !retryFailures)
+                foreach ((string bundle, ScanCache.Entry entry) in failures.CurrentFailures())
                 {
-                    outcome = "invalid-description";
-                    invalid = ex.Message;
+                    if (leftOut.Add(MarkerText(bundle))) skips.Add(MarkerText(bundle));
+                    evidence.SkipFailure(bundle, entry.FailureReason, entry.FailedAt);
                 }
-            }
-            if (plugins is not null)
+            for (int retries = 0; ; retries++)
             {
-                evidence.Add(searched, plugins.Count == 0 ? "no-plugins" : "ok", plugins: plugins.Count);
-                return plugins;
+                TimeSpan left = allowed - System.Diagnostics.Stopwatch.GetElapsedTime(scanBegun);
+                TimeSpan allotted = left < deadline ? left : deadline;
+                if (allotted <= TimeSpan.Zero) break;
+                DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+                long begun = System.Diagnostics.Stopwatch.GetTimestamp();
+                List<string> arguments = ["scan-lv2", .. skips.SelectMany(text => new[] { "--skip", text })];
+                if (lv2Path is not null) arguments.Add(lv2Path);
+                ProcessResult scan;
+                try
+                {
+                    scan = ProcessRunner.Run(executable, arguments, allotted, stdoutCap: stdoutCap, stderrCap: stderrCap);
+                }
+                catch (Exception ex)
+                {
+                    evidence.Add(searched, "start-error", detail: ex.Message);
+                    break;
+                }
+                int? exitCode = scan.ExitCode == -1 ? null : scan.ExitCode;
+                string? outcome = scan.Ok ? null : scan.TimedOut ? "timeout" : scan.Truncated ? "output-limit"
+                    : scan.Incomplete ? "output-incomplete" : "scan-failed";
+                IReadOnlyList<PluginInfo>? plugins = null;
+                string? invalid = null;
+                if (outcome is null)
+                {
+                    try { plugins = Parse(scan.Stdout); }
+                    catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+                    {
+                        outcome = "invalid-description";
+                        invalid = ex.Message;
+                    }
+                }
+                if (plugins is not null)
+                {
+                    evidence.Add(searched, plugins.Count == 0 ? "no-plugins" : "ok", plugins: plugins.Count);
+                    // A bundle remembered as failed that this scan read
+                    // without trouble has changed or been fixed.
+                    if (failures is not null)
+                        foreach (string bundle in failures.FailedBundles())
+                            if (!leftOut.Contains(MarkerText(bundle))) failures.Invalidate(bundle);
+                    return new(plugins, true);
+                }
+                // Output past the cap stops wherever the helper was; that bundle
+                // did not cause it. A crash or a stall is in the bundle it was
+                // reading, which its last marker names.
+                string? culprit = outcome is "scan-failed" or "timeout" or "output-incomplete" ? Culprit(scan.Stderr) : null;
+                string path = culprit is null ? searched : MarkerPath(culprit);
+                PluginScanLogRef log = logs is null ? default : logs.Save(
+                    new PluginScanAttempt(kind, path, outcome!, startedAt, System.Diagnostics.Stopwatch.GetElapsedTime(begun),
+                        exitCode, scan.TimedOut, scan.Truncated, Scanner: executable, Detail: invalid),
+                    scan.Stdout, scan.Truncated, scan.Stderr, scan.Truncated);
+                evidence.Add(path, outcome!, exitCode: exitCode, detail: invalid ?? scan.Stderr,
+                    logId: log.Id, logNote: log.Note);
+                if (outcome != "invalid-description") partial = ParsePartial(scan.Stdout);
+                // Nothing to leave out, or a helper that read the bundle it
+                // was told to leave out: another run would end the same way.
+                if (culprit is null || leftOut.Contains(culprit)) break;
+                // A run cut short by the budget says nothing about the bundle
+                // it was reading; the next scan gives it the full deadline.
+                if (scan.TimedOut && allotted < deadline) break;
+                leftOut.Add(culprit);
+                skips.Add(culprit);
+                if (failures is not null)
+                {
+                    failures.StoreFailure(path, outcome!, startedAt);
+                    failures.Flush();
+                }
+                if (retries >= maxRetries) break;
             }
-            // Output past the cap stops wherever the helper was; that bundle
-            // did not cause it. A crash or a stall is in the bundle it was
-            // reading, which its last marker names.
-            string path = outcome is "scan-failed" or "timeout" or "output-incomplete"
-                ? Culprit(scan.Stderr) ?? searched : searched;
-            PluginScanLogRef log = logs is null ? default : logs.Save(
-                new PluginScanAttempt(kind, path, outcome!, startedAt, System.Diagnostics.Stopwatch.GetElapsedTime(begun),
-                    exitCode, scan.TimedOut, scan.Truncated, Scanner: executable, Detail: invalid),
-                scan.Stdout, scan.Truncated, scan.Stderr, scan.Truncated);
-            evidence.Add(path, outcome!, exitCode: exitCode, detail: invalid ?? scan.Stderr,
-                logId: log.Id, logNote: log.Note);
-            return null;
+            return new(partial, false);
         }
         catch (Exception ex)
         {
             evidence.Add(searched, "scan-error", detail: ex.Message);
-            return null;
+            return new(partial, false);
         }
-        finally { evidence.Complete(); }
+        finally
+        {
+            try { failures?.Save(); }
+            catch (Exception) { /* the next scan reads the bundles again */ }
+            evidence.Complete();
+        }
     }
 
     /// <summary>The directories a scan reads, for the diagnostics.</summary>
@@ -201,22 +294,73 @@ public static class Lv2Catalog
         catch (Exception) { return "LV2_PATH"; }
     }
 
-    private const string BundleMarker = "trace: scan LV2 plugin ";
+    private const string MarkerPrefix = "trace: scan LV2";
 
-    /// <summary>The bundle the helper's last phase marker names, if any.</summary>
+    /// <summary>
+    /// The text that names the bundle the helper was reading when it stopped,
+    /// or null when its last phase marker names none: before the first
+    /// bundle, after the last, or right after one it left out. A marker
+    /// starts its line; the same words inside lilv's own messages do not
+    /// count.
+    /// </summary>
     internal static string? Culprit(string stderr)
     {
-        int at = stderr.LastIndexOf(BundleMarker, StringComparison.Ordinal);
-        // A marker starts its line; the same words inside lilv's own
-        // messages do not count.
-        while (at > 0 && stderr[at - 1] != '\n')
-            at = stderr.LastIndexOf(BundleMarker, at - 1, StringComparison.Ordinal);
-        if (at < 0) return null;
+        int at = stderr.Length;
+        do
+        {
+            at = at == 0 ? -1 : stderr.LastIndexOf(MarkerPrefix, at - 1, StringComparison.Ordinal);
+            if (at < 0) return null;
+        }
+        while (at > 0 && stderr[at - 1] != '\n');
         int end = stderr.IndexOf('\n', at);
         string line = end < 0 ? stderr[at..] : stderr[at..end];
-        int bundle = line.IndexOf(": bundle ", StringComparison.Ordinal);
-        string path = bundle < 0 ? "" : line[(bundle + ": bundle ".Length)..];
-        return path.Length == 0 ? null : path;
+        // trace: scan LV2 manifest N: bundle TEXT, or plugin N.
+        string rest = line[MarkerPrefix.Length..];
+        string? numbered = rest.StartsWith(" manifest ", StringComparison.Ordinal) ? rest[" manifest ".Length..]
+            : rest.StartsWith(" plugin ", StringComparison.Ordinal) ? rest[" plugin ".Length..] : null;
+        int bundle = numbered?.IndexOf(": bundle ", StringComparison.Ordinal) ?? -1;
+        if (bundle <= 0 || !numbered![..bundle].All(char.IsAsciiDigit)) return null;
+        string text = numbered[(bundle + ": bundle ".Length)..];
+        return text.Length == 0 ? null : text;
+    }
+
+    /// <summary>The longest marker text the helper prints, in bytes.</summary>
+    internal const int MaxMarkerBytes = 512;
+
+    /// <summary>
+    /// A bundle path as the helper's markers write it, and as <c>--skip</c>
+    /// takes it: every byte outside printable ASCII and every '%' as %XX, at
+    /// most <see cref="MaxMarkerBytes"/>, never ending inside an escape.
+    /// </summary>
+    internal static string MarkerText(string path)
+    {
+        var text = new StringBuilder();
+        foreach (byte b in Encoding.UTF8.GetBytes(path))
+        {
+            bool plain = b >= 0x20 && b < 0x7f && b != (byte)'%';
+            if (text.Length + (plain ? 1 : 3) > MaxMarkerBytes) break;
+            if (plain) text.Append((char)b);
+            else text.Append('%').Append(b.ToString("X2", CultureInfo.InvariantCulture));
+        }
+        return text.ToString();
+    }
+
+    /// <summary>The path a marker text names: its escapes read back as UTF-8.</summary>
+    internal static string MarkerPath(string text)
+    {
+        if (!text.Contains('%')) return text;
+        var bytes = new List<byte>(text.Length);
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '%' && i + 2 < text.Length && byte.TryParse(text.AsSpan(i + 1, 2),
+                    NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out byte value))
+            {
+                bytes.Add(value);
+                i += 2;
+            }
+            else bytes.AddRange(Encoding.UTF8.GetBytes(text[i].ToString()));
+        }
+        return Encoding.UTF8.GetString([.. bytes]);
     }
 
     /// <summary>
@@ -249,6 +393,47 @@ public static class Lv2Catalog
         // not one the helper finished.
         while (reader.Read()) { }
         if (!listed) throw new JsonException("The scanner printed no plugin list.");
+        return Sorted(result);
+    }
+
+    /// <summary>
+    /// The plugins a helper that stopped had already described: every
+    /// object it finished, none it was in the middle of. The same rules hold
+    /// for each as for a finished catalogue.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo> ParsePartial(ReadOnlySpan<byte> json)
+    {
+        var result = new List<PluginInfo>();
+        var known = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            var reader = new Utf8JsonReader(json, isFinalBlock: false, state: default);
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return result;
+            while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+            {
+                if (!reader.ValueTextEquals("plugins"u8))
+                {
+                    if (!reader.Read() || !reader.TrySkip()) break;
+                    continue;
+                }
+                if (!reader.Read() || reader.TokenType != JsonTokenType.StartArray) break;
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                {
+                    if (reader.TokenType != JsonTokenType.StartObject)
+                    {
+                        if (!reader.TrySkip()) break;
+                        continue;
+                    }
+                    int start = (int)reader.TokenStartIndex;
+                    if (!reader.TrySkip()) break;   // the object the helper was writing
+                    var one = new Utf8JsonReader(json[start..(int)reader.BytesConsumed]);
+                    one.Read();
+                    if (ReadPlugin(ref one) is PluginInfo info && known.Add(info.Plugin)) result.Add(info);
+                }
+                break;
+            }
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException) { }
         return Sorted(result);
     }
 

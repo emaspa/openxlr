@@ -63,7 +63,7 @@ public static class PluginCatalog
     /// </summary>
     public static IReadOnlyList<PluginInfo> Refresh()
     {
-        Lv2Catalog.Refresh();
+        Lv2Catalog.Refresh(retryFailures: true);
         ClapCatalog.Refresh(retryFailures: true);
         Vst3Catalog.Refresh(retryFailures: true);
         All.Refresh();
