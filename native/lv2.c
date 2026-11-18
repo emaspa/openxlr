@@ -80,8 +80,13 @@ static bool ring_pop(Ring *r, void *dst, uint32_t *size_out) {
   return true;
 }
 
+// What one port carries. Each port is exactly one of these, and only the
+// buffer its kind names is connected and allocated.
+typedef enum { PORT_UNUSED, PORT_AUDIO, PORT_CONTROL, PORT_ATOM } PortKind;
+
 typedef struct {
-  bool input, audio, control, atom;
+  bool input;
+  PortKind kind;
   const char *symbol;
   float value;                 // connected for a control port
   float *samples;              // connected for an audio port
@@ -332,30 +337,43 @@ static bool lv2_load(Host *h, char **arguments) {
     const LilvPort *port = lilv_plugin_get_port_by_index(l->plugin, i);
     p->symbol = lilv_node_as_string(lilv_port_get_symbol(l->plugin, port));
     p->input = lilv_port_is_a(l->plugin, port, input);
-    p->audio = lilv_port_is_a(l->plugin, port, audio);
-    p->control = lilv_port_is_a(l->plugin, port, control);
-    p->atom = lilv_port_is_a(l->plugin, port, atom);
+    bool is_audio = lilv_port_is_a(l->plugin, port, audio),
+         is_control = lilv_port_is_a(l->plugin, port, control),
+         is_atom = lilv_port_is_a(l->plugin, port, atom);
     p->channel = NO_CHANNEL;
-    if (p->audio) {
+    // A port typed as more than one kind has no single buffer that suits it,
+    // so the plugin is refused. A kind is recorded only once its buffer
+    // exists, and every later use of a port goes by its kind.
+    if (is_audio + is_control + is_atom > 1) {
+      fprintf(stderr, "LV2 port %s is typed as more than one of audio, control and atom\n",
+              p->symbol);
+      ok = false;
+    } else if (is_audio) {
       p->samples = calloc(MAX_FRAMES, sizeof(float));
       ok = p->samples != NULL;
       if (ok) {
+        p->kind = PORT_AUDIO;
         lilv_instance_connect_port(l->instance, i, p->samples);
         unsigned index = p->input ? ins++ : outs++;
         if (index < h->channels)
           p->channel = index;
       }
-    } else if (p->control) {
+    } else if (is_control) {
       p->value = isfinite(ranges[i + 2 * l->count]) ? ranges[i + 2 * l->count] : 0;
       p->ctl = host_add_control(h, p->symbol, ranges[i], ranges[i + l->count],
                                 p->value, !p->input, p);
       ok = p->ctl != NULL;
-      lilv_instance_connect_port(l->instance, i, &p->value);
-    } else if (p->atom) {
+      if (ok) {
+        p->kind = PORT_CONTROL;
+        lilv_instance_connect_port(l->instance, i, &p->value);
+      }
+    } else if (is_atom) {
       p->sequence = calloc(1, ATOM_CAPACITY);
       ok = p->sequence != NULL;
-      if (ok)
+      if (ok) {
+        p->kind = PORT_ATOM;
         lilv_instance_connect_port(l->instance, i, p->sequence);
+      }
     } else if (lilv_port_has_property(l->plugin, port, optional))
       lilv_instance_connect_port(l->instance, i, NULL);
     else {
@@ -436,14 +454,14 @@ static void lv2_process(Host *h, uint32_t frames, float *const *in,
   Lv2 *l = h->impl;
   for (uint32_t i = 0; i < l->count; ++i) {
     Port *p = &l->ports[i];
-    if (p->audio && p->input) {
+    if (p->kind == PORT_AUDIO && p->input) {
       if (p->channel != NO_CHANNEL)
         memcpy(p->samples, in[p->channel], frames * sizeof(float));
       else
         memset(p->samples, 0, frames * sizeof(float));
-    } else if (p->control && p->input)
+    } else if (p->kind == PORT_CONTROL && p->input)
       p->value = atomic_load(&p->ctl->desired);
-    else if (p->atom) {
+    else if (p->kind == PORT_ATOM) {
       p->sequence->atom.type = l->sequence_type;
       p->sequence->atom.size = p->input ? sizeof(LV2_Atom_Sequence_Body)
                                         : ATOM_CAPACITY - sizeof(LV2_Atom);
@@ -462,9 +480,9 @@ static void lv2_process(Host *h, uint32_t frames, float *const *in,
     l->worker->end_run(lilv_instance_get_handle(l->instance));
   for (uint32_t i = 0; i < l->count; ++i) {
     Port *p = &l->ports[i];
-    if (p->audio && !p->input && p->channel != NO_CHANNEL)
+    if (p->kind == PORT_AUDIO && !p->input && p->channel != NO_CHANNEL)
       memcpy(out[p->channel], p->samples, frames * sizeof(float));
-    else if (p->control)
+    else if (p->kind == PORT_CONTROL)
       atomic_store(&p->ctl->observed, p->value);
   }
 }
@@ -477,7 +495,7 @@ static void ui_write(LV2UI_Controller controller, uint32_t index, uint32_t size,
   if (index >= l->count || format != 0 || size != sizeof(float))
     return;
   Port *p = &l->ports[index];
-  if (!p->input || !p->control)
+  if (!p->input || p->kind != PORT_CONTROL)
     return;
   host_control_moved(l->h, p->ctl, *(const float *)buffer);
 }
@@ -598,7 +616,7 @@ static bool lv2_editor_idle(Host *h) {
   if (l->ui_descriptor->port_event)
     for (uint32_t i = 0; i < l->count; ++i) {
       Port *p = &l->ports[i];
-      if (!p->control)
+      if (p->kind != PORT_CONTROL)
         continue;
       float value = p->input ? atomic_load(&p->ctl->desired)
                              : atomic_load(&p->ctl->observed);

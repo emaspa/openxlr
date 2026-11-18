@@ -85,8 +85,10 @@ server, a display or an installed plugin.
 `make -C native test-lv2` loads the fixture in `tests/latency.lv2`, a stereo
 delay whose latency port follows its delay control, through lilv and the LV2
 backend, and checks that its latency is reported once audio has run and again
-when the delay changes. It builds the fixture itself and needs lilv, but no
-PipeWire, display or installed plugin.
+when the delay changes. A plugin with a port typed as more than one of
+audio, control and atom is refused at load, the way any other unusable
+port is, with the port named on stderr. It builds the fixture itself and
+needs lilv, but no PipeWire, display or installed plugin.
 
 `make -C native test-vst3` checks VST3 parameter queue indices, attribute
 identifiers and buffers, the component-state memory stream, and that the
