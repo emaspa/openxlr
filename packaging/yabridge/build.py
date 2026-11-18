@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -193,6 +194,46 @@ def generic_target_flags(flags):
     return f"{kept} {GENERIC_TARGET}".strip()
 
 
+HARDENING_COMPILE = ["-fstack-protector-strong", "-fstack-clash-protection", "-fcf-protection"]
+HARDENING_LINK = ["-Wl,-z,relro", "-Wl,-z,now", "-Wl,-z,noexecstack"]
+
+
+def fortify_flags(compiler, flags):
+    """The _FORTIFY_SOURCE definition to add, or none when one is already set.
+
+    The packager's flags or the compiler itself may define it, and a second,
+    different definition is a warning. Level 3 where the compiler and the C
+    library support it, 2 otherwise.
+    """
+    probe = subprocess.run([*compiler, *flags, "-O2", "-dM", "-E", "-x", "c++", "-"],
+                           input="", capture_output=True, text=True)
+    if probe.returncode == 0 and re.search(r"^#define _FORTIFY_SOURCE\b", probe.stdout, re.MULTILINE):
+        return []
+    level3 = subprocess.run([*compiler, "-O2", "-D_FORTIFY_SOURCE=3", "-Werror", "-include", "cstring",
+                             "-E", "-x", "c++", "-"], input="", capture_output=True, text=True)
+    return [f"-D_FORTIFY_SOURCE={3 if level3.returncode == 0 else 2}"]
+
+
+def harden_plugin_libraries(env):
+    """Add hardening to the flags of the plugin libraries, after the packager's.
+
+    Meson builds the bridge as a cross build with winegcc as the host
+    compiler, so CFLAGS, CXXFLAGS and LDFLAGS reach only the Wine host. The
+    libraries the plugin host loads are built for the build machine, from
+    the _FOR_BUILD variables. They get the stack protector, FORTIFY, stack
+    clash and control-flow protection, full RELRO with immediate binding and
+    a non-executable stack. The Wine host keeps its packager's link flags:
+    Winelib output carries relocations in a read-only segment, which the
+    hardened link flags refuse.
+    """
+    compiler = shlex.split(env.get("CXX_FOR_BUILD", "c++"))
+    given = shlex.split(env.get("CPPFLAGS_FOR_BUILD", "")) + shlex.split(env.get("CXXFLAGS_FOR_BUILD", ""))
+    compile_flags = HARDENING_COMPILE + fortify_flags(compiler, given)
+    for name in ("CFLAGS_FOR_BUILD", "CXXFLAGS_FOR_BUILD"):
+        env[name] = " ".join([env.get(name, ""), *compile_flags]).strip()
+    env["LDFLAGS_FOR_BUILD"] = " ".join([env.get("LDFLAGS_FOR_BUILD", ""), *HARDENING_LINK]).strip()
+
+
 def build(source, output, jobs):
     prepared = source / "openxlr-packaging/prepared.json"
     if not prepared.exists() or json.loads(prepared.read_text()) != PIN:
@@ -202,6 +243,7 @@ def build(source, output, jobs):
     env["SOURCE_DATE_EPOCH"] = str(PIN["sourceDateEpoch"])
     for name in ("CFLAGS", "CXXFLAGS"):
         env[name] = generic_target_flags(env.get(name, ""))
+    harden_plugin_libraries(env)
     native = output / "native"
     if not (native / "build.ninja").exists():
         run(["meson", "setup", native, source, "--buildtype=release", "--cross-file=" + str(source / "cross-wine.conf"),

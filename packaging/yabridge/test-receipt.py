@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -460,6 +461,41 @@ class BuildDirectoryTests(unittest.TestCase):
         with patch.object(bridge, "run", side_effect=run), self.assertRaises(subprocess.CalledProcessError):
             bridge.prepare(source)
         self.assertEqual(["git", "init", str(source)], calls[0])
+
+
+class HardeningTests(unittest.TestCase):
+    """The plugin libraries are hardened; the Wine host keeps the packager's flags."""
+
+    def test_plugin_libraries_get_hardening_after_the_packagers_flags(self):
+        env = {"CFLAGS": "-O2 -g", "CXXFLAGS": "-O2 -g", "LDFLAGS": "-Wl,-z,notext",
+               "CXXFLAGS_FOR_BUILD": "-O2 -flto=auto", "LDFLAGS_FOR_BUILD": "-flto=auto"}
+        with patch.object(bridge, "fortify_flags", return_value=["-D_FORTIFY_SOURCE=3"]):
+            bridge.harden_plugin_libraries(env)
+        compile_flags = ["-fstack-protector-strong", "-fstack-clash-protection", "-fcf-protection", "-D_FORTIFY_SOURCE=3"]
+        self.assertEqual(["-O2", "-flto=auto", *compile_flags], env["CXXFLAGS_FOR_BUILD"].split())
+        self.assertEqual(compile_flags, env["CFLAGS_FOR_BUILD"].split())
+        self.assertEqual(["-flto=auto", "-Wl,-z,relro", "-Wl,-z,now", "-Wl,-z,noexecstack"],
+                         env["LDFLAGS_FOR_BUILD"].split())
+        # Winelib output refuses the hardened link flags; the host is left alone.
+        self.assertEqual(("-O2 -g", "-O2 -g", "-Wl,-z,notext"), (env["CFLAGS"], env["CXXFLAGS"], env["LDFLAGS"]))
+
+    def test_fortify_is_defined_once(self):
+        def compiler(defined, level3):
+            def run(arguments, **kwargs):
+                if "-dM" in arguments:
+                    return subprocess.CompletedProcess(arguments, 0, "#define _FORTIFY_SOURCE 3\n" if defined else "", "")
+                return subprocess.CompletedProcess(arguments, 0 if level3 else 1, "", "")
+            return patch.object(bridge.subprocess, "run", side_effect=run)
+        with compiler(defined=True, level3=True):
+            self.assertEqual([], bridge.fortify_flags(["c++"], ["-Wp,-D_FORTIFY_SOURCE=3"]))
+        with compiler(defined=False, level3=True):
+            self.assertEqual(["-D_FORTIFY_SOURCE=3"], bridge.fortify_flags(["c++"], []))
+        with compiler(defined=False, level3=False):
+            self.assertEqual(["-D_FORTIFY_SOURCE=2"], bridge.fortify_flags(["c++"], []))
+
+    @unittest.skipUnless(shutil.which("c++"), "needs a C++ compiler")
+    def test_a_packagers_fortify_level_is_kept(self):
+        self.assertEqual([], bridge.fortify_flags(["c++"], ["-D_FORTIFY_SOURCE=2"]))
 
 
 if __name__ == "__main__":
