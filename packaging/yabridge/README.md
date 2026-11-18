@@ -157,7 +157,9 @@ you or swap the files you later install with `sudo`. Every step refuses a
 else owns, or that group or other users can write to. It also refuses one
 whose parent someone else owns, or whose parent any user can write to
 without the sticky bit that `/tmp` has. Under `sudo` it accepts directories
-you own or root owns.
+you own or root owns. The Debian recipe passes `--package-build`, which
+keeps the checks on the package's own directories and skips their parents:
+Launchpad builds under `/build`, which belongs to the builder's account.
 
 Install through a package, or use the package-free local install:
 

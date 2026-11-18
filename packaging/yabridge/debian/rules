@@ -18,6 +18,8 @@ export DEB_LDFLAGS_MAINT_SET = -Wl,-z,notext
 override_dh_auto_configure:
 	:
 
+# --package-build: sbuild builds in a tree under /build, which its own account
+# owns, so build.py checks the package's directories and not their parents.
 # Ubuntu ships the winelib compilers as winegcc-stable and wineg++-stable, and
 # the build calls them by their plain names. Put the plain names on PATH for
 # the build when the distribution does not provide them.
@@ -28,13 +30,13 @@ override_dh_auto_build:
 	done
 	PATH="$(CURDIR)/debian/winetools:$$PATH" \
 	HOME="$(CURDIR)/debian" WINEPREFIX="$(CURDIR)/debian/wineprefix" WINEDEBUG=-all \
-		python3 openxlr-packaging/build.py build --source . --output out
+		python3 openxlr-packaging/build.py build --package-build --source . --output out
 
 override_dh_auto_test:
 	:
 
 override_dh_auto_install:
-	python3 openxlr-packaging/build.py stage --source . --output out --destdir debian/openxlr-yabridge --manager debian
+	python3 openxlr-packaging/build.py stage --package-build --source . --output out --destdir debian/openxlr-yabridge --manager debian
 	python3 openxlr-packaging/test-package.py debian/openxlr-yabridge
 
 override_dh_auto_clean:
