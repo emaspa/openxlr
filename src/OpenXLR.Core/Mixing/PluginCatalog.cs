@@ -2,8 +2,9 @@ namespace OpenXLR.Core.Mixing;
 
 /// <summary>
 /// Every plugin an insert can hold, whichever format it comes in. The LV2
-/// list is read through lilv in this process; the CLAP and VST3 lists come
-/// from the native host, one scan per bundle. All of them are read once and
+/// list comes from one scan by the native host (through lilv in this process
+/// on a build without it); the CLAP and VST3 lists come from the native
+/// host, one scan per bundle. All of them are read once and
 /// kept, whole: an insert is resolved against everything installed, so a
 /// chain that loaded yesterday loads today.
 ///
@@ -67,10 +68,11 @@ public static class PluginCatalog
         Vst3Catalog.Refresh(retryFailures: true);
         All.Refresh();
         IReadOnlyList<PluginInfo> plugins = All.Value;
-        // The old catalogue goes now. lilv builds and frees a large model to
-        // answer this; without the trim the C library keeps every megabyte of
-        // it for a use that never comes, and a few rescans cost more memory
-        // than the daemon ever needs.
+        // The old catalogue goes now. Without the native host lilv builds and
+        // frees a large model in this process to answer this; without the
+        // trim the C library keeps every megabyte of it for a use that never
+        // comes, and a few rescans cost more memory than the daemon ever
+        // needs.
         GC.Collect(2, GCCollectionMode.Aggressive, blocking: true);
         NativeHeap.Trim();
         return plugins;

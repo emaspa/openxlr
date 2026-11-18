@@ -58,7 +58,7 @@ DF_DEPS = $(DEEPFILTER_LIB)
 DF_LINK = -Wl,--gc-sections $(DEEPFILTER_LIB) -lgcc_s -lutil -lrt
 endif
 
-OBJECTS = host.o measure.o lv2.o clap.o vst3.o sound-check.o eq.o duck.o level.o player.o denoise.o \
+OBJECTS = host.o measure.o lv2.o lv2-scan.o clap.o vst3.o sound-check.o eq.o duck.o level.o player.o denoise.o \
           voice.o voice-stretch.o dynamics.o bridge.o $(RNN_OBJECTS)
 TEST_OBJECTS = $(addprefix tests/,editor.o audio.o own-block.o measure.o clap.o lv2.o vst3.o host.o \
                lifecycle.o sound-check.o eq.o duck.o denoise.o denoise-handoff.o denoise-recovery.o \
@@ -122,29 +122,29 @@ FORCE:
 # The library alone, for a package that builds it in a step of its own.
 deepfilter: deepfilter/target/release/libopenxlr_deepfilter.a
 
-tests/editor: tests/editor.o lv2.o clap.o vst3.o
+tests/editor: tests/editor.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # It links the duck stage to feed it non-finite input through the host.
-tests/audio: tests/audio.o duck.o lv2.o clap.o vst3.o
+tests/audio: tests/audio.o duck.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # The plugin's own block: the audio callback and its worker, without a graph.
-tests/own-block: tests/own-block.o lv2.o clap.o vst3.o
+tests/own-block: tests/own-block.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # The measured delay: known delays, a noise remover, the own block, and
 # outputs that must never give a figure, without a graph.
-tests/measure: tests/measure.o measure.o lv2.o clap.o vst3.o
+tests/measure: tests/measure.o measure.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # This one compiles clap.c into itself to reach the layout reading, so it
 # links without clap.o.
-tests/clap: tests/clap.o lv2.o vst3.o
+tests/clap: tests/clap.o lv2.o lv2-scan.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # This one compiles lv2.c into itself, and loads the latency fixture.
-tests/lv2: tests/lv2.o clap.o vst3.o
+tests/lv2: tests/lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 tests/latency.lv2/latency.so: tests/latency.lv2/latency.c
@@ -160,11 +160,11 @@ tests/host.o: tests/vst3-host.c
 	@mv $@.d.tmp $@.d
 
 # The C++ test includes vst3.cpp to exercise host-owned SDK objects.
-tests/vst3: tests/vst3.o tests/host.o lv2.o clap.o
+tests/vst3: tests/vst3.o tests/host.o lv2.o lv2-scan.o clap.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # A plugin lifecycle check against a real plugin, run by hand (see README).
-tests/lifecycle: tests/lifecycle.o lv2.o clap.o vst3.o
+tests/lifecycle: tests/lifecycle.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY: test test-editor test-audio test-clap test-lv2 test-vst3 test-scan test-fixtures
@@ -209,7 +209,7 @@ clean-native:
 
 # Sound Check: the loop backend and the level meter beside it, driven
 # directly with deterministic samples and no audio server.
-tests/sound-check: tests/sound-check.o lv2.o clap.o vst3.o
+tests/sound-check: tests/sound-check.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY: test-sound-check clean-sound-check
@@ -223,7 +223,7 @@ clean-sound-check:
 
 # The microphone EQ: the backend driven directly, its response measured
 # against tools/eq-reference.py's table, with no audio server.
-tests/eq: tests/eq.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
+tests/eq: tests/eq.o $(STAGE_OBJECTS) lv2.o lv2-scan.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
 .PHONY: test-eq clean-eq
@@ -236,7 +236,7 @@ clean-eq:
 	rm -f tests/eq tests/eq.o
 
 # The duck stage: detector and gain timing with no audio server.
-tests/duck: tests/duck.o lv2.o clap.o vst3.o
+tests/duck: tests/duck.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY: test-duck clean-duck
@@ -251,16 +251,16 @@ clean-duck:
 # Noise removal: both engines driven through the microphone stage with a
 # synthetic voice in noise, with no audio server. DeepFilterNet is checked
 # when this build carries it.
-tests/denoise: tests/denoise.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
+tests/denoise: tests/denoise.o $(STAGE_OBJECTS) lv2.o lv2-scan.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
 # The handoff test compiles denoise.c with a fake DeepFilterNet model.
-tests/denoise-handoff: tests/denoise-handoff.o $(RNN_OBJECTS) lv2.o clap.o vst3.o
+tests/denoise-handoff: tests/denoise-handoff.o $(RNN_OBJECTS) lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # Recovery from an engine that answers with NaN: RNNoise's own state, and a
 # fake DeepFilterNet model, with denoise.c compiled in.
-tests/denoise-recovery: tests/denoise-recovery.o $(RNN_OBJECTS) lv2.o clap.o vst3.o
+tests/denoise-recovery: tests/denoise-recovery.o $(RNN_OBJECTS) lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY: test-denoise clean-denoise clean-denoise-objects
@@ -282,7 +282,7 @@ clean-deepfilter:
 # The voice changer: every voice driven through the microphone stage over a
 # synthetic voice, with no audio server. `tests/voice --render IN.wav DIR`
 # writes every voice over a recording for listening.
-tests/voice: tests/voice.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
+tests/voice: tests/voice.o $(STAGE_OBJECTS) lv2.o lv2-scan.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
 .PHONY: test-voice clean-voice
@@ -297,7 +297,7 @@ clean-voice:
 # The compressor and the expander: driven through the microphone stage with
 # steady and stepped levels and with no audio server, checked against their
 # static curves, their time constants and their meters.
-tests/dynamics: tests/dynamics.o $(STAGE_OBJECTS) lv2.o clap.o vst3.o $(DF_DEPS)
+tests/dynamics: tests/dynamics.o $(STAGE_OBJECTS) lv2.o lv2-scan.o clap.o vst3.o $(DF_DEPS)
 	$(CXX) $(filter %.o,$^) -o $@ $(LDFLAGS) $(DF_LINK) $(LDLIBS)
 
 .PHONY: test-dynamics clean-dynamics
@@ -312,7 +312,7 @@ clean-dynamics:
 # The soundboard player: decoding, resampling, press modes and ramps, driven
 # directly with no audio server. It asks the helper for its `formats` and
 # `probe` lines.
-tests/player: tests/player.o lv2.o clap.o vst3.o
+tests/player: tests/player.o lv2.o lv2-scan.o clap.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 .PHONY: test-player clean-player

@@ -550,28 +550,28 @@ internal static class HostScan
 
     // Consume the entire value even when a scalar field contains an object
     // or array, so nested properties cannot become plugin or control fields.
-    private static string? Text(ref Utf8JsonReader reader)
+    internal static string? Text(ref Utf8JsonReader reader)
     {
         string? value = reader.TokenType == JsonTokenType.String ? reader.GetString() : null;
         reader.Skip();
         return value;
     }
 
-    private static double Number(ref Utf8JsonReader reader, double fallback = 0)
+    internal static double Number(ref Utf8JsonReader reader, double fallback = 0)
     {
         double result = reader.TokenType == JsonTokenType.Number && reader.TryGetDouble(out double value) ? value : fallback;
         reader.Skip();
         return result;
     }
 
-    private static int Whole(ref Utf8JsonReader reader)
+    internal static int Whole(ref Utf8JsonReader reader)
     {
         int result = reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out int value) ? value : 0;
         reader.Skip();
         return result;
     }
 
-    private static bool Flag(ref Utf8JsonReader reader)
+    internal static bool Flag(ref Utf8JsonReader reader)
     {
         bool value = reader.TokenType == JsonTokenType.True;
         reader.Skip();

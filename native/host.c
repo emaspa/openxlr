@@ -1394,6 +1394,8 @@ int main(int argc, char **argv) {
     return clap_scan(argv[2]);
   if (argc == 3 && !strcmp(argv[1], "scan-vst3"))
     return vst3_scan(argv[2]);
+  if ((argc == 2 || argc == 3) && !strcmp(argv[1], "scan-lv2"))
+    return lv2_scan(argc == 3 ? argv[2] : NULL);
   if (argc == 2 && !strcmp(argv[1], "engines") && denoise_print_engines)
     return denoise_print_engines();
   if (argc == 2 && !strcmp(argv[1], "formats") && player_print_formats)
@@ -1426,6 +1428,7 @@ int main(int argc, char **argv) {
           "       openxlr-lv2-host player NODE 2 RATE [SYMBOL=VALUE ...]\n"
           "       openxlr-lv2-host scan-clap FILE\n"
           "       openxlr-lv2-host scan-vst3 BUNDLE\n"
+          "       openxlr-lv2-host scan-lv2 [LV2_PATH]\n"
           "       openxlr-lv2-host engines\n"
           "       openxlr-lv2-host formats\n"
           "       openxlr-lv2-host probe PATH\n"
