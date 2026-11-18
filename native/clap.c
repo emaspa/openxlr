@@ -61,7 +61,17 @@ struct Clap {
   const clap_plugin_posix_fd_support_t *fd_support;
   Param *records;
   uint32_t record_count;
-  bool activated, gui_created, gui_closed;
+  bool activated, gui_created;  // main thread only
+  // What the plugin asked of its editor, from any thread. X is only ever
+  // called from the main thread, so a request is recorded here and carried
+  // out there: at once when it came from the main thread, otherwise when
+  // gui_wake brings the main loop round. The latest size wins; show and hide
+  // are one pending choice, the latest again. A size is width << 32 | height,
+  // and 0 means none is waiting.
+  _Atomic uint64_t gui_resize;
+  _Atomic int gui_visibility;
+  _Atomic bool gui_closed, gui_destroyed;
+  struct spa_source *gui_wake;
   _Atomic bool processing;  // start_processing has run, on the audio thread
   _Atomic bool callback_requested, flush_requested;
   // A restart the plugin asked for, from any thread, and how far the host
@@ -143,29 +153,68 @@ static void params_request_flush(const clap_host_t *host) {
 static const clap_host_params_t params_extension = {
     params_rescan, params_clear, params_request_flush};
 
+// The host never reads a CLAP editor's resize hints: the frame follows the
+// size the plugin gives its own window. So there is nothing to refresh, and
+// nothing here touches X or the editor's state.
 static void gui_resize_hints_changed(const clap_host_t *host) {}
 
+enum { GUI_VISIBILITY_NONE, GUI_VISIBILITY_SHOW, GUI_VISIBILITY_HIDE };
+
+// Carry out what the plugin asked of its editor. Main thread only: this is
+// where the X calls happen. With no editor open the host's calls do nothing.
+static void clap_gui_requests(Clap *c) {
+  uint64_t size = atomic_exchange(&c->gui_resize, 0);
+  if (size)
+    host_resize_editor(c->h, (unsigned)(size >> 32), (unsigned)(size & 0xffffffffu));
+  int visibility = atomic_exchange(&c->gui_visibility, GUI_VISIBILITY_NONE);
+  if (visibility != GUI_VISIBILITY_NONE)
+    host_show_editor(c->h, visibility == GUI_VISIBILITY_SHOW);
+}
+
+static void gui_requests_due(void *data, uint64_t count) { clap_gui_requests(data); }
+
+// A request is always recorded first, so one made on the main thread also
+// overrides an older one still waiting from another thread.
+static void gui_request_arrived(Clap *c) {
+  if (host_on_main_thread(c->h))
+    clap_gui_requests(c);
+  else if (c->gui_wake)
+    pw_loop_signal_event(host_loop(c->h), c->gui_wake);
+}
+
+// CLAP lets these come from any thread. Off the main thread the answer is
+// that the request was taken, as CLAP allows, and it is carried out shortly
+// after; a size the host cannot give is simply not given.
 static bool gui_request_resize(const clap_host_t *host, uint32_t width,
                                uint32_t height) {
-  host_resize_editor(of(host)->h, width, height);
+  Clap *c = of(host);
+  atomic_store(&c->gui_resize, (uint64_t)width << 32 | height);
+  gui_request_arrived(c);
   return true;
 }
 
 static bool gui_request_show(const clap_host_t *host) {
-  host_show_editor(of(host)->h, true);
+  Clap *c = of(host);
+  atomic_store(&c->gui_visibility, GUI_VISIBILITY_SHOW);
+  gui_request_arrived(c);
   return true;
 }
 
 static bool gui_request_hide(const clap_host_t *host) {
-  host_show_editor(of(host)->h, false);
+  Clap *c = of(host);
+  atomic_store(&c->gui_visibility, GUI_VISIBILITY_HIDE);
+  gui_request_arrived(c);
   return true;
 }
 
+// Also from any thread. The editor is closed on the next idle pass, on the
+// main thread; a plugin that destroyed its editor is still sent destroy,
+// which CLAP asks for as the acknowledgement, but not hide.
 static void gui_closed(const clap_host_t *host, bool was_destroyed) {
   Clap *c = of(host);
-  c->gui_closed = true;
   if (was_destroyed)
-    c->gui_created = false;
+    atomic_store(&c->gui_destroyed, true);
+  atomic_store(&c->gui_closed, true);
 }
 
 static const clap_host_gui_t gui_extension = {
@@ -537,6 +586,9 @@ static bool clap_load(Host *h, char **arguments) {
   };
   c->in_list = (clap_input_events_t){c, in_size, in_get};
   c->out_list = (clap_output_events_t){c, out_push};
+  // Before the plugin exists, since it may ask for its editor from a thread
+  // of its own as soon as it does. Without it, the tick carries requests out.
+  c->gui_wake = pw_loop_add_event(host_loop(h), gui_requests_due, c);
   if (!open_bundle(c, arguments[0]))
     return false;
   const clap_plugin_factory_t *factory = factory_of(c);
@@ -643,6 +695,8 @@ static void clap_unload(Host *h) {
   for (int i = 0; i < MAX_FDS; ++i)
     if (c->fds[i].source)
       pw_loop_destroy_source(host_loop(h), c->fds[i].source);
+  if (c->gui_wake)
+    pw_loop_destroy_source(host_loop(h), c->gui_wake);
   if (c->entry)
     c->entry->deinit();
   if (c->library)
@@ -785,6 +839,7 @@ static void clap_restart(Host *h, Clap *c) {
 static void clap_main_thread(Host *h) {
   Clap *c = h->impl;
   clap_restart(h, c);
+  clap_gui_requests(c);  // in case the wake was missed
   if (atomic_exchange(&c->callback_requested, false))
     host_run_guarded(h, on_main_thread, c);
   // A plugin that is not being processed flushes parameter changes here
@@ -813,7 +868,8 @@ static bool clap_editor_open(Host *h) {
   if (!c->gui->create(c->plugin, CLAP_WINDOW_API_X11, false))
     return false;
   c->gui_created = true;
-  c->gui_closed = false;
+  atomic_store(&c->gui_closed, false);
+  atomic_store(&c->gui_destroyed, false);
   c->gui->set_scale(c->plugin, 1.0);
   uint32_t width = 0, height = 0;
   if (c->gui->get_size(c->plugin, &width, &height) && width && height)
@@ -832,7 +888,8 @@ static void clap_editor_close(Host *h) {
   Clap *c = h->impl;
   if (!c->gui_created)
     return;
-  c->gui->hide(c->plugin);
+  if (!atomic_exchange(&c->gui_destroyed, false))
+    c->gui->hide(c->plugin);
   c->gui->destroy(c->plugin);
   c->gui_created = false;
 }
@@ -843,7 +900,9 @@ static void clap_editor_lost(Host *h) {
   ((Clap *)h->impl)->gui_created = false;
 }
 
-static bool clap_editor_idle(Host *h) { return ((Clap *)h->impl)->gui_closed; }
+static bool clap_editor_idle(Host *h) {
+  return atomic_load(&((Clap *)h->impl)->gui_closed);
+}
 
 static uint32_t clap_latency(Host *h) {
   Clap *c = h->impl;

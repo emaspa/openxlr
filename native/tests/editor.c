@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Exercise the actual host event loop with a plugin on a separate X connection.
+// clap.c is compiled in as well, to drive the CLAP editor requests through a
+// fake plugin, so this links without clap.o.
 #define main host_program_main
 #include "../host.c"
 #undef main
+#include "../clap.c"
 #include <assert.h>
 #include <sys/wait.h>
 
@@ -147,6 +150,174 @@ static int lost_connection_outcome(bool on_other_thread) {
   int status;
   assert(waitpid(child, &status, 0) == child);
   return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
+// --- a CLAP plugin that asks for things from a thread of its own ------------
+
+static Display *clap_display;
+static Window clap_window;
+static unsigned clap_hides, clap_destroys;
+
+static bool cg_create(const clap_plugin_t *p, const char *api, bool floating) {
+  return true;
+}
+static void cg_destroy(const clap_plugin_t *p) {
+  ++clap_destroys;
+  XDestroyWindow(clap_display, clap_window);
+  XCloseDisplay(clap_display);
+  clap_display = NULL;
+}
+static bool cg_set_scale(const clap_plugin_t *p, double scale) { return true; }
+static bool cg_get_size(const clap_plugin_t *p, uint32_t *width, uint32_t *height) {
+  *width = 64;
+  *height = 48;
+  return true;
+}
+static bool cg_set_parent(const clap_plugin_t *p, const clap_window_t *window) {
+  clap_display = XOpenDisplay(NULL);
+  assert(clap_display);
+  // No window manager runs under Xvfb, so the frame is mapped and unmapped
+  // exactly when the host says.
+  XSetWindowAttributes attributes = {.override_redirect = True};
+  XChangeWindowAttributes(clap_display, window->x11, CWOverrideRedirect, &attributes);
+  clap_window = XCreateSimpleWindow(clap_display, window->x11, 0, 0, 64, 48, 0, 0, 0);
+  XMapWindow(clap_display, clap_window);
+  XSync(clap_display, False);
+  return true;
+}
+static bool cg_show(const clap_plugin_t *p) { return true; }
+static bool cg_hide(const clap_plugin_t *p) {
+  ++clap_hides;
+  return true;
+}
+static const clap_plugin_gui_t clap_gui = {
+    .create = cg_create, .destroy = cg_destroy, .set_scale = cg_set_scale,
+    .get_size = cg_get_size, .set_parent = cg_set_parent, .show = cg_show,
+    .hide = cg_hide};
+static void cp_destroy(const clap_plugin_t *p) {}
+static const clap_plugin_t clap_plugin = {.destroy = cp_destroy};
+
+// One request, made on a thread that is not the host's main thread. What the
+// frame's recorded size was when the call returned is kept, since a host
+// that answered the request there would already have changed it.
+typedef struct {
+  Host *h;
+  const clap_host_gui_t *gui;
+  enum { ASK_RESIZE, ASK_SHOW, ASK_HIDE, ASK_CLOSED } ask;
+  uint32_t width, height;
+  bool answer;
+  unsigned width_after;
+} ClapAsk;
+
+static void *clap_ask(void *data) {
+  ClapAsk *a = data;
+  Clap *c = a->h->impl;
+  assert(!host_on_main_thread(a->h));
+  switch (a->ask) {
+  case ASK_RESIZE:
+    // Twice: only the second size may reach the frame.
+    assert(a->gui->request_resize(&c->host, a->width / 2, a->height / 2));
+    a->answer = a->gui->request_resize(&c->host, a->width, a->height);
+    break;
+  case ASK_SHOW: a->answer = a->gui->request_show(&c->host); break;
+  case ASK_HIDE: a->answer = a->gui->request_hide(&c->host); break;
+  case ASK_CLOSED: a->gui->closed(&c->host, true); a->answer = true; break;
+  }
+  a->width_after = a->h->self_width;
+  return NULL;
+}
+
+static void ask_from_thread(ClapAsk *a) {
+  pthread_t thread;
+  assert(pthread_create(&thread, NULL, clap_ask, a) == 0);
+  assert(pthread_join(thread, NULL) == 0);
+}
+
+static XWindowAttributes clap_frame(Host *h) {
+  XWindowAttributes attributes;
+  XSync(clap_display, False);
+  assert(XGetWindowAttributes(clap_display, h->window, &attributes));
+  return attributes;
+}
+
+// CLAP lets a plugin ask for a size, to be shown or hidden, or say its editor
+// closed, from any thread. X is only called from the main thread, so a
+// request from elsewhere is answered at once and carried out there, through
+// the main loop, with no tick in between.
+static void clap_requests_off_main_thread(void) {
+  Host h = {.backend = &clap_backend, .has_editor = true,
+            .node_name = "openxlr-clap-editor-test",
+            .main_thread = pthread_self()};
+  h.loop = pw_main_loop_new(NULL);
+  assert(h.loop);
+  pw_loop_enter(host_loop(&h));
+  Clap *c = calloc(1, sizeof(Clap));
+  assert(c);
+  c->h = &h;
+  c->plugin = &clap_plugin;
+  c->gui = &clap_gui;
+  c->host = (clap_host_t){.host_data = c, .get_extension = host_get_extension};
+  c->gui_wake = pw_loop_add_event(host_loop(&h), gui_requests_due, c);
+  assert(c->gui_wake);
+  h.impl = c;
+  const clap_host_gui_t *gui = c->host.get_extension(&c->host, CLAP_EXT_GUI);
+  assert(gui);
+  assert(open_ui(&h));
+  drain(&h);
+  XWindowAttributes frame = clap_frame(&h);
+  assert(frame.width == 64 && frame.height == 48 && frame.map_state == IsViewable);
+
+  ClapAsk resize = {.h = &h, .gui = gui, .ask = ASK_RESIZE, .width = 200, .height = 150};
+  ask_from_thread(&resize);
+  assert(resize.answer && resize.width_after == 64);
+  frame = clap_frame(&h);
+  assert(frame.width == 64 && frame.height == 48);
+  drain(&h);
+  frame = clap_frame(&h);
+  assert(frame.width == 200 && frame.height == 150 && h.self_width == 200);
+  puts("PASS: a CLAP resize asked off the main thread is carried out there, the latest size");
+
+  ClapAsk hide = {.h = &h, .gui = gui, .ask = ASK_HIDE};
+  ask_from_thread(&hide);
+  assert(hide.answer && clap_frame(&h).map_state == IsViewable);
+  drain(&h);
+  assert(clap_frame(&h).map_state == IsUnmapped);
+  ClapAsk show = {.h = &h, .gui = gui, .ask = ASK_SHOW};
+  ask_from_thread(&show);
+  assert(show.answer && clap_frame(&h).map_state == IsUnmapped);
+  drain(&h);
+  assert(clap_frame(&h).map_state == IsViewable);
+  puts("PASS: a CLAP show or hide asked off the main thread is carried out there");
+
+  // On the main thread a request is carried out at once, and it replaces one
+  // still waiting from another thread rather than being undone by it.
+  assert(gui->request_resize(&c->host, 220, 160) && h.self_width == 220);
+  ClapAsk late = {.h = &h, .gui = gui, .ask = ASK_RESIZE, .width = 300, .height = 200};
+  ask_from_thread(&late);  // its wake is not dispatched until the drain below
+  assert(gui->request_resize(&c->host, 240, 180) && h.self_width == 240);
+  drain(&h);
+  frame = clap_frame(&h);
+  assert(frame.width == 240 && frame.height == 180);
+  puts("PASS: a CLAP resize on the main thread is immediate and supersedes a waiting one");
+
+  // The plugin says from its own thread that it destroyed its editor. The
+  // editor closes on the next idle pass, and the plugin is sent destroy to
+  // acknowledge it, but not hide.
+  ClapAsk closed = {.h = &h, .gui = gui, .ask = ASK_CLOSED};
+  ask_from_thread(&closed);
+  assert(h.editor_open && clap_hides == 0 && clap_destroys == 0);
+  pump_editor(&h, true);
+  assert(!h.editor_open && !h.display && clap_hides == 0 && clap_destroys == 1);
+  // A plain close later still hides first.
+  assert(open_ui(&h));
+  drain(&h);
+  close_ui(&h);
+  assert(clap_hides == 1 && clap_destroys == 2);
+  puts("PASS: a CLAP editor closed from another thread is destroyed on the main thread");
+
+  clap_unload(&h);
+  pw_loop_leave(host_loop(&h));
+  pw_main_loop_destroy(h.loop);
 }
 
 int main(void) {
@@ -335,6 +506,7 @@ int main(void) {
   XCloseDisplay(host_display);
   pw_loop_leave(host_loop(&h));
   pw_main_loop_destroy(h.loop);
+  clap_requests_off_main_thread();
   pw_deinit();
   XCloseDisplay(keepalive);
   puts("PASS: closing, reopening and losing a display remove its event source");

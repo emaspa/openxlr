@@ -147,7 +147,9 @@ FORCE:
 # The library alone, for a package that builds it in a step of its own.
 deepfilter: deepfilter/target/release/libopenxlr_deepfilter.a
 
-tests/editor: tests/editor.o lv2.o lv2-scan.o clap.o vst3.o
+# This one compiles clap.c into itself to drive CLAP editor requests, so it
+# links without clap.o.
+tests/editor: tests/editor.o lv2.o lv2-scan.o vst3.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # It links the duck stage to feed it non-finite input through the host.
