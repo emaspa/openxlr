@@ -11,7 +11,7 @@ namespace OpenXLR.Tests;
 public sealed class PluginSearchPathTests : IDisposable
 {
     private readonly string _directory = Directory.CreateTempSubdirectory("openxlr-search-paths-").FullName;
-    private readonly Dictionary<string, string?> _environment = new[] { "XDG_CONFIG_HOME", "LV2_PATH" }
+    private readonly Dictionary<string, string?> _environment = new[] { "XDG_CONFIG_HOME", "LV2_PATH", "CLAP_PATH", "VST3_PATH", "PATH", "LADSPA_PATH" }
         .ToDictionary(k => k, Environment.GetEnvironmentVariable);
     private string SettingsFile => Path.Combine(OpenXlrPaths.ConfigDir, "daemon.json");
 
@@ -275,6 +275,107 @@ public sealed class PluginSearchPathTests : IDisposable
         string healthy = Directory.CreateDirectory(Path.Combine(_directory, "healthy")).FullName;
         Assert.Equal(new[] { loop, healthy }, PluginSearchPaths.Include("clap", [loop, healthy]));
         Assert.False(PluginSearchPaths.Change("clap", loop, true).Ok);
+    }
+
+    [Fact]
+    public void OnlyAbsoluteEntriesOfASearchVariableAreKept()
+    {
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        Assert.Equal(["/a", "/b"], SearchPathList.Split(".:plugins::/a:/b:", expandHome: false, out var ignored));
+        Assert.Equal([".", "plugins", "", ""], ignored);
+        Assert.Equal([home + "/.lv2", home, "/c"], SearchPathList.Split("~/.lv2:~:/c:~user/x", expandHome: true, out ignored));
+        Assert.Equal(["~user/x"], ignored);
+        Assert.Equal(["/c"], SearchPathList.Split("~/.lv2:/c", expandHome: false, out ignored));
+        Assert.Equal(["~/.lv2"], ignored);
+        Assert.Empty(SearchPathList.Split(null, expandHome: false, out ignored));
+        Assert.Empty(ignored);
+    }
+
+    [Fact]
+    public void AnIgnoredEntryIsLoggedOnce()
+    {
+        string entry = "relative-" + Guid.NewGuid().ToString("N");
+        Assert.True(SearchPathList.Report("CLAP_PATH", entry));
+        Assert.False(SearchPathList.Report("CLAP_PATH", entry));
+        Assert.True(SearchPathList.Report("VST3_PATH", entry));
+    }
+
+    [Theory]
+    [InlineData("CLAP_PATH", "clap")]
+    [InlineData("VST3_PATH", "vst3")]
+    public void RelativeClapAndVst3EntriesAreNotSearched(string variable, string kind)
+    {
+        string absolute = Directory.CreateDirectory(Path.Combine(_directory, kind)).FullName;
+        Environment.SetEnvironmentVariable(variable, $".:plugins::{absolute}:");
+        IReadOnlyList<string> searched = kind == "clap" ? ClapCatalog.SearchPath() : Vst3Catalog.SearchPath();
+        Assert.Contains(absolute, searched);
+        Assert.All(searched, path => Assert.True(Path.IsPathFullyQualified(path), path));
+        string cwd = Directory.GetCurrentDirectory();
+        Assert.DoesNotContain(searched, path => path == cwd || path == Path.Combine(cwd, "plugins"));
+
+        // A variable that names nothing usable falls back to the standard folders.
+        Environment.SetEnvironmentVariable(variable, ".:plugins");
+        searched = kind == "clap" ? ClapCatalog.SearchPath() : Vst3Catalog.SearchPath();
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        Assert.Contains(WindowsPluginWrappers.Canonical(Path.Combine(home, "." + kind)), searched);
+        Assert.DoesNotContain(searched, path => path == cwd || path == Path.Combine(cwd, "plugins"));
+    }
+
+    [Fact]
+    public void ARelativeLv2EntryIsDroppedFromThePathEveryHostReceives()
+    {
+        string absolute = Directory.CreateDirectory(Path.Combine(_directory, "lv2")).FullName;
+        Environment.SetEnvironmentVariable("LV2_PATH", absolute);
+        Assert.Null(PluginSearchPaths.Lv2Path());
+
+        Environment.SetEnvironmentVariable("LV2_PATH", $"plugins::{absolute}");
+        string path = Assert.IsType<string>(PluginSearchPaths.Lv2Path());
+        Assert.Equal(WindowsPluginWrappers.Canonical(absolute), path);
+        Assert.Equal([path], PluginSearchPaths.Lv2Directories());
+        Assert.Equal(path, PipeWireAdapter.FilterChainProcess("{}").Environment["LV2_PATH"]);
+        Assert.Equal(path, HostEnvironment());
+
+        // Nothing usable: the standard directories, spelled out so lilv does
+        // not read the relative entry from the environment itself.
+        Environment.SetEnvironmentVariable("LV2_PATH", ".");
+        string[] standard = [.. PluginSearchPaths.StandardLv2Directories().Select(WindowsPluginWrappers.Canonical).Distinct()];
+        Assert.Equal(string.Join(':', standard), PluginSearchPaths.Lv2Path());
+        Assert.Equal(string.Join(':', standard), HostEnvironment());
+    }
+
+    [Fact]
+    public void HelpersAreNotFoundThroughARelativePathEntry()
+    {
+        string name = "openxlr-path-test-" + Guid.NewGuid().ToString("N");
+        string relative = Path.Combine(Directory.GetCurrentDirectory(), name);
+        Directory.CreateDirectory(relative);
+        try
+        {
+            File.WriteAllText(Path.Combine(relative, "yabridgectl"), "");
+            Environment.SetEnvironmentVariable("PATH", name);
+            Assert.NotEqual(Path.Combine(relative, "yabridgectl"), PluginInstaller.OnPath("yabridgectl"));
+            Environment.SetEnvironmentVariable("PATH", relative);
+            Assert.Equal(Path.Combine(relative, "yabridgectl"), PluginInstaller.OnPath("yabridgectl"));
+
+            // A plugin host started with the system bridge gets only the absolute entries.
+            Environment.SetEnvironmentVariable("PATH", $"{name}::/usr/bin");
+            Assert.Equal("/usr/bin", new PluginHostEnvironment(null).Overlay["PATH"]);
+            Environment.SetEnvironmentVariable("PATH", "/usr/bin:/bin");
+            Assert.False(new PluginHostEnvironment(null).Overlay.ContainsKey("PATH"));
+
+            // The limiter is not looked for in the working directory either.
+            File.WriteAllText(Path.Combine(relative, "hard_limiter_1413.so"), "");
+            Environment.SetEnvironmentVariable("LADSPA_PATH", $"{name}:{_directory}");
+            IReadOnlyList<string> ladspa = PipeWireAdapter.LadspaSearchDirectories();
+            Assert.Equal(_directory, ladspa[0]);
+            Assert.All(ladspa, path => Assert.True(Path.IsPathFullyQualified(path), path));
+            Assert.Equal(_directory, PipeWireAdapter.FilterChainProcess("{}").Environment["LADSPA_PATH"]);
+            Environment.SetEnvironmentVariable("LADSPA_PATH", name);
+            Assert.False(PipeWireAdapter.FilterChainProcess("{}").Environment.ContainsKey("LADSPA_PATH"));
+            Environment.SetEnvironmentVariable("LADSPA_PATH", _directory);
+            Assert.Equal(_directory, PipeWireAdapter.FilterChainProcess("{}").Environment["LADSPA_PATH"]);
+        }
+        finally { Directory.Delete(relative, true); }
     }
 
     public void Dispose()

@@ -126,9 +126,9 @@ public sealed class PluginInstaller
     /// </summary>
     internal static string? OnPath(string name)
     {
-        var directories = new List<string>();
-        string? path = Environment.GetEnvironmentVariable("PATH");
-        if (!string.IsNullOrEmpty(path)) directories.AddRange(path.Split(':', StringSplitOptions.RemoveEmptyEntries));
+        // Only PATH's absolute entries: an empty or relative one names the
+        // daemon's working directory, and a helper found there would run.
+        var directories = new List<string>(SearchPathList.FromEnvironment("PATH"));
         directories.Add(HomeDirectory(Path.Combine(".local", "bin")));
         directories.Add(HomeDirectory(Path.Combine(".local", "share", "yabridge")));
         directories.Add("/usr/local/bin");

@@ -144,27 +144,30 @@ public static class PluginSearchPaths
         return [.. candidates.Where(Directory.Exists)];
     }
 
-    private static IEnumerable<string> Lv2Base()
-    {
-        string? configured = Environment.GetEnvironmentVariable("LV2_PATH");
-        return string.IsNullOrWhiteSpace(configured) ? StandardLv2Directories()
-            : configured.Split(':', StringSplitOptions.RemoveEmptyEntries);
-    }
+    /// <summary>
+    /// LV2_PATH's absolute entries (a leading ~ is the home folder, as lilv
+    /// reads it), or the standard directories when it is unset or names none.
+    /// </summary>
+    private static IReadOnlyList<string> Lv2Base(out bool adjusted)
+        => SearchPathList.Directories("LV2_PATH", StandardLv2Directories, out adjusted);
 
     /// <summary>The LV2 directories searched: LV2_PATH or the standard ones, then the added folders.</summary>
-    public static IReadOnlyList<string> Lv2Directories() => Include("lv2", Lv2Base());
+    public static IReadOnlyList<string> Lv2Directories() => Include("lv2", Lv2Base(out _));
 
     /// <summary>
     /// The LV2_PATH every LV2 consumer gets: the catalogue's lilv scan, the
     /// PipeWire filter-chain and the native host. Null when no LV2 folder was
-    /// added, so each keeps the environment and lilv defaults it has today.
-    /// With one, the path is spelled out, because lilv reads either LV2_PATH
-    /// or its compiled default, never both.
+    /// added and the daemon's LV2_PATH holds only absolute entries, so each
+    /// keeps the environment and lilv defaults it has today. Otherwise the
+    /// path is spelled out, because lilv reads either LV2_PATH or its
+    /// compiled default, never both, and would resolve a relative entry
+    /// against the working directory.
     /// </summary>
     public static string? Lv2Path()
     {
         IReadOnlyList<string> added = Additional("lv2");
-        return added.Count == 0 ? null : string.Join(':', Fold(Lv2Base().Concat(added)));
+        IReadOnlyList<string> standard = Lv2Base(out bool adjusted);
+        return added.Count == 0 && !adjusted ? null : string.Join(':', Fold(standard.Concat(added)));
     }
 
     /// <summary>Hand a helper that loads LV2 plugins the same LV2_PATH the catalogue was read with.</summary>

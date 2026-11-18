@@ -208,12 +208,14 @@ public sealed class PipeWireAdapter
         return null;
     }
 
-    private static IReadOnlyList<string> LadspaSearchDirectories()
+    internal static IReadOnlyList<string> LadspaSearchDirectories()
     {
         var result = new List<string>();
         string? configured = Environment.GetEnvironmentVariable("LADSPA_PATH");
+        // Absolute entries only: a relative one would find the limiter in
+        // the daemon's working directory and load it from there.
         if (!string.IsNullOrWhiteSpace(configured))
-            result.AddRange(configured.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries));
+            result.AddRange(SearchPathList.Absolute("LADSPA_PATH", configured, expandHome: false, out _));
 
         string? home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (!string.IsNullOrWhiteSpace(home)) result.Add(Path.Combine(home, ".ladspa"));
@@ -1896,7 +1898,9 @@ public sealed class PipeWireAdapter
 
     /// <summary>
     /// The pw-cli process that holds a filter-chain module. The module loads
-    /// LV2 plugins inside it, so it gets the LV2_PATH the catalogue was read with.
+    /// LV2 plugins inside it, so it gets the LV2_PATH the catalogue was read
+    /// with, and finds the limiter by name on LADSPA_PATH, so it gets that
+    /// variable's absolute entries only.
     /// </summary>
     internal static ProcessStartInfo FilterChainProcess(string spa)
     {
@@ -1910,6 +1914,7 @@ public sealed class PipeWireAdapter
         psi.ArgumentList.Add("libpipewire-module-filter-chain");
         psi.ArgumentList.Add(spa);
         PluginSearchPaths.ApplyLv2(psi);
+        SearchPathList.ApplyAbsolute(psi, "LADSPA_PATH");
         return psi;
     }
 
