@@ -2504,6 +2504,12 @@ Select the interface OpenXLR drives</value>
   <data name="HistoryLineInGain" xml:space="preserve">
     <value>Line In gain</value>
   </data>
+  <data name="HistoryLineOutLevel" xml:space="preserve">
+    <value>Line Out level</value>
+  </data>
+  <data name="LineOutLevelTip" xml:space="preserve">
+    <value>The Wave XLR Pro's Line Out level. Nothing on the unit turns it, so set it here.</value>
+  </data>
   <data name="HistoryMonitorDry" xml:space="preserve">
     <value>Dry monitor in {0}</value>
   </data>

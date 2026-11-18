@@ -149,6 +149,8 @@ internal sealed class InputsView : View
             { Enabled = state.Count("hpOutputs") > 1 });
             rows.Add(new ToggleRow("USB Aux out", state.Flag("outUsbAux"), value => Set(link, "outUsbAux", value)));
             rows.Add(new ToggleRow("Line out", state.Flag("outLineOut"), value => Set(link, "outLineOut", value)));
+            rows.Add(new NumberRow("Line out level", Percent(state.Number("lineOutLevelDb")), 0, 100, 5, Widgets.Percent0,
+                value => Set(link, "lineOutLevelDb", Decibels(value))));
         }
 
         if (state.Ducking is { } ducking) Ducking(rows, app, state, ducking);

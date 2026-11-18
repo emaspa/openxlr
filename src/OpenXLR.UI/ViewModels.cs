@@ -421,7 +421,13 @@ public sealed partial class MainViewModel : ViewModelBase
     private bool _hasXlr2 = true;
     public bool HasXlr2 { get => _hasXlr2; set => Set(ref _hasXlr2, value); }
     private bool _hasHp2 = true;
-    public bool HasHp2 { get => _hasHp2; set => Set(ref _hasHp2, value); }
+    public bool HasHp2 { get => _hasHp2; set { if (Set(ref _hasHp2, value)) Raise(nameof(ShowsLineOutLevel)); } }
+
+    /// <summary>
+    /// Line Out's level, under Phones 2 in the headphone grid: a unit with
+    /// output routing (the Wave XLR Pro), whose second jack column it shares.
+    /// </summary>
+    public bool ShowsLineOutLevel => _capOutputRouting && _hasHp2;
     private bool _capLowCut = true;
     public bool CapLowCut { get => _capLowCut; set => Set(ref _capLowCut, value); }
     private bool _capExpander = true;
@@ -449,7 +455,7 @@ public sealed partial class MainViewModel : ViewModelBase
     public bool UnitXlrJacks { get => _unitXlrJacks; set => Set(ref _unitXlrJacks, value); }
 
     private bool _capOutputRouting = true;
-    public bool CapOutputRouting { get => _capOutputRouting; set => Set(ref _capOutputRouting, value); }
+    public bool CapOutputRouting { get => _capOutputRouting; set { if (Set(ref _capOutputRouting, value)) Raise(nameof(ShowsLineOutLevel)); } }
 
     private bool _capPhysicalControls = true;
     public bool CapPhysicalControls { get => _capPhysicalControls; set => Set(ref _capPhysicalControls, value); }
@@ -691,6 +697,31 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         get => HeadphonePercent(_hp2VolumeDb);
         set => Hp2VolumeDb = -60.0 + Math.Clamp(value, 0, 100) * 0.6;
+    }
+
+    private double _lineOutLevelDb;
+    /// <summary>The Wave XLR Pro's Line Out level: the same attenuator and scale as a headphone jack.</summary>
+    public double LineOutLevelDb
+    {
+        get => _lineOutLevelDb;
+        set
+        {
+            if (Set(ref _lineOutLevelDb, value) && !_applying)
+            {
+                double v = value;
+                SliderSync.Touch("lineout");
+                SliderSync.Send("lineout", () => _ = _client.SetControlAsync("lineOutLevelDb", v));
+            }
+            Raise(nameof(LineOutText));
+            Raise(nameof(LineOutPercent));
+        }
+    }
+    public string LineOutText => $"{LineOutPercent:0}%";
+
+    public double LineOutPercent
+    {
+        get => HeadphonePercent(_lineOutLevelDb);
+        set => LineOutLevelDb = -60.0 + Math.Clamp(value, 0, 100) * 0.6;
     }
 
     // --- second XLR input ---
@@ -1315,6 +1346,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 if (!SliderSync.RecentlyTouched("xfade")) Crossfade = s["crossfade"]?.GetValue<int>() ?? 0;
                 if (!SliderSync.RecentlyTouched("hp")) HpVolumeDb = s["hpVolumeDb"]?.GetValue<double>() ?? 0;
                 if (!SliderSync.RecentlyTouched("hp2")) Hp2VolumeDb = s["hp2VolumeDb"]?.GetValue<double>() ?? 0;
+                if (!SliderSync.RecentlyTouched("lineout")) LineOutLevelDb = s["lineOutLevelDb"]?.GetValue<double>() ?? 0;
                 Phantom = s["phantom"]?.GetValue<bool>() ?? false;
                 PhantomSettling = s["phantomSettling"]?.GetValue<bool>() ?? false;
                 PhantomSettling2 = s["phantomSettling2"]?.GetValue<bool>() ?? false;

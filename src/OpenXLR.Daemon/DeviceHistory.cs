@@ -74,6 +74,7 @@ internal static class DeviceHistory
         ["voiceTuneStrength2"] = new("unitVoiceTune", 2, s => s.VoiceTuneStrength2),
         [ControlNames.HpVolumeDb] = new("unitHeadphones", 0, s => s.HpVolumeDb),
         ["hp2VolumeDb"] = new("unitHeadphones", 0, s => s.Hp2VolumeDb),
+        [ControlNames.LineOutLevelDb] = new("unitHeadphones", 0, s => s.LineOutLevelDb),
         [ControlNames.Crossfade] = new("unitCrossfade", 0, s => s.Crossfade),
         [ControlNames.LowImpedance] = new("unitLowImpedance", 0, s => s.LowImpedance),
         [ControlNames.AuxLevelDb] = new("unitAuxLevel", 0, s => s.AuxLevelDb),
@@ -143,7 +144,12 @@ internal static class DeviceHistory
             "unitExpander" => $"{Input()} expander",
             "unitCompressor" => $"{Input()} compressor",
             "unitVoiceTune" => $"{Input()} Voice Tune",
-            "unitHeadphones" => Unit(target.Control == "hp2VolumeDb" ? "headphone 2 volume" : "headphone volume"),
+            "unitHeadphones" => Unit(target.Control switch
+            {
+                "hp2VolumeDb" => "headphone 2 volume",
+                ControlNames.LineOutLevelDb => "Line Out level",
+                _ => "headphone volume",
+            }),
             "unitCrossfade" => Unit("Mic/PC blend"),
             "unitLowImpedance" => Unit("headphone impedance"),
             "unitAuxLevel" => Unit("USB Aux level"),

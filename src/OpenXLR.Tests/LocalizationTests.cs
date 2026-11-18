@@ -175,7 +175,7 @@ public sealed class LocalizationTests
         var english = English;
         string[] keys = [.. english.Keys.Where(key => key.StartsWith("History", StringComparison.Ordinal)
             || key is "Undo" or "Redo" or "UndoStep" or "RedoStep" or "NothingToUndo" or "NothingToRedo" or "UndidStep" or "RedidStep")];
-        Assert.Equal(42, keys.Length);
+        Assert.Equal(43, keys.Length);
         Dictionary<string, string> translated = Read(file);
         Assert.Equal(keys, keys.Where(translated.ContainsKey));
         // Ducking is the word German uses too.

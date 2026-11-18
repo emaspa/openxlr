@@ -974,6 +974,10 @@ that was the default.
    left is only your microphone, right is only computer audio. The Wave XLR
    Pro has no crossfade: its zero-latency path follows the microphone's
    Monitor send (see [the channel volume](#volume-direct-monitor)).
+   On the Wave XLR Pro the card also holds Line Out's level, on the same
+   0 to 100% scale as the headphone volumes. Nothing on the unit turns
+   it, so a Line Out that plays nothing while it is a monitor output is
+   usually sitting at 0% here.
 
 With one headphone jack, its volume fader uses the whole row. Two jacks
 share the row equally. In MONITOR, a long output name is shortened to
@@ -3774,7 +3778,7 @@ is [Own clock](#own-clock) gets an **Own clock** button instead, which
 turns it on and off at a click and turns green while it is on; its
 tooltip shows the delay and the dropouts. They are the same controls as
 in INPUTS, so switching one here switches it there. **Mic** turns green while
-one of them is on or noise removal, the compressor or the expander runs, and its small lamp lights red while phantom power is on, so you can
+one of them is on or noise removal, the compressor or the expander runs, and a small red lamp appears in it while phantom power is on, so you can
 see both without opening it. Under **Mic** is the input's gain in dB. While
 you move the row's volume fader it shows the volume instead, as a
 percentage, and goes back to the gain one second after you let go. A
@@ -4630,7 +4634,7 @@ profiles work as before. What changes on the mixes the unit builds:
 |---|---|
 | How many channels | Eight fit, hidden ones included, each on its own USB pair. XLR 1, XLR 2, Line In and Aux In are the unit's own inputs and need none. A bigger layout is refused, and so is adding a ninth channel. The pairs your channels leave free go to processed microphones first, then to auditions. A channel you add while every pair is in use, as with seven channels and a processed XLR 1, gets no pair. The jacks and the USB Aux port leave it out until a pair is free, and the processed microphone keeps its pair. Stream and Chat still get the channel. |
 | Headphones when it starts | Turned down 21 dB, or 29 dB while a jack's mix holds Line In, Aux In or a microphone that reaches the unit raw, so nothing gets louder. |
-| Output volume of a jack | Turns that jack's headphone volume, or Line Out's level, down. It never goes above where it was. |
+| Output volume of a jack | Turns that jack's headphone volume, or Line Out's level, down. It never goes above where it was. A headphone volume turned on the unit, or a headphone volume or Line Out level set in the UI, becomes the jack's new level. |
 | Balance | Applications sit 7.9 dB under the microphones at equal faders, as they do under Wave Link. |
 | Noise removal, the voice changer, a software EQ, compressor or expander and plugins on a microphone | Heard on the unit's mixes too: the processed voice plays back to the unit on a free USB pair, a few milliseconds later than the raw microphone, as it reaches your headset today. With no pair free, the unit's mixes get the microphone as it comes in, without them, and the UI says so. Stream and Chat always get them. |
 | Plugins on a mix the unit builds | Not run there, and no plugin can be added. |

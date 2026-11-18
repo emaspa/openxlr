@@ -2397,6 +2397,12 @@
   <data name="HistoryLineInGain" xml:space="preserve">
     <value>појачање за Line In</value>
   </data>
+  <data name="HistoryLineOutLevel" xml:space="preserve">
+    <value>ниво за Line Out</value>
+  </data>
+  <data name="LineOutLevelTip" xml:space="preserve">
+    <value>Ниво за Line Out на уређају Wave XLR Pro. На уређају нема контроле за њега, па се подешава овде.</value>
+  </data>
   <data name="HistoryMonitorDry" xml:space="preserve">
     <value>суви монитор у {0}</value>
   </data>

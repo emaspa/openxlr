@@ -1391,6 +1391,7 @@ public sealed partial class DeviceManager : BackgroundService
                 case ControlNames.OutHp2: WriteMixLocked(dev, new ProMixPlan { Hp2 = value.GetBoolean() }, "set"); break;
                 case ControlNames.OutUsbAux: WriteMixLocked(dev, new ProMixPlan { UsbAux = value.GetBoolean() }, "set"); break;
                 case ControlNames.OutLineOut: WriteMixLocked(dev, new ProMixPlan { LineOut = value.GetBoolean() }, "set"); break;
+                case ControlNames.LineOutLevelDb: dev.SetLineOutLevelDb(value.GetDouble()); break;
                 case ControlNames.AuxLevelDb: dev.SetAuxLevelDb(value.GetDouble()); break;
                 case ControlNames.AuxLevelLock: dev.SetAuxLevelLock(value.GetBoolean()); break;
                 case ControlNames.LineInGain: lineInWritten = dev.SetLineInGainDb(value.GetInt32()); break;
@@ -1554,7 +1555,7 @@ public sealed partial class DeviceManager : BackgroundService
             ControlNames.ClipGuard => c.ClipGuard,
             ControlNames.Compressor => c.Compressor,
             ControlNames.OutHp1 or ControlNames.OutHp2 or ControlNames.OutUsbAux or
-                ControlNames.OutLineOut => c.OutputRouting,
+                ControlNames.OutLineOut or ControlNames.LineOutLevelDb => c.OutputRouting,
             ControlNames.AuxLevelDb or ControlNames.AuxLevelLock => c.AuxInput,
             ControlNames.LineInGain or ControlNames.LineInLevelLock => c.LineInput,
             ControlNames.RawCapture or ControlNames.RawCapture2 or ControlNames.LineInRawCapture

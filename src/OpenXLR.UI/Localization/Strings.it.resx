@@ -2455,6 +2455,12 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
   <data name="HistoryLineInGain" xml:space="preserve">
     <value>guadagno di Line In</value>
   </data>
+  <data name="HistoryLineOutLevel" xml:space="preserve">
+    <value>livello di Line Out</value>
+  </data>
+  <data name="LineOutLevelTip" xml:space="preserve">
+    <value>Il livello di Line Out del Wave XLR Pro. Sull'unità non c'è nulla che lo regoli, quindi si imposta qui.</value>
+  </data>
   <data name="HistoryMonitorDry" xml:space="preserve">
     <value>ascolto senza effetti in {0}</value>
   </data>

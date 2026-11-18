@@ -31,6 +31,7 @@ public sealed class DeviceControlSupportTests
     [InlineData("gain2")]
     [InlineData("hp2VolumeDb")]
     [InlineData("outHp1")]
+    [InlineData("lineOutLevelDb")]
     [InlineData("auxLevelDb")]
     public void Dock_RejectsUnsupportedControls(string control)
         => Assert.Contains("not supported",
@@ -51,6 +52,7 @@ public sealed class DeviceControlSupportTests
         Assert.Null(DeviceManager.UnsupportedControlReason(pro, "lowCut2"));
         Assert.Null(DeviceManager.UnsupportedControlReason(pro, "hp2VolumeDb"));
         Assert.Null(DeviceManager.UnsupportedControlReason(pro, "outLineOut"));
+        Assert.Null(DeviceManager.UnsupportedControlReason(pro, "lineOutLevelDb"));
         Assert.Null(DeviceManager.UnsupportedControlReason(pro, "auxLevelLock"));
     }
 }

@@ -2487,6 +2487,12 @@ Von OpenXLR gesteuertes Interface wählen</value>
   <data name="HistoryLineInGain" xml:space="preserve">
     <value>Gain von Line In</value>
   </data>
+  <data name="HistoryLineOutLevel" xml:space="preserve">
+    <value>Pegel von Line Out</value>
+  </data>
+  <data name="LineOutLevelTip" xml:space="preserve">
+    <value>Der Pegel von Line Out am Wave XLR Pro. Am Gerät lässt er sich nicht drehen, er wird hier eingestellt.</value>
+  </data>
   <data name="HistoryMonitorDry" xml:space="preserve">
     <value>Trockenes Monitoring in {0}</value>
   </data>

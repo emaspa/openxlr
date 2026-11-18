@@ -169,6 +169,34 @@ public sealed class HardwareMixingWriteTests
         Assert.False(levels.HeldBy(new DeviceState { HpVolumeDb = -20, Hp2VolumeDb = -5 }));
     }
 
+    /// <summary>
+    /// Line Out's level is byte 4 of block 0x0005 in the headphones' encoding,
+    /// written alone: nothing on the unit turns it, so a jack left at the floor
+    /// plays nothing until this raises it.
+    /// </summary>
+    [Fact]
+    public void LineOutsLevelIsWrittenToItsOwnByte()
+    {
+        var unit = new Mk2HardwareEqTests.Unit { Bank = 0x0103 };
+        unit.Blocks.Clear();
+        unit.Blocks[0x0001] = ProMixPlanTests.Neutral();
+        unit.Blocks[0x0003] = new byte[12];
+        unit.Blocks[0x0004] = Convert.FromHexString(ProDuckingDeviceTests.SettingsBlock);
+        unit.Blocks[0x0005] = [40, 0x02, 40, 0, 240, 0, 0, 0];
+        unit.Blocks[0x0008] = new byte[ProDucking.Length];
+        using var pro = new WaveXlrProDevice(unit);
+        pro.Connect();
+        Assert.Equal(-60, pro.ReadState().LineOutLevelDb);
+
+        pro.SetLineOutLevelDb(-20);
+        Assert.Equal(new byte[] { 40, 0x02, 40, 0, 80, 0, 0, 0 }, unit.Blocks[0x0005]);
+        Assert.Equal(-20, pro.ReadState().LineOutLevelDb);
+        pro.SetLineOutLevelDb(-90);
+        Assert.Equal(240, unit.Blocks[0x0005][4]);
+        pro.SetLineOutLevelDb(3);
+        Assert.Equal(0, unit.Blocks[0x0005][4]);
+    }
+
     /// <summary>The driver writes a lowering before block 0x0001 and a raise after it, under one lock.</summary>
     [Fact]
     public void TheDriverLowersTheJacksBeforeTheMixesAndRaisesThemAfter()
