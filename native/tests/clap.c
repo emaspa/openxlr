@@ -25,6 +25,10 @@ typedef struct {
 } Side;
 
 static Side in_side, out_side;
+// A plugin that answers differently the second time: once this many port
+// readings have been answered, every later one claims far more channels
+// than a bus can hold. Zero answers truthfully throughout.
+static unsigned port_readings, honest_readings;
 static bool touched_every_bus;
 static uint32_t seen_in_count, seen_out_count;
 
@@ -40,6 +44,8 @@ static bool ap_get(const clap_plugin_t *p, uint32_t index, bool input,
   memset(info, 0, sizeof(*info));
   info->id = index;
   info->channel_count = s->channels[index];
+  if (honest_readings && ++port_readings > honest_readings)
+    info->channel_count = 1000;
   info->flags = (s->flag_main && index == s->main) ? CLAP_AUDIO_PORT_IS_MAIN : 0;
   info->port_type = CLAP_PORT_STEREO;
   info->in_place_pair = CLAP_INVALID_ID;
@@ -649,6 +655,25 @@ int main(void) {
   assert(!clap_map_ports(c, &h, NULL, true));
   release(c);
   puts("PASS: the refusals hold");
+
+  // 4b. Each port is read once. The channel count the bounds check passed is
+  // the one the buses are laid out from, whatever a second reading says.
+  in_side = (Side){.count = 2, .channels = {2, MAX_PORT_CHANNELS}, .main = 0, .flag_main = true};
+  out_side = (Side){.count = 2, .channels = {2, MAX_PORT_CHANNELS}, .main = 0, .flag_main = true};
+  c = fresh(&h);
+  port_readings = 0;
+  honest_readings = 2;
+  assert(clap_map_ports(c, &h, &ap_ext, true));
+  assert(port_readings == 2);
+  port_readings = 0;
+  assert(clap_map_ports(c, &h, &ap_ext, false));
+  assert(port_readings == 2);
+  honest_readings = 0;
+  assert(c->in_buses[1].channel_count == MAX_PORT_CHANNELS);
+  assert(c->out_buses[1].channel_count == MAX_PORT_CHANNELS);
+  run(&h, c, MAX_FRAMES);
+  release(c);
+  puts("PASS: a plugin whose port answers change after the check cannot widen a bus");
 
   // 5. two cycles in a row: the main pointers move, the spare ones stay.
   in_side = (Side){.count = 2, .channels = {2, 2}, .main = 0, .flag_main = true};

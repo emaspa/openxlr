@@ -22,6 +22,9 @@
 
 sigjmp_buf x_escape;
 volatile sig_atomic_t x_escape_armed;
+// The thread that runs the editor and arms the escape, recorded before any
+// other thread starts.
+static pthread_t x_main_thread;
 
 static int report_x_error(Display *display, XErrorEvent *event) {
   char text[256];
@@ -32,7 +35,10 @@ static int report_x_error(Display *display, XErrorEvent *event) {
 }
 
 static int lost_x_connection(Display *display) {
-  if (x_escape_armed) {
+  // A jump is only defined back into the thread that set the buffer, which
+  // is the main thread. A plugin thread that loses its own connection, even
+  // while the main thread is armed, ends the process as Xlib would.
+  if (x_escape_armed && pthread_equal(pthread_self(), x_main_thread)) {
     x_escape_armed = 0;
     siglongjmp(x_escape, 1);
   }
@@ -1450,6 +1456,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   setvbuf(stdout, NULL, _IOLBF, 0);
+  x_main_thread = pthread_self();
   XSetErrorHandler(report_x_error);
   XSetIOErrorHandler(lost_x_connection);
   h.silence = calloc(MAX_FRAMES, sizeof(float));

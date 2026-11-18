@@ -14,6 +14,7 @@
 #include "../lv2.c"
 #include <assert.h>
 #include <limits.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static Control *control_named(Host *h, const char *symbol) {
@@ -96,6 +97,67 @@ static void own_block_fixture(char *uri) {
   puts("PASS: an LV2 plugin on its own block is told 1024 frames and runs exactly 1536 frames late");
 }
 
+// A port typed as more than one of audio, control and atom is refused at
+// load, with nothing left for the audio thread or the editor to reach. Each
+// case is the mono gain fixture's binary under a manifest that types one of
+// its ports twice, alone on LV2_PATH.
+static void contradictory_ports_refused(const char *gain_binary) {
+  static const char *const ports[][3] = {
+      {"lv2:AudioPort, lv2:ControlPort, lv2:InputPort", "lv2:AudioPort, lv2:OutputPort",
+       "lv2:ControlPort, lv2:InputPort"},
+      {"lv2:AudioPort, lv2:InputPort", "lv2:AudioPort, atom:AtomPort, lv2:OutputPort",
+       "lv2:ControlPort, lv2:InputPort"},
+      {"lv2:AudioPort, lv2:InputPort", "lv2:AudioPort, lv2:OutputPort",
+       "lv2:ControlPort, atom:AtomPort, lv2:OutputPort"},
+  };
+  const char *saved = getenv("LV2_PATH");
+  char *saved_path = saved ? strdup(saved) : NULL;
+  assert(!saved || saved_path);
+  for (unsigned i = 0; i < sizeof(ports) / sizeof(*ports); ++i) {
+    char directory[] = "/tmp/openxlr-lv2-dual-XXXXXX", bundle[64], manifest[96],
+         binary[96];
+    assert(mkdtemp(directory));
+    snprintf(bundle, sizeof(bundle), "%s/dual.lv2", directory);
+    assert(mkdir(bundle, 0700) == 0);
+    snprintf(binary, sizeof(binary), "%s/gain.so", bundle);
+    assert(symlink(gain_binary, binary) == 0);
+    snprintf(manifest, sizeof(manifest), "%s/manifest.ttl", bundle);
+    FILE *f = fopen(manifest, "w");
+    assert(f);
+    fprintf(f,
+            "@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n"
+            "@prefix doap: <http://usefulinc.com/ns/doap#> .\n"
+            "@prefix atom: <http://lv2plug.in/ns/ext/atom#> .\n"
+            "<urn:openxlr:test:gain:mono> a lv2:Plugin ; doap:name \"Dual typed\" ;"
+            " lv2:binary <gain.so> ;\n"
+            "  lv2:port [ a %s ; lv2:index 0 ; lv2:symbol \"in\" ; lv2:name \"In\" ],\n"
+            "    [ a %s ; lv2:index 1 ; lv2:symbol \"out\" ; lv2:name \"Out\" ],\n"
+            "    [ a %s ; lv2:index 2 ; lv2:symbol \"gain\" ; lv2:name \"Gain\" ;"
+            " lv2:default 1 ; lv2:minimum 0 ; lv2:maximum 1 ] .\n",
+            ports[i][0], ports[i][1], ports[i][2]);
+    assert(fclose(f) == 0);
+    setenv("LV2_PATH", directory, 1);
+    Host h = {.rate = 48000, .channels = 1, .backend = &lv2_backend};
+    char uri[] = "urn:openxlr:test:gain:mono";
+    char *arguments[] = {uri};
+    assert(!lv2_load(&h, arguments));
+    Lv2 *l = h.impl;
+    for (uint32_t port = 0; port < l->count; ++port)
+      assert(l->ports[port].kind != PORT_CONTROL || l->ports[port].ctl);
+    lv2_unload(&h);
+    unlink(manifest);
+    unlink(binary);
+    rmdir(bundle);
+    rmdir(directory);
+  }
+  if (saved_path) {
+    setenv("LV2_PATH", saved_path, 1);
+    free(saved_path);
+  } else
+    unsetenv("LV2_PATH");
+  puts("PASS: a port typed as more than one kind refuses the plugin at load");
+}
+
 int main(void) {
   // The fixtures' bundles are the only ones this test may see: LV2_PATH
   // names a fresh directory holding a link to each and nothing else.
@@ -137,6 +199,9 @@ int main(void) {
   gain_fixture(2, "urn:openxlr:test:gain");
   puts("PASS: mono and stereo gain fixtures scale each audio channel");
   own_block_fixture("urn:openxlr:test:gain:mono");
+  char gain_binary[PATH_MAX];
+  assert(realpath("tests/gain.lv2/gain.so", gain_binary));
+  contradictory_ports_refused(gain_binary);
   unlink(gain_link);
   unlink(link);
   rmdir(directory);

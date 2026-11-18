@@ -40,8 +40,9 @@ These tests need neither a plugin installation nor a running PipeWire
 server. They cover event delivery without idle polling, coalesced sizes,
 drag reversal, size constraints, changes to child-window size bounds,
 fixed-size editors and plugin-driven scaling, the Wine coordinate nudge
-and display cleanup. Real plugin repainting and mouse input still need
-desktop testing.
+and display cleanup, and that a lost connection returns to the armed call
+only on the main thread and ends the process on any other. Real plugin
+repainting and mouse input still need desktop testing.
 
 `make -C native test-audio` checks the audio thread's safety rules
 without a graph: a cycle the fixed buffers cannot carry is refused before
@@ -70,7 +71,9 @@ the voice's level never gives a figure; and the audio callback allocates
 nothing. `make -C native test-clap` checks the
 CLAP port layout against fake plugins that declare more buses than the
 chain uses, and that the scanner and the loader agree about which layouts
-can be carried. It also checks that a CLAP plugin's latency is read after
+can be carried. Each port is read from the plugin once, so a plugin whose
+answer changes after the channel bound was checked cannot widen a bus past
+it. It also checks that a CLAP plugin's latency is read after
 activation and again only after the plugin says it changed, and that the
 host reports it once and then once per change. A plugin that asks for a
 restart is restarted in place in the order CLAP sets: processing stops
@@ -85,8 +88,10 @@ server, a display or an installed plugin.
 `make -C native test-lv2` loads the fixture in `tests/latency.lv2`, a stereo
 delay whose latency port follows its delay control, through lilv and the LV2
 backend, and checks that its latency is reported once audio has run and again
-when the delay changes. It builds the fixture itself and needs lilv, but no
-PipeWire, display or installed plugin.
+when the delay changes. A plugin with a port typed as more than one of
+audio, control and atom is refused at load, the way any other unusable
+port is, with the port named on stderr. It builds the fixture itself and
+needs lilv, but no PipeWire, display or installed plugin.
 
 `make -C native test-vst3` checks VST3 parameter queue indices, attribute
 identifiers and buffers, the component-state memory stream, and that the
@@ -389,7 +394,11 @@ can still interrupt that insert's chain.
   Verified by asking the X server to close the helper's connection while an
   editor was open: the process kept its heartbeat, kept its ports, and opened
   a fresh editor on request. The same test on a build without the handlers
-  killed the process immediately.
+  killed the process immediately. The return to the armed call happens only
+  on the main thread, since that jump is defined only within the thread that
+  set it. A plugin thread that
+  loses a connection of its own ends the helper, and the daemon rebuilds the
+  chain as it does after any other exit.
 - An editor that stops answering freezes that insert's controls and says so.
   Its audio continues, and the daemon does not rebuild the chain for it.
 - A chain that dies on its own is rebuilt, until it has failed three times
