@@ -1189,16 +1189,32 @@ size hints are read again, so a plugin's scaling controls can update them.
 LV2 editors do not receive the Wine coordinate nudge.
 
 The same binary reads the daemon's LV2 catalogue with
-`openxlr-lv2-host scan-lv2 [LV2_PATH]`. lilv parses every bundle's Turtle
-files in that process, never in the daemon, and no plugin code is loaded.
-The scan prints every plugin as JSON, with the limits the daemon applies (4096
-ports, 512 controls, 256 scale points, 64 features, 4096 bytes a string)
-and text that is always valid UTF-8. Before describing each plugin it
-writes `trace: scan LV2 plugin N: bundle PATH` to standard error, with the
-path reduced to printable ASCII, so the log of a scan that crashed or
-stalled names the bundle. lilv reads every manifest under
-`trace: scan LV2: load bundles` and a plugin's own data files when that
-plugin is described.
+`openxlr-lv2-host scan-lv2 [--skip BUNDLE]... [LV2_PATH]`. lilv parses every
+bundle's Turtle files in that process, never in the daemon, and no plugin
+code is loaded. The scan prints every plugin as JSON, with the limits the
+daemon applies (4096 ports, 512 controls, 256 scale points, 64 features,
+4096 bytes a string) and text that is always valid UTF-8.
+
+The scan loads the bundles itself, one at a time, in the order
+`lilv_world_load_all` would: the directories of the path given, of
+`LV2_PATH`, or of lilv's compiled default, each expanded as lilv expands
+it. It writes `trace: scan LV2 manifest N: bundle TEXT` to standard error
+before reading a bundle's manifest, and `trace: scan LV2 plugin N: bundle
+TEXT` before describing each plugin, when lilv reads the plugin's own data
+files. TEXT is the bundle's path with every byte outside printable ASCII,
+and every `%`, written as `%XX`, at most 512 bytes. So the log of a scan
+that crashed or stalled names the bundle in its last marker, and the daemon
+reads the path back from it. `--skip TEXT` leaves out the bundle with that
+marker text, and the scan writes `trace: scan LV2: skip bundle TEXT`
+instead.
+
+lilv has no call that returns its default path. The scan builds the text
+lilv's build writes for each library directory lilv could be installed
+under, and uses one only when that exact text is in lilv's loaded image. A
+distribution that set its own default matches none of them. Then lilv loads
+every bundle in one step under `trace: scan LV2: load bundles`, the scan
+unloads a skipped bundle again before describing its plugins, and only the
+plugin markers name a bundle.
 
 Before loading a plugin, the helper defaults `LSP_WS_LIB_GLXSURFACE` to `0`
 unless the user already set it. LSP's software renderer avoids the repaint
