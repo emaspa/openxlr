@@ -3121,6 +3121,13 @@ bridged or not. The optional `openxlr-yabridge` companion carries a pinned build
 input fix. Select it and restart the daemon. Users managing their own
 bridge can follow the upstream development builds linked from issue 409.
 
+Some desktops cause the same symptom another way. On KWin 6.8.3 with
+XWayland, the Wine window that draws the plugin stays hidden inside the
+editor. The picture shows, but every click lands on the window around it.
+The plugin host maps that window again whenever it finds it hidden, and
+the daemon's log then has the line `editor: the Wine window ... was left
+unmapped in the frame; mapped it`.
+
 <a name="memlock"></a>
 **"Low memory locking limit".** yabridge prints this when it starts, in
 the daemon's log:

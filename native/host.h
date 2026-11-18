@@ -222,6 +222,10 @@ struct Host {
   // the screen. One pixel out and back teaches it, and this counts the ticks
   // until that is worth doing again.
   unsigned settle_ticks;
+  // How many times this editor's Wine window was found unmapped inside the
+  // frame and mapped again. Capped, so the host never fights whatever keeps
+  // hiding it.
+  unsigned wine_maps;
   int frame_x, frame_y;  // where the frame was, to notice that it moved
   unsigned settle_width, settle_height;  // the size to put back afterwards
   // Ignore consecutive duplicates, but deliver A -> B -> A during a drag.

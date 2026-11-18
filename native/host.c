@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -102,6 +103,7 @@ static void forget_ui(Host *h) {
   h->self_width = h->self_height = 0;
   h->child_width = h->child_height = 0;
   h->settle_ticks = h->settle_width = h->settle_height = 0;
+  h->wine_maps = 0;
   h->frame_x = h->frame_y = 0;
   h->dragged_at = (struct timespec){0};
 }
@@ -760,9 +762,59 @@ static void update_editor_hints(Host *h) {
   XSetWMNormalHints(h->display, h->window, &hints);
 }
 
+// Wine names a window's class after the program, so a class ending in .exe
+// is a window of a program running under Wine.
+static bool wine_window(Display *display, Window window) {
+  XClassHint hint = {0};
+  if (!XGetClassHint(display, window, &hint))
+    return false;
+  size_t length = hint.res_class ? strlen(hint.res_class) : 0;
+  bool wine = length > 4 && !strcasecmp(hint.res_class + length - 4, ".exe");
+  if (hint.res_name)
+    XFree(hint.res_name);
+  if (hint.res_class)
+    XFree(hint.res_class);
+  return wine;
+}
+
+enum { MAX_WINE_MAPS = 16 };
+
+static void map_hidden_wine_window(Host *h, Window parent, Window window) {
+  XWindowAttributes outer, inner;
+  if (h->wine_maps >= MAX_WINE_MAPS ||
+      !XGetWindowAttributes(h->display, parent, &outer) || outer.map_state != IsViewable ||
+      !XGetWindowAttributes(h->display, window, &inner) || inner.map_state != IsUnmapped ||
+      inner.class != InputOutput || !wine_window(h->display, window))
+    return;
+  if (h->wine_maps++ == 0)
+    fprintf(stderr, "editor: the Wine window 0x%lx was left unmapped in the frame; mapped it\n",
+            (unsigned long)window);
+  XMapWindow(h->display, window);
+}
+
+// A plugin bridged from Windows draws in a Wine window that the bridge puts
+// inside the plugin's window. On some desktops, KWin 6.8.3 on XWayland among
+// them, that window ends up unmapped there: the picture still shows, but
+// every click lands on the window around it and the plugin takes none. While
+// the frame is on screen, a Wine window in it that is not is mapped again.
+static void show_wine_windows(Host *h) {
+  if (!h->child || !h->backend->editor_coordinate_nudge)
+    return;
+  map_hidden_wine_window(h, h->window, h->child);
+  Window root, parent, *children = NULL;
+  unsigned count = 0;
+  if (!XQueryTree(h->display, h->child, &root, &parent, &children, &count))
+    return;
+  for (unsigned i = 0; i < count; ++i)
+    map_hidden_wine_window(h, h->child, children[i]);
+  if (children)
+    XFree(children);
+}
+
 // A plugin builds its interface in a window of its own inside ours, at
 // whatever size it wants, and many never call the host's resize. Take the
-// size from that window, and watch it so later changes follow.
+// size from that window, and watch it so later changes follow. Its own
+// children are watched too, for a bridge's Wine window losing its mapping.
 static void fit_to_child(Host *h) {
   Window root, parent, *children = NULL;
   unsigned count = 0;
@@ -770,7 +822,8 @@ static void fit_to_child(Host *h) {
     return;
   if (count > 0) {
     h->child = children[count - 1];
-    XSelectInput(h->display, h->child, StructureNotifyMask | PropertyChangeMask);
+    XSelectInput(h->display, h->child,
+                 StructureNotifyMask | SubstructureNotifyMask | PropertyChangeMask);
     XWindowAttributes attributes;
     if (XGetWindowAttributes(h->display, h->child, &attributes) &&
         attributes.width > 0 && attributes.height > 0) {
@@ -917,10 +970,13 @@ static void pump_editor_once(Host *h, bool idle) {
   }
   x_escape_armed = 1;
   unsigned frame_width = 0, frame_height = 0, plugin_width = 0, plugin_height = 0;
-  bool frame_resized = false, plugin_resized = false;
+  bool frame_resized = false, plugin_resized = false, mapping_changed = false;
   while (XPending(h->display)) {
     XEvent event;
     XNextEvent(h->display, &event);
+    if (event.type == MapNotify || event.type == UnmapNotify ||
+        event.type == ReparentNotify || event.type == CreateNotify)
+      mapping_changed = true;
     if (event.type == ClientMessage &&
         (Atom)event.xclient.data.l[0] == h->close_message) {
       x_escape_armed = 0;
@@ -1013,6 +1069,8 @@ static void pump_editor_once(Host *h, bool idle) {
       h->child_height = frame_height;
     }
   }
+  if (mapping_changed)
+    show_wine_windows(h);
   // A window that has just opened or moved has to change size once for a
   // plugin bridged from Windows to find out where it is; until it does, its
   // clicks land as far from the pointer as the window is from the corner of
