@@ -28,6 +28,12 @@ export CARGO ?= /usr/bin/cargo
 export RUSTC ?= /usr/bin/rustc
 export CARGO_HOME = $(HOME)/.cargo
 
+# dh exports the distribution's build flags, and make reads them when the
+# daemon's publish below builds the native helper. Every hardening feature is
+# on, immediate binding included, which Debian leaves off by default;
+# native/Makefile adds its own after these.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
 OUT = $(CURDIR)/debian/out
 PKG = $(CURDIR)/debian/openxlr
 

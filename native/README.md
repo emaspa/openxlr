@@ -33,6 +33,16 @@ runtime dependencies of every package. DeepFilterNet, one of the two
 the first time, network for its crates and model; `DEEPFILTER=0` builds
 without it.
 
+The Makefile hardens the helper and its tests with the stack protector,
+`_FORTIFY_SOURCE`, a position-independent executable, full RELRO with
+immediate binding and a non-executable stack, plus stack clash and
+control-flow protection where the compiler has them. It adds these after
+the caller's `CPPFLAGS`, `CFLAGS` and `LDFLAGS`, so a package keeps its
+distribution's flags. It defines `_FORTIFY_SOURCE` only when those flags
+and the compiler leave it undefined. `HARDENING=0` leaves every flag to the
+caller. Make does not track flags, so run `make -C native clean-native`
+after changing them.
+
 `make -C native test-editor` runs the host's resize regression tests on
 `DISPLAY`, using a small test editor and a separate X connection. On a
 machine without a desktop, run `xvfb-run -a make -C native test-editor`.

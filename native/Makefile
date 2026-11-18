@@ -5,13 +5,38 @@
 # needs nothing beyond the PipeWire, lilv, LV2, X11 and libsndfile
 # development files and a C and C++ compiler.
 PKGS = libpipewire-0.3 lilv-0 lv2 x11 sndfile
+
+# Hardening: the stack protector, FORTIFY, a position-independent executable,
+# full RELRO with immediate binding and a non-executable stack, plus stack
+# clash and control-flow protection where the compiler has them. They come
+# after the caller's flags, so a package adds its distribution's set and keeps
+# it. _FORTIFY_SOURCE is defined only when neither those flags nor the
+# compiler already define it: a second, different definition is a warning,
+# and warnings are errors here. Level 3 where the compiler and C library
+# support it, 2 otherwise. HARDENING=0 leaves all of it to the caller.
+HARDENING ?= 1
+ifeq ($(HARDENING),1)
+cc_option = $(shell $(CC) -Werror $(1) -x c -c -o /dev/null /dev/null 2>/dev/null && echo $(1))
+FORTIFY_SET := $(shell echo | $(CC) $(CPPFLAGS) $(CFLAGS) -O2 -dM -E -x c - 2>/dev/null | grep -w _FORTIFY_SOURCE)
+FORTIFY_LEVEL := $(shell echo | $(CC) -O2 -D_FORTIFY_SOURCE=3 -Werror -include string.h -E -x c - >/dev/null 2>&1 \
+                   && echo 3 || echo 2)
+HARDEN_CPPFLAGS := $(if $(FORTIFY_SET),,-D_FORTIFY_SOURCE=$(FORTIFY_LEVEL))
+HARDEN_CFLAGS := -fstack-protector-strong $(call cc_option,-fstack-clash-protection) \
+                 $(call cc_option,-fcf-protection) -fPIE
+# DeepFilterNet's crates carry assembly without a stack note, which some
+# linkers read as a request for an executable stack; none of it needs one.
+HARDEN_LDFLAGS := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
+endif
+
 # Taken before the flags below are added: vendored code is built with the
 # caller's flags but not with this project's warnings.
-RNN_CFLAGS := -O2 -g $(CFLAGS) -w
-CPPFLAGS += $(shell pkg-config --cflags $(PKGS)) -isystem clap/include -isystem vst3 -isystem signalsmith
+RNN_CFLAGS := -O2 -g $(CPPFLAGS) $(HARDEN_CPPFLAGS) $(CFLAGS) $(HARDEN_CFLAGS) -w
+CPPFLAGS += $(shell pkg-config --cflags $(PKGS)) -isystem clap/include -isystem vst3 -isystem signalsmith \
+            $(HARDEN_CPPFLAGS)
 WARN = -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter
-CFLAGS += -std=c11 $(WARN)
-CXXFLAGS += -std=c++17 $(WARN) -fno-exceptions -fno-rtti
+CFLAGS += -std=c11 $(WARN) $(HARDEN_CFLAGS)
+CXXFLAGS += -std=c++17 $(WARN) -fno-exceptions -fno-rtti $(HARDEN_CFLAGS)
+LDFLAGS += $(HARDEN_LDFLAGS)
 LDLIBS += $(shell pkg-config --libs $(PKGS)) -ldl -lm -pthread
 # Track headers from each compilation, including SDKs passed with -isystem.
 # Replace the dependency file only after a successful compile.
