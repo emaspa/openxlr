@@ -73,6 +73,12 @@ override_dh_auto_install:
 	install -Dm644 browser/native-host.json \
 		$(PKG)/etc/opt/chrome/native-messaging-hosts/com.emaspa.openxlr.browser.json
 
+	# Chromium and Chrome offer the companion from the Chrome Web Store.
+	install -Dm644 browser/external-extension.json \
+		$(PKG)/usr/share/chromium/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
+	install -Dm644 browser/external-extension.json \
+		$(PKG)/usr/share/google-chrome/extensions/beeohanoffjpcofbjiiamkdammhcihaf.json
+
 	install -Dm644 packaging/70-openxlr.rules \
 		$(PKG)/usr/lib/udev/rules.d/70-openxlr.rules
 	install -Dm644 packaging/50-xlr-dock-capture-hold.conf \
