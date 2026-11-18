@@ -22,6 +22,8 @@ public sealed class WindowsExecutableIcons
     private const int MaxProcesses = 1024;
     // Icons are small; the UI does not draw a file larger than 4 MB.
     private const int MaxIconBytes = 4 * 1024 * 1024;
+    // All the bytes one executable is read for, headers and icons together.
+    private const int MaxReadBytes = 16 * 1024 * 1024;
     private const int MaxSide = 1024;
 
     private readonly string _procRoot;
@@ -29,6 +31,9 @@ public sealed class WindowsExecutableIcons
     private readonly string _homePrefix;
     private readonly IReadOnlyList<(string Root, int Depth)> _prefixRoots;
     private readonly ConcurrentDictionary<(int Pid, string? Name), string?> _byProcess = new();
+    // One program is looked at a time, away from the caller.
+    private readonly Lock _start = new();
+    private Task _reading = Task.CompletedTask;
 
     /// <param name="prefixRoots">Where to look for Wine prefixes, and how many folders deep, when the process's own prefix cannot be read.</param>
     public WindowsExecutableIcons(string? procRoot = null, string? cacheDirectory = null, string? homePrefix = null,
@@ -73,19 +78,37 @@ public sealed class WindowsExecutableIcons
 
     /// <summary>
     /// The PNG of this stream's Windows program, or null when the stream is
-    /// not a Wine program or its executable has no icon. The first call for
-    /// a process reads its command line and its executable; later calls do
-    /// not touch the disk.
+    /// not a Wine program, its executable has no icon, or it is still being
+    /// read. The first call for a process starts reading its command line
+    /// and its executable in the background and answers null at once, so a
+    /// slow disk never holds up the stream sweep that asks; a later call
+    /// answers what the read found without touching the disk. While one read
+    /// runs, other processes wait for a later call.
     /// </summary>
     public string? For(AudioStream stream)
     {
         if (stream.ProcessId <= 0 || stream.FlatpakInstanceId is not null || !StreamMatcher.RunsUnderWine(stream)) return null;
         var key = (stream.ProcessId, stream.AppName);
         if (_byProcess.TryGetValue(key, out string? known)) return known;
-        if (_byProcess.Count >= MaxProcesses) _byProcess.Clear();
-        string? icon = Find(stream.ProcessId);
-        _byProcess[key] = icon;
-        return icon;
+        lock (_start)
+        {
+            if (!_reading.IsCompleted) return null;
+            if (_byProcess.Count >= MaxProcesses) _byProcess.Clear();
+            int pid = stream.ProcessId;
+            _reading = Task.Run(() =>
+            {
+                string? icon = null;
+                try { icon = Find(pid); }
+                finally { _byProcess[key] = icon; }
+            });
+        }
+        return null;
+    }
+
+    /// <summary>The read in progress, or a finished task when there is none.</summary>
+    internal Task Reading
+    {
+        get { lock (_start) return _reading; }
     }
 
     private string? Find(int pid)
@@ -198,12 +221,17 @@ public sealed class WindowsExecutableIcons
         return target;
     }
 
-    /// <summary>The executable's largest icon as PNG bytes, or null when it has none this can draw.</summary>
+    /// <summary>
+    /// The executable's largest icon as PNG bytes, or null when it has none
+    /// this can draw. The path comes from a process's command line, which
+    /// any program sets, so only a regular file is read: the open does not
+    /// wait on a pipe, and a device is refused.
+    /// </summary>
     internal static byte[]? Extract(string file)
     {
         try
         {
-            using SafeFileHandle handle = File.OpenHandle(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using SafeFileHandle handle = RegularFile.OpenHandle(file);
             var image = new PortableExecutable(handle, RandomAccess.GetLength(handle));
             if (image.Resource(ResourceType.GroupIcon, null) is not { } group) return null;
             foreach (ushort id in IconsBySize(group))
@@ -343,8 +371,8 @@ public sealed class WindowsExecutableIcons
     /// <summary>
     /// Just enough of a PE image to find resources: the section table maps
     /// addresses to file offsets, and the resource tree runs type, name,
-    /// language. Every read is bounded by the file; anything out of place is
-    /// no resource.
+    /// language. Every read is bounded by the file, and all of them together
+    /// by <see cref="MaxReadBytes"/>; anything out of place is no resource.
     /// </summary>
     private sealed class PortableExecutable
     {
@@ -352,6 +380,7 @@ public sealed class WindowsExecutableIcons
         private readonly long _length;
         private readonly List<(uint Address, uint Size, uint Offset, uint RawSize)> _sections = [];
         private readonly long _resources = -1;
+        private long _budget = MaxReadBytes;
 
         public PortableExecutable(SafeFileHandle file, long length)
         {
@@ -417,7 +446,8 @@ public sealed class WindowsExecutableIcons
 
         private byte[]? Read(long offset, int count)
         {
-            if (offset < 0 || count < 0 || offset + count > _length) return null;
+            if (offset < 0 || count < 0 || offset + count > _length || count > _budget) return null;
+            _budget -= count;
             var buffer = new byte[count];
             return RandomAccess.Read(_file, buffer, offset) == count ? buffer : null;
         }

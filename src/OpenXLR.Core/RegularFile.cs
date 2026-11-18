@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 #if OPENXLR_UI
 namespace OpenXLR.UI;
@@ -61,6 +62,47 @@ internal static class RegularFile
     /// </summary>
     internal static bool IsSpecial(string path) =>
         OperatingSystem.IsLinux() && Inspect(path) is { } status && (status.Mode & 0xf000) != 0x8000;
+
+    /// <summary>
+    /// Open a regular file for reading, following links. The open does not
+    /// block, so a pipe or a device in the file's place is refused at once
+    /// instead of holding the caller, and the type is checked on the handle
+    /// that was opened rather than on a path that can change after a check.
+    /// </summary>
+    internal static SafeFileHandle OpenHandle(string path)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Require(path);
+            return File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        }
+        int fd = Open(path, ReadOnly | NonBlocking | CloseOnExec | NoControllingTerminal);
+        if (fd < 0)
+        {
+            int error = Marshal.GetLastPInvokeError();
+            string message = $"Could not open {path}: {new Win32Exception(error).Message}";
+            throw error == AccessDenied ? new UnauthorizedAccessException(message) : new IOException(message);
+        }
+        var handle = new SafeFileHandle(fd, ownsHandle: true);
+        try
+        {
+            if (Inspect($"/proc/self/fd/{fd}") is not { } status || (status.Mode & 0xf000) != 0x8000)
+                throw new IOException($"{path} is not a regular file.");
+            return handle;
+        }
+        catch
+        {
+            handle.Dispose();
+            throw;
+        }
+    }
+
+    // Linux's values, the same on x86-64 and AArch64.
+    private const int ReadOnly = 0, NoControllingTerminal = 0x100, NonBlocking = 0x800, CloseOnExec = 0x80000;
+    private const int AccessDenied = 13;
+
+    [DllImport("libc", EntryPoint = "open", SetLastError = true)]
+    private static extern int Open([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags);
 
     /// <summary>Linux's fixed metadata layout, also used to own a control socket without following links.</summary>
     internal static LinuxFileStatus? Inspect(string path, bool noFollow = false)

@@ -100,7 +100,7 @@ public sealed class WindowsExecutableIconsTests : IDisposable
         var icons = new WindowsExecutableIcons(proc, cache, Path.Combine(_root, "no-wine"));
 
         var game = new AudioStream(1, "Game.exe", "wine-preloader", null) { ProcessId = 4242 };
-        string? png = icons.For(game);
+        string? png = Settled(icons, game);
         Assert.NotNull(png);
         Assert.Equal(cache, Path.GetDirectoryName(png));
         var (w, h, _) = ReadPng(File.ReadAllBytes(png!));
@@ -111,7 +111,7 @@ public sealed class WindowsExecutableIconsTests : IDisposable
         Assert.Equal(png, icons.For(game));
         // A second reader finds the file already drawn.
         Process(proc, 4242, @"C:\Program Files\Game\Game.exe" + "\0", $"WINEPREFIX={prefix}\0");
-        Assert.Equal(png, new WindowsExecutableIcons(proc, cache).For(game));
+        Assert.Equal(png, Settled(new WindowsExecutableIcons(proc, cache), game));
 
         Assert.Null(icons.For(new AudioStream(2, "Firefox", "firefox", null) { ProcessId = 4343 }));
         Assert.Null(icons.For(game with { ProcessId = 0 }));
@@ -132,9 +132,9 @@ public sealed class WindowsExecutableIconsTests : IDisposable
         var icons = new WindowsExecutableIcons(proc, Path.Combine(_root, "cache"), Path.Combine(_root, "no-wine"),
             [(Path.Combine(_root, "missing"), 4), (_root, 1)]);
 
-        Assert.NotNull(icons.For(new AudioStream(1, "Game.exe", "wine64-preloader", null) { ProcessId = 7 }));
-        Assert.NotNull(icons.For(new AudioStream(2, "Game.exe", "wine64-preloader", null) { ProcessId = 8 }));
-        Assert.Null(icons.For(new AudioStream(3, "Game.exe", "wine64-preloader", null) { ProcessId = 9 }));
+        Assert.NotNull(Settled(icons, new AudioStream(1, "Game.exe", "wine64-preloader", null) { ProcessId = 7 }));
+        Assert.NotNull(Settled(icons, new AudioStream(2, "Game.exe", "wine64-preloader", null) { ProcessId = 8 }));
+        Assert.Null(Settled(icons, new AudioStream(3, "Game.exe", "wine64-preloader", null) { ProcessId = 9 }));
     }
 
     [Fact]
@@ -152,6 +152,85 @@ public sealed class WindowsExecutableIconsTests : IDisposable
         Assert.Equal([Path.Combine(_root, "a/b/c/deep"), prefix], WindowsExecutableIcons.PrefixesUnder(_root, 4));
         Assert.Equal([prefix], WindowsExecutableIcons.PrefixesUnder(prefix, 0));
         Assert.Empty(WindowsExecutableIcons.PrefixesUnder(Path.Combine(_root, "missing"), 4));
+    }
+
+    /// <summary>
+    /// A program named in a command line is only read when it is a regular
+    /// file. A pipe would hold the open until something wrote to it, and a
+    /// device never ends; both are no icon, at once.
+    /// </summary>
+    [Theory]
+    [InlineData("pipe")]
+    [InlineData("device")]
+    public async Task AProgramThatIsNotARegularFileIsNoIcon(string kind)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string file = Path.Combine(_root, "Trap.exe");
+        SpecialFile.Make(file, kind);
+        Assert.Null(await SpecialFile.Promptly(file, kind, () => WindowsExecutableIcons.Extract(file)));
+
+        // The same through a stream whose process names it.
+        string proc = Path.Combine(_root, "proc");
+        Process(proc, 31, file + "\0", "");
+        var icons = new WindowsExecutableIcons(proc, Path.Combine(_root, "cache"), Path.Combine(_root, "no-wine"));
+        var stream = new AudioStream(1, "Trap.exe", "wine-preloader", null) { ProcessId = 31 };
+        Assert.Null(await SpecialFile.Promptly(file, kind, () => Settled(icons, stream)));
+    }
+
+    /// <summary>
+    /// The stream sweep asks for icons on its own thread. A read that does
+    /// not finish leaves every call answering at once, and the icon arrives
+    /// on a call after the read ends.
+    /// </summary>
+    [Fact]
+    public async Task ASlowReadNeverHoldsUpTheCaller()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string prefix = Prefix();
+        string proc = Path.Combine(_root, "proc");
+        // A command line that cannot be read until something writes it
+        // stands in for a disk that does not answer.
+        Process(proc, 51, "", $"WINEPREFIX={prefix}\0");
+        string cmdline = Path.Combine(proc, "51", "cmdline");
+        SpecialFile.Make(cmdline, "pipe");
+        Process(proc, 52, @"C:\Program Files\Game\Game.exe" + "\0", $"WINEPREFIX={prefix}\0");
+        var icons = new WindowsExecutableIcons(proc, Path.Combine(_root, "cache"), Path.Combine(_root, "no-wine"));
+        var stalled = new AudioStream(1, "Game.exe", "wine-preloader", null) { ProcessId = 51 };
+        var other = new AudioStream(2, "Game.exe", "wine-preloader", null) { ProcessId = 52 };
+
+        try
+        {
+            Task<string?> calls = Task.Run(() =>
+            {
+                Assert.Null(icons.For(stalled));
+                Assert.Null(icons.For(stalled));
+                return icons.For(other);
+            });
+            Assert.Null(await calls.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.False(icons.Reading.IsCompleted);
+
+            await using (var writer = new FileStream(cmdline, FileMode.Open, FileAccess.Write))
+                await writer.WriteAsync(Encoding.UTF8.GetBytes(@"C:\Program Files\Game\Game.exe" + "\0"));
+            await icons.Reading.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            // Release a read left waiting, so a failure does not hold a thread.
+            if (!icons.Reading.IsCompleted)
+            {
+                using var keeper = new FileStream(cmdline, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            }
+        }
+        Assert.NotNull(icons.For(stalled));
+        Assert.NotNull(Settled(icons, other));
+    }
+
+    // The answer once the read a first call starts has ended.
+    private static string? Settled(WindowsExecutableIcons icons, AudioStream stream)
+    {
+        if (icons.For(stream) is { } known) return known;
+        Assert.True(icons.Reading.Wait(TimeSpan.FromSeconds(5)));
+        return icons.For(stream);
     }
 
     // A prefix whose drive C holds one game with a 32-pixel icon.

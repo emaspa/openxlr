@@ -1328,7 +1328,9 @@ Each app shows its icon before its name, the one your desktop's launcher
 shows for it. The UI looks it up in your icon theme, then in hicolor and
 `/usr/share/pixmaps`, and Flatpak and Snap apps get theirs too. A Windows
 game under Wine or Proton with no launcher entry of its own shows the icon
-built into its `.exe`. An app with no icon gets the first letter of its
+built into its `.exe`. The daemon reads that file in the background, and
+only when it is a regular file, so the icon can show up a moment after
+the game. An app with no icon gets the first letter of its
 name on a badge of the same size, so the names stay lined up. An app keeps
 its icon in the list after it quits. Manage shows the same icon or letter
 beside each name in its list, and remembered apps that are not running get
