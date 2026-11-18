@@ -129,22 +129,10 @@ function connectDaemon() {
   };
   socket.onmessage = (e) => {
     if (daemon !== socket) return;
-    let m;
-    try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === "state") { daemonState = m; pruneEqTurns(); refreshAll(); refreshMeters(); publishLayout(); publishOutputs(); publishClips(); }
-    else if (m.type === "meters") { meterLevels = m.levels; refreshMeters(); }
-    else if (m.type === "plugins") {
-      catalog = new Map((m.plugins ?? []).map((p) => [p.plugin, p]));
-      refreshAll();
-    }
-    else if (m.type === "commandResult") keyCommands.finish(m.requestId, !!m.error);
-    else if (m.type === "error") {
-      console.error("OpenXLR daemon:", m.message);
-      // A refused command leaves no echo to correct a dial that showed it:
-      // every dial goes back to what the daemon holds.
-      dropDialValues();
-      refreshAll();
-    }
+    const m = parsedMessage(e.data, "the daemon");
+    if (!m) return;
+    try { onDaemonMessage(m); }
+    catch (error) { console.error("OpenXLR plugin: dropped a %s message from the daemon:", String(m.type), error); }
   };
   socket.onclose = (e) => {
     if (daemon !== socket) return;
@@ -169,6 +157,77 @@ function connectDaemon() {
     scheduleDaemonReconnect(generation);
   };
 }
+function onDaemonMessage(m) {
+  if (m.type === "state") { daemonState = stateOf(m); pruneEqTurns(); refreshAll(); refreshMeters(); publishLayout(); publishOutputs(); publishClips(); }
+  else if (m.type === "meters") { meterLevels = levelsOf(m.levels); refreshMeters(); }
+  else if (m.type === "plugins") {
+    catalog = new Map(listOf(m.plugins, isObject).map((p) => [p.plugin, p]));
+    refreshAll();
+  }
+  else if (m.type === "commandResult") keyCommands.finish(m.requestId, !!m.error);
+  else if (m.type === "error") {
+    console.error("OpenXLR daemon:", m.message);
+    // A refused command leaves no echo to correct a dial that showed it:
+    // every dial goes back to what the daemon holds.
+    dropDialValues();
+    refreshAll();
+  }
+}
+
+// ---------- message shapes ----------
+// Messages from OpenDeck and from the daemon are checked where the code relies
+// on their shape: a field it iterates, indexes or calls a string method on. A
+// message that still throws is logged and dropped at its socket, so one bad
+// message cannot end the plugin and blank every key.
+const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+const isString = (v) => typeof v === "string";
+const listOf = (v, keep) => Array.isArray(v) ? v.filter(keep) : [];
+
+// One JSON message as an object, or null after logging why it was dropped.
+function parsedMessage(data, from) {
+  let m;
+  try { m = JSON.parse(data); }
+  catch (error) { console.error(`OpenXLR plugin: dropped a message from ${from} that is not JSON:`, error.message); return null; }
+  if (isObject(m)) return m;
+  console.error(`OpenXLR plugin: dropped a message from ${from} that is not an object`);
+  return null;
+}
+
+// An action's settings as OpenDeck saved them in its profile, which a person
+// can edit or import. A target that is not a string reads as no target.
+function settingsOf(payload) {
+  const settings = isObject(payload?.settings) ? { ...payload.settings } : {};
+  if (!isString(settings.target)) delete settings.target;
+  if (settings.targets != null) settings.targets = listOf(settings.targets, isString);
+  return settings;
+}
+
+// The daemon's state with the lists and maps the readers walk made sure of: a
+// list that is not a list reads as empty, an entry of the wrong kind is left
+// out, and a block that is not an object reads as absent.
+function stateOf(m) {
+  const state = { ...m, profiles: listOf(m.profiles, isString), devices: listOf(m.devices, isObject) };
+  for (const key of ["state", "capabilities", "mixer", "ducking", "history"])
+    if (state[key] != null && !isObject(state[key])) state[key] = null;
+  if (!state.mixer) return state;
+  const mixer = state.mixer = { ...state.mixer };
+  for (const key of ["channels", "mixes", "exclusiveGroups"])
+    if (mixer[key] != null) mixer[key] = listOf(mixer[key], isObject);
+  if (mixer.monitorOutputs != null) mixer.monitorOutputs = listOf(mixer.monitorOutputs, isString);
+  for (const key of ["monitorFeeds", "monitorOutputLabels", "soundboard", "hardwareMixing", "outputVolumeLock"])
+    if (mixer[key] != null && !isObject(mixer[key])) mixer[key] = null;
+  if (mixer.inserts != null)
+    mixer.inserts = Object.fromEntries(Object.entries(isObject(mixer.inserts) ? mixer.inserts : {})
+      .map(([channel, chain]) => [channel, listOf(chain, isObject)]));
+  return state;
+}
+
+// Meter levels keyed ch:/mix:/clip:, each a list of numbers.
+function levelsOf(levels) {
+  if (!isObject(levels)) return null;
+  return Object.fromEntries(Object.entries(levels).filter(([, value]) => Array.isArray(value)));
+}
+
 const cmd = (o) => {
   if (!daemonUp || !daemon || daemon.readyState !== WebSocket.OPEN) return false;
   try {
@@ -213,6 +272,12 @@ function forgetSent(context) { sentImage.delete(context); sentFeedback.delete(co
 const send = (o) => { if (!unchanged(o)) host.send(JSON.stringify(o)); };
 host.onopen = () => send({ event: registerEvent, uuid: pluginUUID });
 host.onclose = () => process.exit(0);
+// An error no handler caught would end the process, and every key and dial
+// would go blank until OpenDeck starts the plugin again. What the plugin holds
+// is drawn again from the next message, so it logs the error and carries on;
+// it still ends when OpenDeck closes its socket.
+process.on("uncaughtException", (error) => console.error("OpenXLR plugin: uncaught error:", error));
+process.on("unhandledRejection", (reason) => console.error("OpenXLR plugin: unhandled rejection:", reason));
 
 // Visible action instances: context -> {action, device, settings, controller}
 const instances = new Map();
@@ -252,7 +317,7 @@ const insertsOf = (ch) => (mixer()?.inserts?.[ch] ?? []).map((s) => s.insert ?? 
 // A short plugin name for a key face: drop the vendor prefix and the
 // channel-count suffix ("LSP Compressor Mono" -> "Compressor").
 function pluginShort(label, uri) {
-  let s = label || catalog.get(uri)?.name || uri?.split("/").pop() || "Plugin";
+  let s = String(label || catalog.get(uri)?.name || (isString(uri) ? uri.split("/").pop() : "") || "Plugin");
   s = s.replace(/^LSP\s+/i, "").replace(/\s+(Mono|Stereo|MidSide|LR|MS|x\d)$/i, "");
   return s;
 }
@@ -359,8 +424,12 @@ function cycleStack(context, inst) {
 }
 
 host.onmessage = (e) => {
-  let m;
-  try { m = JSON.parse(e.data); } catch { return; }
+  const m = parsedMessage(e.data, "OpenDeck");
+  if (!m) return;
+  try { onHostMessage(m); }
+  catch (error) { console.error("OpenXLR plugin: dropped a %s message from OpenDeck:", String(m.event), error); }
+};
+function onHostMessage(m) {
   const inst = instances.get(m.context);
   switch (m.event) {
     case "willAppear":
@@ -372,7 +441,7 @@ host.onmessage = (e) => {
       instances.set(m.context, {
         action: m.action,
         device: m.device,
-        settings: m.payload?.settings ?? {},
+        settings: settingsOf(m.payload),
         controller: m.payload?.controller ?? "Keypad",
       });
       refresh(m.context);
@@ -402,7 +471,7 @@ host.onmessage = (e) => {
       keyCommands.clear(m.context);
       if (inst) {
         const previous = eqBinding(inst);
-        inst.settings = m.payload?.settings ?? {};
+        inst.settings = settingsOf(m.payload);
         if (eqBinding(inst) !== previous) clearEqTurns(m.context);
         refresh(m.context);
         refreshEqMeter(m.context);
@@ -417,7 +486,7 @@ host.onmessage = (e) => {
       releaseHeldVoice(m.context);
       break;
     case "dialRotate":
-      if (inst) onDialRotate(m.context, inst, m.payload?.ticks ?? 0);
+      if (inst) onDialRotate(m.context, inst, Number.isFinite(m.payload?.ticks) ? m.payload.ticks : 0);
       break;
     case "dialDown":
       if (!inst) break;
@@ -436,7 +505,7 @@ host.onmessage = (e) => {
       // swallowed keystrokes and put its choices back (#834). A key's face
       // only depends on whether it has a title, and a dial's strip not on the
       // title at all, so only a key whose title comes or goes is redrawn.
-      const title = m.payload?.title ?? "";
+      const title = isString(m.payload?.title) ? m.payload.title : "";
       if (title !== "" && inst && isLegacyDefaultTitle(inst, title)) {
         send({ event: "setTitle", context: m.context, payload: { title: "" } });
         break;
@@ -480,7 +549,7 @@ host.onmessage = (e) => {
       clipInspectors.delete(m.context);
       break;
   }
-};
+}
 
 // Saved profiles of the active device, for the PI's picker. A key made for
 // one is looked up by name, so a profile saved again under the same name
