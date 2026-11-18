@@ -64,6 +64,33 @@ static const Backend test_backend = {
     .editor_idle = test_idle, .editor_resized = test_resize,
     .editor_constrain = test_constrain, .editor_coordinate_nudge = true};
 
+// A bridged plugin as yabridge builds it: the bridge's wrapper inside the
+// frame, and in it the Wine window that draws the plugin, left unmapped the
+// way some desktops leave it. A native window beside it, also unmapped, is
+// the plugin's own business and stays as it is.
+static Window wine_window_id, native_window_id;
+
+static Window unmapped_child(Window parent, const char *class_name) {
+  Window window = XCreateSimpleWindow(plugin_display, parent, 0, 0, 64, 48, 0, 0, 0);
+  XClassHint hint = {(char *)class_name, (char *)class_name};
+  XSetClassHint(plugin_display, window, &hint);
+  return window;
+}
+
+static bool wine_open(Host *h) {
+  assert(test_open(h));
+  wine_window_id = unmapped_child(plugin_window, "yabridge-host.exe");
+  native_window_id = unmapped_child(plugin_window, "native-plugin");
+  XSync(plugin_display, False);
+  return true;
+}
+
+static int map_state(Window window) {
+  XWindowAttributes attributes;
+  assert(XGetWindowAttributes(plugin_display, window, &attributes));
+  return attributes.map_state;
+}
+
 // A backend that learns only while opening that the plugin has no editor,
 // as the VST3 backend does now that it creates no view while loading.
 static bool refuse_open(Host *h) {
@@ -473,6 +500,33 @@ int main(void) {
   assert_bounds(&h, 128, 96, 128, 96);
   puts("PASS: fixed editors reject border resizing but accept plugin scaling");
   close_ui(&h);
+  fixed_editor = false;
+
+  Backend wine_backend = test_backend;
+  wine_backend.editor_open = wine_open;
+  h.backend = &wine_backend;
+  assert(open_ui(&h));
+  drain(&h);
+  assert(map_state(wine_window_id) == IsViewable);
+  assert(map_state(native_window_id) == IsUnmapped);
+  XUnmapWindow(plugin_display, wine_window_id);
+  XSync(plugin_display, False);
+  drain(&h);
+  assert(map_state(wine_window_id) == IsViewable);
+  h.wine_maps = MAX_WINE_MAPS;  // past the cap, whatever hides it wins
+  XUnmapWindow(plugin_display, wine_window_id);
+  XSync(plugin_display, False);
+  drain(&h);
+  assert(map_state(wine_window_id) == IsUnmapped);
+  close_ui(&h);
+  assert(h.wine_maps == 0);
+  wine_backend.editor_coordinate_nudge = false;  // a format that never comes through Wine
+  assert(open_ui(&h));
+  drain(&h);
+  assert(map_state(wine_window_id) == IsUnmapped);
+  close_ui(&h);
+  h.backend = &test_backend;
+  puts("PASS: a Wine window left unmapped in the frame is mapped again, nothing else is");
 
   // Whether a plugin has an editor is settled when one is asked for, not by
   // creating a view while loading, and the reply to show still tells a

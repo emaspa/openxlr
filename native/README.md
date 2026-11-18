@@ -49,8 +49,9 @@ machine without a desktop, run `xvfb-run -a make -C native test-editor`.
 These tests need neither a plugin installation nor a running PipeWire
 server. They cover event delivery without idle polling, coalesced sizes,
 drag reversal, size constraints, changes to child-window size bounds,
-fixed-size editors and plugin-driven scaling, the Wine coordinate nudge
-and display cleanup, and that a lost connection returns to the armed call
+fixed-size editors and plugin-driven scaling, the Wine coordinate nudge,
+a Wine window left unmapped in the frame being mapped again, and display
+cleanup, and that a lost connection returns to the armed call
 only on the main thread and ends the process on any other. Real plugin
 repainting and mouse input still need desktop testing.
 
@@ -1290,7 +1291,12 @@ plugins arrive through yabridge as ordinary bundles. The optional
 helper's PATH. Wine and plugin settings remain in the user's environment.
 
 Editor X events wake the main loop directly; the 30 Hz tick remains for
-idle work and the Wine coordinate workaround. During a frame resize, the
+idle work and the Wine coordinate workaround. For CLAP and VST3 editors
+the host also watches the windows inside the plugin's own window. Some
+desktops leave yabridge's Wine window unmapped there, and clicks then never
+reach the plugin. When a window whose class ends in `.exe` is unmapped
+while the frame is on screen, the host maps it again, at most 16 times per
+opening. During a frame resize, the
 VST3 backend checks the plugin's size constraints before notifying its
 view, and the embedding window follows after that callback. A VST3 view
 that refuses border resizing gets equal minimum and maximum dimensions;
