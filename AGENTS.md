@@ -56,6 +56,9 @@ dbus-run-session -- gjs -m packaging/gnome/tests/bus.mjs  # private GIO/D-Bus te
 node --check browser/tests/chromium-integration.mjs
 python3 -I tools/browser-extension.py --check  # the Store zip (no manifest key) and the release tar.gz (the key), every referenced file present
 python3 tools/test-browser-extension.py
+python3 -I tools/deck-plugin.py --check  # the release's deck plugin zip, reproducible, every file its manifest names present
+python3 tools/test-deck-plugin.py
+python3 tools/test-release-attach.py  # release assets go on one draft, never on a published release
 python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
 python3 -m json.tool packaging/omarchy/openxlr.mixer/manifest.json >/dev/null
 python3 packaging/flatpak/test-package.py  # the Flatpak manifest and its files

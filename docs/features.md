@@ -1253,7 +1253,9 @@ chain. Capture insert keys and dials keep their channel id through a rename.
 Mic setup stays in the UI.
 
 Install: download `com.emaspa.openxlr.sdPlugin.zip` from the
-[latest release](https://github.com/emaspa/openxlr/releases/latest) and
+[latest release](https://github.com/emaspa/openxlr/releases/latest),
+check it against `SHA256SUMS-plugin.txt` and its attestation
+([release assets](releases.md)), and
 use OpenDeck's install-from-file, or copy the plugin folder into
 `~/.config/opendeck/plugins/` (a symlink breaks OpenDeck's asset
 serving; the packages ship the folder in `/usr/share/openxlr/`). Touch

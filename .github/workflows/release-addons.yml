@@ -1,0 +1,105 @@
+name: Release deck plugin and browser companion
+
+# A pushed version tag builds the OpenDeck plugin zip and the browser
+# companion's tar.gz and attaches them to the draft release of that tag;
+# the maintainer publishes the draft once every asset is on it. Only the
+# maintainer can push tags. A manual run builds both as an artifact and
+# attaches nothing. Both archives are reproducible, so anyone can rebuild
+# them from the tag and compare the checksums.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+# The build job can only read. Writing to the release, and the provenance
+# attestation, happen in a second job that never runs the build tools; it
+# checks out only the script that attaches the files.
+# Actions are pinned to commit SHAs (the tag is in the comment).
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Versions agree everywhere, and with the tag
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: tools/check-version.sh ${TAG:+"$TAG"}
+
+      - name: Run tests
+        run: |
+          node --check plugin/com.emaspa.openxlr.sdPlugin/plugin.mjs
+          node --test plugin/tests/*.test.mjs
+          for file in browser/chromium/*.mjs; do node --check "$file"; done
+          node --test browser/tests/*.test.mjs
+          python3 -I tools/deck-plugin.py --check
+          python3 tools/test-deck-plugin.py
+          python3 -I tools/browser-extension.py --check
+          python3 tools/test-browser-extension.py
+
+      # OpenDeck offers every zip on the latest release as a deck plugin,
+      # so the plugin is the only zip; the browser companion is a tar.gz.
+      - name: Build archives
+        run: |
+          python3 -I tools/deck-plugin.py dist
+          python3 -I tools/browser-extension.py dist --unpacked
+          ls dist
+          test "$(find dist -name '*.zip' | wc -l)" -eq 1
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum com.emaspa.openxlr.sdPlugin.zip > SHA256SUMS-plugin.txt
+          sha256sum openxlr-browser-*.tar.gz > SHA256SUMS-browser.txt
+          cat SHA256SUMS-plugin.txt SHA256SUMS-browser.txt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: openxlr-addons
+          path: |
+            dist/com.emaspa.openxlr.sdPlugin.zip
+            dist/openxlr-browser-*.tar.gz
+            dist/SHA256SUMS-plugin.txt
+            dist/SHA256SUMS-browser.txt
+
+  publish:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: script
+          sparse-checkout: tools/release-attach.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: openxlr-addons
+          path: dist
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/com.emaspa.openxlr.sdPlugin.zip
+            dist/openxlr-browser-*.tar.gz
+
+      - name: Attach to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          python3 -I script/tools/release-attach.py "$TAG" \
+            dist/com.emaspa.openxlr.sdPlugin.zip dist/openxlr-browser-*.tar.gz \
+            dist/SHA256SUMS-plugin.txt dist/SHA256SUMS-browser.txt

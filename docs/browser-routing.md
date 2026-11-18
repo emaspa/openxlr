@@ -121,8 +121,11 @@ install -Dm644 browser/native-host.json \
 ### Load it unpacked
 
 Use the companion of the same version as your OpenXLR installation. Each
-release carries it as `openxlr-browser-<version>.tar.gz`. Extract it to a
-folder you keep, since the browser loads the extension from there:
+release carries it as `openxlr-browser-<version>.tar.gz`, with
+`SHA256SUMS-browser.txt` and a provenance attestation from
+`release-addons.yml`; [release assets](releases.md) has the commands.
+Extract it to a folder you keep, since the browser loads the extension
+from there:
 
 ```sh
 rm -rf ~/.local/share/openxlr/browser

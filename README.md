@@ -147,8 +147,17 @@ The graphical mixer also opens a welcome guide on a clean first launch.
 
 Packages exist for Arch Linux, CachyOS and Omarchy (AUR), Ubuntu (PPA),
 Fedora (COPR) and NixOS (flake). Every release also carries a `.deb` and
-an `.rpm`, with SHA-256 checksums and a build provenance attestation
-(`gh attestation verify <file> --owner emaspa`).
+an `.rpm`, with SHA-256 checksums and a build provenance attestation.
+Check one against the workflow and tag that built it:
+
+```sh
+gh attestation verify openxlr_<version>_amd64.deb --repo emaspa/openxlr \
+    --signer-workflow emaspa/openxlr/.github/workflows/release-deb.yml \
+    --source-ref refs/tags/v<version>
+```
+
+For the `.rpm`, name `release-rpm.yml`. [Release assets](docs/releases.md)
+lists every file on a release and how to check each one.
 
 **Arch Linux, CachyOS and Omarchy**, from the
 [AUR](https://aur.archlinux.org/packages/openxlr):

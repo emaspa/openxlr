@@ -2729,6 +2729,8 @@ On NixOS, set `services.openxlr.yabridgePackage` to the flake's
 the `.rpm` or the `.pkg.tar.zst` from the
 [latest release](https://github.com/emaspa/openxlr/releases/latest), check
 it against `SHA256SUMS-yabridge.txt`, and install it by hand. The
+companion has no provenance attestation, so the checksum only shows the
+download is not damaged ([release assets](releases.md)). The
 [package guide](../packaging/yabridge/README.md) covers building it
 yourself, with the build dependencies for each distribution and where to
 install the result so OpenXLR finds it.

@@ -57,6 +57,9 @@ python3 -m json.tool packaging/gnome/openxlr-focus@emaspa.github.com/metadata.js
 dbus-run-session -- gjs -m packaging/gnome/tests/bus.mjs  # private GIO/D-Bus tests; gjs and dbus
 python3 -I tools/browser-extension.py --check  # the Store zip (no manifest key) and the release tar.gz (the key), every referenced file present
 python3 tools/test-browser-extension.py
+python3 -I tools/deck-plugin.py --check  # the release's deck plugin zip, reproducible, every file its manifest names present
+python3 tools/test-deck-plugin.py
+python3 tools/test-release-attach.py  # release assets go on one draft, never on a published release
 python3 -m json.tool plugin/com.emaspa.openxlr.sdPlugin/manifest.json >/dev/null
 python3 -m json.tool packaging/omarchy/openxlr.mixer/manifest.json >/dev/null
 python3 tools/deck-skins.py --check  # regenerate with no flag after changing embedded skins or colour defaults

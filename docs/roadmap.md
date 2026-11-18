@@ -202,8 +202,12 @@ land at any time.
 - [ ] The release `.deb` is built for each Ubuntu series the README
   names, and its native helper is run on the oldest of them before the
   release is public.
-- [ ] A release is cut from a commit whose CI run finished green, and
-  the packages build before the release is published, not after.
+- [ ] A release is cut from a commit whose CI run finished green. The
+  packages already build before the release is published. A pushed tag
+  starts the release workflows, and they attach their files to a draft
+  that is published once complete ([releases.md](releases.md)). Left: a check
+  that the tagged commit's CI run finished green, and GitHub's immutable
+  releases setting, so no asset can change after publication.
 - [ ] The tests that fail now and then on main are listed by name from
   the run history and fixed, and a failed run keeps its test results and
   a screenshot. Cancelling a superseded run on main stays.
@@ -211,9 +215,11 @@ land at any time.
   history tooltip test and the starter sounds check have none today, and
   a change to `docs/api.md` skips the unit tests that read it.
 - [ ] Release assets come from workflows with a checksum and a
-  provenance attestation: the plugin zip, the browser companion and the
-  Flatpak bundle are still made by hand. The release procedure for every
-  channel is written down in this repository.
+  provenance attestation. The packages, the plugin zip and the browser
+  companion do; the Flatpak bundle and the `openxlr-yabridge` files are
+  still uploaded by hand without one. The release procedure for every
+  channel is written down in this repository. The GitHub release's part
+  is in [releases.md](releases.md); the other channels are still to do.
 - [ ] Packages declare every tool the daemon runs as a hard dependency,
   and each package's install check looks for them.
 - [ ] One job builds the native helper with the address and undefined
