@@ -4,6 +4,7 @@
 #include "../host.c"
 #undef main
 #include <assert.h>
+#include <sys/wait.h>
 
 static Display *plugin_display;
 static Window plugin_window;
@@ -118,7 +119,43 @@ static void assert_bounds(Host *h, int min_width, int min_height,
   assert(hints.max_width == max_width && hints.max_height == max_height);
 }
 
+static void *lose_connection(void *unused) {
+  lost_x_connection(NULL);
+  return NULL;
+}
+
+// What a lost connection does with the escape armed on the main thread, in a
+// child so an exit can be told from a jump: 0 when it jumped back, 1 when
+// the handler ended the process, 2 if it returned.
+static int lost_connection_outcome(bool on_other_thread) {
+  pid_t child = fork();
+  assert(child >= 0);
+  if (child == 0) {
+    x_main_thread = pthread_self();
+    if (sigsetjmp(x_escape, 0))
+      _exit(0);
+    x_escape_armed = 1;
+    if (on_other_thread) {
+      pthread_t thread;
+      if (pthread_create(&thread, NULL, lose_connection, NULL) != 0)
+        _exit(3);
+      pthread_join(thread, NULL);
+    } else
+      lost_x_connection(NULL);
+    _exit(2);
+  }
+  int status;
+  assert(waitpid(child, &status, 0) == child);
+  return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
 int main(void) {
+  // Before any thread or connection of this test exists, so the children
+  // inherit nothing but the escape.
+  assert(lost_connection_outcome(false) == 0);
+  assert(lost_connection_outcome(true) == 1);
+  puts("PASS: a lost connection jumps back on the main thread and exits on any other");
+
   // An X server resets when its last client disconnects, and a connection
   // opened while it resets is refused. Closing the editor drops every
   // connection this test holds, so one is kept open for the whole run.

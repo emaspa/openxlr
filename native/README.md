@@ -40,8 +40,9 @@ These tests need neither a plugin installation nor a running PipeWire
 server. They cover event delivery without idle polling, coalesced sizes,
 drag reversal, size constraints, changes to child-window size bounds,
 fixed-size editors and plugin-driven scaling, the Wine coordinate nudge
-and display cleanup. Real plugin repainting and mouse input still need
-desktop testing.
+and display cleanup, and that a lost connection returns to the armed call
+only on the main thread and ends the process on any other. Real plugin
+repainting and mouse input still need desktop testing.
 
 `make -C native test-audio` checks the audio thread's safety rules
 without a graph: a cycle the fixed buffers cannot carry is refused before
@@ -393,7 +394,11 @@ can still interrupt that insert's chain.
   Verified by asking the X server to close the helper's connection while an
   editor was open: the process kept its heartbeat, kept its ports, and opened
   a fresh editor on request. The same test on a build without the handlers
-  killed the process immediately.
+  killed the process immediately. The return to the armed call happens only
+  on the main thread, since that jump is defined only within the thread that
+  set it. A plugin thread that
+  loses a connection of its own ends the helper, and the daemon rebuilds the
+  chain as it does after any other exit.
 - An editor that stops answering freezes that insert's controls and says so.
   Its audio continues, and the daemon does not rebuild the chain for it.
 - A chain that dies on its own is rebuilt, until it has failed three times
