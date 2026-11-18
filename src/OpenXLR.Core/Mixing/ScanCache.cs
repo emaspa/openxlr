@@ -116,6 +116,19 @@ public sealed class ScanCache
 
     public Entry? Failure(string bundle) => Current(bundle) is { Failed: true } entry ? entry : null;
 
+    /// <summary>
+    /// Every bundle that failed and has not changed since, in path order. A
+    /// scanner that reads a whole search path in one run, as the LV2 one
+    /// does, is told these up front instead of being asked bundle by bundle.
+    /// </summary>
+    public IReadOnlyList<(string Bundle, Entry Entry)> CurrentFailures()
+        => [.. _index.Where(e => e.Value.Failed).Select(e => e.Key).Order(StringComparer.Ordinal)
+            .Select(bundle => (bundle, Failure(bundle))).Where(f => f.Item2 is not null)
+            .Select(f => (f.bundle, f.Item2!))];
+
+    /// <summary>Every bundle recorded as failed, changed since or not.</summary>
+    public IReadOnlyList<string> FailedBundles() => [.. _index.Where(e => e.Value.Failed).Select(e => e.Key)];
+
     /// <summary>Discard damaged cache data so the next scan asks the bundle again.</summary>
     public void Invalidate(string bundle)
     {

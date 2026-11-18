@@ -2956,14 +2956,19 @@ Collect [diagnostics](#reporting) after the scan ends.
 
 LV2 plugins are read by the native helper in one scan of their own, so a
 bundle whose files crash or stall the LV2 parser costs that scan, not the
-daemon. If the scan crashes, takes longer than a minute or prints something
+daemon. When the scan crashes or takes longer than a minute, the daemon logs
+the failure with the bundle the scan was reading, under the format `lv2`,
+and scans again without that bundle. It does this for up to eight bad
+bundles and within a minute and a half in all, so a run of them cannot hold
+the catalogue for minutes. A bundle left out this way is remembered like a
+failed CLAP or VST3 bundle: later scans pass it by until it changes or
+OpenXLR is updated, it is listed under "Skipped after a failed scan", and
+Rescan reads it again. If no scan completes, or the helper prints something
 that is not a plugin list, the picker keeps the LV2 plugins the last good
-scan found (none, right after the daemon starts), and the daemon logs the
-failure with the bundle the scan was reading, under the format `lv2`.
-Remove or fix that bundle, then Rescan. An LV2 failure is not remembered:
-every start and every Rescan reads the bundles again. A build without the
-native helper reads LV2 bundles inside the daemon instead, where a bundle
-that crashes the parser stops the daemon.
+scan found; right after the daemon starts, when there is none, it lists the
+plugins the failed scan did read. A build without the native helper reads
+LV2 bundles inside the daemon instead, where a bundle that crashes the
+parser stops the daemon.
 
 For a loader conflict, `OPENXLR_PLUGIN_CLEAN_ENV=1` in the daemon's environment
 opts its scanners and live plugin hosts into a clean launch. It removes

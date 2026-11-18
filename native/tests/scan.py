@@ -127,7 +127,13 @@ with tempfile.TemporaryDirectory(prefix="openxlr-lv2-scan-") as directory:
     markers = [line for line in lines if line.startswith("trace: scan LV2 plugin ")]
     assert len(markers) == 6, markers
     assert all(": bundle " + str(lv2) + "/" in m for m in markers), markers
-    assert all(m.isascii() for m in markers) and any(m.endswith("/na??ve.lv2/") for m in markers), markers
+    assert all(m.isascii() for m in markers) and any(m.endswith("/na%C3%AFve.lv2/") for m in markers), markers
+    # Each bundle's manifest is read under a marker of its own, naming the
+    # bundle by the same text its plugins' markers use.
+    manifests = [line for line in lines if line.startswith("trace: scan LV2 manifest ")]
+    assert len(manifests) == 5, manifests
+    assert [m.split(": bundle ")[0] for m in manifests] == [f"trace: scan LV2 manifest {i}" for i in range(5)]
+    assert {m.split(": bundle ")[1] for m in manifests} == {m.split(": bundle ")[1] for m in markers}, (manifests, markers)
 
     result = subprocess.run(command[:2] + [str(lv2 / "missing")], env=env, capture_output=True, timeout=10)
     assert result.returncode == 0 and json.loads(result.stdout) == {"plugins": []}, result
@@ -135,3 +141,48 @@ with tempfile.TemporaryDirectory(prefix="openxlr-lv2-scan-") as directory:
     assert result.returncode == 2, result
     print(f"PASS: LV2 scan describes {len(plugins)} plugins in readable JSON, one bundle marker per plugin, "
           "refused data and the port limit cost their own plugin")
+
+    for arguments in (["--skip"], ["--skip", "a", "--skip"], [str(lv2), "--skip", "a"]):
+        result = subprocess.run(command[:2] + arguments, env=env, capture_output=True, timeout=10)
+        assert result.returncode == 2, (arguments, result)
+
+    # A bundle that stalls lilv. A manifest that is a pipe nobody writes
+    # blocks while the manifests are read; a plugin data file that is one
+    # blocks when that plugin is described. Each scan names the bundle in its
+    # last marker, and `--skip` with that text leaves the bundle out.
+    def last_marker(stderr):
+        traces = [line for line in stderr.decode("utf-8", "replace").splitlines() if line.startswith("trace: scan LV2")]
+        return traces[-1]
+
+    stall = lv2 / "stall.lv2"
+    stall.mkdir()
+    os.mkfifo(stall / "manifest.ttl")
+    slow = lv2 / "slow.lv2"
+    slow.mkdir()
+    (slow / "manifest.ttl").write_text(
+        prefixes + "<urn:openxlr:scan:slow> a lv2:Plugin ; lv2:binary <slow.so> ; rdfs:seeAlso <slow.ttl> .\n")
+    os.mkfifo(slow / "slow.ttl")
+    skips = []
+    for phase, name in (("manifest", "stall"), ("plugin", "slow")):
+        try:
+            subprocess.run(command[:2] + skips + [str(lv2)], env=env, capture_output=True, timeout=3)
+            raise AssertionError(f"the scan finished with {name}.lv2 in the way")
+        except subprocess.TimeoutExpired as stalled:
+            marker = last_marker(stalled.stderr)
+        assert marker.startswith(f"trace: scan LV2 {phase} ") and marker.endswith(f": bundle {lv2}/{name}.lv2/"), marker
+        skips += ["--skip", marker.split(": bundle ", 1)[1]]
+    result = subprocess.run(command[:2] + skips + [str(lv2)], env=env, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert set(p["uri"] for p in json.loads(result.stdout)["plugins"]) == set(plugins), result.stdout
+    lines = result.stderr.decode("utf-8", "replace").splitlines()
+    assert sorted(line for line in lines if line.startswith("trace: scan LV2: skip bundle ")) == [
+        f"trace: scan LV2: skip bundle {lv2}/{name}.lv2/" for name in ("slow", "stall")], lines
+    assert not any(line.endswith(("/slow.lv2/", "/stall.lv2/")) for line in lines if line.startswith(
+        ("trace: scan LV2 manifest ", "trace: scan LV2 plugin "))), lines
+    # The marker text is the one the scan printed, escapes included.
+    result = subprocess.run(command[:2] + skips + ["--skip", f"{lv2}/na%C3%AFve.lv2/", str(lv2)],
+                            env=env, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert "urn:openxlr:scan:naïve" not in {p["uri"] for p in json.loads(result.stdout)["plugins"]}
+    print("PASS: LV2 scan stalled in a manifest and in a plugin's data names each bundle last; "
+          "--skip leaves them out and the rest is described")

@@ -45,8 +45,9 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
         {
             WriteBundles(directory);
             IReadOnlyList<PluginInfo> inProcess = Lv2Catalog.InProcess(directory);
-            IReadOnlyList<PluginInfo>? scanned = Lv2Catalog.FromHelper(NativePluginHost.Executable, directory, null, Kind());
-            Assert.NotNull(scanned);
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(NativePluginHost.Executable, directory, null, Kind());
+            Assert.True(scan.Complete);
+            IReadOnlyList<PluginInfo> scanned = scan.Plugins;
             Assert.Equal(Snapshot(inProcess), Snapshot(scanned));
 
             PluginInfo rich = Assert.Single(scanned, p => p.Plugin == "urn:openxlr:test:rich");
@@ -82,8 +83,9 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
     {
         if (!LilvInstalled() || !NativePluginHost.HostInstalled) return;
         IReadOnlyList<PluginInfo> inProcess = Lv2Catalog.InProcess(null);
-        IReadOnlyList<PluginInfo>? scanned = Lv2Catalog.FromHelper(NativePluginHost.Executable, null, null, Kind());
-        Assert.NotNull(scanned);
+        Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(NativePluginHost.Executable, null, null, Kind());
+        Assert.True(scan.Complete);
+        IReadOnlyList<PluginInfo> scanned = scan.Plugins;
         output.WriteLine($"{scanned.Count} plugins, {scanned.Sum(p => p.Params.Count)} controls, "
             + $"{scanned.Sum(p => p.Params.Sum(q => q.ScalePoints.Count))} scale points, "
             + $"{scanned.Count(p => p.HasNativeUi)} with an X11 UI, {scanned.Count(p => p.ReportsLatency == true)} reporting latency, "
@@ -116,8 +118,9 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
                 ]}
                 """;
             string scanner = Fake(directory, $"cat <<'EOF'\n{json}\nEOF\necho 'trace: scan LV2: complete' >&2\n");
-            IReadOnlyList<PluginInfo>? plugins = Lv2Catalog.FromHelper(scanner, directory, null, Kind());
-            Assert.NotNull(plugins);
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(scanner, directory, null, Kind());
+            Assert.True(scan.Complete);
+            IReadOnlyList<PluginInfo> plugins = scan.Plugins;
             Assert.Equal(["urn:a", "urn:b"], plugins.Select(p => p.Plugin));
             PluginInfo alpha = plugins[0];
             Assert.Equal(("Alpha", "Delay", true, true), (alpha.Name, alpha.Category, alpha.ReportsLatency == true, alpha.HasNativeUi));
@@ -141,7 +144,7 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
     [InlineData("list", "invalid-description")]
     [InlineData("flood", "output-limit")]
     [InlineData("failure", "scan-failed")]
-    public void AScannerThatFailsGivesNoCatalogueAndSaysWhy(string behaviour, string outcome)
+    public void AScannerThatFailsCompletesNoCatalogueAndSaysWhy(string behaviour, string outcome)
     {
         if (!OperatingSystem.IsLinux()) return;
         string directory = Directory.CreateTempSubdirectory("openxlr-lv2-broken-").FullName;
@@ -164,9 +167,11 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
                 _ => markers + "echo 'out of memory' >&2\nexit 3\n",
             };
             var logs = new PluginScanLogStore(Path.Combine(directory, "logs"));
-            IReadOnlyList<PluginInfo>? plugins = Lv2Catalog.FromHelper(Fake(directory, body), "/plugins", logs, kind,
-                timeout: TimeSpan.FromSeconds(behaviour == "hang" ? 1 : 10), stdoutCap: 1024);
-            Assert.Null(plugins);
+            // One run: running again without the bundle is the next tests' subject.
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(Fake(directory, body), "/plugins", logs, kind,
+                timeout: TimeSpan.FromSeconds(behaviour == "hang" ? 1 : 10), stdoutCap: 1024, maxRetries: 0);
+            Assert.False(scan.Complete);
+            Assert.Empty(scan.Plugins);
             PluginScanEntry entry = Assert.Single(PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind).Entries);
             Assert.Equal(outcome, entry.Outcome);
             // A crash or a stall is put down to the bundle being read; output
@@ -191,13 +196,13 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
         try
         {
             string kind = Kind();
-            IReadOnlyList<PluginInfo>? plugins = Lv2Catalog.FromHelper(Fake(directory, "echo '{\"plugins\":[]}'\n"), directory, null, kind);
-            Assert.NotNull(plugins);
-            Assert.Empty(plugins);
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(Fake(directory, "echo '{\"plugins\":[]}'\n"), directory, null, kind);
+            Assert.True(scan.Complete);
+            Assert.Empty(scan.Plugins);
             Assert.Equal("no-plugins", Assert.Single(PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind).Entries).Outcome);
 
             kind = Kind();
-            Assert.Null(Lv2Catalog.FromHelper(Path.Combine(directory, "missing"), directory, null, kind));
+            Assert.False(Lv2Catalog.FromHelper(Path.Combine(directory, "missing"), directory, null, kind).Complete);
             Assert.Equal("start-error", Assert.Single(PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind).Entries).Outcome);
         }
         finally { Directory.Delete(directory, recursive: true); }
@@ -207,24 +212,298 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
     public void AFailedScanKeepsTheLastCatalogueAScanCompleted()
     {
         IReadOnlyList<PluginInfo>? lastGood = null;
-        Assert.Empty(Lv2Catalog.KeepLastGood(ref lastGood, null));
         PluginInfo plugin = new("lv2", "urn:a", "A", "", 1, 1, "in", "out", [], [], ["in"], ["out"]);
+        PluginInfo other = plugin with { Plugin = "urn:b" };
+        Assert.Empty(Lv2Catalog.KeepLastGood(ref lastGood, new([], false)));
+        // Right after the daemon starts, what a failed scan did describe.
+        IReadOnlyList<PluginInfo> described = [other];
+        Assert.Same(described, Lv2Catalog.KeepLastGood(ref lastGood, new(described, false)));
+        Assert.Null(lastGood);
         IReadOnlyList<PluginInfo> first = [plugin];
-        Assert.Same(first, Lv2Catalog.KeepLastGood(ref lastGood, first));
-        Assert.Same(first, Lv2Catalog.KeepLastGood(ref lastGood, null));
+        Assert.Same(first, Lv2Catalog.KeepLastGood(ref lastGood, new(first, true)));
+        Assert.Same(first, Lv2Catalog.KeepLastGood(ref lastGood, new([], false)));
+        Assert.Same(first, Lv2Catalog.KeepLastGood(ref lastGood, new(described, false)));
         IReadOnlyList<PluginInfo> empty = [];
-        Assert.Same(empty, Lv2Catalog.KeepLastGood(ref lastGood, empty));
-        Assert.Same(empty, Lv2Catalog.KeepLastGood(ref lastGood, null));
+        Assert.Same(empty, Lv2Catalog.KeepLastGood(ref lastGood, new(empty, true)));
+        Assert.Same(empty, Lv2Catalog.KeepLastGood(ref lastGood, new(described, false)));
     }
 
     [Fact]
-    public void OnlyAMarkerAtTheStartOfALineNamesTheBundle()
+    public void OnlyTheLastMarkerAtTheStartOfALineNamesTheBundle()
     {
         Assert.Null(Lv2Catalog.Culprit(""));
         Assert.Null(Lv2Catalog.Culprit("trace: scan LV2: load bundles\n"));
         Assert.Equal("/a.lv2/", Lv2Catalog.Culprit("trace: scan LV2 plugin 0: bundle /a.lv2/"));
+        Assert.Equal("/a.lv2/", Lv2Catalog.Culprit("trace: scan LV2 manifest 12: bundle /a.lv2/\n"));
         Assert.Equal("/a.lv2/", Lv2Catalog.Culprit("trace: scan LV2 plugin 0: bundle /a.lv2/\nwarning: trace: scan LV2 plugin 1: bundle /b.lv2/\n"));
+        Assert.Equal("/na%C3%AFve.lv2/", Lv2Catalog.Culprit("trace: scan LV2 plugin 3: bundle /na%C3%AFve.lv2/\n"));
         Assert.Null(Lv2Catalog.Culprit("trace: scan LV2 plugin 0: bundle \n"));
+        Assert.Null(Lv2Catalog.Culprit("trace: scan LV2 plugin x: bundle /a.lv2/\n"));
+        // Past a bundle's marker, a later step names no bundle.
+        Assert.Null(Lv2Catalog.Culprit("trace: scan LV2 manifest 0: bundle /a.lv2/\ntrace: scan LV2: specifications and plugin classes\n"));
+        Assert.Null(Lv2Catalog.Culprit("trace: scan LV2 plugin 0: bundle /a.lv2/\ntrace: scan LV2: finish\n"));
+        Assert.Null(Lv2Catalog.Culprit("trace: scan LV2 manifest 0: bundle /a.lv2/\ntrace: scan LV2: skip bundle /b.lv2/\n"));
+    }
+
+    [Fact]
+    public void AMarkerTextIsThePathEscapedAndReadsBack()
+    {
+        Assert.Equal("/usr/lib/lv2/a b.lv2/", Lv2Catalog.MarkerText("/usr/lib/lv2/a b.lv2/"));
+        Assert.Equal("/lv2/na%C3%AFve%25%0A.lv2/", Lv2Catalog.MarkerText("/lv2/naïve%\n.lv2/"));
+        foreach (string path in new[] { "/usr/lib/lv2/a b.lv2/", "/lv2/naïve%\n.lv2/", "/lv2/50%.lv2/", "/lv2/日本.lv2/" })
+            Assert.Equal(path, Lv2Catalog.MarkerPath(Lv2Catalog.MarkerText(path)));
+        // A stray % that is not an escape is kept as written.
+        Assert.Equal("/lv2/50%zz/", Lv2Catalog.MarkerPath("/lv2/50%zz/"));
+        // Clipped where the helper clips, never inside an escape.
+        string text = Lv2Catalog.MarkerText("/" + new string('a', 509) + "é");
+        Assert.Equal(510, text.Length);
+        Assert.Equal(Lv2Catalog.MaxMarkerBytes, Lv2Catalog.MarkerText(new string('b', 600)).Length);
+    }
+
+    [Fact]
+    public void APartialCatalogueKeepsEveryFinishedPlugin()
+    {
+        const string one = "{\"uri\":\"urn:a\",\"name\":\"A\",\"audioIns\":1,\"audioOuts\":1,\"inputs\":[\"in\"],\"outputs\":[\"out\"]}";
+        const string two = "{\"uri\":\"urn:b\",\"name\":\"B\",\"params\":[{\"symbol\":\"x\",\"min\":0,\"max\":1}],\"audioIns\":1,\"audioOuts\":1,\"inputs\":[\"in\"],\"outputs\":[\"out\"]}";
+        Assert.Empty(Lv2Catalog.ParsePartial(""u8));
+        Assert.Empty(Lv2Catalog.ParsePartial("{\"plugins\":["u8));
+        Assert.Equal(["urn:a"], Lv2Catalog.ParsePartial(Encoding.UTF8.GetBytes("{\"plugins\":[" + one)).Select(p => p.Plugin));
+        // The plugin being written when the helper stopped is left out,
+        // however much of it was already there.
+        for (int cut = 1; cut < two.Length; cut++)
+            Assert.Equal(["urn:a"], Lv2Catalog.ParsePartial(Encoding.UTF8.GetBytes("{\"plugins\":[" + one + "," + two[..cut])).Select(p => p.Plugin));
+        IReadOnlyList<PluginInfo> both = Lv2Catalog.ParsePartial(Encoding.UTF8.GetBytes("{\"plugins\":[" + two + "," + one + ","));
+        Assert.Equal(["urn:a", "urn:b"], both.Select(p => p.Plugin));
+        Assert.Equal("x", Assert.Single(both[1].Params).Symbol);
+        Assert.Equal(["urn:a"], Lv2Catalog.ParsePartial(Encoding.UTF8.GetBytes("{\"plugins\":[" + one + "]}")).Select(p => p.Plugin));
+        Assert.Empty(Lv2Catalog.ParsePartial("not json"u8));
+    }
+
+    /// <summary>
+    /// A scanner that crashes on one bundle and stalls on another, unless
+    /// told to skip them, and lists every other bundle as a plugin. Each run
+    /// adds its arguments as a line to <paramref name="calls"/>.
+    /// </summary>
+    private static string Fussy(string directory, string calls, IEnumerable<string> bundles)
+        => Fake(directory, $$"""
+            echo "$*" >> '{{calls}}'
+            skips=" $* "
+            echo 'trace: scan LV2: load bundles' >&2
+            printf '{"plugins":['
+            separator=''
+            n=0
+            for bundle in {{string.Join(' ', bundles.Select(b => "'" + b + "'"))}}; do
+              case "$skips" in *" --skip $bundle "*) echo "trace: scan LV2: skip bundle $bundle" >&2; continue;; esac
+              echo "trace: scan LV2 plugin $n: bundle $bundle" >&2
+              n=$((n + 1))
+              case "$bundle" in */crash*) kill -SEGV $$;; */hang*) exec sleep 30;; esac
+              name=$(basename "$bundle" .lv2)
+              printf '%s{"uri":"urn:%s","name":"%s","audioIns":1,"audioOuts":1,"inputs":["in"],"outputs":["out"]}' "$separator" "$name" "$name"
+              separator=','
+            done
+            echo ']}'
+            echo 'trace: scan LV2: complete' >&2
+            """);
+
+    private static List<string> Bundles(string directory, params string[] names)
+        => [.. names.Select(name => Directory.CreateDirectory(Path.Combine(directory, "plugins", name + ".lv2")).FullName + "/")];
+
+    private static string[] Calls(string calls) => File.Exists(calls) ? File.ReadAllLines(calls) : [];
+
+    [Fact]
+    public void ACrashAndAStallCostTheirBundlesAndAreRememberedUntilTheyChange()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string directory = Directory.CreateTempSubdirectory("openxlr-lv2-skip-").FullName;
+        try
+        {
+            List<string> bundles = Bundles(directory, "first", "crash", "second", "hang", "third");
+            string calls = Path.Combine(directory, "calls");
+            string scanner = Fussy(directory, calls, bundles);
+            string cacheDirectory = Path.Combine(directory, "cache");
+            var logs = new PluginScanLogStore(Path.Combine(directory, "logs"));
+            TimeSpan timeout = TimeSpan.FromSeconds(2);
+
+            string kind = Kind();
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(scanner, "/plugins", logs, kind, timeout,
+                failures: new ScanCache(cacheDirectory), budget: TimeSpan.FromSeconds(30));
+            Assert.True(scan.Complete);
+            Assert.Equal(["urn:first", "urn:second", "urn:third"], scan.Plugins.Select(p => p.Plugin));
+            Assert.Equal(["scan-lv2 /plugins", $"scan-lv2 --skip {bundles[1]} /plugins",
+                $"scan-lv2 --skip {bundles[1]} --skip {bundles[3]} /plugins"], Calls(calls));
+            PluginScanReport report = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind);
+            Assert.Equal([(bundles[1], "scan-failed"), (bundles[3], "timeout"), ("/plugins", "ok")],
+                report.Entries.Select(e => (e.Path, e.Outcome)));
+            Assert.All(report.Entries.Take(2), e => Assert.NotNull(e.LogId));
+            Assert.Equal(2, PluginScanDiagnostics.Failures([report]).Count);
+
+            // The next scan leaves both out from the start, and says so
+            // where skipped bundles are listed.
+            File.Delete(calls);
+            kind = Kind();
+            long begun = System.Diagnostics.Stopwatch.GetTimestamp();
+            scan = Lv2Catalog.FromHelper(scanner, "/plugins", logs, kind, timeout, failures: new ScanCache(cacheDirectory));
+            Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(begun) < timeout);
+            Assert.True(scan.Complete);
+            Assert.Equal(3, scan.Plugins.Count);
+            Assert.Equal([$"scan-lv2 --skip {bundles[1]} --skip {bundles[3]} /plugins"], Calls(calls));
+            report = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind);
+            Assert.Equal(2, report.SkippedFailedCount);
+            Assert.Equal([(bundles[1], "scan-failed"), (bundles[3], "timeout")],
+                report.SkippedFailedBundles.Select(b => (b.Path, b.Outcome)));
+            Assert.Empty(PluginScanDiagnostics.Failures([report]));
+
+            // A changed bundle is read again; the unchanged one stays out.
+            File.Delete(calls);
+            File.WriteAllText(Path.Combine(bundles[1], "manifest.ttl"), "# fixed\n");
+            scan = Lv2Catalog.FromHelper(scanner, "/plugins", logs, Kind(), timeout, failures: new ScanCache(cacheDirectory));
+            Assert.True(scan.Complete);
+            Assert.Equal([$"scan-lv2 --skip {bundles[3]} /plugins",
+                $"scan-lv2 --skip {bundles[3]} --skip {bundles[1]} /plugins"], Calls(calls));
+
+            // A rescan the user asked for reads every bundle again.
+            File.Delete(calls);
+            scan = Lv2Catalog.FromHelper(scanner, "/plugins", logs, Kind(), timeout, failures: new ScanCache(cacheDirectory),
+                retryFailures: true, budget: TimeSpan.FromSeconds(30));
+            Assert.True(scan.Complete);
+            Assert.Equal(3, Calls(calls).Length);
+            Assert.Equal([bundles[1], bundles[3]], new ScanCache(cacheDirectory).CurrentFailures().Select(f => f.Bundle));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public void ABundleThatScansAgainIsForgotten()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string directory = Directory.CreateTempSubdirectory("openxlr-lv2-forget-").FullName;
+        try
+        {
+            List<string> bundles = Bundles(directory, "first", "crash");
+            string calls = Path.Combine(directory, "calls");
+            string cacheDirectory = Path.Combine(directory, "cache");
+            Lv2Catalog.FromHelper(Fussy(directory, calls, bundles), "/plugins", null, Kind(), failures: new ScanCache(cacheDirectory));
+            Assert.Equal([bundles[1]], new ScanCache(cacheDirectory).FailedBundles());
+            // The bundle is fixed. An automatic scan still leaves it out and
+            // keeps the failure; the user's rescan reads it and drops it.
+            string fixedScanner = Fake(directory, "echo '{\"plugins\":[]}'\n");
+            Assert.True(Lv2Catalog.FromHelper(fixedScanner, "/plugins", null, Kind(), failures: new ScanCache(cacheDirectory)).Complete);
+            Assert.Equal([bundles[1]], new ScanCache(cacheDirectory).FailedBundles());
+            Assert.True(Lv2Catalog.FromHelper(fixedScanner, "/plugins", null, Kind(), failures: new ScanCache(cacheDirectory),
+                retryFailures: true).Complete);
+            Assert.Empty(new ScanCache(cacheDirectory).FailedBundles());
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public void RetriesStopAtTheLimitAndKeepWhatWasDescribed()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string directory = Directory.CreateTempSubdirectory("openxlr-lv2-limit-").FullName;
+        try
+        {
+            List<string> bundles = Bundles(directory, "first", "crash-a", "second", "crash-b", "third", "crash-c", "fourth");
+            string calls = Path.Combine(directory, "calls");
+            string cacheDirectory = Path.Combine(directory, "cache");
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(Fussy(directory, calls, bundles), "/plugins", null, Kind(),
+                failures: new ScanCache(cacheDirectory), maxRetries: 1);
+            Assert.False(scan.Complete);
+            Assert.Equal(2, Calls(calls).Length);
+            // The second run described the plugins before its crash.
+            Assert.Equal(["urn:first", "urn:second"], scan.Plugins.Select(p => p.Plugin));
+            // Both crashes are remembered, so the next scan starts past them.
+            Assert.Equal([bundles[1], bundles[3]], new ScanCache(cacheDirectory).CurrentFailures().Select(f => f.Bundle));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public void TheBudgetBoundsARunOfStalls()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string directory = Directory.CreateTempSubdirectory("openxlr-lv2-budget-").FullName;
+        try
+        {
+            List<string> bundles = Bundles(directory, "first", "hang-a", "second", "hang-b", "third", "hang-c");
+            string calls = Path.Combine(directory, "calls");
+            string cacheDirectory = Path.Combine(directory, "cache");
+            string kind = Kind();
+            long begun = System.Diagnostics.Stopwatch.GetTimestamp();
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(Fussy(directory, calls, bundles), "/plugins", null, kind,
+                TimeSpan.FromSeconds(1), failures: new ScanCache(cacheDirectory), budget: TimeSpan.FromSeconds(1.5));
+            Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(begun) < TimeSpan.FromSeconds(4));
+            Assert.False(scan.Complete);
+            Assert.Equal(2, Calls(calls).Length);
+            Assert.Equal(["urn:first", "urn:second"], scan.Plugins.Select(p => p.Plugin));
+            Assert.Equal([(bundles[1], "timeout"), (bundles[3], "timeout")],
+                PluginScanDiagnostics.Snapshot().Single(r => r.Kind == kind).Entries.Select(e => (e.Path, e.Outcome)));
+            // Only the run that had the whole deadline judged its bundle; the
+            // one cut short by the budget did not.
+            Assert.Equal([bundles[1]], new ScanCache(cacheDirectory).CurrentFailures().Select(f => f.Bundle));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public void AHelperThatIgnoresTheSkipIsNotAskedAgain()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        string directory = Directory.CreateTempSubdirectory("openxlr-lv2-stubborn-").FullName;
+        try
+        {
+            string calls = Path.Combine(directory, "calls");
+            string scanner = Fake(directory, $"echo \"$*\" >> '{calls}'\n"
+                + "echo 'trace: scan LV2 plugin 0: bundle /plugins/broken.lv2/' >&2\nkill -SEGV $$\n");
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(scanner, "/plugins", null, Kind());
+            Assert.False(scan.Complete);
+            Assert.Equal(["scan-lv2 /plugins", "scan-lv2 --skip /plugins/broken.lv2/ /plugins"], Calls(calls));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [DllImport("libc", EntryPoint = "mkfifo", SetLastError = true)]
+    private static extern int MakeFifo([MarshalAs(UnmanagedType.LPUTF8Str)] string path, uint mode);
+
+    /// <summary>
+    /// The real helper against bundles that stall lilv: one whose manifest is
+    /// a pipe nobody writes, read while the manifests are, and one whose
+    /// plugin data is, read when that plugin is described. Its name is not
+    /// ASCII, so the marker text has escapes in it.
+    /// </summary>
+    [Fact]
+    public void TheHelperLeavesOutTheBundlesThatStalledIt()
+    {
+        if (!LilvInstalled() || !NativePluginHost.HostInstalled) return;
+        string directory = Directory.CreateTempSubdirectory("openxlr-lv2-stall-").FullName;
+        try
+        {
+            WriteBundles(directory);
+            string stall = Directory.CreateDirectory(Path.Combine(directory, "stall.lv2")).FullName;
+            Assert.Equal(0, MakeFifo(Path.Combine(stall, "manifest.ttl"), 0b110_000_000));
+            string slow = Directory.CreateDirectory(Path.Combine(directory, "slöw.lv2")).FullName;
+            File.WriteAllText(Path.Combine(slow, "manifest.ttl"), Prefixes
+                + "<urn:openxlr:test:slow> a lv2:Plugin ; lv2:binary <slow.so> ; rdfs:seeAlso <slow.ttl> .\n");
+            Assert.Equal(0, MakeFifo(Path.Combine(slow, "slow.ttl"), 0b110_000_000));
+            string cacheDirectory = Path.Combine(directory, "cache");
+            string kind = Kind();
+            Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(NativePluginHost.Executable, directory, null, kind,
+                TimeSpan.FromSeconds(3), failures: new ScanCache(cacheDirectory), budget: TimeSpan.FromSeconds(30));
+            Assert.True(scan.Complete);
+            // The bundles WriteBundles makes list one insert; the stalled ones none.
+            Assert.Equal(["urn:openxlr:test:rich"], scan.Plugins.Select(p => p.Plugin));
+            Assert.Equal([(stall + "/", "timeout"), (slow + "/", "timeout")], PluginScanDiagnostics.Snapshot()
+                .Single(r => r.Kind == kind).Entries.Where(e => e.Outcome != "ok").Select(e => (e.Path, e.Outcome)));
+            Assert.Equal([slow + "/", stall + "/"], new ScanCache(cacheDirectory).CurrentFailures().Select(f => f.Bundle));
+
+            long begun = System.Diagnostics.Stopwatch.GetTimestamp();
+            Lv2Catalog.Lv2Scan again = Lv2Catalog.FromHelper(NativePluginHost.Executable, directory, null, Kind(),
+                TimeSpan.FromSeconds(3), failures: new ScanCache(cacheDirectory));
+            Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(begun) < TimeSpan.FromSeconds(3));
+            Assert.True(again.Complete);
+            Assert.Equal(Snapshot(scan.Plugins), Snapshot(again.Plugins));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 
     private static string Kind() => "lv2-test-" + Guid.NewGuid().ToString("N");
