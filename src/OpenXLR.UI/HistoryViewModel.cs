@@ -237,6 +237,7 @@ public sealed class HistoryViewModel : ViewModelBase
             "unitCompressor" when channel is not null => Localizer.Format("HistoryCompressor", channel),
             "unitVoiceTune" when channel is not null => Localizer.Format("HistoryVoiceTune", channel),
             "unitHeadphones" when step.Unit is null && step.Control == "hp2VolumeDb" => Localizer.Text("HistoryHeadphones2"),
+            "unitHeadphones" when step.Unit is null && step.Control == "lineOutLevelDb" => Localizer.Text("HistoryLineOutLevel"),
             "unitHeadphones" when step.Unit is null => Localizer.Text("HistoryHeadphones"),
             "unitCrossfade" when step.Unit is null => Localizer.Text("HistoryCrossfade"),
             "unitLowImpedance" when step.Unit is null => Localizer.Text("HistoryLowImpedance"),

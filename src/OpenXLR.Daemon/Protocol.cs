@@ -639,6 +639,7 @@ public static class ControlNames
     public const string OutHp2 = "outHp2";                   // bool
     public const string OutUsbAux = "outUsbAux";             // bool
     public const string OutLineOut = "outLineOut";           // bool
+    public const string LineOutLevelDb = "lineOutLevelDb";   // number dB (-60..0), the Wave XLR Pro's Line Out
     public const string AuxLevelDb = "auxLevelDb";           // number dB (-60..0)
     public const string AuxLevelLock = "auxLevelLock";       // bool
     public const string LineInGain = "lineInGain";           // int dB (0..lineInGainMaxDb)

@@ -923,7 +923,7 @@
           <TextBlock Text="{loc:Text Key=HEADPHONES}" Classes="h" VerticalAlignment="Center"/>
         </StackPanel></Expander.Header>
       <StackPanel Name="HeadphonesPanel" Classes="dev" Spacing="4" IsEnabled="{Binding ControlsEnabled}">
-        <Grid Name="HeadphoneControls" Grid.IsSharedSizeScope="True">
+        <Grid Name="HeadphoneControls" Grid.IsSharedSizeScope="True" RowDefinitions="Auto,Auto">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*" MaxWidth="{DynamicResource Ox.Main.FaderMaxWidth}"/>
@@ -940,7 +940,7 @@
             <TextBlock Grid.Column="1" Text="{loc:Text Key=Phones1}" Classes="h" Classes.layoutAccent="{Binding HasColour}"
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
           </Grid>
-          <Slider vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
+          <Slider Name="Phones1Slider" vm:FaderInput.Step="1" Grid.Column="1" Minimum="0" Maximum="100"
                   Value="{Binding HpPercent, Mode=TwoWay}"/>
           <skin:LitText Grid.Column="2" Text="{Binding HpText}" Classes="val" VerticalAlignment="Center"
                         HorizontalAlignment="Right"/>
@@ -953,10 +953,28 @@
                          VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
             </Grid>
           </Panel>
-          <Slider vm:FaderInput.Step="1" Grid.Column="5" Minimum="0" Maximum="100"
+          <Slider Name="Phones2Slider" vm:FaderInput.Step="1" Grid.Column="5" Minimum="0" Maximum="100"
                   Value="{Binding Hp2Percent, Mode=TwoWay}" IsVisible="{Binding HasHp2}"/>
-          <skin:LitText Grid.Column="6" Text="{Binding Hp2Text}" Classes="val" VerticalAlignment="Center"
+          <skin:LitText Name="Phones2Value" Grid.Column="6" Text="{Binding Hp2Text}" Classes="val" VerticalAlignment="Center"
                         HorizontalAlignment="Right" IsVisible="{Binding HasHp2}"/>
+          <!-- the Wave XLR Pro's second row: Low Imp. under Phones 1 and Line Out under Phones 2, the
+               same attenuator as a headphone jack, which nothing on the unit turns -->
+          <ToggleButton Name="LowImpedanceBesideLineOut" Grid.Row="1" Grid.ColumnSpan="3" HorizontalAlignment="Left" Margin="0,4,0,0"
+                        Content="{loc:Text Key=LowImp}" IsChecked="{Binding LowImpedance, Mode=TwoWay}">
+            <ToggleButton.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="ShowsLineOutLevel"/>
+                <Binding Path="CapLowImpedance"/>
+              </MultiBinding>
+            </ToggleButton.IsVisible>
+          </ToggleButton>
+          <TextBlock Name="LineOutLabel" Grid.Row="1" Grid.Column="4" Text="{loc:Text Key=HardwareMixingJackLineOut}" Classes="h" Margin="0,4,0,0"
+                     VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{loc:Text Key=LineOutLevelTip}"
+                     IsVisible="{Binding ShowsLineOutLevel}"/>
+          <Slider Name="LineOutSlider" vm:FaderInput.Step="1" Grid.Row="1" Grid.Column="5" Minimum="0" Maximum="100" Margin="0,4,0,0"
+                  Value="{Binding LineOutPercent, Mode=TwoWay}" IsVisible="{Binding ShowsLineOutLevel}"/>
+          <skin:LitText Name="LineOutValue" Grid.Row="1" Grid.Column="6" Text="{Binding LineOutText}" Classes="val" VerticalAlignment="Center" Margin="0,4,0,0"
+                        HorizontalAlignment="Right" IsVisible="{Binding ShowsLineOutLevel}"/>
         </Grid>
         <!-- hardware zero-latency blend between mic direct and PC playback;
              the value column can grow for larger text and translated readouts -->
@@ -977,8 +995,14 @@
         <TextBlock Name="CrossfadeNote" Text="{Binding CrossfadeNote}" Classes="hint" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                    Margin="90,0,0,0" IsVisible="{Binding HasCrossfadeNote}"/>
         <UniformGrid Columns="7">
-          <ToggleButton Content="{loc:Text Key=LowImp}" IsChecked="{Binding LowImpedance, Mode=TwoWay}" Margin="0,0,6,0"
-                        IsVisible="{Binding CapLowImpedance}"/>
+          <ToggleButton Name="LowImpedanceButton" Content="{loc:Text Key=LowImp}" IsChecked="{Binding LowImpedance, Mode=TwoWay}" Margin="0,0,6,0">
+            <ToggleButton.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="CapLowImpedance"/>
+                <Binding Path="!ShowsLineOutLevel"/>
+              </MultiBinding>
+            </ToggleButton.IsVisible>
+          </ToggleButton>
           <!-- the unit's LED ring, on a unit that has one OpenXLR sets -->
           <Button Name="LedRingButton" Content="{loc:Text Key=LedRingButton}" Click="OnLedRing" Margin="0,0,6,0"
                   IsVisible="{Binding LedRing.Available}" ToolTip.Tip="{loc:Text Key=LedRingButtonTip}"/>

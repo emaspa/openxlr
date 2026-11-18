@@ -48,6 +48,7 @@ public sealed partial class SkinWindowTests
             NeitherShippedAppearanceBreaksTheLayoutOrTheLabels(main, options, flow);
             EveryBuiltInSkinKeepsTheMainLabelsReadable(main);
             ChannelTileAlignmentWindowTests.CheckSkins();
+            HeadphoneAlignmentWindowTests.CheckSkins();
             EveryWindowWearsTheSkin(main);
             ClipStatusAndGainLockAreVisibleInEveryBuiltInSkin();
             ACheckBoxLabelTakesItsOwnToken(options);

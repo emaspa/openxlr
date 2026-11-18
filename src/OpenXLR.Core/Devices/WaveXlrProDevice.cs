@@ -382,6 +382,14 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         Write(BlockHp, b);
     }
 
+    /// <summary>Line Out's level (protocol notes, section 19); same -4*dB byte encoding.</summary>
+    public void SetLineOutLevelDb(double db)
+    {
+        byte[] b = Read(BlockHp, HpLen);
+        b[ProJackLevels.LineOutOffset] = ProJackLevels.ByteOf(db);
+        Write(BlockHp, b);
+    }
+
     public void SetGain2Db(int db)
     {
         db = Math.Clamp(db, 0, GainMaxDb);

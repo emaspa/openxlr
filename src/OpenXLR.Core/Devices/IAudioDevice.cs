@@ -97,6 +97,9 @@ public interface IAudioDevice : IDisposable
     // Second XLR input. Default no-ops so single-input devices need no code;
     // a device with XlrInputs > 1 overrides them.
     void SetHp2VolumeDb(double db) { }
+
+    /// <summary>The Wave XLR Pro's Line Out level in dB, -60 to 0; a no-op on every other model.</summary>
+    void SetLineOutLevelDb(double db) { }
     void SetGain2Db(int db) { }
     void SetMute2(bool on) { }
     void SetLowCut2(bool on) { }

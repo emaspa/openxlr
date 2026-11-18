@@ -40,7 +40,7 @@ public sealed class HistoryDeviceTests : IDisposable
         string[] expected =
         [
             "auxLevelDb", "clipGuard", "clipGuard2", "compressor", "compressor2", "crossfade", "expander", "expander2",
-            "gain", "gain2", "hp2VolumeDb", "hpVolumeDb", "lineInGain", "lowCut", "lowCut2", "lowImpedance",
+            "gain", "gain2", "hp2VolumeDb", "hpVolumeDb", "lineInGain", "lineOutLevelDb", "lowCut", "lowCut2", "lowImpedance",
             "voiceTune", "voiceTune2", "voiceTuneStrength", "voiceTuneStrength2",
         ];
         Assert.Equal(expected, DeviceHistory.Controls.Keys.Order(StringComparer.Ordinal));
@@ -65,7 +65,7 @@ public sealed class HistoryDeviceTests : IDisposable
         [
             "GainDb", "Gain2Db", "LowCut", "LowCut2", "ClipGuard", "ClipGuard2", "Expander", "Expander2",
             "Compressor", "Compressor2", "VoiceTune", "VoiceTune2", "VoiceTuneStrength", "VoiceTuneStrength2",
-            "HpVolumeDb", "Hp2VolumeDb", "Crossfade", "LowImpedance", "AuxLevelDb", "LineInGainDb",
+            "HpVolumeDb", "Hp2VolumeDb", "LineOutLevelDb", "Crossfade", "LowImpedance", "AuxLevelDb", "LineInGainDb",
         ];
         var plain = new DeviceState { LineInGainDb = 10 };
         object flipped = plain with { };
@@ -114,14 +114,19 @@ public sealed class HistoryDeviceTests : IDisposable
         Assert.Equal(("unitHeadphones", "hp2VolumeDb", "Headphone 2 volume"),
             (f.History().Undo!.Kind, f.History().Undo!.Control, f.History().Undo!.Label));
         f.Now += 2000;
+        await f.Ok("""{"cmd":"set","control":"lineOutLevelDb","value":-20}""");
+        Assert.Equal(("unitHeadphones", "lineOutLevelDb", "Line Out level"),
+            (f.History().Undo!.Kind, f.History().Undo!.Control, f.History().Undo!.Label));
+        f.Now += 2000;
         await f.Ok("""{"cmd":"set","control":"lowCut2","value":true}""");
         Assert.Equal(("unitLowCut", "xlr2"), (f.History().Undo!.Kind, f.History().Undo!.Channel));
         f.Now += 2000;
         await f.Ok("""{"cmd":"set","control":"lineInGain","value":20}""");
         Assert.Equal("Line In gain", f.History().Undo!.Label);
 
-        for (int i = 0; i < 4; i++) await f.Ok("""{"cmd":"undo"}""");
-        Assert.Equal((-20.0, -20.0, false, 0), (f.Pro.State.HpVolumeDb, f.Pro.State.Hp2VolumeDb, f.Pro.State.LowCut2, f.Pro.State.LineInGainDb));
+        for (int i = 0; i < 5; i++) await f.Ok("""{"cmd":"undo"}""");
+        Assert.Equal((-20.0, -20.0, 0.0, false, 0),
+            (f.Pro.State.HpVolumeDb, f.Pro.State.Hp2VolumeDb, f.Pro.State.LineOutLevelDb, f.Pro.State.LowCut2, f.Pro.State.LineInGainDb));
         Assert.Equal("undo: nothing to undo", await f.Refused("""{"cmd":"undo"}"""));
     }
 
@@ -366,7 +371,7 @@ public sealed class HistoryDeviceTests : IDisposable
         {
             Gain = true, Mute = true, LowCut = true, Expander = true, VoiceTune = true, HpVolume = true, LowImpedance = true,
             Crossfade = true, Phantom = true, ClipGuard = true, Compressor = true, AuxInput = true, LineInput = true,
-            LineInGainMaxDb = 60, XlrInputs = 2, HpOutputs = 2, RetainsSettings = true,
+            LineInGainMaxDb = 60, XlrInputs = 2, HpOutputs = 2, RetainsSettings = true, OutputRouting = true,
         };
         public DeviceState State { get; set; } = new()
         {
@@ -392,6 +397,7 @@ public sealed class HistoryDeviceTests : IDisposable
         public void SetVoiceTuneStrength(int value) => Write(s => s with { VoiceTuneStrength = value });
         public void SetHpVolumeDb(double db) => Write(s => s with { HpVolumeDb = db });
         public void SetHp2VolumeDb(double db) => Write(s => s with { Hp2VolumeDb = db });
+        public void SetLineOutLevelDb(double db) => Write(s => s with { LineOutLevelDb = db });
         public void SetLowImpedance(bool on) => Write(s => s with { LowImpedance = on });
         public void SetCrossfade(int value) => Write(s => s with { Crossfade = value });
         public void SetPhantom(bool on) { PhantomWrites++; Write(s => s with { Phantom = on }); }

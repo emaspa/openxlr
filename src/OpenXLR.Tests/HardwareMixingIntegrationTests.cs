@@ -159,6 +159,15 @@ public sealed partial class MonitorVolumeIntegrationTests
             Sweep();
             Assert.Equal(ProJackLevels.ByteOf(-31 + 60 * Math.Log10(0.5)), pro.Levels[0]);
 
+            // Line Out set in the mode stays where it was set: the mode takes
+            // it as the jack's new base, as it does a dial turned on the unit,
+            // instead of putting the old level back on the next sweep.
+            Assert.Equal(ProJackLevels.ByteOf(-21 + 60 * Math.Log10(0.5)), pro.Levels[4]);
+            Assert.Null(devices.Apply("lineOutLevelDb", JsonSerializer.SerializeToElement(-20.0)));
+            for (int i = 0; i < 3; i++) Sweep();
+            Assert.Equal(ProJackLevels.ByteOf(-20), pro.Levels[4]);
+            PrimaryWait(() => Math.Abs(MixerSettings.Load()!.HardwareEntry!.Jacks["lineout"] - (-20 - 60 * Math.Log10(0.5))) < 0.3);
+
             // A fader moves a cell, a mute a membership.
             Run(new() { Cmd = "setLevel", Channel = "music", Mix = "monitor", Value = JsonSerializer.SerializeToElement(0.5) });
             Sweep();
@@ -362,6 +371,7 @@ public sealed partial class MonitorVolumeIntegrationTests
         public void SetVoiceTune(bool on) { } public void SetVoiceTuneStrength(int value) { }
         public void SetHpVolumeDb(double db) { lock (this) _levels[0] = ProJackLevels.ByteOf(db); }
         public void SetHp2VolumeDb(double db) { lock (this) _levels[2] = ProJackLevels.ByteOf(db); }
+        public void SetLineOutLevelDb(double db) { lock (this) _levels[4] = ProJackLevels.ByteOf(db); }
         public void SetLowImpedance(bool on) { } public void SetCrossfade(int value) { } public void SetPhantom(bool on) { }
         public void SetClipGuard(bool on) { } public void SetCompressor(bool on) { }
     }

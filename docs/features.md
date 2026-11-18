@@ -46,7 +46,8 @@ Wave XLR Pro:
   the device, which follows that microphone's send in the Monitor mix.
   The Pro has no Mic/PC crossfade
 - Physical output routing: Headphones 1, Headphones 2, Line Out and USB
-  Aux are each switched in the device's hardware mixer
+  Aux are each switched in the device's hardware mixer, with Line Out's
+  level set in the HEADPHONES card under the two headphone volumes
 - Hardware mixing (experimental, heard on one unit with Headphones 1 and
   the USB Aux port, not yet with two jacks on two mixes): the unit builds
   the mixes its jacks play from one USB pair per channel and its own
