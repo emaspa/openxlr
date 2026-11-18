@@ -121,6 +121,68 @@ public static class OpenXlrPaths
     }
 
     /// <summary>
+    /// Create or check a directory that holds a socket, such as the runtime
+    /// directory with the daemon's control socket and lock. It has to be a
+    /// real directory, not a symbolic link, owned by this user with mode
+    /// 0700; one of ours with a looser mode is tightened, anything else is
+    /// refused with an <see cref="IOException"/> that says why. Its parent
+    /// (XDG_RUNTIME_DIR, or the configuration home without one) has to belong
+    /// to this user or to root and must not be writable by other users unless
+    /// it is sticky, so nobody else can swap the directory after the check.
+    /// That matters when XDG_RUNTIME_DIR is shared or wrongly set: in a
+    /// container, under sudo -E, or pointed at /tmp.
+    /// </summary>
+    public static void EnsurePrivateRuntimeDir(string directory)
+    {
+        if (!OperatingSystem.IsLinux()) { EnsurePrivateDir(directory); return; }
+        string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory));
+        string parent = Path.GetDirectoryName(full) ?? throw new IOException($"The runtime directory {full} has no parent.");
+        RequireSafeParent(full, parent, allowMissing: true);
+        // Checked before anything is created or tightened, so the mode change
+        // below never reaches through a link or into another user's directory.
+        RequirePrivateDirectory(full, allowMissing: true, exactMode: false);
+        EnsurePrivateDir(full);
+        RequireSafeParent(full, parent, allowMissing: false);
+        RequirePrivateDirectory(full, allowMissing: false, exactMode: true);
+    }
+
+    private static void RequirePrivateDirectory(string directory, bool allowMissing, bool exactMode)
+    {
+        if (RegularFile.Inspect(directory, noFollow: true) is not { } status)
+        {
+            if (allowMissing) return;
+            throw new IOException($"The runtime directory {directory} could not be created.");
+        }
+        if ((status.Mode & 0xf000) == 0xa000)
+            throw new IOException($"The runtime directory {directory} is a symbolic link, not a directory.");
+        if ((status.Mode & 0xf000) != 0x4000)
+            throw new IOException($"The runtime directory {directory} is not a directory.");
+        uint user = UnixPeerCredentials.User;
+        if (status.User != user)
+            throw new IOException($"The runtime directory {directory} belongs to user {status.User}, not to this user ({user}).");
+        if (exactMode && (status.Mode & 0xfff) != (int)PrivateDir)
+            throw new IOException($"The runtime directory {directory} has mode {Convert.ToString(status.Mode & 0xfff, 8)}, not 700.");
+    }
+
+    private static void RequireSafeParent(string directory, string parent, bool allowMissing)
+    {
+        // The parent may itself be a link (/var/run to /run); what it leads to counts.
+        if (RegularFile.Inspect(parent) is not { } status)
+        {
+            if (allowMissing) return;
+            throw new IOException($"The parent of the runtime directory {directory} is missing.");
+        }
+        uint user = UnixPeerCredentials.User;
+        if ((status.Mode & 0xf000) != 0x4000)
+            throw new IOException($"The parent of the runtime directory {directory} is not a directory.");
+        if (status.User != user && status.User != 0)
+            throw new IOException($"The parent of the runtime directory {directory}, {parent}, belongs to user {status.User}; set XDG_RUNTIME_DIR to this user's own runtime directory.");
+        // Writable by everyone and not sticky: anyone could rename the directory away.
+        if ((status.Mode & 0x2) != 0 && (status.Mode & 0x200) == 0)
+            throw new IOException($"The parent of the runtime directory {directory}, {parent}, is writable by every user; set XDG_RUNTIME_DIR to this user's own runtime directory.");
+    }
+
+    /// <summary>
     /// Write text atomically, creating its directory. Private permissions are
     /// the default. Startup files in desktop-owned directories opt out so the
     /// directory keeps its permissions and the file follows the process umask.

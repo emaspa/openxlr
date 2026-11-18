@@ -5095,6 +5095,13 @@ diagnostics** in Options and open an issue with the archive.
   writable by your user and that `openxlr/control.sock` is not a regular
   file or symbolic link. OpenXLR refuses to delete those. An unused socket
   left by an unclean exit is repaired automatically before audio starts.
+- "Refusing to start the control socket": the `openxlr` folder in the
+  runtime directory is a symbolic link, is not a folder or belongs to
+  another user, or the runtime directory can be written by every user. This
+  happens when `XDG_RUNTIME_DIR` points somewhere shared, as in some
+  containers or under `sudo -E`. Run the daemon as your own user with your
+  own runtime directory (`/run/user/` and your user id), or remove a
+  symbolic link you left there yourself.
 - "The mixer is waiting for the audio server": the daemon started, but
   pipewire-pulse did not answer when the daemon built the mixer. A USB
   device that stops responding can hold pipewire-pulse up for minutes.

@@ -63,13 +63,16 @@ internal sealed class SingleInstance : IDisposable
     public static SingleInstance? TryBecomePrimary(string? path = null)
     {
         path ??= DefaultPath;
-        try { OpenXlrPaths.EnsurePrivateDir(Path.GetDirectoryName(path)!); }
-        catch (Exception) { return Listen(path) ?? Fallback(); }
+        // The daemon's rules for the directory: a link, another user's
+        // directory or a parent others can write to is not used, since
+        // whoever controls it could keep this UI from opening.
+        try { OpenXlrPaths.EnsurePrivateRuntimeDir(Path.GetDirectoryName(path)!); }
+        catch (Exception) { return Fallback(); }
         if (AskRunningWindow(path)) return null;
         return Listen(path) ?? (AskRunningWindow(path) ? null : Fallback());
 
-        // No socket at all (an unwritable runtime directory): run without the
-        // guard rather than refuse to start.
+        // No socket at all (an unwritable or untrusted runtime directory):
+        // run without the guard rather than refuse to start.
         static SingleInstance? Fallback() => new(new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified), "");
     }
 

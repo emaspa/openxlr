@@ -45,6 +45,25 @@ public sealed class SingleInstanceTests
     }
 
     [Fact]
+    public void ALinkedRuntimeDirectoryRunsWithoutTheGuard()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "openxlr-test-" + Guid.NewGuid().ToString("N"));
+        string target = Directory.CreateDirectory(dir + ".target").FullName;
+        try
+        {
+            Directory.CreateSymbolicLink(dir, target);
+            using SingleInstance? first = SingleInstance.TryBecomePrimary(Path.Combine(dir, "ui.sock"));
+            Assert.NotNull(first);
+            Assert.Empty(Directory.GetFileSystemEntries(target));
+        }
+        finally
+        {
+            try { File.Delete(dir); } catch (IOException) { }
+            try { Directory.Delete(target, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void LaunchesDuringInitializationAreRememberedAndCoalesced()
     {
         string dir = Path.Combine(Path.GetTempPath(), "openxlr-test-" + Guid.NewGuid().ToString("N"));

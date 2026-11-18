@@ -71,13 +71,15 @@ public sealed class ControlSocketListener : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
-    /// <summary>Prepare the shared lock/socket directory without chmod through a link.</summary>
+    /// <summary>
+    /// Prepare the shared lock/socket directory: a real directory of this
+    /// user's with mode 0700, in a parent nobody else can rename it out of.
+    /// Anything else stops the daemon before it binds the socket.
+    /// </summary>
     public static void PrepareDirectory(string directory)
     {
-        if (RegularFile.Inspect(directory, noFollow: true) is { } parent &&
-            ((parent.Mode & 0xf000) != 0x4000 || parent.User != UnixPeerCredentials.User))
-            throw new IOException("The control socket directory must be a directory owned by this user, without a symbolic link.");
-        OpenXlrPaths.EnsurePrivateDir(directory);
+        try { OpenXlrPaths.EnsurePrivateRuntimeDir(directory); }
+        catch (IOException ex) { throw new IOException("Refusing to start the control socket: " + ex.Message, ex); }
     }
 
     private static bool Same(RegularFile.LinuxFileStatus expected, RegularFile.LinuxFileStatus? current)
