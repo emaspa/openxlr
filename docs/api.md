@@ -2074,8 +2074,8 @@ left as it is), the answer is `ok: false` with the reason, and nothing is
 rescanned. CLAP and VST3 folders are walked to any depth, up to 16,384
 entries per folder; past that the walk stops and the scan reports the folder.
 
-Once an LV2 folder is added, the daemon passes one `LV2_PATH` to the lilv
-scan, to every PipeWire filter-chain it loads and to the native host. That
+Once an LV2 folder is added, the daemon passes one `LV2_PATH` to the LV2
+catalogue scan, to every PipeWire filter-chain it loads and to the native host. That
 path is the daemon's own `LV2_PATH` or the standard directories, then the
 added folders.
 With none added, all three keep the daemon's environment and lilv's default,
@@ -2206,8 +2206,12 @@ list under PLUGINS, and Rescan retries the failures.
 controller cannot start. The status command has a five-second deadline,
 64 KiB stdout and 16 KiB stderr limits. It does not run a sync.
 
-`scans` contains the last completed report for each native format since
-startup, with `kind`, `completedAt`, `entries` and `omitted`. An empty list
+`scans` contains the last completed report for each native format and for
+LV2 since startup, with `kind`, `completedAt`, `entries` and `omitted`. The
+`lv2` report has one entry for one scan of every LV2 bundle: its path is the
+LV2 search path, or on a crash, a stall or a nonzero exit the bundle the
+scan was reading. Its `detail` says when a build without the native helper
+read the bundles in the daemon. An empty list
 means no native scan has completed yet. Entries carry `path`, `outcome`,
 `cached`, `plugins`, `duplicates`, `exitCode` and `detail`. Outcomes include
 `host-missing`, `directory`, `directory-missing`, `directory-error`,

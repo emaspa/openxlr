@@ -2954,6 +2954,17 @@ changed bundle or scanner is tried automatically; Rescan retries failures
 even when the files are unchanged. Scanner start errors stay retryable.
 Collect [diagnostics](#reporting) after the scan ends.
 
+LV2 plugins are read by the native helper in one scan of their own, so a
+bundle whose files crash or stall the LV2 parser costs that scan, not the
+daemon. If the scan crashes, takes longer than a minute or prints something
+that is not a plugin list, the picker keeps the LV2 plugins the last good
+scan found (none, right after the daemon starts), and the daemon logs the
+failure with the bundle the scan was reading, under the format `lv2`.
+Remove or fix that bundle, then Rescan. An LV2 failure is not remembered:
+every start and every Rescan reads the bundles again. A build without the
+native helper reads LV2 bundles inside the daemon instead, where a bundle
+that crashes the parser stops the daemon.
+
 For a loader conflict, `OPENXLR_PLUGIN_CLEAN_ENV=1` in the daemon's environment
 opts its scanners and live plugin hosts into a clean launch. It removes
 exactly `LD_LIBRARY_PATH`, `LD_PRELOAD` and `LD_AUDIT`, with either bridge
@@ -5146,7 +5157,8 @@ diagnostics** in Options and open an issue with the archive.
   Without them the control is disabled and its tooltip says so; the
   rest keeps working.
 - For LV2, check lilv and the installed plugins in `/usr/lib/lv2`, `~/.lv2`
-  or `LV2_PATH`. CLAP and VST3 also require the native helper; Options
+  or `LV2_PATH`, and the daemon's log for an `lv2` scan failure (see
+  [scan failures](#bundle-not-read)). CLAP and VST3 also require the native helper; Options
   reports whether it is installed. A source build without the native
   flag removes it. Check the format filter and press Rescan after an
   external installation. A Windows bundle also needs Wine and a working

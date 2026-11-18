@@ -13,7 +13,7 @@ flowchart TD
     Core --> USB["USB helper: libusb vendor transfers"]
     Core --> ALSA["amixer: first XLR Dock controls"]
     Core --> Graph["PipeWire modules and port links"]
-    Core --> Catalog["lilv: LV2 catalogue"]
+    Core --> Catalog["lilv in the daemon: LV2 catalogue, only without the native helper"]
     Core --> Host["Native helper: LV2, CLAP, VST3 and built-in stages (EQ, noise removal, compressor, expander and voice changer, ducking, soundboard player, clock bridge, Sound Check, level)"]
     Host <-->|"audio ports"| Graph
     Host --> Bridge["Optional yabridge / Wine: Windows plugins"]
@@ -240,9 +240,13 @@ modules or custom drivers:
 
 ## Plugin discovery and Windows bridging
 
-LV2 metadata is read through lilv. CLAP and VST3 bundles are described in
-isolated helper processes, with bounded output and a cache invalidated by
-bundle changes. An optional managed bridge also keys that cache by its
+LV2 metadata is read through lilv in one helper process
+(`openxlr-lv2-host scan-lv2`), so the daemon never parses a bundle's Turtle
+files. The scan has a one-minute deadline and bounded output; when it
+fails the daemon keeps the LV2 catalogue it had. A build without the
+native helper reads LV2 metadata through lilv in the daemon. CLAP and VST3
+bundles are described in a helper process each, with bounded output and a
+cache invalidated by bundle changes. An optional managed bridge also keys that cache by its
 package version, source commit and installation directory.
 
 `ManagedYabridge` selects a complete companion installation, or falls back

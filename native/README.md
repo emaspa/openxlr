@@ -121,7 +121,11 @@ not turn a native plugin into a sandbox or cap its own allocations.
 `make -C native test-scan` checks the ordinary CLAP and VST3 phase markers
 against a fixture that exits inside each phase. It also scans 200 plugins
 with 32 parameters each and checks that markers stay at four lines per
-CLAP plugin and five per VST3 audio class, plus four per module. It needs
+CLAP plugin and five per VST3 audio class, plus four per module. The same
+script runs the LV2 scan over bundles with escaped and non-ASCII names,
+an infinite range, a missing range, more ports than the limit, a Turtle
+syntax error and bytes that are not UTF-8, and checks the JSON, the
+plugins left out and one bundle marker per plugin. It needs
 Python 3 and a compiler with C++20 support for the fixture, but no Wine,
 display or installed plugin. The normal host build still uses C++17.
 
@@ -1173,6 +1177,18 @@ The host calls a UI's LV2 resize interface when present and forwards the
 child window's minimum and maximum dimensions to the outer window. Changed
 size hints are read again, so a plugin's scaling controls can update them.
 LV2 editors do not receive the Wine coordinate nudge.
+
+The same binary reads the daemon's LV2 catalogue with
+`openxlr-lv2-host scan-lv2 [LV2_PATH]`. lilv parses every bundle's Turtle
+files in that process, never in the daemon, and no plugin code is loaded.
+The scan prints every plugin as JSON, with the limits the daemon applies (4096
+ports, 512 controls, 256 scale points, 64 features, 4096 bytes a string)
+and text that is always valid UTF-8. Before describing each plugin it
+writes `trace: scan LV2 plugin N: bundle PATH` to standard error, with the
+path reduced to printable ASCII, so the log of a scan that crashed or
+stalled names the bundle. lilv reads every manifest under
+`trace: scan LV2: load bundles` and a plugin's own data files when that
+plugin is described.
 
 Before loading a plugin, the helper defaults `LSP_WS_LIB_GLXSURFACE` to `0`
 unless the user already set it. LSP's software renderer avoids the repaint

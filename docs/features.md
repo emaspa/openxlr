@@ -885,7 +885,7 @@ that the chosen backend cannot run. VST2 is not supported.
 
 | Format | Processing host | Discovery |
 |---|---|---|
-| LV2 | PipeWire filter-chain by default; optional native host per insert, which also takes over an insert the filter chain refuses | lilv, standard LV2 directories or `LV2_PATH`, plus added folders |
+| LV2 | PipeWire filter-chain by default; optional native host per insert, which also takes over an insert the filter chain refuses | lilv in a native helper scan (in the daemon on a build without the helper), standard LV2 directories or `LV2_PATH`, plus added folders |
 | CLAP | native host, one process per insert | standard CLAP directories or `CLAP_PATH`, plus added folders |
 | VST3 | native host, one process per insert | standard VST3 directories or `VST3_PATH`, plus added folders |
 | Windows VST3 / CLAP | yabridge and Wine behind the native host | bridge-generated Linux wrappers |

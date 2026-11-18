@@ -76,3 +76,62 @@ with tempfile.TemporaryDirectory(prefix="openxlr-bridge-source-") as directory:
         link.unlink()
         win.rmdir()
     print("PASS: dangling Windows sources rejected before plugin initialization; restoration loads again")
+
+# LV2: lilv parses every bundle's Turtle in the scanner, never in the daemon.
+# A marker before each plugin names its bundle, so a scan that crashed or
+# stalled says where; data lilv refuses costs its own plugin; a plugin past
+# the port limit is left out; the output is JSON whatever the bundles hold.
+with tempfile.TemporaryDirectory(prefix="openxlr-lv2-scan-") as directory:
+    lv2 = Path(directory)
+    (lv2 / "gain.lv2").symlink_to(root / "tests/gain.lv2")
+    prefixes = ("@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n"
+                "@prefix doap: <http://usefulinc.com/ns/doap#> .\n"
+                "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n")
+    ports = ('lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "In" ],\n'
+             ' [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Out" ]')
+
+    def bundle(name, data):
+        path = lv2 / (name + ".lv2")
+        path.mkdir()
+        (path / "manifest.ttl").write_text(
+            prefixes + f"<urn:openxlr:scan:{name}> a lv2:Plugin ; lv2:binary <{name}.so> ; rdfs:seeAlso <{name}.ttl> .\n")
+        (path / (name + ".ttl")).write_bytes(prefixes.encode() + data)
+
+    bundle("odd", ('<urn:openxlr:scan:odd> a lv2:Plugin ; doap:name "Tab\\t \\"quote\\" \\\\ é" ;\n' + ports
+                   + ',\n [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "endless" ; lv2:name "Endless" ;'
+                   ' lv2:default 0 ; lv2:minimum 0 ; lv2:maximum 1e999 ],\n'
+                   ' [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "loose" ; lv2:name "Loose" ] .\n').encode())
+    bundle("monster", ("<urn:openxlr:scan:monster> a lv2:Plugin ;\n" + ports + "".join(
+        f',\n [ a lv2:ControlPort, lv2:InputPort ; lv2:index {i} ; lv2:symbol "c{i}" ]' for i in range(2, 4100))
+        + " .\n").encode())
+    bundle("broken", b"<urn:openxlr:scan:broken> a lv2:Plugin ; this is not turtle")
+    bundle("naïve", b'<urn:openxlr:scan:na\xc3\xafve> a lv2:Plugin ; doap:name "Bad \xff\xc3\x28" ;\n' + ports.encode() + b" .\n")
+    command = [str(root / "openxlr-lv2-host"), "scan-lv2", str(lv2)]
+    result = subprocess.run(command, env=env | {"LV2_PATH": "/nonexistent"}, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    plugins = {p["uri"]: p for p in json.loads(result.stdout)["plugins"]}
+    assert set(plugins) == {"urn:openxlr:test:gain", "urn:openxlr:test:gain:mono", "urn:openxlr:scan:odd",
+                            "urn:openxlr:scan:broken", "urn:openxlr:scan:naïve"}, sorted(plugins)
+    odd = plugins["urn:openxlr:scan:odd"]
+    assert odd["name"] == 'Tab\t "quote" \\ é', odd["name"]
+    assert [p["symbol"] for p in odd["params"]] == ["loose"], odd["params"]
+    assert (odd["params"][0]["min"], odd["params"][0]["max"], odd["params"][0]["default"]) == (0, 1, 0)
+    assert (odd["audioIns"], odd["audioOuts"], odd["inputs"], odd["outputs"]) == (1, 1, ["in"], ["out"])
+    gain = plugins["urn:openxlr:test:gain"]
+    assert gain["inputs"] == ["in_l", "in_r"] and gain["params"][0]["default"] == 1, gain
+    assert plugins["urn:openxlr:scan:broken"]["audioIns"] == 0
+    assert plugins["urn:openxlr:scan:naïve"]["audioIns"] == 0
+    # lilv's own messages print the bundle as it is; the markers never do.
+    lines = result.stderr.decode("utf-8", "replace").splitlines()
+    assert lines[0] == "trace: scan LV2: load bundles" and lines[-1] == "trace: scan LV2: complete", lines
+    markers = [line for line in lines if line.startswith("trace: scan LV2 plugin ")]
+    assert len(markers) == 6, markers
+    assert all(": bundle " + str(lv2) + "/" in m for m in markers), markers
+    assert all(m.isascii() for m in markers) and any(m.endswith("/na??ve.lv2/") for m in markers), markers
+
+    result = subprocess.run(command[:2] + [str(lv2 / "missing")], env=env, capture_output=True, timeout=10)
+    assert result.returncode == 0 and json.loads(result.stdout) == {"plugins": []}, result
+    result = subprocess.run(command + ["extra"], env=env, capture_output=True, timeout=10)
+    assert result.returncode == 2, result
+    print(f"PASS: LV2 scan describes {len(plugins)} plugins in readable JSON, one bundle marker per plugin, "
+          "refused data and the port limit cost their own plugin")

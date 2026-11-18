@@ -6,11 +6,15 @@ using System.Text.Json.Serialization;
 namespace OpenXLR.Core.Mixing;
 
 /// <summary>
-/// The installed LV2 plugins, read through lilv (the same library PipeWire's
-/// filter-chain uses to load them, so whatever this lists is loadable in
-/// principle). Scanned once, lazily, on a background thread: lilv's
-/// load_all walks every bundle on LV2_PATH and can take a second on a
-/// system with the big collections installed.
+/// The installed LV2 plugins. lilv (the same library PipeWire's filter-chain
+/// uses to load them, so whatever this lists is loadable in principle) parses
+/// every bundle's Turtle files, and with the native host installed it does
+/// that in a helper process (<c>openxlr-lv2-host scan-lv2</c>), as CLAP and
+/// VST3 bundles are described: a bundle whose data crashes or stalls the
+/// parser costs that scan, with a deadline and a bound on what the helper
+/// may print, and the daemon keeps the catalogue it had. A build without
+/// the native host reads the bundles through lilv in this process, as every
+/// build did before the helper could.
 ///
 /// Only what an insert UI needs is read: names, audio port counts, the
 /// control ports with their ranges and hints, and the required features
@@ -19,7 +23,32 @@ namespace OpenXLR.Core.Mixing;
 /// </summary>
 public static class Lv2Catalog
 {
-    private static readonly Refreshable<IReadOnlyList<PluginInfo>> Scan = new(() => ScanNow());
+    // The last catalogue a scan completed. A scan that fails hands this back
+    // instead of an empty list, so one broken bundle installed since does
+    // not take every LV2 insert out of the picker.
+    private static IReadOnlyList<PluginInfo>? _lastGood;
+    private static readonly Refreshable<IReadOnlyList<PluginInfo>> Scan = new(() =>
+        KeepLastGood(ref _lastGood, Collect(null, new PluginScanLogStore(PluginScanLogStore.DefaultDirectory))));
+
+    /// <summary>
+    /// How long the helper may take. lilv reads a full LSP, x42 and Calf
+    /// installation in a few seconds; a scan still running after this is
+    /// stuck in a bundle.
+    /// </summary>
+    internal static readonly TimeSpan ScanTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// What the helper may print. A few hundred plugins with every LSP
+    /// plugin among them come to about 6 MiB; this is ten times that, and
+    /// the same bound a single CLAP or VST3 module gets.
+    /// </summary>
+    internal const int OutputCapBytes = ProcessRunner.DefaultStdoutCap;
+
+    /// <summary>
+    /// Standard error: one phase marker per plugin, and whatever lilv says
+    /// about the bundles it reads. Past this the scan counts as failed.
+    /// </summary>
+    internal const int ErrorCapBytes = 1024 * 1024;
 
     /// <summary>
     /// The host features PipeWire's filter-chain LV2 loader provides (read
@@ -55,15 +84,323 @@ public static class Lv2Catalog
     public static PluginInfo? Find(string uri) => Plugins.FirstOrDefault(p => p.Plugin == uri);
 
     /// <summary>
-    /// A fresh scan outside the cached one. With <paramref name="lv2Path"/>
-    /// only those directories are read (tests point it at their own
-    /// bundles); otherwise the LV2_PATH every LV2 host is given, from
-    /// <see cref="PluginSearchPaths.Lv2Path"/>, or lilv's default when no
-    /// folder was added.
+    /// A fresh scan outside the cached one, empty when it failed. With
+    /// <paramref name="lv2Path"/> only those directories are read (tests
+    /// point it at their own bundles); otherwise the LV2_PATH every LV2 host
+    /// is given, from <see cref="PluginSearchPaths.Lv2Path"/>, or lilv's
+    /// default when no folder was added.
     /// </summary>
-    internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null)
+    internal static IReadOnlyList<PluginInfo> ScanNow(string? lv2Path = null) => Collect(lv2Path, logs: null) ?? [];
+
+    /// <summary>
+    /// One scan, through the helper when it is installed, or null when the
+    /// helper failed. <paramref name="logs"/> keeps the output of a failed
+    /// attempt; the daemon's catalogue passes its store, a test none.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo>? Collect(string? lv2Path, PluginScanLogStore? logs)
     {
         lv2Path ??= PluginSearchPaths.Lv2Path();
+        if (NativePluginHost.HostInstalled)
+            return FromHelper(NativePluginHost.Executable, lv2Path, logs);
+        var evidence = new PluginScanDiagnostics.Capture("lv2");
+        try
+        {
+            IReadOnlyList<PluginInfo> plugins = InProcess(lv2Path);
+            evidence.Add(Searched(lv2Path), plugins.Count == 0 ? "no-plugins" : "ok", plugins: plugins.Count,
+                detail: "read in the daemon: the native host is not installed");
+            return plugins;
+        }
+        finally { evidence.Complete(); }
+    }
+
+    /// <summary>
+    /// What the daemon keeps: a completed scan, or after a failed one the
+    /// catalogue the last completed scan gave, empty when there was none.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo> KeepLastGood(ref IReadOnlyList<PluginInfo>? lastGood, IReadOnlyList<PluginInfo>? scanned)
+    {
+        if (scanned is null) return Volatile.Read(ref lastGood) ?? [];
+        Volatile.Write(ref lastGood, scanned);
+        return scanned;
+    }
+
+    /// <summary>
+    /// Run the helper and read its catalogue, or null when it crashed, ran
+    /// out of time, printed more than it may or printed something that is
+    /// not a catalogue. Each failure is recorded under <paramref name="kind"/>
+    /// in the scan diagnostics, which the daemon logs, with the bundle the
+    /// helper was reading when its phase markers name one.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo>? FromHelper(string executable, string? lv2Path,
+        PluginScanLogStore? logs, string kind = "lv2", TimeSpan? timeout = null,
+        int stdoutCap = OutputCapBytes, int stderrCap = ErrorCapBytes)
+    {
+        // Nothing here may throw: the catalogue is read once and kept.
+        var evidence = new PluginScanDiagnostics.Capture(kind);
+        string searched = Searched(lv2Path);
+        try
+        {
+            DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+            long begun = System.Diagnostics.Stopwatch.GetTimestamp();
+            ProcessResult scan;
+            try
+            {
+                scan = ProcessRunner.Run(executable, lv2Path is null ? ["scan-lv2"] : ["scan-lv2", lv2Path],
+                    timeout ?? ScanTimeout, stdoutCap: stdoutCap, stderrCap: stderrCap);
+            }
+            catch (Exception ex)
+            {
+                evidence.Add(searched, "start-error", detail: ex.Message);
+                return null;
+            }
+            int? exitCode = scan.ExitCode == -1 ? null : scan.ExitCode;
+            string? outcome = scan.Ok ? null : scan.TimedOut ? "timeout" : scan.Truncated ? "output-limit"
+                : scan.Incomplete ? "output-incomplete" : "scan-failed";
+            IReadOnlyList<PluginInfo>? plugins = null;
+            string? invalid = null;
+            if (outcome is null)
+            {
+                try { plugins = Parse(scan.Stdout); }
+                catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+                {
+                    outcome = "invalid-description";
+                    invalid = ex.Message;
+                }
+            }
+            if (plugins is not null)
+            {
+                evidence.Add(searched, plugins.Count == 0 ? "no-plugins" : "ok", plugins: plugins.Count);
+                return plugins;
+            }
+            // Output past the cap stops wherever the helper was; that bundle
+            // did not cause it. A crash or a stall is in the bundle it was
+            // reading, which its last marker names.
+            string path = outcome is "scan-failed" or "timeout" or "output-incomplete"
+                ? Culprit(scan.Stderr) ?? searched : searched;
+            PluginScanLogRef log = logs is null ? default : logs.Save(
+                new PluginScanAttempt(kind, path, outcome!, startedAt, System.Diagnostics.Stopwatch.GetElapsedTime(begun),
+                    exitCode, scan.TimedOut, scan.Truncated, Scanner: executable, Detail: invalid),
+                scan.Stdout, scan.Truncated, scan.Stderr, scan.Truncated);
+            evidence.Add(path, outcome!, exitCode: exitCode, detail: invalid ?? scan.Stderr,
+                logId: log.Id, logNote: log.Note);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            evidence.Add(searched, "scan-error", detail: ex.Message);
+            return null;
+        }
+        finally { evidence.Complete(); }
+    }
+
+    /// <summary>The directories a scan reads, for the diagnostics.</summary>
+    private static string Searched(string? lv2Path)
+    {
+        if (lv2Path is not null) return lv2Path;
+        try { return string.Join(':', PluginSearchPaths.Lv2Directories()); }
+        catch (Exception) { return "LV2_PATH"; }
+    }
+
+    private const string BundleMarker = "trace: scan LV2 plugin ";
+
+    /// <summary>The bundle the helper's last phase marker names, if any.</summary>
+    internal static string? Culprit(string stderr)
+    {
+        int at = stderr.LastIndexOf(BundleMarker, StringComparison.Ordinal);
+        // A marker starts its line; the same words inside lilv's own
+        // messages do not count.
+        while (at > 0 && stderr[at - 1] != '\n')
+            at = stderr.LastIndexOf(BundleMarker, at - 1, StringComparison.Ordinal);
+        if (at < 0) return null;
+        int end = stderr.IndexOf('\n', at);
+        string line = end < 0 ? stderr[at..] : stderr[at..end];
+        int bundle = line.IndexOf(": bundle ", StringComparison.Ordinal);
+        string path = bundle < 0 ? "" : line[(bundle + ": bundle ".Length)..];
+        return path.Length == 0 ? null : path;
+    }
+
+    /// <summary>
+    /// The helper's catalogue, held to the rules the reading in this process
+    /// applies: the helper is trusted no more than a bundle is. Read as a
+    /// stream of tokens, as module descriptions are, so nothing but the
+    /// plugins is held.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo> Parse(ReadOnlySpan<byte> json)
+    {
+        var result = new List<PluginInfo>();
+        var known = new HashSet<string>(StringComparer.Ordinal);
+        var reader = new Utf8JsonReader(json);
+        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            throw new JsonException("The scanner did not print a catalogue.");
+        bool listed = false;
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (!reader.ValueTextEquals("plugins"u8)) { reader.Read(); reader.Skip(); continue; }
+            reader.Read();
+            if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException("The scanner's plugin list is not a list.");
+            listed = true;
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+            {
+                if (reader.TokenType != JsonTokenType.StartObject) { reader.Skip(); continue; }
+                if (ReadPlugin(ref reader) is PluginInfo info && known.Add(info.Plugin)) result.Add(info);
+            }
+        }
+        // Read through the end: a catalogue followed by anything else is
+        // not one the helper finished.
+        while (reader.Read()) { }
+        if (!listed) throw new JsonException("The scanner printed no plugin list.");
+        return Sorted(result);
+    }
+
+    private static List<PluginInfo> Sorted(List<PluginInfo> plugins)
+    {
+        plugins.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        // Whole: the budget belongs to the message a client is sent, not to
+        // what an insert can name. A chain saved around a large plugin has to
+        // keep loading after another format's plugins arrive beside it.
+        return plugins;
+    }
+
+    /// <summary>One plugin object; null for one the catalogue does not list.</summary>
+    private static PluginInfo? ReadPlugin(ref Utf8JsonReader reader)
+    {
+        string? uri = null, name = null, category = null;
+        bool latency = false;
+        int audioIns = 0, audioOuts = 0;
+        var inputs = new List<string>();
+        var outputs = new List<string>();
+        var features = new List<string>();
+        List<string>? uiFeatures = null;
+        var pars = new List<PluginParam>();
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (reader.ValueTextEquals("uri"u8)) { reader.Read(); uri = HostScan.Text(ref reader); }
+            else if (reader.ValueTextEquals("name"u8)) { reader.Read(); name = HostScan.Text(ref reader); }
+            else if (reader.ValueTextEquals("class"u8)) { reader.Read(); category = HostScan.Text(ref reader); }
+            else if (reader.ValueTextEquals("latency"u8)) { reader.Read(); latency = HostScan.Flag(ref reader); }
+            else if (reader.ValueTextEquals("audioIns"u8)) { reader.Read(); audioIns = HostScan.Whole(ref reader); }
+            else if (reader.ValueTextEquals("audioOuts"u8)) { reader.Read(); audioOuts = HostScan.Whole(ref reader); }
+            else if (reader.ValueTextEquals("inputs"u8)) { reader.Read(); Strings(ref reader, inputs, MaxControls); }
+            else if (reader.ValueTextEquals("outputs"u8)) { reader.Read(); Strings(ref reader, outputs, MaxControls); }
+            else if (reader.ValueTextEquals("features"u8)) { reader.Read(); Strings(ref reader, features, MaxFeatures); }
+            else if (reader.ValueTextEquals("ui"u8))
+            {
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.StartObject) { reader.Skip(); continue; }
+                uiFeatures = [];
+                while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (reader.ValueTextEquals("features"u8)) { reader.Read(); Strings(ref reader, uiFeatures, MaxFeatures); }
+                    else { reader.Read(); reader.Skip(); }
+                }
+            }
+            else if (reader.ValueTextEquals("params"u8))
+            {
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); continue; }
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                {
+                    if (reader.TokenType != JsonTokenType.StartObject || pars.Count >= MaxControls) { reader.Skip(); continue; }
+                    if (ReadParam(ref reader) is PluginParam param) pars.Add(param);
+                }
+            }
+            else { reader.Read(); reader.Skip(); }
+        }
+        if (uri is null) return null;
+        // Plugin hosts wrapped as LV2 (Carla's rack and patchbay) need their
+        // own GUI and bridges; inside a headless filter-chain they are dead
+        // weight, and their declared features look like any other plugin's.
+        if (uri.StartsWith("http://kxstudio.sf.net/carla", StringComparison.Ordinal)) return null;
+        if (audioIns <= 0 || audioOuts <= 0 || inputs.Count == 0 || outputs.Count == 0) return null;   // generators and analysers are not inserts
+        if (uri.Length > MaxUri) return null;
+        List<string> required = [.. features.Select(f => f.Length <= MaxUri ? f : f[..MaxUri])];
+        return new PluginInfo("lv2", uri, Clip(name ?? uri), Clip(category ?? ""), audioIns, audioOuts,
+            inputs[0], outputs[0], pars, required, [.. inputs.Select(Clip)], [.. outputs.Select(Clip)])
+        {
+            ReportsLatency = latency,
+            UnsupportedFeatures = UnsupportedFeatures(required),
+            HasNativeUi = uiFeatures is not null,
+            NativeUiRequiredFeatures = uiFeatures ?? [],
+        };
+    }
+
+    /// <summary>One control; null for one the catalogue leaves out.</summary>
+    private static PluginParam? ReadParam(ref Utf8JsonReader reader)
+    {
+        string? symbol = null, name = null;
+        float min = 0, max = 1;
+        float? initial = null;
+        bool toggled = false, integer = false, logarithmic = false, enumeration = false;
+        var points = new List<ScalePoint>();
+        while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+        {
+            if (reader.ValueTextEquals("symbol"u8)) { reader.Read(); symbol = HostScan.Text(ref reader); }
+            else if (reader.ValueTextEquals("name"u8)) { reader.Read(); name = HostScan.Text(ref reader); }
+            else if (reader.ValueTextEquals("min"u8)) { reader.Read(); min = Single(ref reader, 0); }
+            else if (reader.ValueTextEquals("max"u8)) { reader.Read(); max = Single(ref reader, 1); }
+            else if (reader.ValueTextEquals("default"u8)) { reader.Read(); initial = Single(ref reader, float.NaN); }
+            else if (reader.ValueTextEquals("toggled"u8)) { reader.Read(); toggled = HostScan.Flag(ref reader); }
+            else if (reader.ValueTextEquals("integer"u8)) { reader.Read(); integer = HostScan.Flag(ref reader); }
+            else if (reader.ValueTextEquals("logarithmic"u8)) { reader.Read(); logarithmic = HostScan.Flag(ref reader); }
+            else if (reader.ValueTextEquals("enum"u8)) { reader.Read(); enumeration = HostScan.Flag(ref reader); }
+            else if (reader.ValueTextEquals("points"u8))
+            {
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); continue; }
+                while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+                {
+                    if (reader.TokenType != JsonTokenType.StartObject || points.Count >= MaxScalePoints) { reader.Skip(); continue; }
+                    string? label = null;
+                    float value = float.NaN;
+                    while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+                    {
+                        if (reader.ValueTextEquals("label"u8)) { reader.Read(); label = HostScan.Text(ref reader); }
+                        else if (reader.ValueTextEquals("value"u8)) { reader.Read(); value = Single(ref reader, float.NaN); }
+                        else { reader.Read(); reader.Skip(); }
+                    }
+                    if (label is not null && float.IsFinite(value)) points.Add(new ScalePoint(Clip(label), value));
+                }
+            }
+            else { reader.Read(); reader.Skip(); }
+        }
+        if (symbol is null) return null;
+        float def = initial is float d && !float.IsNaN(d) ? d : min;
+        // Infinite metadata cannot be sent as a JSON number.
+        if (!float.IsFinite(min) || !float.IsFinite(max) || !float.IsFinite(def) || min > max) return null;
+        string sym = Clip(symbol);
+        return new PluginParam(sym, Clip(name ?? sym), min, max, Math.Clamp(def, min, max),
+            toggled, integer, logarithmic, enumeration, points);
+    }
+
+    /// <summary>
+    /// A number lilv read as a float. The helper prints nine significant
+    /// digits, which read back to the same float, so the value the daemon
+    /// holds is the one the in-process reading gives.
+    /// </summary>
+    private static float Single(ref Utf8JsonReader reader, float fallback)
+    {
+        float result = reader.TokenType == JsonTokenType.Number && reader.TryGetDouble(out double value) ? (float)value : fallback;
+        reader.Skip();
+        return result;
+    }
+
+    private static void Strings(ref Utf8JsonReader reader, List<string> into, int limit)
+    {
+        if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); return; }
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+        {
+            if (into.Count < limit && reader.TokenType == JsonTokenType.String) into.Add(reader.GetString() ?? "");
+            else reader.Skip();
+        }
+    }
+
+    /// <summary>
+    /// The reading in this process, for a build without the native host. It
+    /// loads lilv into the daemon, so a bundle that crashes lilv takes the
+    /// daemon with it; the helper exists to keep that out of the daemon.
+    /// </summary>
+    internal static IReadOnlyList<PluginInfo> InProcess(string? lv2Path)
+    {
         var result = new List<PluginInfo>();
         IntPtr world;
         try { world = Lilv.lilv_world_new(); }
@@ -107,11 +444,7 @@ public static class Lv2Catalog
         {
             Lilv.lilv_world_free(world);
         }
-        result.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        // Whole: the budget belongs to the message a client is sent, not to
-        // what an insert can name. A chain saved around a large plugin has to
-        // keep loading after another format's plugins arrive beside it.
-        return result;
+        return Sorted(result);
     }
 
     // Limits on what a bundle can make the daemon hold. lilv reports whatever

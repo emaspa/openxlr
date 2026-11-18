@@ -321,6 +321,8 @@ extern const Backend vst3_backend;
 // `scan-clap FILE` and `scan-vst3 PATH`: describe a bundle's plugins as JSON.
 int clap_scan(const char *file);
 int vst3_scan(const char *path);
+// `scan-lv2 [LV2_PATH]`: describe every installed LV2 plugin as JSON.
+int lv2_scan(const char *lv2_path);
 
 #ifdef __cplusplus
 }
