@@ -57,9 +57,12 @@ internal sealed record ManagedYabridge(string Directory, string Version, string 
 
     // Runtime selection only changes PATH in the isolated scanner/host. It
     // leaves the plugin's HOME, Wine prefix and settings directories alone.
+    // Only PATH's absolute entries follow the companion's directory, so a
+    // helper is never looked up in the working directory.
     public Dictionary<string, string> HostEnvironment() => new()
     {
-        ["PATH"] = Directory + Path.PathSeparator + (Environment.GetEnvironmentVariable("PATH") ?? "/usr/bin:/bin"),
+        ["PATH"] = string.Join(Path.PathSeparator, [Directory, .. SearchPathList.Absolute("PATH",
+            Environment.GetEnvironmentVariable("PATH") ?? "/usr/bin:/bin", expandHome: false, out _)]),
     };
 
     public Dictionary<string, string> ControllerEnvironment()

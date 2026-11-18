@@ -2040,9 +2040,12 @@ every folder searched: `kind` is `lv2`, `clap` or `vst3`, `custom` marks a
 folder added with `addPluginSearchPath`, and `exists` is a directory check
 made when the reply was built, not a promise that every bundle in it loads.
 The LV2 entries are `LV2_PATH`, or the standard directories that exist, then
-the added folders. `searchPathWarning` is null, or a sentence saying how many
-saved folders were skipped because they are invalid or no longer resolve.
-Skipped entries stay saved.
+the added folders. Only absolute entries of `LV2_PATH`, `CLAP_PATH` and
+`VST3_PATH` are listed or searched (a leading `~` is the home folder); an
+empty or relative entry is ignored and logged once, and a variable with no
+absolute entry counts as unset. `searchPathWarning` is null, or a sentence
+saying how many saved folders were skipped because they are invalid or no
+longer resolve. Skipped entries stay saved.
 
 `addPluginSearchPath` and `removePluginSearchPath` take `kind` and an
 absolute `path` of at most 4096 characters without a colon or control
@@ -2062,7 +2065,9 @@ Once an LV2 folder is added, the daemon passes one `LV2_PATH` to the lilv
 scan, to every PipeWire filter-chain it loads and to the native host. That
 path is the daemon's own `LV2_PATH` or the standard directories, then the
 added folders.
-With none added, all three keep the daemon's environment and lilv's default.
+With none added, all three keep the daemon's environment and lilv's default,
+unless the daemon's `LV2_PATH` has an ignored entry: then they get its
+absolute entries, or the standard directories when it has none.
 
 ## Runtime snapshot
 

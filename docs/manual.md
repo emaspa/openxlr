@@ -2646,6 +2646,14 @@ folder searched for LV2, CLAP and VST3 plugins: the standard ones, those
 `LV2_PATH`, `CLAP_PATH` and `VST3_PATH` name, and the ones you added.
 A folder that is missing or unreadable says so.
 
+Only absolute entries of those variables are searched. An empty entry, or
+a relative one such as `.` or `plugins`, would name whatever folder the
+daemon was started in, so OpenXLR ignores it and names it once in the
+daemon's journal. A leading `~` is your home folder. A variable with no
+absolute entry counts as unset. The same holds for `PATH` when OpenXLR
+looks for yabridgectl, Wine and wineserver, and for `LADSPA_PATH` when it
+looks for the limiter.
+
 - Choose LV2, CLAP or VST3 and press "Add plugin folder". OpenXLR searches
   that folder from then on and reads the catalogues again, so its plugins
   are in the picker when it finishes. The list is kept in
@@ -2671,7 +2679,9 @@ folder also loads. Once an LV2 folder is added, that path is `LV2_PATH`
 when the daemon has one, otherwise `~/.lv2`, `/usr/local/lib/lv2`,
 `/usr/lib/lv2`, their `lib64` and Debian multiarch counterparts and the Nix
 profile folders, whichever exist, followed by the added folders. With no
-LV2 folder added, every LV2 host uses lilv's own default.
+LV2 folder added, every LV2 host uses the daemon's `LV2_PATH` or lilv's own
+default, except that an `LV2_PATH` with an ignored entry is handed on
+without it.
 
 A saved folder that can no longer be resolved, such as a symbolic link that
 now points at itself, is skipped with a warning in the manager; the other

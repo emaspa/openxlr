@@ -429,8 +429,8 @@ shell export does not update an already running service.
 | `OPENXLR_BUILD_MIXER=1` | build the PipeWire submix graph (otherwise device-control only); `daemon.json`'s `submixer` key, written by the Options window, overrides it when present |
 | `OPENXLR_MONITOR_OUTPUT=<sink>` | initial monitor output (overrides saved choice) |
 | `OPENXLR_DEVICE=<pid>` | which interface to drive at start when several are attached (hex product id, e.g. `00a6`); a unit picked in the header wins over it, also after a restart ([Multiple Wave interfaces](wave-interfaces.md)) |
-| `LV2_PATH`, `CLAP_PATH`, `VST3_PATH` | colon-separated plugin search directories; CLAP/VST3 private companion directories still take priority |
-| `LADSPA_PATH` | LADSPA directories for the software limiter |
+| `LV2_PATH`, `CLAP_PATH`, `VST3_PATH` | colon-separated plugin search directories; only absolute entries count (a leading `~` is the home folder), others are ignored and logged; CLAP/VST3 private companion directories still take priority |
+| `LADSPA_PATH` | LADSPA directories for the software limiter; only absolute entries count |
 | `OPENXLR_YABRIDGE` | `system` selects the existing bridge; an absolute path selects a complete companion; unset enables automatic discovery |
 | `WINEPREFIX` | Wine prefix used when locating Windows plugin folders; defaults to `~/.wine` |
 | `WINEDLLOVERRIDES` | passed to bridged plugins with `wineusb.sys=d` appended, which keeps Wine's USB driver off; a value that already names `wineusb.sys` is passed unchanged |

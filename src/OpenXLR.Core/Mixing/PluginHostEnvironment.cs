@@ -27,6 +27,11 @@ internal sealed class PluginHostEnvironment(ManagedYabridge? bridge, bool scanne
     {
         // A bridged plugin starts Wine; keep its USB driver out of that prefix.
         Dictionary<string, string> overlay = bridge?.HostEnvironment() ?? new(StringComparer.Ordinal);
+        // The system bridge finds its host program and Wine on PATH; hand it
+        // only the absolute entries, as the companion's PATH already is.
+        if (!overlay.ContainsKey("PATH") && Environment.GetEnvironmentVariable("PATH") is { } inherited
+            && SearchPathList.Absolute("PATH", inherited, expandHome: false, out int ignored) is var kept && ignored > 0)
+            overlay["PATH"] = string.Join(Path.PathSeparator, kept);
         WineDllOverrides.Apply(overlay);
         if (scanner && Environment.GetEnvironmentVariable(WineTraceVariable) == "1"
             && Environment.GetEnvironmentVariable("WINEDEBUG") is null)
@@ -41,7 +46,7 @@ internal sealed class PluginHostEnvironment(ManagedYabridge? bridge, bool scanne
         string runner = Environment.GetEnvironmentVariable("WINELOADER") ?? "wine";
         if (runner.Contains(Path.DirectorySeparatorChar)) return Path.GetFullPath(runner);
         string path = Overlay.GetValueOrDefault("PATH") ?? Environment.GetEnvironmentVariable("PATH") ?? "/usr/bin:/bin";
-        foreach (string directory in path.Split(Path.PathSeparator))
+        foreach (string directory in SearchPathList.Absolute("PATH", path, expandHome: false, out _))
         {
             string candidate = Path.GetFullPath(Path.Combine(directory, runner));
             if (File.Exists(candidate) && (!OperatingSystem.IsLinux()

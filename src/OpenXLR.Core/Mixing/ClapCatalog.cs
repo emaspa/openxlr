@@ -25,15 +25,16 @@ public static class ClapCatalog
         Scan.Refresh();
     }
 
-    /// <summary>Where bundles live, in the order the CLAP specification gives.</summary>
+    /// <summary>
+    /// Where bundles live, in the order the CLAP specification gives:
+    /// CLAP_PATH's absolute entries, or the standard folders.
+    /// </summary>
     public static IReadOnlyList<string> SearchPath()
-    {
-        string? configured = Environment.GetEnvironmentVariable("CLAP_PATH");
-        if (!string.IsNullOrWhiteSpace(configured))
-            return WithManagedPath(configured.Split(':', StringSplitOptions.RemoveEmptyEntries));
-        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return WithManagedPath([Path.Combine(home, ".clap"), "/usr/lib/clap", "/usr/local/lib/clap"]);
-    }
+        => WithManagedPath(SearchPathList.Directories("CLAP_PATH", () =>
+        {
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return [Path.Combine(home, ".clap"), "/usr/lib/clap", "/usr/local/lib/clap"];
+        }, out _));
 
     private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
         => PluginSearchPaths.Include("clap", ManagedYabridge.Discover() is null ? paths
@@ -75,14 +76,13 @@ public static class Vst3Catalog
         Scan.Refresh();
     }
 
+    /// <summary>VST3_PATH's absolute entries, or the standard folders.</summary>
     public static IReadOnlyList<string> SearchPath()
-    {
-        string? configured = Environment.GetEnvironmentVariable("VST3_PATH");
-        if (!string.IsNullOrWhiteSpace(configured))
-            return WithManagedPath(configured.Split(':', StringSplitOptions.RemoveEmptyEntries));
-        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return WithManagedPath([Path.Combine(home, ".vst3"), "/usr/lib/vst3", "/usr/local/lib/vst3"]);
-    }
+        => WithManagedPath(SearchPathList.Directories("VST3_PATH", () =>
+        {
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return [Path.Combine(home, ".vst3"), "/usr/lib/vst3", "/usr/local/lib/vst3"];
+        }, out _));
 
     private static IReadOnlyList<string> WithManagedPath(IEnumerable<string> paths)
         => PluginSearchPaths.Include("vst3", ManagedYabridge.Discover() is null ? paths
