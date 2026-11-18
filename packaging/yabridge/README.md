@@ -35,7 +35,18 @@ baseline x86-64: the bridge calls into Windows code through the Microsoft
 calling convention, and GCC spills AVX registers around those calls to the
 wrong stack slot, which faults on the first plugin factory call with
 AVX-512 and reads garbage with AVX2. The Nix companion sets the same
-target on the bridge derivation. The staged bridge directory carries
+target on the bridge derivation.
+
+Meson builds the bridge as a cross build with winegcc as the host
+compiler, so the packager's `CPPFLAGS`, `CFLAGS`, `CXXFLAGS` and `LDFLAGS`
+reach only the Wine host. Winelib output carries relocations in a read-only
+segment, which hardened link flags refuse. The Debian and RPM source
+recipes therefore link the host with `-Wl,-z,notext` alone, and compile it
+with the stack protector, `_FORTIFY_SOURCE`, stack clash and control-flow
+protection. Meson builds the plugin libraries for the build machine from
+the `_FOR_BUILD` variables. `build.py` adds the same compile protections to
+those, plus full RELRO, immediate binding and a non-executable stack. It
+defines `_FORTIFY_SOURCE` only when nothing else does. The staged bridge directory carries
 an `openxlr-yabridge.json` receipt with that version, the source commit,
 the Wine input fix flag and the Windows architectures it bridges
 (`x86_64`); the daemon reads the receipt before it selects a companion.

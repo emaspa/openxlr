@@ -34,11 +34,14 @@ export WINEPREFIX=%{_builddir}/wine
 export WINEDEBUG=-all
 mkdir -p "$WINEPREFIX"
 wine --version || :
-# Winelib output carries relocations in a read-only segment, which the
-# distribution's hardened link flags refuse. The bridge is built with the
-# flags its own recipe uses, as it is on every other channel.
-export CFLAGS="-O2 -g"
-export CXXFLAGS="-O2 -g"
+# Meson builds the bridge as a cross build with winegcc as the host compiler,
+# so these flags reach only the Wine host; build.py hardens the plugin
+# libraries through the _FOR_BUILD flags. Winelib output carries relocations
+# in a read-only segment, which the distribution's hardened link flags refuse,
+# so the Wine host links with its own flags. It compiles with the protections
+# the binary packages already build it with.
+export CFLAGS="-O2 -g -fstack-protector-strong -fstack-clash-protection -fcf-protection -Wp,-D_FORTIFY_SOURCE=3"
+export CXXFLAGS="$CFLAGS"
 export LDFLAGS="-Wl,-z,notext"
 python3 openxlr-packaging/build.py build --source . --output out --jobs %{_smp_build_ncpus}
 

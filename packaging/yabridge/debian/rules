@@ -1,11 +1,15 @@
 #!/usr/bin/make -f
 
-# Winelib output keeps relocations in a read-only segment, which the
-# distribution's hardened link flags reject, and the bridge is built with the
-# flags its own recipe uses on every other channel.
-export DEB_BUILD_MAINT_OPTIONS = hardening=-all
-export DEB_CFLAGS_MAINT_SET = -O2 -g
-export DEB_CXXFLAGS_MAINT_SET = -O2 -g
+# Meson builds the bridge as a cross build with winegcc as the host compiler,
+# so CPPFLAGS, CFLAGS, CXXFLAGS and LDFLAGS reach only the Wine host. The
+# plugin libraries are built from the _FOR_BUILD flags, which take the full
+# hardening set, and build.py adds its own after them. Winelib output keeps
+# relocations in a read-only segment, which the hardened link flags refuse,
+# so the Wine host links with its own flags. It compiles with the protections
+# the binary packages already build it with, FORTIFY coming from CPPFLAGS.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CFLAGS_MAINT_SET = -O2 -g -fstack-protector-strong -fstack-clash-protection -fcf-protection
+export DEB_CXXFLAGS_MAINT_SET = -O2 -g -fstack-protector-strong -fstack-clash-protection -fcf-protection
 export DEB_LDFLAGS_MAINT_SET = -Wl,-z,notext
 
 %:
