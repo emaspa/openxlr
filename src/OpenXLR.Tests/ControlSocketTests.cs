@@ -115,6 +115,62 @@ public sealed class ControlSocketTests
     }
 
     [Fact]
+    public void TheSocketDirectoryIsCreatedPrivateAndALooseOneOfOursIsTightened()
+    {
+        const UnixFileMode Private = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        string parent = Directory.CreateTempSubdirectory("ox-unix-").FullName;
+        try
+        {
+            string created = Path.Combine(parent, "new");
+            using (ControlSocketListener.Bind(Path.Combine(created, "control.sock")))
+                Assert.Equal(Private, File.GetUnixFileMode(created));
+
+            string loose = Directory.CreateDirectory(Path.Combine(parent, "loose")).FullName;
+            File.SetUnixFileMode(loose, Private | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
+                | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute);
+            using (ControlSocketListener.Bind(Path.Combine(loose, "control.sock")))
+                Assert.Equal(Private, File.GetUnixFileMode(loose));
+
+            string file = Path.Combine(parent, "file");
+            File.WriteAllText(file, "");
+            var refused = Assert.Throws<IOException>(() => ControlSocketListener.Bind(Path.Combine(file, "control.sock")));
+            Assert.Contains("not a directory", refused.Message);
+        }
+        finally { Directory.Delete(parent, true); }
+    }
+
+    [Fact]
+    public void AParentOtherUsersCanWriteIsRefusedUnlessItIsSticky()
+    {
+        string parent = Directory.CreateTempSubdirectory("ox-unix-").FullName;
+        string? previous = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        try
+        {
+            var open = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+                | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+            File.SetUnixFileMode(parent, open);
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", parent);
+            var refused = Assert.Throws<IOException>(() => DaemonLock.TryAcquire());
+            Assert.StartsWith("Refusing to start the control socket:", refused.Message);
+            Assert.Contains("writable by every user", refused.Message);
+            Assert.Throws<IOException>(() => ControlSocketListener.Bind());
+            Assert.False(File.Exists(OpenXlrPaths.ControlSocketPath));
+
+            // /tmp's shape: others can write, but only an entry's owner can
+            // rename it, so the directory stays ours.
+            File.SetUnixFileMode(parent, open | UnixFileMode.StickyBit);
+            using (var held = DaemonLock.TryAcquire()) Assert.NotNull(held);
+            using (ControlSocketListener.Bind()) Assert.True(File.Exists(OpenXlrPaths.ControlSocketPath));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_RUNTIME_DIR", previous);
+            Directory.Delete(parent, true);
+        }
+    }
+
+    [Fact]
     public void TheDaemonLockRemainsExclusiveUntilItsHolderExits()
     {
         string directory = Directory.CreateTempSubdirectory("ox-unix-").FullName;

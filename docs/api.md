@@ -7,9 +7,20 @@ The daemon serves HTTP and the WebSocket paths `/ws` and `/api/v1/events`
 on `$XDG_RUNTIME_DIR/openxlr/control.sock`. Without a runtime directory it
 uses `$XDG_CONFIG_HOME/openxlr/control.sock`, defaulting to
 `~/.config/openxlr/control.sock`. There is no loopback listener or token
-file. The directory is private (0700) and the socket is 0600. Linux
+file. The directory is private (0700) and the socket is 0600. Before it
+takes the lock or binds the socket, the daemon checks the `openxlr`
+directory without following a link: it must be a real directory owned by
+the daemon's user with mode 0700. One of the user's own with a looser mode
+is tightened. Its parent, the runtime directory itself, must belong to that
+user or to root and must not be writable by every user unless it is sticky,
+as `/tmp` is. Anything else (a symbolic link, another user's directory, a
+shared runtime directory left by a container or `sudo -E`) stops the daemon
+with "daemon lock unavailable: Refusing to start the control socket:" and
+the reason. The UI's own `ui.sock` follows the same rule and, when the
+directory fails it, runs without the guard against a second UI. Linux
 `SO_PEERCRED` must identify the daemon's effective user before Kestrel reads
-HTTP; bundled clients also verify the server's user before sending data.
+HTTP; bundled clients also verify the server's user before sending data, so
+a socket another user planted is refused whatever directory it is in.
 This trusts processes belonging to that user, not other local accounts.
 Foreign browser Origins are still refused.
 
