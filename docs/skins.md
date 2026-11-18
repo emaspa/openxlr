@@ -368,6 +368,11 @@ The whole file is refused, and the previous appearance stays on, when:
 - the folder name is not a usable id;
 - `skin.json` is larger than 256 KB, or is not valid JSON, or is not a
   JSON object;
+- `skin.json` is not a regular file. OpenXLR never opens a pipe, a device
+  or a socket, or a link to one, so a faulty folder cannot stall the UI at
+  launch or fill its memory. Options lists it as broken and the terminal
+  mixer leaves it out. A link to an ordinary file is read like the file
+  itself;
 - `schema` is missing, is not a number, or is below 1;
 - `schema` is above the version this OpenXLR reads, which is `1`. The
   message says to update OpenXLR. A newer OpenXLR keeps reading schema 1
@@ -1011,6 +1016,7 @@ The rules a `source` is held to:
   leading slash, no `.` or `..` segment, no colon and no URL. Nothing is
   ever fetched over the network;
 - a symbolic link whose target is outside the folder is not followed;
+- the file is a regular file, never a pipe or a device;
 - the file is a PNG or a JPEG, at most 4 MB, at most 4096 pixels a side,
   and a skin's images together decode to at most 16 megapixels;
 - a skin may name at most 32 images;

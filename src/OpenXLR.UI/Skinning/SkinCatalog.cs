@@ -153,9 +153,13 @@ public static class SkinCatalog
         {
             var file = new FileInfo(path);
             if (!file.Exists) return null;
+            // A device reports no size and never ends, and a pipe blocks the
+            // open, so only a regular file is read, and never past the limit.
+            if (RegularFile.IsSpecial(path))
+                return Broken(id, origin, folder, "skin.json is not a regular file, so it is not read.");
             if (file.Length > SkinFormat.MaxDocumentBytes)
                 return Broken(id, origin, folder, $"skin.json is larger than the {SkinFormat.MaxDocumentBytes / 1024} KB limit.");
-            json = File.ReadAllText(path);
+            json = RegularFile.ReadText(path, SkinFormat.MaxDocumentBytes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

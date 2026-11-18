@@ -54,6 +54,14 @@ internal static class RegularFile
             throw new IOException($"{path} is not a regular file.");
     }
 
+    /// <summary>
+    /// True when the path, after its links, names a device, a pipe, a socket or a
+    /// directory, so a caller can say so in its own words before reading. A missing
+    /// path is false and left for the read to report.
+    /// </summary>
+    internal static bool IsSpecial(string path) =>
+        OperatingSystem.IsLinux() && Inspect(path) is { } status && (status.Mode & 0xf000) != 0x8000;
+
     /// <summary>Linux's fixed metadata layout, also used to own a control socket without following links.</summary>
     internal static LinuxFileStatus? Inspect(string path, bool noFollow = false)
     {
