@@ -130,24 +130,36 @@ checks out the VST3 SDK it needs and vendors the Rust crates, so `build`
 works offline afterwards:
 
 ```sh
-python3 packaging/yabridge/build.py prepare --source /tmp/yabridge-source --output /tmp/yabridge-build
-python3 packaging/yabridge/build.py build   --source /tmp/yabridge-source --output /tmp/yabridge-build --jobs "$(nproc)"
+python3 packaging/yabridge/build.py prepare --source ~/.cache/openxlr-yabridge/source \
+    --output ~/.cache/openxlr-yabridge/build
+python3 packaging/yabridge/build.py build --source ~/.cache/openxlr-yabridge/source \
+    --output ~/.cache/openxlr-yabridge/build --jobs "$(nproc)"
 ```
+
+Both directories sit in your own cache, and `build.py` creates them readable
+only by you. Do not build in a fixed path under `/tmp`. On a shared machine
+another user can create that path first, then run their own build rules as
+you or swap the files you later install with `sudo`. Every step refuses a
+`--source` or `--output` directory that is a symbolic link, that someone
+else owns, or that group or other users can write to. It also refuses one
+whose parent someone else owns, or whose parent any user can write to
+without the sticky bit that `/tmp` has. Under `sudo` it accepts directories
+you own or root owns.
 
 Install through a package, or use the package-free local install:
 
 ```sh
-python3 packaging/yabridge/build.py package --source /tmp/yabridge-source \
-    --output /tmp/yabridge-build --format deb
-# Install the matching .deb from /tmp/yabridge-build/dist with apt.
+python3 packaging/yabridge/build.py package --source ~/.cache/openxlr-yabridge/source \
+    --output ~/.cache/openxlr-yabridge/build --format deb
+# Install the matching .deb from ~/.cache/openxlr-yabridge/build/dist with apt.
 systemctl --user restart openxlr-daemon
 ```
 
 For a package-free install, the explicit local prefix is still supported:
 
 ```sh
-sudo python3 packaging/yabridge/build.py stage --source /tmp/yabridge-source \
-    --output /tmp/yabridge-build --destdir / --prefix /usr/local --manager manual
+sudo python3 packaging/yabridge/build.py stage --source ~/.cache/openxlr-yabridge/source \
+    --output ~/.cache/openxlr-yabridge/build --destdir / --prefix /usr/local --manager manual
 systemctl --user restart openxlr-daemon
 ```
 
@@ -203,8 +215,9 @@ segment.
 Package creation also uses dpkg-dev, rpm, tar, xz and zstd.
 
 ```sh
-python3 packaging/yabridge/build.py package --source /tmp/yabridge-source --output /tmp/yabridge-build --format deb
-python3 packaging/yabridge/test-package.py /tmp/yabridge-build/stage-deb
+python3 packaging/yabridge/build.py package --source ~/.cache/openxlr-yabridge/source \
+    --output ~/.cache/openxlr-yabridge/build --format deb
+python3 packaging/yabridge/test-package.py ~/.cache/openxlr-yabridge/build/stage-deb
 ```
 
 Repeat `package` with `--format rpm`, `arch`, `srpm` or `debian-source` for
