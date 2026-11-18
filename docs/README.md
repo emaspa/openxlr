@@ -48,7 +48,8 @@ open `main`, so they can describe changes newer than the installed release.
 
 ## Developing and integrating
 
-- [Contributing](../CONTRIBUTING.md) and [agent instructions](../AGENTS.md).
+- [Contributing](../CONTRIBUTING.md), [agent instructions](../AGENTS.md)
+  and the [security policy](../SECURITY.md).
 - [Roadmap](roadmap.md): implemented work and remaining priorities.
 - [Architecture](architecture.md) and [source orientation](../src/README.md).
 - [WebSocket API and state](api.md), [HTTP API](http-api.md),
