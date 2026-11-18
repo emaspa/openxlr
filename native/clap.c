@@ -426,6 +426,10 @@ typedef struct {
   uint32_t count;          // ports the plugin declares in this direction
   uint32_t main;           // index of the main one
   uint32_t main_channels;  // its channel count, which is what the catalogue shows
+  // Every port's channel count, read once and bounded. The loader lays out
+  // its buffers from these and never asks the plugin a second time, so an
+  // answer that changes between two reads cannot reach the arrays.
+  uint32_t channels[MAX_PORTS];
 } PortLayout;
 
 // Read one direction's layout and say whether this host can carry it. The
@@ -463,6 +467,7 @@ static bool clap_layout(const clap_plugin_t *plugin,
                side, i, info.channel_count, MAX_PORT_CHANNELS);
       return false;
     }
+    out->channels[i] = info.channel_count;
     if (!flagged && ((info.flags & CLAP_AUDIO_PORT_IS_MAIN) || i == 0)) {
       flagged = (info.flags & CLAP_AUDIO_PORT_IS_MAIN) != 0;
       out->main = i;
@@ -497,13 +502,10 @@ static bool clap_map_ports(Clap *c, Host *h,
   float *(*channels)[MAX_PORT_CHANNELS] = input ? c->in_channels : c->out_channels;
   float *spare = input ? c->quiet : c->discard;
   for (uint32_t i = 0; i < layout.count; ++i) {
-    clap_audio_port_info_t info;
-    if (!ports->get(c->plugin, i, input, &info))
-      return false;   // clap_layout already read every port; a change now is a refusal
-    for (uint32_t k = 0; k < info.channel_count; ++k)
+    for (uint32_t k = 0; k < layout.channels[i]; ++k)
       channels[i][k] = spare;
     buses[i].data32 = channels[i];
-    buses[i].channel_count = info.channel_count;
+    buses[i].channel_count = layout.channels[i];
   }
   if (input) {
     c->in_bus_count = layout.count;

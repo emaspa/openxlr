@@ -70,7 +70,9 @@ the voice's level never gives a figure; and the audio callback allocates
 nothing. `make -C native test-clap` checks the
 CLAP port layout against fake plugins that declare more buses than the
 chain uses, and that the scanner and the loader agree about which layouts
-can be carried. It also checks that a CLAP plugin's latency is read after
+can be carried. Each port is read from the plugin once, so a plugin whose
+answer changes after the channel bound was checked cannot widen a bus past
+it. It also checks that a CLAP plugin's latency is read after
 activation and again only after the plugin says it changed, and that the
 host reports it once and then once per change. A plugin that asks for a
 restart is restarted in place in the order CLAP sets: processing stops
