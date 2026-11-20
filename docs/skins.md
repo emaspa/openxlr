@@ -239,8 +239,25 @@ default appearance, so you can start with two values and grow the file.
 Anything OpenXLR could not use is listed under the picker, with the token
 name and the reason.
 
-Edit, press Reload, look. Reload rereads the folders, so a skin you have
-just edited, added or removed is picked up without restarting the UI.
+Edit, save, look. The UI and the terminal mixer watch the folder of the
+skin you are wearing and read it again a moment after a file in it
+changes, so an edit shows up on its own. Reload rereads every folder,
+which also picks up a skin you have just added or removed.
+
+### Follow a theme tool
+
+A tool that writes your desktop theme's colours into files, such as
+noctalia, matugen or pywal, can keep OpenXLR in step with no hook to call.
+Point a template at `~/.local/share/openxlr/skins/<name>/skin.json` and
+choose that skin once in Options. From then on, each time the tool
+rewrites the file, the UI and the terminal mixer put the new colours on.
+
+OpenXLR watches the folder named after the chosen skin in every skin
+directory. A file written in place counts, and so does a temporary file
+renamed over `skin.json`, an image changed beside it, or the whole folder
+replaced. A skin directory created after the UI started goes unwatched
+until the next start, so create `~/.local/share/openxlr/skins` before
+starting the UI if you are setting this up from nothing.
 
 ### Start from a working skin
 
@@ -2263,7 +2280,7 @@ your readme what it is. A system-wide install is the same folder under
 their own copy of the same id shadows it.
 
 To stop using a skin, pick another one in Options. To remove it, delete
-its folder and press Reload. A folder that is gone while its skin is the
+its folder. A folder that is gone while its skin is the
 chosen one leaves the UI on Material, and `ui.json` keeps the name
 until you choose something else, so putting the folder back brings it
 straight back.

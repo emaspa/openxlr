@@ -1,4 +1,6 @@
 using OpenXLR.Tui;
+using App = OpenXLR.Tui.App;
+using TuiProgram = OpenXLR.Tui.Program;
 
 namespace OpenXLR.Tests;
 
@@ -52,6 +54,48 @@ public sealed class TuiSkinTests : IDisposable
         Assert.Equal("Future", theme.Name);
         Assert.Equal(Theme.Material.Card, theme.Card);
         Assert.False(theme.ConsoleFaders);
+    }
+
+    [Fact]
+    public void ASkinChangedOnDiskIsReadAgainOnTheNextFrameAndReturnsWithItsFolder()
+    {
+        Environment.SetEnvironmentVariable("XDG_DATA_HOME", Path.Combine(_root, "home"));
+        Environment.SetEnvironmentVariable("XDG_DATA_DIRS", Path.Combine(_root, "system"));
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", Path.Combine(_root, "config"));
+        Assert.True(UiSettingsFile.WriteSkin("noctalia"));
+
+        // Chosen but not there yet: Material, with the choice kept.
+        App app = TuiProgram.CreateApp(new DaemonLink(), null);
+        Assert.Equal("default", app.Theme.Id);
+        Assert.Equal("noctalia", app.WantedSkin);
+        var screen = new Screen(100, 30);
+
+        string folder = Skin("home", "noctalia", Doc("\"Ox.Window.Background\":\"#101010\""));
+        // Nothing is read until the watch says so.
+        app.Draw(screen);
+        Assert.Equal("default", app.Theme.Id);
+        app.NoteSkinFilesChanged();
+        app.Draw(screen);
+        Assert.Equal("noctalia", app.Theme.Id);
+        Assert.Equal(Rgb.Parse("#101010"), app.Theme.Window);
+
+        File.WriteAllText(Path.Combine(folder, "skin.json"), Doc("\"Ox.Window.Background\":\"#202020\""));
+        app.NoteSkinFilesChanged();
+        app.Draw(screen);
+        Assert.Equal(Rgb.Parse("#202020"), app.Theme.Window);
+
+        // A launch override is read again and stays an override.
+        App forced = TuiProgram.CreateApp(new DaemonLink(), "noctalia");
+        File.WriteAllText(Path.Combine(folder, "skin.json"), Doc("\"Ox.Window.Background\":\"#303030\""));
+        forced.NoteSkinFilesChanged();
+        forced.Draw(screen);
+        Assert.Equal(Rgb.Parse("#303030"), forced.Theme.Window);
+
+        // A skin picked in Options that cannot be read is still the one followed.
+        app.UseTheme(Theme.Material, "noctalia");
+        Assert.Equal("noctalia", app.WantedSkin);
+        app.UseTheme(Theme.Material);
+        Assert.Equal("default", app.WantedSkin);
     }
 
     [Fact]

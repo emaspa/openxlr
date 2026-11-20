@@ -21,6 +21,7 @@
     <Compile Include="../OpenXLR.Core/ControlConnection.cs" Link="ControlConnection.cs" />
     <Compile Include="../OpenXLR.Core/DaemonProbe.cs" Link="DaemonProbe.cs" />
     <Compile Include="../OpenXLR.Core/RegularFile.cs" Link="RegularFile.cs" />
+    <Compile Include="../OpenXLR.Core/SkinFolderWatch.cs" Link="SkinFolderWatch.cs" />
     <Compile Include="../OpenXLR.Core/ProcessRunner.cs" Link="ProcessRunner.cs" />
     <Compile Include="../OpenXLR.Core/AppearanceModes.cs" Link="AppearanceModes.cs" />
     <Compile Include="../OpenXLR.Core/Mixing/LayoutIcons.cs" Link="LayoutIcons.cs" />

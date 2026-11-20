@@ -40,6 +40,10 @@ public partial class App : Application
             // kept, and Options reports anything the user should know.
             if (!FlatpakEnvironment.IsFlatpak) StartupIntegration.RepairWindowAutostart();
 
+            // A skin rewritten on disk, by hand or by a theme tool, is worn
+            // again without pressing Reload.
+            Skinning.SkinService.FollowSkinFolders();
+
             var window = new MainWindow(new DaemonClient(), syncDesktopVolume: true, showWelcomeGuide: _showWelcomeGuide);
             // A later launch asks for the window through the single-instance
             // socket: bring it up, from the tray or from behind other windows.

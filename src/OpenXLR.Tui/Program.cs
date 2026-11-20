@@ -72,6 +72,10 @@ internal static class Program
         using PosixSignalRegistration interrupted = PosixSignalRegistration.Create(
             PosixSignal.SIGTERM, context => { context.Cancel = true; app.Stop(); });
 
+        // A skin rewritten on disk, by hand or by a theme tool, is drawn
+        // again on the next frame.
+        using SkinFolderWatch skinFolders = new(SkinCatalog.Roots(), app.NoteSkinFilesChanged) { Id = app.WantedSkin };
+
         link.Start();
         terminal.Start();
 
@@ -106,6 +110,7 @@ internal static class Program
                 // The portal is watched only while Material follows the
                 // desktop; a frame reads the value it last reported.
                 appearance = await FollowAppearance(app, appearance);
+                skinFolders.Id = app.WantedSkin;
                 app.Draw(screen);
                 terminal.Write(screen.Render());
             }
@@ -134,8 +139,10 @@ internal static class Program
     {
         // An empty variable or argument is no override, as in the window.
         if (string.IsNullOrEmpty(skin)) skin = null;
-        Theme theme = skin is not null ? SkinCatalog.Load(skin) : SkinCatalog.LoadSaved(UiSettingsFile.ReadSkin());
-        return new App(link, theme, UiSettingsFile.ReadAppearanceMode(), skinOverride: skin is not null);
+        string? saved = skin is null ? UiSettingsFile.ReadSkin() : null;
+        Theme theme = skin is not null ? SkinCatalog.Load(skin) : SkinCatalog.LoadSaved(saved);
+        string wanted = skin ?? (saved is { Length: > 0 } ? saved : SkinCatalog.StartingId);
+        return new App(link, theme, UiSettingsFile.ReadAppearanceMode(), skinOverride: skin is not null, wantedSkin: wanted);
     }
 
     /// <summary>Start the portal watch when the app begins following the desktop, stop it when it no longer does.</summary>
