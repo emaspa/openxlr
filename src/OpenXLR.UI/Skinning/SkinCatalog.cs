@@ -55,6 +55,13 @@ public static class SkinCatalog
     /// <summary>Where a user drops a skin folder.</summary>
     public static string UserSkinDir => Path.Combine(DataHome, "openxlr", "skins");
 
+    /// <summary>The directories that hold skin folders: the user's own, then the system ones.</summary>
+    public static IEnumerable<string> Roots()
+    {
+        yield return UserSkinDir;
+        foreach (string dir in DataDirs) yield return Path.Combine(dir, "openxlr", "skins");
+    }
+
     /// <summary>Every skin this machine has, the default first, then the rest by name.</summary>
     public static IReadOnlyList<SkinEntry> Discover()
     {

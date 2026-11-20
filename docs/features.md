@@ -1462,7 +1462,10 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   install, or one that never picked a skin, starts on it, and a skin the
   user picked, Material included, is kept. The picker is in Options, the
   choice lives in `ui.json` alone, and switching
-  repaints open windows without touching audio or the layout. A skin is
+  repaints open windows without touching audio or the layout. The UI and
+  the terminal mixer watch the chosen skin's folder and put it on again
+  when its files change, so a skin written by a theme tool such as
+  noctalia or matugen follows the desktop with no hook to call. A skin is
   data. It carries no markup and no code, reaches no file outside its own
   folder, makes no network request, and its images are bounded and measured
   before they are decoded. A shipped skin can carry images as well, compiled

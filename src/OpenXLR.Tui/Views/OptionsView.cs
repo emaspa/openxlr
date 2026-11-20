@@ -170,7 +170,7 @@ internal sealed class OptionsView : View
             Theme theme = skin.Id == "default"
                 ? Theme.Material
                 : skin.Read() is { } json ? Theme.FromJson(json, skin.Id, skin.Name) : Theme.Material;
-            app.UseTheme(theme);
+            app.UseTheme(theme, skin.Id);
             app.Say(UiSettingsFile.WriteSkin(skin.Id)
                 ? $"{skin.Name} is the appearance here and in the window"
                 : $"{skin.Name} is on for this run, the saved choice could not be written");

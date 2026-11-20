@@ -199,6 +199,31 @@ public static class SkinService
     /// <summary>Raised on the UI thread after a skin is applied, for what resources cannot reach.</summary>
     public static event Action? Changed;
 
+    /// <summary>
+    /// Raised on the UI thread after the skin folders were read again because
+    /// the chosen skin's files changed on disk, so Options can list them anew.
+    /// </summary>
+    public static event Action? FolderReloaded;
+
+    /// <summary>
+    /// The id of the skin asked for: the launch override, the saved choice,
+    /// Broadcast while there is none, or the last skin put on. It outlives a
+    /// fall back to Material while that skin's folder is gone, so a reload
+    /// puts the skin back once its folder returns.
+    /// </summary>
+    internal static string Wanted
+    {
+        get => _wanted;
+        private set
+        {
+            _wanted = value;
+            if (_folderWatch is not null) _folderWatch.Id = value;
+        }
+    }
+
+    private static string _wanted = SkinPackage.DefaultId;
+    private static SkinFolderWatch? _folderWatch;
+
     /// <summary>How many handlers <see cref="Changed"/> holds now, for the tests that prove a switch leaves none behind.</summary>
     internal static int ChangedSubscribers => Changed?.GetInvocationList().Length ?? 0;
 
@@ -242,7 +267,9 @@ public static class SkinService
             _application = Application.Current;
             if (_application is not null) _application.ActualThemeVariantChanged += OnThemeVariantChanged;
         }
-        ApplyMode(settings.AppearanceMode, Resolve(Overridden ? id : settings.Skin, Overridden));
+        string? wanted = Overridden ? id : settings.Skin;
+        ApplyMode(settings.AppearanceMode, Resolve(wanted, Overridden));
+        Wanted = wanted is { Length: > 0 } ? wanted : SkinPackage.StartingId;
     }
 
     /// <summary>
@@ -296,6 +323,7 @@ public static class SkinService
     {
         var errors = new List<string>(entry.Errors);
         Current = entry;
+        Wanted = entry.Id;
         LayoutIconRegistry.UseSkin(entry.Package.Icons);
         if (Application.Current is not { } application)
         {
@@ -516,9 +544,35 @@ public static class SkinService
         return minimum > 0 ? Math.Max(value is double size ? size : 0, minimum) : value;
     }
 
-    /// <summary>Read the skin folders again and put the current choice back on.</summary>
-    public static IReadOnlyList<string> Reload() =>
-        ApplyMode(Mode, SkinCatalog.Find(Current.Id) ?? new SkinEntry(SkinPackage.Default, []));
+    /// <summary>
+    /// Read the skin folders again and put the skin asked for back on: the
+    /// current one, or the one whose folder was missing and has come back.
+    /// </summary>
+    public static IReadOnlyList<string> Reload()
+    {
+        string wanted = Wanted;
+        IReadOnlyList<string> errors = ApplyMode(Mode, SkinCatalog.Find(wanted) ?? new SkinEntry(SkinPackage.Default, []));
+        Wanted = wanted;
+        return errors;
+    }
+
+    /// <summary>
+    /// Read the chosen skin again whenever its folder changes in any skin
+    /// directory, as Reload in Options does. Started once by the application;
+    /// the windows the tests build put skins on by hand and watch nothing.
+    /// </summary>
+    internal static void FollowSkinFolders()
+    {
+        if (_folderWatch is not null) return;
+        _folderWatch = new SkinFolderWatch(SkinCatalog.Roots(),
+            () => Avalonia.Threading.Dispatcher.UIThread.Post(ReloadFromFolder)) { Id = Wanted };
+    }
+
+    private static void ReloadFromFolder()
+    {
+        Reload();
+        FolderReloaded?.Invoke();
+    }
 
     /// <summary>Turns validated values into the Avalonia objects the resources hold.</summary>
     private sealed class Realizer(SkinPackage package, List<string> errors)

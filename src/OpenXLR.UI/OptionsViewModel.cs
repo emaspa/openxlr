@@ -677,12 +677,23 @@ public sealed class OptionsViewModel : ViewModelBase
     /// <summary>Read the skin folders again, keeping the current choice if it is still there.</summary>
     public void ReloadSkins()
     {
+        Skinning.SkinService.Reload();
+        SkinsReloaded();
+    }
+
+    /// <summary>
+    /// List the skins the folders hold now and show the one in force with
+    /// what is wrong with it, after Reload or after the chosen skin changed
+    /// on disk and was read again.
+    /// </summary>
+    internal void SkinsReloaded()
+    {
         string id = Skinning.SkinService.Current.Id;
         BuildSkinChoices();
         _applying = true;
         try { SelectedSkin = SkinChoices.FirstOrDefault(c => c.Id == id) ?? SkinChoices[0]; }
         finally { _applying = false; }
-        ReportSkin(Skinning.SkinService.Reload());
+        ReportSkin(Skinning.SkinService.Errors);
     }
 
     private void BuildSkinChoices()

@@ -3941,8 +3941,12 @@ Anything wrong with a skin is listed under the picker, not in the mixer
 itself. A skin that sets only part of the appearance keeps the default for
 everything else.
 
-Your own skins go in `~/.local/share/openxlr/skins/<name>/skin.json`;
-"Reload" reads the folders again without restarting. A skin is a data file:
+Your own skins go in `~/.local/share/openxlr/skins/<name>/skin.json`.
+The skin you are wearing is read again a moment after a file in its
+folder changes, so an edit, or a theme tool such as noctalia or matugen
+rewriting the file, shows without pressing anything
+([skins.md](skins.md#follow-a-theme-tool)). "Reload" reads every folder
+again, which also picks up a skin you have added or removed. A skin is a data file:
 it holds named colours, sizes and local images, and it picks from the
 control appearances OpenXLR itself draws. It cannot carry code, markup or
 a template, reach a file outside its own folder, or make a network
@@ -6907,7 +6911,10 @@ files, in the same order, and the choice in Options is the same choice, so
 picking Gruvbox in one picks it in the other ([skins.md](skins.md)).
 With no saved choice it wears Broadcast, as the UI does, and writes
 nothing. If the saved choice cannot be read, the terminal mixer uses
-Material for that run and leaves the file as it is. Material's mode is shared too:
+Material and leaves the file as it is. Like the UI, it watches the
+chosen skin's folder and draws the skin again on the next frame after a
+file there changes, which also brings a missing skin back once its folder
+appears. Material's mode is shared too:
 **Material mode** on the Options tab changes it with Left and Right, and in
 System the terminal follows the desktop's preference through the portal
 with `gdbus`, staying dark when there is no session bus or no `gdbus`.

@@ -54,6 +54,7 @@ internal sealed class App
 
     private Theme _chosenTheme;
     private bool _skinOverride;
+    private int _skinFilesChanged;
     private int _systemScheme;
 
     /// <param name="theme">The skin chosen for this run, saved or given at launch.</param>
@@ -61,12 +62,14 @@ internal sealed class App
     /// <param name="skinOverride">True when <c>--skin</c> or <c>OPENXLR_SKIN</c> chose the skin, which holds Material dark.</param>
     /// <param name="time">The clock for temporary notices and feed confirmations.</param>
     /// <param name="views">The tabs, for a test; the nine sections otherwise.</param>
+    /// <param name="wantedSkin">The id asked for when it differs from the theme's, as for a skin whose folder is missing.</param>
     public App(DaemonLink link, Theme theme, string appearanceMode = AppearanceModes.System, bool skinOverride = false, TimeProvider? time = null,
-        IEnumerable<View>? views = null)
+        IEnumerable<View>? views = null, string? wantedSkin = null)
     {
         Time = time ?? TimeProvider.System;
         Link = link;
         Theme = _chosenTheme = theme;
+        WantedSkin = wantedSkin is { Length: > 0 } ? wantedSkin : theme.Id;
         AppearanceMode = AppearanceModes.Normalize(appearanceMode);
         _skinOverride = skinOverride;
         ApplyAppearance();
@@ -93,6 +96,12 @@ internal sealed class App
 
     /// <summary>Material's mode: system, light or dark.</summary>
     public string AppearanceMode { get; private set; }
+
+    /// <summary>
+    /// The id of the skin asked for, which outlives a fall back to Material
+    /// while that skin's folder is gone, so the skin returns with its folder.
+    /// </summary>
+    public string WantedSkin { get; private set; }
 
     /// <summary>True while the palette depends on the desktop's preference, so the portal is worth watching.</summary>
     public bool FollowsSystem => !_skinOverride && _chosenTheme.Id == "default" && AppearanceMode == AppearanceModes.System;
@@ -132,10 +141,25 @@ internal sealed class App
     }
 
     /// <summary>Wear a skin chosen in Options; it replaces a launch override.</summary>
-    public void UseTheme(Theme theme)
+    /// <param name="wantedSkin">The id chosen, when the theme fell back to Material because it could not be read.</param>
+    public void UseTheme(Theme theme, string? wantedSkin = null)
     {
         _chosenTheme = theme;
+        WantedSkin = wantedSkin is { Length: > 0 } ? wantedSkin : theme.Id;
         _skinOverride = false;
+        ApplyAppearance();
+    }
+
+    /// <summary>
+    /// The skin's files changed on disk. Called from the watcher's thread;
+    /// the next frame reads the skin again on the drawing thread.
+    /// </summary>
+    public void NoteSkinFilesChanged() => Interlocked.Exchange(ref _skinFilesChanged, 1);
+
+    /// <summary>Read the skin asked for again; a launch override stays one.</summary>
+    internal void ReloadSkin()
+    {
+        _chosenTheme = SkinCatalog.Load(WantedSkin);
         ApplyAppearance();
     }
 
@@ -326,6 +350,7 @@ internal sealed class App
     /// </summary>
     public void Draw(Screen screen)
     {
+        if (Interlocked.Exchange(ref _skinFilesChanged, 0) == 1) ReloadSkin();
         try { DrawFrame(screen); }
         catch (Exception error)
         {

@@ -186,6 +186,14 @@ internal static class AppearanceModeWindowTests
                 Assert.Equal(mode == AppearanceModes.Light ? ThemeVariant.Light : ThemeVariant.Dark,
                     Application.Current.RequestedThemeVariant);
                 Assert.Equal(mode == AppearanceModes.Light ? Light : Dark, Background(main));
+                // The choice outlives the fall back, so the skin returns with its file.
+                File.WriteAllText(file, """{"schema":1,"name":"Temporary","tokens":{"Ox.Window.Background":"#123456"}}""");
+                SkinService.Reload();
+                Pump();
+                Assert.Equal("temporary", SkinService.Current.Id);
+                File.Delete(file);
+                SkinService.Reload();
+                Pump();
             }
         }
         finally

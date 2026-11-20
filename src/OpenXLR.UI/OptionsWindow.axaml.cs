@@ -64,7 +64,13 @@ public partial class OptionsWindow : Window
         // the window, as they do in a browser; the arrow keys move along the
         // row of tabs once it has the focus.
         AddHandler(KeyDownEvent, OnTabKeys, RoutingStrategies.Tunnel);
+        // The chosen skin read again because its files changed: the picker
+        // and the skin's notes follow, as after Reload.
+        Skinning.SkinService.FolderReloaded += OnSkinFolderReloaded;
+        Closed += (_, _) => Skinning.SkinService.FolderReloaded -= OnSkinFolderReloaded;
     }
+
+    private void OnSkinFolderReloaded() => (DataContext as OptionsViewModel)?.SkinsReloaded();
 
     /// <summary>
     /// The window's size on a screen with this much room, in device
