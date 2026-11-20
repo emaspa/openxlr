@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.9.2
+Version: 0.9.3
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -257,6 +257,11 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Fri Nov 20 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.3-1
+- The UI and the terminal mixer read the chosen skin again when its files change, so a skin written by a theme tool follows the desktop.
+- Reload brings back a chosen skin whose folder was missing once the folder returns.
+- The Windows bridge companion's Debian recipe builds in Launchpad's tree.
+
 * Wed Nov 18 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.2-1
 - Windows plugin editors take clicks again on KWin 6.8.3: the plugin host shows the hidden Wine window again.
 - The LV2 catalogue is read by the plugin host in a scan of its own, and a bundle that crashes or stalls it is skipped.
