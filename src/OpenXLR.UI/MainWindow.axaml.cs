@@ -173,31 +173,38 @@ public partial class MainWindow : Window
         };
         Closed += async (_, _) =>
         {
-            Skinning.SkinService.Changed -= UpdateControlSizing;
-            Frame.Dispose();
-            _reallyExit = true;
-            _hideToTrayPending = false;
-            _mixerWindow?.Close();
-            _options?.Close();
-            _welcomeGuide?.Close();
-            SoundboardWindow.Current?.Close();
-            VoiceChangerWindow.Current?.Close();
-            _lifetime.Cancel();
-            DisposeTray();
-            // Before the client goes: push to talk held open mutes on the way out.
-            await _desktopKeys.ShutdownAsync();
-            if (_volumeRange is not null)
+            try
             {
-                _vm.DesktopVolumeBoostRequested -= _volumeRange.Set;
-                await _volumeRange.DisposeAsync();
+                Skinning.SkinService.Changed -= UpdateControlSizing;
+                Frame.Dispose();
+                _reallyExit = true;
+                _hideToTrayPending = false;
+                _mixerWindow?.Close();
+                _options?.Close();
+                _welcomeGuide?.Close();
+                SoundboardWindow.Current?.Close();
+                VoiceChangerWindow.Current?.Close();
+                _lifetime.Cancel();
+                DisposeTray();
+                // Before the client goes: push to talk held open mutes on the way out.
+                await _desktopKeys.ShutdownAsync();
+                if (_volumeRange is not null)
+                {
+                    _vm.DesktopVolumeBoostRequested -= _volumeRange.Set;
+                    await _volumeRange.DisposeAsync();
+                }
+                await _client.DisposeAsync();
+                _lifetime.Dispose();
             }
-            await _client.DisposeAsync();
-            _lifetime.Dispose();
-            // A window that started hidden is not the lifetime's MainWindow,
-            // so closing it for real must end the process explicitly.
-            if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                && desktop.ShutdownMode == ShutdownMode.OnExplicitShutdown)
-                desktop.Shutdown();
+            finally
+            {
+                // Every start path leaves the shutdown to this handler (see
+                // App.UseLifetime), so it is asked for here, after the
+                // teardown, even when a step above failed. Any window still
+                // open closes with it.
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                    desktop.Shutdown();
+            }
         };
     }
 

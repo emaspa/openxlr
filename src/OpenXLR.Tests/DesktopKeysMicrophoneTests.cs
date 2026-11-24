@@ -327,7 +327,7 @@ public sealed partial class DesktopKeysTests
     /// Every mute command is recorded and answered with the state, then
     /// with its commandResult, as the daemon does.
     /// </summary>
-    private sealed class MicDaemon : IAsyncDisposable
+    internal sealed class MicDaemon : IAsyncDisposable
     {
         internal const string Primary = "0fd9:007d@0000000000000001";
         internal const string Extra = "0fd9:00aa@0000000000000002";

@@ -859,7 +859,7 @@ public sealed partial class DesktopKeysTests
         Assert.Equal(64, normalized.Clips.Count);
     }
 
-    private sealed class DesktopBackend(DesktopBus bus) : IPathMethodHandler
+    internal sealed class DesktopBackend(DesktopBus bus) : IPathMethodHandler
     {
         public string Path => "/";
         public bool HandlesChildPaths => true;

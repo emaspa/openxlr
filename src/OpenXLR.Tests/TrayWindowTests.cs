@@ -126,6 +126,11 @@ public sealed class TrayWindowTests
                 new UiSettings { StartMinimized = true }.Save();
                 window = NewWindow();
                 Assert.True(window.StartsHidden);
+                window.Quit();
+                window = null;
+
+                // Last: the lifetime this starts ends the dispatcher.
+                QuitDuringPushToTalkMutesEveryMicrophoneBeforeTheProcessEnds();
             }
             catch (Exception ex) { failure = ex; }
             finally
@@ -185,6 +190,89 @@ public sealed class TrayWindowTests
             TrayIcon.SetIcons(app, null);
             new UiSettings { MinimizeToTray = true }.Save();
         }
+    }
+
+    /// <summary>
+    /// The UI started visible is closed while push to talk holds two
+    /// microphones open, under the lifetime App gives it and the real
+    /// lifetime class running the dispatcher. Both mutes reach the daemon and
+    /// the client is gone before the lifetime is asked to end, which is what
+    /// lets the process exit. The daemon is a fake and the desktop's
+    /// shortcut portal sits on a private session bus.
+    /// </summary>
+    private static void QuitDuringPushToTalkMutesEveryMicrophoneBeforeTheProcessEnds()
+    {
+        if (DesktopBusSkip.Reason is not null) return;
+        // The windows closed above finish their teardown first, so none of
+        // them asks the lifetime below to end.
+        Pump(TimeSpan.FromSeconds(1));
+        // Set up off this thread: its awaits must not wait for a dispatcher
+        // that nothing is pumping.
+        var (bus, desktop, fake, daemon) = Task.Run(async () =>
+        {
+            var bus = await DesktopKeysTests.PrivateBus.Start();
+            var desktop = new Tmds.DBus.Protocol.DBusConnection(bus.Address);
+            await desktop.ConnectAsync();
+            await desktop.RequestNameAsync(DesktopBus.Portal);
+            var fake = new DesktopKeysTests.DesktopBackend(new DesktopBus(desktop));
+            desktop.AddMethodHandler(fake);
+            return (bus, desktop, fake, await DesktopKeysTests.MicDaemon.Start());
+        }).GetAwaiter().GetResult();
+        try
+        {
+            WindowLayoutTests.PinMaterial(new UiSettings { MinimizeToTray = false });
+            new DesktopKeySettings { Enabled = true, PushToTalk = true, Microphones = ["xlr1", "xlr2"] }.Save();
+            var client = new DaemonClient(daemon.Server.Url);
+            var window = new MainWindow(client);
+            Assert.False(window.StartsHidden);
+            string[] Mutes() => [.. daemon.Commands.Where(c => c.StartsWith("set mute", StringComparison.Ordinal))];
+
+            PumpUntil(() => Mutes().Length == 2 && fake.ShortcutIds.Contains(DesktopKeys.TalkKey), "Push to talk was not set up.");
+            Assert.Equal(["set mute true", "set mute2 true"], Mutes());
+            fake.Activate(DesktopKeys.TalkKey);
+            PumpUntil(() => Mutes().Length == 4, "The key did not open the microphones.");
+            Assert.Equal(["set mute false", "set mute2 false"], Mutes()[2..]);
+
+            var lifetime = new Avalonia.Controls.ApplicationLifetimes.ClassicDesktopStyleApplicationLifetime();
+            typeof(Application).GetField("_applicationLifetime", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .SetValue(Application.Current, lifetime);
+            App.UseLifetime(lifetime, window);
+            string[]? mutesAtExit = null;
+            bool clientGoneAtExit = false;
+            lifetime.Exit += (_, _) =>
+            {
+                mutesAtExit = Mutes();
+                clientGoneAtExit = client.DisposeAsync().IsCompleted;
+            };
+            bool stuck = false;
+            DispatcherTimer.RunOnce(() => { stuck = true; lifetime.Shutdown(); }, TimeSpan.FromSeconds(15));
+            Dispatcher.UIThread.Post(window.Close);
+            // Shows the window, then runs the dispatcher until the lifetime ends.
+            lifetime.Start([]);
+
+            Assert.False(stuck, "Closing the window never ended the lifetime.");
+            Assert.NotNull(mutesAtExit);
+            Assert.Equal(["set mute true", "set mute2 true", "set mute false", "set mute2 false", "set mute true", "set mute2 true"], mutesAtExit);
+            Assert.True(clientGoneAtExit, "The lifetime ended before the daemon client was disposed.");
+            Assert.True(daemon.Muted["xlr1"]);
+            Assert.True(daemon.Muted["xlr2"]);
+        }
+        finally
+        {
+            Task.Run(async () =>
+            {
+                await daemon.DisposeAsync();
+                desktop.Dispose();
+                await bus.DisposeAsync();
+            }).GetAwaiter().GetResult();
+        }
+    }
+
+    private static void PumpUntil(Func<bool> condition, string message)
+    {
+        DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!condition() && DateTime.UtcNow < deadline) Pump(TimeSpan.FromMilliseconds(25));
+        Assert.True(condition(), message);
     }
 
     /// <summary>

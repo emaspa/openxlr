@@ -49,22 +49,27 @@ public partial class App : Application
             // socket: bring it up, from the tray or from behind other windows.
             if (Program.Instance is { } instance)
                 instance.ShowRequested = () => Avalonia.Threading.Dispatcher.UIThread.Post(window.ShowMixer);
-            if (window.StartsHidden)
-            {
-                // Starting in the tray means the window must never be
-                // mapped: showing it and hiding it a moment later leaves a
-                // hollow frame on some compositors (KDE on Wayland, issue
-                // #11). The lifetime shows MainWindow after this method, so
-                // the window is simply not registered as MainWindow; the
-                // tray shows it on demand and Quit shuts the app down.
-                desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            }
-            else
-            {
-                desktop.MainWindow = window;
-            }
+            UseLifetime(desktop, window);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Hand the window to the lifetime. The UI ends only when the window's
+    /// Closed handler has finished its teardown and asks for the shutdown
+    /// itself, whichever way it started: with the lifetime ending at the
+    /// last window's close instead, the dispatcher stops at the handler's
+    /// first await and drops the rest, push to talk's later mutes included.
+    /// </summary>
+    internal static void UseLifetime(IClassicDesktopStyleApplicationLifetime desktop, MainWindow window)
+    {
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        // Starting in the tray means the window must never be mapped:
+        // showing it and hiding it a moment later leaves a hollow frame on
+        // some compositors (KDE on Wayland, issue #11). The lifetime shows
+        // MainWindow after OnFrameworkInitializationCompleted, so the window
+        // is simply not registered as MainWindow; the tray shows it on demand.
+        if (!window.StartsHidden) desktop.MainWindow = window;
     }
 }
