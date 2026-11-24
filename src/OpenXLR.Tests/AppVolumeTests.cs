@@ -151,13 +151,14 @@ public sealed class AppVolumeTests : IDisposable
         Assert.True(_mixer.TakeAppVolumesChanged());
         Assert.False(_mixer.TakeAppVolumesChanged());
 
-        // A boost past unity is followed as full volume and left as it is.
+        // The desktop's boost is saved and shared with the other stream.
         _graph.ClearCalls();
         Streams(BrowserGraph.Node(10, 100, Vlc, 120), BrowserGraph.Node(11, 101, Vlc, 62));
         _now += 1000;
         _mixer.SyncStreams();
-        Assert.Equal(["set-sink-input-volume 101 100%"], VolumeWrites);
-        Assert.Equal(1, App("vlc").Volume);
+        Assert.Equal(["set-sink-input-volume 101 120%"], VolumeWrites);
+        Assert.Equal(1.2, App("vlc").Volume);
+        Assert.Equal(1.2, _mixer.ExportSettings().AppVolumes["vlc"]);
     }
 
     [Fact]
@@ -325,7 +326,7 @@ public sealed class AppVolumeTests : IDisposable
 
         Assert.Throws<InvalidOperationException>(() => _mixer.SetAppVolume("not-listed", .4));
         Assert.Throws<ArgumentException>(() => _mixer.SetAppVolume("wine64-preloader", .4));
-        Assert.Throws<ArgumentOutOfRangeException>(() => _mixer.SetAppVolume("cyberpunk2077", 1.2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => _mixer.SetAppVolume("cyberpunk2077", 1.51));
         // An identity that names no application once migrated.
         Assert.False(Mixer.ValidAppVolumeIdentity(" (deleted)"));
         Assert.Throws<ArgumentException>(() => _mixer.SetAppVolume(" (deleted)", .4));
