@@ -90,6 +90,23 @@ TEST_OBJECTS = $(addprefix tests/,editor.o audio.o own-block.o measure.o clap.o 
                voice.o dynamics.o player.o)
 DEP_TARGETS = $(OBJECTS) $(TEST_OBJECTS) tests/bridge tests/scan-plugin.so \
               tests/latency.lv2/latency.so tests/gain.lv2/gain.so
+
+# The Windows backend (wine.c), which runs a Windows plugin under Wine in a
+# process of its own, and that process's program, openxlr-winhost.exe
+# (winhost/winhost.c), built with mingw and linked statically. WINHOST=1
+# builds both; the default builds neither and needs no mingw. Wine is needed
+# only to run a Windows plugin, never to build.
+WINHOST ?= 0
+MINGW_CC ?= x86_64-w64-mingw32-gcc
+MINGW_CFLAGS = -std=c11 $(WARN) -isystem clap/include
+WINHOST_TARGETS = openxlr-winhost.exe tests/winhost-plugin.clap
+ifeq ($(WINHOST),1)
+OBJECTS += wine.o
+TEST_OBJECTS += tests/winhost.o
+DEP_TARGETS += $(WINHOST_TARGETS)
+.PHONY: all
+all: openxlr-lv2-host openxlr-winhost.exe
+endif
 DEP_FILES = $(addsuffix .d,$(DEP_TARGETS))
 # The stages and their tests link these beside the noise removal objects.
 DENOISE_OBJECTS = denoise.o $(RNN_OBJECTS)
@@ -225,6 +242,40 @@ test-lv2: tests/lv2 test-fixtures
 
 test-vst3: tests/vst3
 	./tests/vst3
+
+openxlr-winhost.exe: winhost/winhost.c
+	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -static $< -o $@ -lole32 -lshell32
+	@mv $@.d.tmp $@.d
+
+tests/winhost-plugin.clap: tests/winhost-plugin.c
+	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@
+	@mv $@.d.tmp $@.d
+
+# This one compiles host.c and wine.c into itself, to drive the audio
+# callback through the Windows backend without a graph.
+tests/winhost: tests/winhost.o lv2.o lv2-scan.o clap.o vst3.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+# The Windows backend against the Windows test plugin, under Wine and with
+# no audio server. Not part of `test`: it needs a build with WINHOST=1,
+# mingw and Wine, and says which one is missing instead of failing.
+.PHONY: test-winhost clean-winhost
+ifneq ($(WINHOST),1)
+test-winhost:
+	@echo "SKIP: test-winhost needs a build with WINHOST=1"
+else ifeq ($(shell command -v $(MINGW_CC) 2>/dev/null),)
+test-winhost:
+	@echo "SKIP: test-winhost needs $(MINGW_CC) to build the Windows plugin host"
+else
+test-winhost: tests/winhost $(WINHOST_TARGETS)
+	./tests/winhost ./openxlr-winhost.exe tests/winhost-plugin.clap
+endif
+
+clean-native: clean-winhost
+clean-winhost:
+	rm -f wine.o tests/winhost tests/winhost.o $(WINHOST_TARGETS)
+	rm -f $(addsuffix .d,wine.o tests/winhost.o $(WINHOST_TARGETS)) \
+	      $(addsuffix .d.tmp,wine.o tests/winhost.o $(WINHOST_TARGETS))
 
 .PHONY: clean clean-native clean-deepfilter
 clean: clean-native clean-deepfilter
