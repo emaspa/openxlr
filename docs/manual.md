@@ -1356,8 +1356,10 @@ Apps tab, `-` and `+` change the level by five points, `[` and `]` by
 one, and `r` resets it.
 
 The level is the program's stream volume, the one the desktop's volume
-control shows for that program. Moving the slider changes what plays at
-once. OpenXLR saves the level, gives it to every stream the program starts
+control shows for that program. PipeWire can hold a second gain on a
+stream, which the desktop's volume control does not show. The level here
+counts that gain, and moving the slider sets it back to unity. Moving the
+slider changes what plays at once. OpenXLR saves the level, gives it to every stream the program starts
 later and keeps it across daemon restarts. When you move the program in
 the desktop's volume control, or the program moves its own stream, the
 saved level follows it. New streams get time to finish restoring their

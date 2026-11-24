@@ -37,6 +37,31 @@ public sealed class AppVolumeTests : IDisposable
 
     private StreamAssignment App(string identity) => _mixer.Snapshot().Streams.Single(app => app.Identity == identity);
 
+    [Theory]
+    [InlineData(.0625, 100, .40)]
+    [InlineData(.0625, 50, .20)]
+    [InlineData(8, 50, 1)]
+    public void AppVolumeIncludesNodeGainAndTheFaderClearsIt(double nodeGain, int channelPercent, double effective)
+    {
+        Streams(BrowserGraph.Node(10, 100, BrowserGraph.ChromiumProps, channelPercent, nodeGain));
+        _mixer.SyncStreams();
+
+        // The separate node gain is applied in addition to both channel levels.
+        Assert.Equal(effective, App("chromium").LiveVolume);
+        _graph.ClearCalls();
+
+        _mixer.SetAppVolume("chromium", 1);
+
+        const string channelWrite = "set-sink-input-volume 100 100%";
+        const string gainWrite = "pw-cli set-param 10 Props { volume: 1.0 }";
+        string[] expected = nodeGain > 1 ? [gainWrite, channelWrite] : [channelWrite, gainWrite];
+        Assert.Equal(expected, _graph.Calls.Where(call => call.StartsWith("set-sink-input-volume", StringComparison.Ordinal)
+            || call.StartsWith("pw-cli", StringComparison.Ordinal)).ToArray());
+        Streams(BrowserGraph.Node(10, 100, BrowserGraph.ChromiumProps));
+        _mixer.SyncStreams();
+        Assert.Equal(1, App("chromium").LiveVolume);
+    }
+
     [Fact]
     public void ACommandWritesTheLevelToEveryPlayingStreamOfTheApplicationAtOnce()
     {
