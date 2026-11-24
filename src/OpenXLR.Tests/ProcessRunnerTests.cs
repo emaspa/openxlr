@@ -41,6 +41,30 @@ public sealed class ProcessRunnerTests
         Assert.InRange(sw.Elapsed, TimeSpan.FromMilliseconds(300), TimeSpan.FromSeconds(10));
     }
 
+    /// <summary>
+    /// Run is called on threads that hold the mixer's lock. A helper killed at
+    /// its deadline is reaped within a bounded wait and reported as timed
+    /// out with the status the kill gave it. A helper the kernel will not let
+    /// die cannot be made in a test; the bound is what returns that one.
+    /// </summary>
+    [Fact]
+    public void AHelperKilledAtItsDeadlineReturnsATimeoutOnTheCallingThread()
+    {
+        string root = Directory.CreateTempSubdirectory("openxlr-runner-").FullName;
+        try
+        {
+            string helper = ExecutableScript.Write(Path.Combine(root, "stubborn"),
+                "#!/bin/sh\ntrap '' TERM INT\nwhile :; do sleep 0.05; done\n");
+            var sw = Stopwatch.StartNew();
+            ProcessResult r = ProcessRunner.Run(helper, [], TimeSpan.FromMilliseconds(300));
+            Assert.InRange(sw.Elapsed, TimeSpan.FromMilliseconds(200), TimeSpan.FromSeconds(5));
+            Assert.True(r.TimedOut);
+            Assert.False(r.Ok);
+            Assert.Equal(128 + 9, r.ExitCode);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
