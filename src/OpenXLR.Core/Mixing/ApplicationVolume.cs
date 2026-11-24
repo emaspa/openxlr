@@ -192,27 +192,27 @@ public sealed partial class Mixer
             _appVolumeApplied.Remove(stream.Id);
             // Without this the stream keeps the last level, and the session
             // manager restores it to every later stream of the program.
-            ResetStreamVolumeLocked(stream.Id, stream.Serial, ref budget, refused: false);
+            ResetStreamVolumeLocked(stream, ref budget, refused: false);
         }
     }
 
-    private void ResetStreamVolumeLocked(int id, int serial, ref AppVolumeWriteBudget budget, bool refused)
+    private void ResetStreamVolumeLocked(AudioStream stream, ref AppVolumeWriteBudget budget, bool refused)
     {
         long started = Clock();
         if (!budget.TryUse(started))
         {
-            _appVolumeResets[id] = new(serial, 0, refused);
+            _appVolumeResets[stream.Id] = new(stream.Serial, 0, refused);
             return;
         }
         try
         {
-            _pw.SetApplicationStreamVolume(serial, 1);
-            _appVolumeResets.Remove(id);
+            _pw.SetApplicationStreamVolume(stream, 1);
+            _appVolumeResets.Remove(stream.Id);
         }
         catch (InvalidOperationException)
         {
             long now = Clock();
-            _appVolumeResets[id] = new(serial, now + RetryDelay(now - started, refused), Refused: true);
+            _appVolumeResets[stream.Id] = new(stream.Serial, now + RetryDelay(now - started, refused), Refused: true);
         }
     }
 
@@ -234,7 +234,7 @@ public sealed partial class Mixer
         newStream |= sameStream && previous is { NewStream: true, Confirmed: false };
         try
         {
-            _pw.SetApplicationStreamVolume(stream.Serial, target);
+            _pw.SetApplicationStreamVolume(stream, target);
             _appVolumeApplied[stream.Id] = new(stream.Serial, key, target, target, Clock()) { Attempts = attempt, NewStream = newStream };
         }
         catch (InvalidOperationException)
@@ -282,7 +282,7 @@ public sealed partial class Mixer
                 _appVolumeResets.Remove(id);
                 continue;
             }
-            if (Clock() >= owed.RetryAt) ResetStreamVolumeLocked(id, owed.Serial, ref budget, owed.Refused);
+            if (Clock() >= owed.RetryAt) ResetStreamVolumeLocked(stream, ref budget, owed.Refused);
         }
 
         bool adopted = false;

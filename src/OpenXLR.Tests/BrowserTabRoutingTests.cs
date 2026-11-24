@@ -756,6 +756,10 @@ public sealed class BrowserTabRoutingTests
                   'move-sink-input 101 desktop') printf '101\t3\n' > "$dir/inputs" ;;
                 esac
                 """);
+            ExecutableScript.Write(Path.Combine(_directory, "pw-cli"), """
+                dir=${0%/*}
+                echo "pw-cli $*" >> "$dir/calls"
+                """);
             Environment.SetEnvironmentVariable("PATH", _directory);
         }
 
@@ -799,10 +803,10 @@ public sealed class BrowserTabRoutingTests
         }
 
         /// <summary>A playback node at a desktop percentage, or without a level of its own.</summary>
-        public static string Node(int id, int serial, string props, int? percent = 100)
+        public static string Node(int id, int serial, string props, int? percent = 100, double nodeGain = 1)
         {
             string level = percent is int p
-                ? FormattableString.Invariant($",\"params\":{{\"Props\":[{{\"channelVolumes\":[{Math.Pow(p / 100.0, 3):R},{Math.Pow(p / 100.0, 3):R}],\"mute\":false}}]}}")
+                ? FormattableString.Invariant($",\"params\":{{\"Props\":[{{\"volume\":{nodeGain:R},\"channelVolumes\":[{Math.Pow(p / 100.0, 3):R},{Math.Pow(p / 100.0, 3):R}],\"mute\":false}}]}}")
                 : "";
             return FormattableString.Invariant($"{{\"id\":{id},\"type\":\"PipeWire:Interface:Node\",\"info\":{{\"props\":{{\"object.serial\":{serial},\"media.class\":\"Stream/Output/Audio\",{props}}}{level}}}}}");
         }

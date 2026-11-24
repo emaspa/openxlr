@@ -64,6 +64,10 @@ public sealed partial class MonitorVolumeIntegrationTests
             var before = StreamVolumes();
             Assert.Equal(3, before.Count);
             Assert.Single(before.Values.Select(stream => stream.Sink).Distinct());
+            foreach (AudioStream stream in pw.ListStreams().Where(stream => stream.Identity == app))
+                pw.Run("pw-cli", "set-param", stream.Id.ToString(), "Props", "{ volume: 0.0625 }");
+            Wait(_ => mixer.Snapshot().Streams.Single(a => a.Identity == app).LiveVolume == .40);
+            Assert.Equal("100%", StreamVolumes()["teams-second"].Volume);
             int arrivals = 0;
             pw.PlaybackStreamArrived += () => Interlocked.Increment(ref arrivals);
             mixer.SetAppVolume(app.ToUpperInvariant(), .35);

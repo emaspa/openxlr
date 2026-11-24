@@ -639,7 +639,8 @@ public sealed class PipeWireAdapter
     /// A sink node's level from its Props param: the quietest channel as
     /// linear amplitude, the loudest as a desktop percentage, and mute.
     /// </summary>
-    private static (double Volume, double DesktopVolume, bool Muted)? SinkLevel(JsonElement info, bool firstChannel = false)
+    private static (double Volume, double DesktopVolume, bool Muted)? SinkLevel(JsonElement info, bool firstChannel = false,
+        double nodeGain = 1)
     {
         JsonElement list = SinkProps(info);
         if (list.ValueKind != JsonValueKind.Array) return null;
@@ -662,7 +663,7 @@ public sealed class PipeWireAdapter
             // use its cube root. Device lists keep the loudest channel;
             // the legacy sink-volume query keeps pactl's first channel.
             // Neither read changes channel balance.
-            return (volume, DesktopVolume(firstChannel ? first : maximum), muted);
+            return (volume, DesktopVolume((firstChannel ? first : maximum) * nodeGain), muted);
         }
         return null;
     }
@@ -676,6 +677,16 @@ public sealed class PipeWireAdapter
         amplitude = 0;
         return value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out amplitude)
             && double.IsFinite(amplitude) && amplitude >= 0;
+    }
+
+    private static double StreamNodeGain(JsonElement info)
+    {
+        JsonElement list = SinkProps(info);
+        if (list.ValueKind == JsonValueKind.Array)
+            foreach (JsonElement props in list.EnumerateArray())
+                if (props.TryGetProperty("volume", out JsonElement value) && TryChannelAmplitude(value, out double gain))
+                    return gain;
+        return 1;
     }
 
     private static double DesktopVolume(double amplitude) => Math.Round(Math.Cbrt(amplitude) * 100) / 100;
@@ -782,8 +793,30 @@ public sealed class PipeWireAdapter
     /// not answer costs a quarter of a second here, not the usual five; the
     /// caller tries again later.
     /// </summary>
-    internal void SetApplicationStreamVolume(int index, double volume)
-        => SetSinkInputVolume(index, volume, ApplicationStreamVolumeTimeout);
+    internal void SetApplicationStreamVolume(AudioStream stream, double volume)
+    {
+        long started = Stopwatch.GetTimestamp();
+        // pipewire-pulse sets channelVolumes. When clearing a separate gain,
+        // lower its contribution before raising any channel to avoid a spike.
+        if (stream.NodeGain > 1)
+            ClearStreamNodeGain(stream.Id, ApplicationStreamVolumeTimeout);
+        SetSinkInputVolume(stream.Serial, volume, Remaining());
+        if (stream.NodeGain < 1)
+            ClearStreamNodeGain(stream.Id, Remaining());
+
+        TimeSpan Remaining()
+        {
+            TimeSpan remaining = ApplicationStreamVolumeTimeout - Stopwatch.GetElapsedTime(started);
+            return remaining > TimeSpan.Zero ? remaining
+                : throw new InvalidOperationException("application stream volume write timed out");
+        }
+    }
+
+    private void ClearStreamNodeGain(int id, TimeSpan timeout)
+    {
+        Run("pw-cli", timeout, "set-param", id.ToString(), "Props", "{ volume: 1.0 }");
+        InvalidateDump();
+    }
 
     private void SetSinkInputVolume(int index, double volume, TimeSpan timeout)
     {
@@ -3093,6 +3126,7 @@ public sealed class PipeWireAdapter
             string? binary = AppProperty("application.process.binary");
             if (binary is not null && binary.EndsWith(" (deleted)", StringComparison.Ordinal))
                 binary = binary[..^10];
+            double nodeGain = StreamNodeGain(info);
             found.Add(new AudioStream(
                 o.GetProperty("id").GetInt32(),
                 AudioStream.ProgramName(AppProperty("application.name")),
@@ -3106,7 +3140,8 @@ public sealed class PipeWireAdapter
                 // The portal's id is set by PipeWire on the client and cannot
                 // be forged by a sandboxed application, so it comes first.
                 AppId = Str(client, "pipewire.access.portal.app_id") ?? AppProperty("application.id"),
-                Volume = SinkLevel(info)?.DesktopVolume,
+                Volume = SinkLevel(info, nodeGain: nodeGain)?.DesktopVolume,
+                NodeGain = nodeGain,
             });
         }
         return found;
