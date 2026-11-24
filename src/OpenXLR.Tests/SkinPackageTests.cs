@@ -501,6 +501,38 @@ public sealed class SkinPackageTests : IDisposable
         Assert.Single(Read(Doc(Tok("Ox.Label.FontWeight", "99999"))).Errors);
     }
 
+    /// <summary>
+    /// A weight in quotes is a name. Text that only spells a number, or joins
+    /// two names, names no weight, and a weight of 0 or below cannot be drawn
+    /// at all; each is reported and the token keeps its default.
+    /// </summary>
+    [Theory]
+    [InlineData("\"999999\"")]
+    [InlineData("\"0\"")]
+    [InlineData("\"-5\"")]
+    [InlineData("\"700\"")]
+    [InlineData("\" Bold\"")]
+    [InlineData("\"Bold, Thin\"")]
+    public void AQuotedFontWeightIsOnlyAName(string json)
+    {
+        SkinReadResult result = Read(Doc(Tok("Ox.Label.FontWeight", json)));
+        Assert.Contains("is not a font weight", Assert.Single(result.Errors));
+        Assert.False(result.Package!.Tokens.ContainsKey("Ox.Label.FontWeight"));
+    }
+
+    [Fact]
+    public void EveryFontWeightNameIsAcceptedInAnyCase()
+    {
+        foreach (string name in Enum.GetNames<FontWeight>())
+            foreach (string written in new[] { name, name.ToLowerInvariant(), name.ToUpperInvariant() })
+            {
+                SkinReadResult result = Read(Doc(Tok("Ox.Label.FontWeight", $"\"{written}\"")));
+                Assert.True(result.Ok, $"{written}: {string.Join("; ", result.Errors)}");
+                Assert.Equal(Enum.Parse<FontWeight>(name),
+                    ((SkinFontWeight)result.Package!.Tokens["Ox.Label.FontWeight"]).Value);
+            }
+    }
+
     [Fact]
     public void AnIdThatDisagreesWithTheFolderIsReportedAndTheFolderWins()
     {

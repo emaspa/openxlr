@@ -510,9 +510,15 @@ public static class SkinReader
             return (FontWeight)(int)number;
         }
         if (value.ValueKind != JsonValueKind.String) throw new SkinValueException("expected a font weight.");
-        return Enum.TryParse(value.GetString(), ignoreCase: true, out FontWeight weight)
-            ? weight
-            : throw new SkinValueException($"\"{value.GetString()}\" is not a font weight; try \"Normal\", \"SemiBold\" or \"Bold\".");
+        // Text is a name and nothing else. An enum parse would also take the
+        // text of any integer, or two names joined by a comma, and hand back
+        // a weight that names none; one of 0 or below cannot be drawn at all.
+        string text = value.GetString()!;
+        string? name = Array.Find(Enum.GetNames<FontWeight>(),
+            n => string.Equals(n, text, StringComparison.OrdinalIgnoreCase));
+        return name is not null
+            ? Enum.Parse<FontWeight>(name)
+            : throw new SkinValueException($"\"{text}\" is not a font weight; try \"Normal\", \"SemiBold\" or \"Bold\".");
     }
 
     private static string? Text(JsonElement element, string name)

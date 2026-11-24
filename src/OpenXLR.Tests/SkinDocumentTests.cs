@@ -292,9 +292,10 @@ public sealed class SkinDocumentTests
     }
 
     /// <summary>
-    /// The font weight names the document offers are names the reader takes.
-    /// They are the toolkit's, and "SemiBold" and "DemiBold" are the same 600,
-    /// so the list is worth checking rather than remembering.
+    /// The font weight names the document offers are exactly the names the
+    /// reader takes, and the schema lists the same ones. They are the
+    /// toolkit's, and "SemiBold" and "DemiBold" are the same 600, so the list
+    /// is worth checking rather than remembering.
     /// </summary>
     [Fact]
     public void TheWeightNamesTheDocumentOffersAreAccepted()
@@ -310,6 +311,20 @@ public sealed class SkinDocumentTests
                 SkinOrigin.BuiltIn, null);
             Assert.True(result.Ok, $"{name}: {string.Join("; ", result.Errors)}");
         }
+        Assert.Equal(Enum.GetNames<FontWeight>().Order(StringComparer.Ordinal), names.Order(StringComparer.Ordinal));
+
+        using JsonDocument schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(Root, "docs", "skin.schema.json")));
+        JsonElement text = schema.RootElement.GetProperty("$defs").GetProperty("fontWeight").GetProperty("oneOf")
+            .EnumerateArray().Single(e => e.GetProperty("type").GetString() == "string");
+        string description = text.GetProperty("description").GetString()!;
+        var listed = System.Text.RegularExpressions.Regex.Matches(description[(description.IndexOf(':') + 1)..], "[A-Z][A-Za-z]+")
+            .Select(m => m.Value).ToList();
+        Assert.Equal(names.Order(StringComparer.Ordinal), listed.Order(StringComparer.Ordinal));
+        // The schema's pattern turns away what the reader turns away for its
+        // shape: a number in quotes, a sign, a space, two names joined.
+        var pattern = new System.Text.RegularExpressions.Regex(text.GetProperty("pattern").GetString()!);
+        Assert.All(names, name => Assert.Matches(pattern, name.ToLowerInvariant()));
+        Assert.All(new[] { "999999", "0", "-5", " Bold", "Bold, Thin" }, bad => Assert.DoesNotMatch(pattern, bad));
     }
 
     /// <summary>The numbers in the prose are the limits a package is actually read under.</summary>
