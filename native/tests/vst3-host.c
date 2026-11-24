@@ -50,3 +50,6 @@ void test_host_open_editor(Host *h, const Backend *backend) {
 
 // What Xlib does when a plugin's call finds the display gone.
 void test_host_lose_display(void) { lost_x_connection(NULL); }
+
+// The name the backend gave the host, for the window title.
+const char *test_host_plugin_name(const Host *h) { return h->plugin_name; }
