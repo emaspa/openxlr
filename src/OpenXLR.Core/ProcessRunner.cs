@@ -59,6 +59,13 @@ public static class ProcessRunner
     public const int DefaultStderrCap = 64 * 1024;
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// How long a killed helper gets to be reaped. A process stuck in the
+    /// kernel, on a dead mount for one, cannot die until it leaves it, and
+    /// <see cref="Run"/> can be called by a thread holding the mixer's lock.
+    /// </summary>
+    private static readonly TimeSpan ReapTimeout = TimeSpan.FromSeconds(2);
+
     /// <summary>Run to completion on the calling thread. See <see cref="RunAsync"/>.</summary>
     public static ProcessResult Run(string exe, IReadOnlyList<string> args, TimeSpan? timeout = null,
         int stdoutCap = DefaultStdoutCap, int stderrCap = DefaultStderrCap, bool cLocale = true,
@@ -128,7 +135,8 @@ public static class ProcessRunner
         bool cancelled = interrupted && cancel.IsCancellationRequested;
         bool timedOut = interrupted && limit.IsCancellationRequested && !cancelled;
         if (!p.HasExited) KillTree(p);
-        try { p.WaitForExit(); } catch (Exception) { /* reaped */ }
+        // One that cannot be reaped in time has no exit status: -1.
+        try { p.WaitForExit(ReapTimeout); } catch (Exception) { /* reaped */ }
         int exit;
         try { exit = p.ExitCode; } catch (InvalidOperationException) { exit = -1; }
         return new ProcessResult(exit, outData, Encoding.UTF8.GetString(errData), timedOut, truncated, incomplete, cancelled);
@@ -175,7 +183,9 @@ public static class ProcessRunner
             }
         }
         if (!process.HasExited) KillTree(process);
-        await process.WaitForExitAsync().ConfigureAwait(false);
+        // A child that cannot be reaped in time has no exit status: -1.
+        try { await process.WaitForExitAsync().WaitAsync(ReapTimeout).ConfigureAwait(false); }
+        catch (TimeoutException) { return -1; }
         return process.ExitCode;
     }
 
