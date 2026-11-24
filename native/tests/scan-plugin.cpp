@@ -52,10 +52,18 @@ class Plugin final : public IComponent, public IAudioProcessor, public IEditCont
   tresult PLUGIN_API setComponentState(IBStream *) override { return kResultOk; }
   // 32 ordinary parameters, the plugin's own bypass, which is not listed, a
   // NaN maximum and an infinite default, which are not listed either, and a
-  // title with a lone surrogate, which has no UTF-8 form.
+  // title with a lone surrogate, which has no UTF-8 form. The second one's
+  // title and units fill their arrays with no terminator, as the SDK's own
+  // copy leaves them; the fields after them hold text of their own.
   int32 PLUGIN_API getParameterCount() override { phase("parameters"); return 36; }
   tresult PLUGIN_API getParameterInfo(int32 i, ParameterInfo &info) override {
     info = {}; info.id = i;
+    if (i == 1) {
+      for (auto &c : info.title) c = u'T';
+      for (auto &c : info.shortTitle) c = u'S';
+      for (auto &c : info.units) c = u'U';
+      info.stepCount = 'X';
+    }
     if (i == 32) info.flags = ParameterInfo::kIsBypass;
     if (i == 34) info.defaultNormalizedValue = 0.5;
     if (i == 35) {
@@ -87,9 +95,15 @@ class Plugin final : public IComponent, public IAudioProcessor, public IEditCont
 };
 
 static Plugin plugin;
-class Factory final : public IPluginFactory {
+// The class's name, vendor and sub-categories fill their arrays with no
+// terminator. In PClassInfo2 the version follows the vendor, and the vendor
+// follows the sub-categories.
+class Factory final : public IPluginFactory2 {
  public:
-  tresult PLUGIN_API queryInterface(const TUID, void **obj) override { *obj = nullptr; return kNoInterface; }
+  tresult PLUGIN_API queryInterface(const TUID iid, void **obj) override {
+    *obj = !memcmp(iid, IPluginFactory2_iid, 16) ? static_cast<IPluginFactory2 *>(this) : nullptr;
+    return *obj ? kResultOk : kNoInterface;
+  }
   uint32 PLUGIN_API addRef() override { return 1; }
   uint32 PLUGIN_API release() override { return 1; }
   tresult PLUGIN_API getFactoryInfo(PFactoryInfo *) override { return kNotImplemented; }
@@ -97,7 +111,14 @@ class Factory final : public IPluginFactory {
   tresult PLUGIN_API getClassInfo(int32 i, PClassInfo *info) override {
     phase("descriptor");
     *info = {}; memcpy(info->cid, &i, sizeof(i));
-    strcpy(info->category, kVstAudioEffectClass); strcpy(info->name, "Scan fixture");
+    strcpy(info->category, kVstAudioEffectClass); memset(info->name, 'N', sizeof(info->name));
+    return kResultOk;
+  }
+  tresult PLUGIN_API getClassInfo2(int32 i, PClassInfo2 *info) override {
+    *info = {}; memcpy(info->cid, &i, sizeof(i));
+    strcpy(info->category, kVstAudioEffectClass); memset(info->name, 'N', sizeof(info->name));
+    memset(info->subCategories, 'D', sizeof(info->subCategories)); memcpy(info->subCategories, "Fx|", 3);
+    memset(info->vendor, 'V', sizeof(info->vendor)); strcpy(info->version, "1.0");
     return kResultOk;
   }
   tresult PLUGIN_API createInstance(FIDString, FIDString, void **obj) override {

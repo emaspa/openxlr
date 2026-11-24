@@ -64,12 +64,14 @@ bool same_iid(const TUID iid, const TUID other) {
 
 // --- strings ----------------------------------------------------------------
 
-// String128 is UTF-16; the daemon and the catalogue speak UTF-8.
-std::string utf8(const char16* s) {
+// String128 is UTF-16; the daemon and the catalogue speak UTF-8. A plugin
+// fills its strings into fixed arrays and need not end them with a zero, so
+// a read stops at the array's end as well.
+std::string utf8(const char16 *s, size_t size) {
   std::string out;
-  for (; s && *s; ++s) {
+  for (const char16 *end = s ? s + size : s; s != end && *s; ++s) {
     uint32_t c = *s;
-    if (c >= 0xD800 && c <= 0xDBFF && s[1] >= 0xDC00 && s[1] <= 0xDFFF) {
+    if (c >= 0xD800 && c <= 0xDBFF && s + 1 != end && s[1] >= 0xDC00 && s[1] <= 0xDFFF) {
       c = 0x10000 + ((c - 0xD800) << 10) + (s[1] - 0xDC00);
       ++s;
     }
@@ -91,6 +93,13 @@ std::string utf8(const char16* s) {
   }
   return out;
 }
+
+template <size_t N>
+std::string utf8(const char16 (&s)[N]) { return utf8(s, N); }
+
+// The same bound for a plugin's char8 arrays, such as a class's name.
+template <size_t N>
+std::string text_of(const char8 (&s)[N]) { return std::string(s, strnlen(s, N)); }
 
 std::string hex_of(const TUID id) {
   static const char digits[] = "0123456789ABCDEF";
@@ -885,7 +894,7 @@ bool instantiate(Vst3 *v, const TUID cid, int32 scan_class = -1) {
     PClassInfo info;
     if (v->factory->getClassInfo(i, &info) == kResultOk &&
         memcmp(info.cid, cid, sizeof(TUID)) == 0) {
-      host_set_plugin_name(v->h, info.name);
+      host_set_plugin_name(v->h, text_of(info.name).c_str());
       break;
     }
   }
@@ -1506,14 +1515,14 @@ extern "C" int vst3_scan(const char *path) {
     fprintf(stderr, "trace: scan VST3 class %d: class info and component\n", i);
     PClassInfo info;
     if (v.factory->getClassInfo(i, &info) != kResultOk ||
-        strcmp(info.category, kVstAudioEffectClass) != 0)
+        strncmp(info.category, kVstAudioEffectClass, sizeof(info.category)) != 0)
       continue;
     std::string vendor, subcategories;
     if (factory2) {
       PClassInfo2 info2;
       if (factory2->getClassInfo2(i, &info2) == kResultOk) {
-        vendor = info2.vendor;
-        subcategories = info2.subCategories;
+        vendor = text_of(info2.vendor);
+        subcategories = text_of(info2.subCategories);
       }
     }
     if (!instantiate(&v, info.cid, i)) {
@@ -1525,7 +1534,7 @@ extern "C" int vst3_scan(const char *path) {
     first = false;
     json_text(hex_of(info.cid).c_str());
     printf(",\"name\":");
-    json_text(info.name);
+    json_text(text_of(info.name).c_str());
     printf(",\"vendor\":");
     json_text(vendor.c_str());
     // Sub-categories read "Fx|Reverb"; the daemon groups by them.

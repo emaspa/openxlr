@@ -48,6 +48,13 @@ with tempfile.TemporaryDirectory(prefix="openxlr-scan-phases-") as directory:
         assert all(q["id"] not in (32, 33, 34) for p in plugins for q in p["params"])
         bad = {"CLAP": "Bad \ufffd byte", "VST3": "Bad \ufffd\ufffd\ufffd surrogate"}[kind]
         assert all(p["params"][-1]["id"] == 35 and p["params"][-1]["name"] == bad for p in plugins), plugins[0]
+        # The VST3 fixture fills its fixed-size strings to the last element,
+        # with no terminator; each is read to the end of its own array.
+        if kind == "VST3":
+            assert all(p["name"] == "N" * 64 and p["vendor"] == "V" * 64 and p["features"] == ["Fx", "D" * 125]
+                       for p in plugins), plugins[0]
+            assert all(p["params"][1]["name"] == "T" * 128 and p["params"][1]["module"] == "U" * 128
+                       for p in plugins), plugins[0]["params"][1]
         lines = result.stderr.splitlines()
         assert len(lines) == 200 * per_plugin + 4, (kind, len(lines))
         assert lines[-1] == f"trace: scan {kind}: complete"

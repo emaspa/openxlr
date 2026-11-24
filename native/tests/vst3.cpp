@@ -17,6 +17,7 @@ extern "C" bool test_host_audio_failed(Host *h);
 extern "C" void test_host_set_own_block(Host *h, bool own_block);
 extern "C" void test_host_open_editor(Host *h, const Backend *backend);
 extern "C" void test_host_lose_display(void);
+extern "C" const char *test_host_plugin_name(const Host *h);
 
 class Watch final : public Linux::ITimerHandler, public Linux::IEventHandler {
  public:
@@ -389,6 +390,90 @@ static void attributes() {
   assert(list.setBinary("bytes", "abc", 3) == kResultOk);
   assert(list.getBinary("bytes", data, size) == kResultOk && size == 3);
   assert(memcmp(data, "abc", size) == 0);
+}
+
+// A plugin fills its strings into fixed arrays, and the SDK's own copy
+// leaves no terminator in a string that fills its array. A read stops at
+// the array's end.
+class NameComponent final : public IComponent {
+ public:
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  HOST_OWNED_REFCOUNT()
+  tresult PLUGIN_API initialize(FUnknown *) override { return kResultOk; }
+  tresult PLUGIN_API terminate() override { return kResultOk; }
+  tresult PLUGIN_API getControllerClassId(TUID) override { return kNotImplemented; }
+  tresult PLUGIN_API setIoMode(IoMode) override { return kResultOk; }
+  int32 PLUGIN_API getBusCount(MediaType, BusDirection) override { return 0; }
+  tresult PLUGIN_API getBusInfo(MediaType, BusDirection, int32, BusInfo &) override { return kNotImplemented; }
+  tresult PLUGIN_API getRoutingInfo(RoutingInfo &, RoutingInfo &) override { return kNotImplemented; }
+  tresult PLUGIN_API activateBus(MediaType, BusDirection, int32, TBool) override { return kResultOk; }
+  tresult PLUGIN_API setActive(TBool) override { return kResultOk; }
+  tresult PLUGIN_API setState(IBStream *) override { return kResultOk; }
+  tresult PLUGIN_API getState(IBStream *) override { return kResultOk; }
+};
+
+class NameFactory final : public IPluginFactory {
+ public:
+  NameComponent component;
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  HOST_OWNED_REFCOUNT()
+  tresult PLUGIN_API getFactoryInfo(PFactoryInfo *) override { return kNotImplemented; }
+  int32 PLUGIN_API countClasses() override { return 1; }
+  tresult PLUGIN_API getClassInfo(int32, PClassInfo *info) override {
+    *info = PClassInfo();
+    strcpy(info->category, kVstAudioEffectClass);
+    memset(info->name, 'N', sizeof(info->name));
+    return kResultOk;
+  }
+  tresult PLUGIN_API createInstance(FIDString, FIDString, void **obj) override {
+    *obj = static_cast<IComponent *>(&component);
+    return kResultOk;
+  }
+};
+
+// Leaves nonzero bytes where the next call's frame will be, so a read past
+// a local array finds them rather than a lucky zero.
+__attribute__((noinline)) static void dirty_stack() {
+  volatile char bytes[8192];
+  for (size_t i = 0; i < sizeof(bytes); ++i)
+    bytes[i] = 'Z';
+}
+
+static void strings() {
+  Host *h = test_audio_host_new(2);
+  NameFactory factory;
+  Vst3 v;
+  v.h = h;
+  v.factory = &factory;
+  TUID cid = {};
+  dirty_stack();
+  assert(!instantiate(&v, cid));  // the fixture does not process audio
+  assert(std::string(test_host_plugin_name(h)) == std::string(64, 'N'));
+  release_plugin(&v);
+  test_audio_host_free(h);
+
+  // Each String128 is followed in ParameterInfo by text of its own, which a
+  // read past the title or the units would take in.
+  ParameterInfo info = {};
+  for (auto &c : info.title) c = u'T';
+  for (auto &c : info.shortTitle) c = u'S';
+  for (auto &c : info.units) c = u'U';
+  info.stepCount = 'X';
+  assert(utf8(info.title) == std::string(128, 'T'));
+  assert(utf8(info.units) == std::string(128, 'U'));
+  // A high surrogate in the last element has no low half inside the array.
+  info.title[127] = 0xD800;
+  info.shortTitle[0] = 0xDC00;
+  assert(utf8(info.title) == std::string(127, 'T') + "\xED\xA0\x80");
+  info.title[3] = 0;
+  assert(utf8(info.title) == "TTT");
+  puts("PASS: VST3 class names and parameter strings stop at the end of their arrays");
 }
 
 // What a plugin may ask of the host after activation. A changed component
@@ -900,6 +985,7 @@ int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "parameters")) parameters();
   if (argc == 1 || !strcmp(argv[1], "stream")) stream();
   if (argc == 1 || !strcmp(argv[1], "attributes")) attributes();
+  if (argc == 1 || !strcmp(argv[1], "strings")) strings();
   if (argc == 1 || !strcmp(argv[1], "restart")) restart();
   if (argc == 1 || !strcmp(argv[1], "reload")) reload_in_place();
   if (argc == 1 || !strcmp(argv[1], "latency")) latency();
