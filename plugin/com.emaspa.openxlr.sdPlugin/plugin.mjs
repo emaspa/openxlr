@@ -654,11 +654,18 @@ function toggleValue(target, inst) {
   if (isGlitchTarget(target)) return glitchValue(daemonUp && daemonState !== null);
   if (isHistoryTarget(target)) return daemonUp ? historyValue(daemonState, target) : null;
   if (isVoiceTarget(target)) return voiceTarget(mixer(), target)?.lit ?? null;
-  // Lit while the microphone's EQ is on and holds the profile's bands.
-  if (isEqProfileTarget(target)) return eqProfileTarget(daemonState, target)?.lit ?? null;
+  // Lit while the microphone's EQ is on and holds the profile's bands. Grey,
+  // as an EQ key is, while hardware mixing holds the mix's EQ off.
+  if (isEqProfileTarget(target)) {
+    const entry = eqProfileTarget(daemonState, target);
+    return entry && !entry.held ? entry.lit : null;
+  }
   if (isEqTarget(target)) {
     const eq = eqTarget(mixer(), target);
     if (!eq) return null;
+    // Grey while hardware mixing holds a mix's EQ off: the state still
+    // reports the saved EQ, but a press sends nothing.
+    if (eq.held) return null;
     if (eq.field === "type") return false;
     if (eq.field !== "enabled") return null;
     const value = dialNow(target, eq.value);

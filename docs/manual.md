@@ -4698,7 +4698,8 @@ profiles work as before. What changes on the mixes the unit builds:
 A greyed control says why in its tooltip. The plugin chain window, Mic
 setup and the Options card say it under the control as well. The terminal
 mixer offers the same choice on its Options tab, and the Deck greys a key
-on a plugin of a mix the unit builds. Scripts use `setMixing` in the
+on a plugin, on the output EQ or on an EQ profile of a mix the unit builds.
+Scripts use `setMixing` in the
 [control API](api.md#hardware-mixing), which also has the dry run.
 
 <a name="pro-maximizer"></a>
@@ -4872,7 +4873,8 @@ keys and dials, without noise removal. Its targets put `mix:` before the
 mix's id: `eq:mix:<mix>`, `eqband:mix:<mix>:<band>`, and `eqtype:`,
 `eqfreq:`, `eqgain:` or `eqq:` followed by `mix:`, the mix and the band.
 While [hardware mixing](#hardware-mixing) holds a mix's EQ off, its keys
-and dials send nothing and its dials say so.
+and its EQ profile keys are grey, its keys and dials send nothing, and its
+dials say so.
 
 <a name="voice-keys"></a>
 Where the daemon reports the [voice changer](#voice-changer) for a
