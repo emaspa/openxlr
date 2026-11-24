@@ -2,6 +2,7 @@
 // A module that can stop inside each scanner phase. Exiting without cleanup
 // leaves stderr exactly as a crashed plugin would, so the test can check
 // the last marker without relying on a timeout or a desktop session.
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -49,14 +50,25 @@ class Plugin final : public IComponent, public IAudioProcessor, public IEditCont
   tresult PLUGIN_API setState(IBStream *) override { return kResultOk; }
   tresult PLUGIN_API getState(IBStream *) override { return kNotImplemented; }
   tresult PLUGIN_API setComponentState(IBStream *) override { return kResultOk; }
-  // 32 ordinary parameters and the plugin's own bypass, which is not listed.
-  int32 PLUGIN_API getParameterCount() override { phase("parameters"); return 33; }
+  // 32 ordinary parameters, the plugin's own bypass, which is not listed, a
+  // NaN maximum and an infinite default, which are not listed either, and a
+  // title with a lone surrogate, which has no UTF-8 form.
+  int32 PLUGIN_API getParameterCount() override { phase("parameters"); return 36; }
   tresult PLUGIN_API getParameterInfo(int32 i, ParameterInfo &info) override {
-    info = {}; info.id = i; if (i == 32) info.flags = ParameterInfo::kIsBypass; return kResultOk;
+    info = {}; info.id = i;
+    if (i == 32) info.flags = ParameterInfo::kIsBypass;
+    if (i == 34) info.defaultNormalizedValue = 0.5;
+    if (i == 35) {
+      static const char16_t title[] = u"Bad \xD800 surrogate";
+      memcpy(info.title, title, sizeof(title));
+    }
+    return kResultOk;
   }
   tresult PLUGIN_API getParamStringByValue(ParamID, ParamValue, String128) override { return kNotImplemented; }
   tresult PLUGIN_API getParamValueByString(ParamID, TChar *, ParamValue &) override { return kNotImplemented; }
-  ParamValue PLUGIN_API normalizedParamToPlain(ParamID, ParamValue v) override { return v; }
+  ParamValue PLUGIN_API normalizedParamToPlain(ParamID id, ParamValue v) override {
+    return id == 33 && v == 1 ? NAN : id == 34 && v == 0.5 ? INFINITY : v;
+  }
   ParamValue PLUGIN_API plainParamToNormalized(ParamID, ParamValue v) override { return v; }
   ParamValue PLUGIN_API getParamNormalized(ParamID) override { return 0; }
   tresult PLUGIN_API setParamNormalized(ParamID, ParamValue) override { return kResultOk; }
@@ -104,10 +116,15 @@ static bool port_info(const clap_plugin_t *, uint32_t, bool, clap_audio_port_inf
   *info = {}; info->flags = CLAP_AUDIO_PORT_IS_MAIN; info->channel_count = 2; return true;
 }
 static const clap_plugin_audio_ports_t ports = {port_count, port_info};
-static uint32_t param_count(const clap_plugin_t *) { phase("parameters"); return 33; }
+// The same parameters as the VST3 class, the bad name being a byte that is
+// not UTF-8.
+static uint32_t param_count(const clap_plugin_t *) { phase("parameters"); return 36; }
 static bool param_info(const clap_plugin_t *, uint32_t i, clap_param_info_t *info) {
   *info = {}; info->id = i; info->max_value = 1;
   if (i == 32) info->flags = CLAP_PARAM_IS_BYPASS | CLAP_PARAM_IS_STEPPED;
+  if (i == 33) info->max_value = NAN;
+  if (i == 34) info->default_value = INFINITY;
+  if (i == 35) strcpy(info->name, "Bad \xff byte");
   return true;
 }
 static const clap_plugin_params_t params = {param_count, param_info, nullptr, nullptr, nullptr, nullptr};

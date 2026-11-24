@@ -328,6 +328,10 @@ int vst3_scan(const char *path);
 // `scan-lv2 [--skip BUNDLE]... [LV2_PATH]`: describe every installed LV2
 // plugin as JSON; argc and argv are the arguments after `scan-lv2`.
 int lv2_scan(int argc, char **argv);
+// A JSON string on stdout for the scanners, or null for NULL. Bytes that
+// are not UTF-8 become U+FFFD and the text stops at 4096 bytes, so the
+// description always parses (lv2-scan.c).
+void json_text(const char *text);
 
 #ifdef __cplusplus
 }

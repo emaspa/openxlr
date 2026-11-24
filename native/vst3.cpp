@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -111,20 +112,6 @@ bool tuid_of(const char *hex, TUID out) {
     out[i] = (char)byte;
   }
   return true;
-}
-
-void json_string(const char *s) {
-  putchar('"');
-  for (; s && *s; ++s) {
-    unsigned char ch = (unsigned char)*s;
-    if (ch == '"' || ch == '\\')
-      printf("\\%c", ch);
-    else if (ch < 0x20)
-      printf("\\u%04x", ch);
-    else
-      putchar(ch);
-  }
-  putchar('"');
 }
 
 // --- host objects -------------------------------------------------------------
@@ -1484,7 +1471,7 @@ extern "C" int vst3_scan(const char *path) {
   if (!open_module(&v, path))
     return 1;
   printf("{\"file\":");
-  json_string(path);
+  json_text(path);
   printf(",\"plugins\":[");
   fputs("trace: scan VST3: factory classes\n", stderr);
   int32 count = v.factory->countClasses();
@@ -1512,11 +1499,11 @@ extern "C" int vst3_scan(const char *path) {
     }
     printf("%s{\"id\":", first ? "" : ",");
     first = false;
-    json_string(hex_of(info.cid).c_str());
+    json_text(hex_of(info.cid).c_str());
     printf(",\"name\":");
-    json_string(info.name);
+    json_text(info.name);
     printf(",\"vendor\":");
-    json_string(vendor.c_str());
+    json_text(vendor.c_str());
     // Sub-categories read "Fx|Reverb"; the daemon groups by them.
     printf(",\"features\":[");
     size_t start = 0;
@@ -1529,7 +1516,7 @@ extern "C" int vst3_scan(const char *path) {
         if (!first_feature)
           putchar(',');
         first_feature = false;
-        json_string(subcategories.substr(start, end - start).c_str());
+        json_text(subcategories.substr(start, end - start).c_str());
       }
       start = end + 1;
     }
@@ -1562,12 +1549,16 @@ extern "C" int vst3_scan(const char *path) {
           pinfo.id, pinfo.defaultNormalizedValue);
       if (minimum > maximum)
         std::swap(minimum, maximum);
+      // A NaN or infinite bound or default has no JSON number and no usable
+      // range, so the parameter is left out, as the LV2 scanner does.
+      if (!std::isfinite(minimum) || !std::isfinite(maximum) || !std::isfinite(fallback))
+        continue;
       printf("%s{\"id\":%u,\"name\":", first_param ? "" : ",",
              (unsigned)pinfo.id);
       first_param = false;
-      json_string(utf8(pinfo.title).c_str());
+      json_text(utf8(pinfo.title).c_str());
       printf(",\"module\":");
-      json_string(utf8(pinfo.units).c_str());
+      json_text(utf8(pinfo.units).c_str());
       printf(",\"min\":%.9g,\"max\":%.9g,\"default\":%.9g,\"readonly\":%s,"
              "\"stepped\":%s,\"enum\":%s}",
              minimum, maximum, fallback,

@@ -108,8 +108,8 @@ static size_t utf8_invalid(const unsigned char *s, size_t n) {
 
 // A JSON string, or null. Bytes that are not UTF-8 become U+FFFD, so the
 // output always parses; the text stops at SCAN_MAX_TEXT bytes, between
-// characters.
-static void json_text(const char *text) {
+// characters. The CLAP and VST3 scanners write their text through it too.
+void json_text(const char *text) {
   if (!text) {
     fputs("null", stdout);
     return;
