@@ -274,7 +274,7 @@ internal static partial class SkinLayoutWindowTests
             if (maximum <= 0) Assert.True(name.Bounds.Width <= nameWidth + 0.5, $"{tile}: name {name.Bounds.Width:0.#} wide");
             AssertInside(name, tiles[i]);
             AssertInside(picker, tiles[i]);
-            var volume = tiles[i].GetVisualDescendants().OfType<Button>().Single(b => b.Name == "PlaybackVolume");
+            var volume = tiles[i].GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "ApplicationPlaybackLevel");
             AssertInside(volume, tiles[i]);
             AssertNoOverlap([picker, volume]);
             ItemsControl sizer = picker.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "ApplicationChannelSizer");

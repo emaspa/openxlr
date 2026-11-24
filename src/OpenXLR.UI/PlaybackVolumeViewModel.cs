@@ -4,7 +4,7 @@ using OpenXLR.UI.Localization;
 
 namespace OpenXLR.UI;
 
-/// <summary>Volume flyout shared by the application and browser tab lists.</summary>
+/// <summary>Volume controls shared by the application and browser tab lists.</summary>
 public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> send, bool website = false) : ViewModelBase
 {
     private readonly record struct Choice(double? Level, bool Remember);
@@ -14,8 +14,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     private Choice? _pending;
     private long _version;
     private bool _supported, _enabled, _browserHeld;
-    // What the row plays at now when nothing is saved for it: the desktop's
-    // level, which the slider starts from and the button shows below 100%.
+    // The observed stream level. A saved level is a fallback when the app is silent.
     private double? _live;
     private string? _error;
 
@@ -24,14 +23,15 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     public bool Website => website;
     public bool HasLevel => (_pending ?? _reported).Level is not null;
     /// <summary>The level the button shows; empty at full volume, saved or not, where it shows a speaker.</summary>
-    public string Label => Math.Round(Level * 100) < 100 ? $"{Level * 100:0}%" : "";
+    public string Label => Math.Round(Level * 100) < 100 ? Percentage : "";
+    public string Percentage => $"{Level * 100:0}%";
     public string Hint => website ? Localizer.Text("TabPlaybackVolumeHint")
         : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHint") : Localizer.Text("AppPlaybackVolumeHint");
     public string? Error { get => _error; private set => Set(ref _error, value); }
 
     public double Level
     {
-        get => (_pending ?? _reported).Level ?? _live ?? 1;
+        get => _pending is { } pending ? pending.Level ?? 1 : _live ?? _reported.Level ?? 1;
         set
         {
             if (Enabled && double.IsFinite(value))
@@ -105,6 +105,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     {
         Raise(nameof(Level));
         Raise(nameof(Label));
+        Raise(nameof(Percentage));
         Raise(nameof(HasLevel));
         Raise(nameof(Remember));
     }

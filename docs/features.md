@@ -1105,8 +1105,9 @@ restores the split profile when it stops.
 - A Manage dialog shows the full registry, each app with the same icon
   or initial as its tile, and an installed-application picker pre-assigns
   channels from `.desktop` entries
-- Each app has a playback volume beside its channel picker, in
-  APPLICATIONS, Manage and the terminal mixer's Apps tab. It is the
+- Each app has a visible playback slider and percentage under its channel
+  picker in APPLICATIONS. Manage and the terminal mixer's Apps tab also
+  expose the playback volume. It is the
   program's own stream volume, so two programs on one channel can play at
   different levels without a channel each. OpenXLR saves the level by
   application and gives it to streams that start later. A change made in

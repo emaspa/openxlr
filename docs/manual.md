@@ -1343,28 +1343,29 @@ routing. A remembered routing change is sent when you choose a different
 channel. When the mixer stops supplying an app list, both the APPLICATIONS
 card and the Manage list clear their stale entries.
 
-Select the volume button beside a program's channel picker to adjust its
-playback volume from 0 to 100%. The button shows a speaker at full volume
-and the level below it. The same control in **Manage**
-works for remembered programs that are closed. OpenXLR uses the playback
-streams published through PipeWire. Audio that bypasses PipeWire does not
-appear here. This level applies to the
-program's playback streams, before the channel and its sends. Two apps
+Adjust a program's playback volume from 0 to 100% with the slider under
+its channel picker in **APPLICATIONS**. The percentage stays visible at
+full volume. The volume button in **Manage** also works for remembered
+programs that are closed. OpenXLR uses the playback streams published
+through PipeWire. Audio that bypasses PipeWire does not appear here. This
+level applies to the program's playback streams, before the channel and
+its sends. Two apps
 can share one channel and still have different levels. A program marked
 **Not managed** can also have a saved volume. In the terminal mixer's
 Apps tab, `-` and `+` change the level by five points, `[` and `]` by
 one, and `r` resets it.
 
-The level is the program's stream volume, the one the desktop's volume
-control shows for that program. Moving the slider changes what plays at
-once. OpenXLR saves the level, gives it to every stream the program starts
-later and keeps it across daemon restarts. When you move the program in
+The slider shows the program's effective stream volume, including any
+additional gain PipeWire applies to the stream. Moving the slider sets
+the channel gains and clears that separate gain. OpenXLR saves the level,
+gives it to every stream the program starts later and keeps it across
+daemon restarts. When you move the program in
 the desktop's volume control, or the program moves its own stream, the
 saved level follows it. New streams get time to finish restoring their
-session volume before they can change the saved level. A program with
-nothing saved starts the slider at the level it plays at, and its button shows that level when it is below
-100%. **Reset** or **Forget** clears the saved level and puts the program
-back to 100%. The saved level is machine state and profiles leave it in
+session volume before they can change the saved level. While a stream
+exists, the slider shows its current level. A silent program shows its
+saved level if it has one. **Reset** or **Forget** clears the saved level
+and puts the program back to 100%. The saved level is machine state and profiles leave it in
 place.
 
 The session manager remembers stream volumes too, under the name a program

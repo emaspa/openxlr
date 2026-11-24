@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:OpenXLR.UI.Localization"
+             xmlns:vm="using:OpenXLR.UI"
+             x:Class="OpenXLR.UI.Views.ApplicationVolumeSlider"
+             x:DataType="vm:PlaybackVolumeViewModel"
+             IsVisible="{Binding Supported}">
+  <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8"
+        ToolTip.Tip="{Binding Hint}">
+    <Slider Name="ApplicationPlaybackLevel" Minimum="0" Maximum="1" vm:FaderInput.Step="0.01"
+            Value="{Binding Level, Mode=TwoWay}" IsEnabled="{Binding Enabled}"
+            AutomationProperties.Name="{loc:Text Key=PlaybackVolume}"/>
+    <Panel Grid.Column="1" VerticalAlignment="Center">
+      <TextBlock Text="100%" Opacity="0" AutomationProperties.AccessibilityView="Raw"/>
+      <TextBlock Name="ApplicationPlaybackPercentage" Text="{Binding Percentage}" HorizontalAlignment="Right"/>
+    </Panel>
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" TextWrapping="Wrap"
+               Classes="warn" IsVisible="{Binding !!Error}"/>
+  </Grid>
+</UserControl>

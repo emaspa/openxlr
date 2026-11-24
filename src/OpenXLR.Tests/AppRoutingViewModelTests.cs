@@ -40,7 +40,7 @@ public sealed class AppRoutingViewModelTests
              {"identity":"vlc","label":"VLC","channelId":"music","active":true,"liveVolume":0.6},
              {"identity":"mpv","label":"mpv","channelId":"music","active":true,"liveVolume":1},
              {"identity":"discord","label":"Discord","channelId":"voicechat","active":true,"volume":0.35,"liveVolume":0.35},
-             {"identity":"obs","label":"OBS","channelId":"voicechat","active":true,"volume":1,"liveVolume":1},
+             {"identity":"obs","label":"OBS","channelId":"voicechat","active":true,"volume":1,"liveVolume":0.4},
              {"identity":"signal","label":"Signal","channelId":"voicechat","active":false}]}
             """));
         PlaybackVolumeViewModel Volume(string identity) => model.Apps.Single(app => app.Identity == identity).PlaybackVolume;
@@ -48,8 +48,8 @@ public sealed class AppRoutingViewModelTests
         Assert.Equal((.6, "60%", false), (Volume("vlc").Level, Volume("vlc").Label, Volume("vlc").HasLevel));
         Assert.Equal((1, "", false), (Volume("mpv").Level, Volume("mpv").Label, Volume("mpv").HasLevel));
         Assert.Equal((.35, "35%", true), (Volume("discord").Level, Volume("discord").Label, Volume("discord").HasLevel));
-        // A level saved at full volume shows the speaker too, and Reset still clears it.
-        Assert.Equal((1, "", true), (Volume("obs").Level, Volume("obs").Label, Volume("obs").HasLevel));
+        // A saved 100% must not hide the attenuation of the live stream.
+        Assert.Equal((.4, "40%", true), (Volume("obs").Level, Volume("obs").Percentage, Volume("obs").HasLevel));
         Assert.Equal((1, "", false), (Volume("signal").Level, Volume("signal").Label, Volume("signal").HasLevel));
 
         // The desktop moves the stream: the control follows without an edit of its own.
