@@ -19,7 +19,13 @@ public sealed class ControlSocketListener : IDisposable
         => (Socket, Path, _owned) = (socket, path, owned);
 
     /// <summary>Call while holding DaemonLock, before any device or audio service starts.</summary>
-    public static ControlSocketListener Bind(string? path = null)
+    public static ControlSocketListener Bind(string? path = null) => Bind(path, beforeInspect: null);
+
+    /// <summary>
+    /// <paramref name="beforeInspect"/> runs on the bound socket just before
+    /// its path is inspected, so a test can remove the path in that window.
+    /// </summary>
+    internal static ControlSocketListener Bind(string? path, Action<Socket>? beforeInspect)
     {
         if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("The control socket requires Linux.");
         path ??= OpenXlrPaths.ControlSocketPath;
@@ -58,7 +64,9 @@ public sealed class ControlSocketListener : IDisposable
                 throw new IOException(new Win32Exception(Marshal.GetLastPInvokeError()).Message);
             socket = new Socket(handle);
             File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            return new(socket, path, RegularFile.Inspect(path, noFollow: true)!.Value);
+            beforeInspect?.Invoke(socket);
+            return new(socket, path, RegularFile.Inspect(path, noFollow: true)
+                ?? throw new IOException("The control socket was removed while it was being bound."));
         }
         catch { socket?.Dispose(); handle.Dispose(); throw; }
     }

@@ -98,6 +98,26 @@ public sealed class ControlSocketTests
     }
 
     [Fact]
+    public void ASocketRemovedWhileItIsBoundFailsAsIOAndClosesItsDescriptor()
+    {
+        string directory = Directory.CreateTempSubdirectory("ox-unix-").FullName;
+        string path = Path.Combine(directory, "control.sock");
+        try
+        {
+            SafeSocketHandle? handle = null;
+            Assert.Throws<IOException>(() => ControlSocketListener.Bind(path, socket =>
+            {
+                handle = socket.SafeHandle;
+                File.Delete(path);
+            }));
+            Assert.NotNull(handle);
+            Assert.True(handle.IsClosed);
+            Assert.False(File.Exists(path));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
+    [Fact]
     public void LinkedSocketDirectoriesAndTcpPeersAreRefused()
     {
         string directory = Directory.CreateTempSubdirectory("ox-unix-").FullName;
