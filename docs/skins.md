@@ -533,9 +533,12 @@ cells exactly under the lettering. `tools/segment-fonts.py` makes the two
 faces from the DSEG files, and `tools/deck-segments.py` then exports the
 outlines the Stream Deck keys use.
 
-**A weight** is `"Thin"`, `"ExtraLight"`, `"Light"`, `"Normal"`,
-`"Medium"`, `"SemiBold"`, `"Bold"`, `"ExtraBold"`, `"Black"` and the other
-names the toolkit knows, in any case, or a number from 1 to 1000.
+**A weight** is a name or a number. The names are `"Thin"`,
+`"ExtraLight"`, `"UltraLight"`, `"Light"`, `"SemiLight"`, `"Normal"`,
+`"Regular"`, `"Medium"`, `"DemiBold"`, `"SemiBold"`, `"Bold"`,
+`"ExtraBold"`, `"UltraBold"`, `"Black"`, `"Heavy"`, `"Solid"`,
+`"ExtraBlack"` and `"UltraBlack"`, in any case. The number is from 1 to
+1000 and written without quotes: `700` is a weight, `"700"` is not.
 
 ## The tokens
 

@@ -1360,7 +1360,9 @@
     "fontWeight": {
       "oneOf": [
         {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[A-Za-z]+$",
+          "description": "A weight name, in any case: Thin, ExtraLight, UltraLight, Light, SemiLight, Normal, Regular, Medium, DemiBold, SemiBold, Bold, ExtraBold, UltraBold, Black, Heavy, Solid, ExtraBlack or UltraBlack."
         },
         {
           "type": "number",
