@@ -293,9 +293,16 @@ void bridge_consume(Bridge *b, float *const *out, uint32_t frames,
     restart(b, rate);
   } else if (fill > 2.0 * b->target) {
     // Far above the target: the mixer side stalled, or the device sent a
-    // burst the loop cannot take back in time. Drop back to the target.
+    // burst the loop cannot take back in time. Drop back to the target, but
+    // keep what this cycle reads at the largest ratio the loop may set: the
+    // fill also counts frames the device has not delivered yet, and with a
+    // late device those can be most of it, so dropping the whole surplus
+    // would empty the ring and turn the overrun into an underrun.
+    uint32_t want = (uint32_t)ceil(frames * nominal * (1 + BRIDGE_MAX_CORRECTION)) +
+                    BRIDGE_HALF + 2;
+    uint32_t keep = avail < want ? avail : want;
     uint32_t drop = (uint32_t)(fill - b->target);
-    if (drop > avail) drop = avail;
+    if (drop > avail - keep) drop = avail - keep;
     read += drop;
     avail -= drop;
     fill -= drop;

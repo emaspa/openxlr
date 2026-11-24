@@ -274,11 +274,42 @@ static void check_mono(void) {
   bridge_free(&b);
 }
 
+// The mixer side stalls while the device keeps writing, so the ring is far
+// above its target, and when the mixer comes back the device's last cycle
+// is a whole target old. The reader drops back to the target but keeps
+// what this cycle reads: one overrun, no underrun, and the level plays on.
+static void check_overrun_with_late_device(void) {
+  Bridge b;
+  assert(bridge_init(&b, 1, BRIDGE_DEFAULT_QUANTA, BRIDGE_DEFAULT_MARGIN_MS));
+  float level[256], heard[256];
+  for (int n = 0; n < 256; ++n) level[n] = 0.25f;
+  const float *in[] = {level};
+  float *out[] = {heard};
+  const uint64_t cycle = 5333333;
+  uint64_t t = 1000000000;
+  for (int i = 0; i < 100; ++i, t += cycle) {
+    bridge_produce(&b, in, 256, 48000, t, t + cycle);
+    bridge_consume(&b, out, 256, 48000, t + 2000000);
+  }
+  assert(atomic_load(&b.state) == BRIDGE_RUNNING);
+  assert(atomic_load(&b.underruns) == 0 && atomic_load(&b.overruns) == 0);
+  for (int i = 0; i < 40; ++i, t += cycle)
+    bridge_produce(&b, in, 256, 48000, t, t + cycle);
+  uint64_t last = t - cycle;
+  uint64_t late = (uint64_t)(b.target / 256 + 2) * cycle;
+  bridge_consume(&b, out, 256, 48000, last + late);
+  assert(atomic_load(&b.overruns) == 1 && atomic_load(&b.underruns) == 0);
+  assert(atomic_load(&b.state) == BRIDGE_RUNNING);
+  for (int n = 0; n < 256; ++n) assert(fabsf(heard[n] - 0.25f) < 1e-6f);
+  bridge_free(&b);
+}
+
 int main(void) {
   setvbuf(stdout, NULL, _IOLBF, 0);
   check_kernel();
   check_arguments();
   check_mono();
+  check_overrun_with_late_device();
   played[0] = played[1] = NULL;
 
   Scenario same = {.name = "one clock, no jitter", .ppm = 0, .in_q = 256, .out_q = 256, .seconds = 40};
