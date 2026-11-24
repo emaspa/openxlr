@@ -31,6 +31,7 @@ native/tests/dynamics
 native/tests/player
 native/tests/bridge
 native/openxlr-winhost.exe
+native/winhost/*.obj
 native/tests/winhost
 native/tests/winhost-plugin.clap
 native/build-config.h

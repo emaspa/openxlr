@@ -92,18 +92,22 @@ DEP_TARGETS = $(OBJECTS) $(TEST_OBJECTS) tests/bridge tests/scan-plugin.so \
               tests/latency.lv2/latency.so tests/gain.lv2/gain.so
 
 # The Windows backend (wine.c), which runs a Windows plugin under Wine in a
-# process of its own, and that process's program, openxlr-winhost.exe
-# (winhost/winhost.c), built with mingw and linked statically. WINHOST=1
-# builds both; the default builds neither and needs no mingw. Wine is needed
-# only to run a Windows plugin, never to build.
+# process of its own, and that process's program, openxlr-winhost.exe, built
+# with mingw and linked statically. The program is the plugin backend's own
+# source built for Windows (clap.c), the host services that backend expects
+# (winhost/shim.c) and the half that talks to the Linux side
+# (winhost/winhost.c). WINHOST=1 builds both; the default builds neither and
+# needs no mingw. Wine is needed only to run a Windows plugin, never to
+# build.
 WINHOST ?= 0
 MINGW_CC ?= x86_64-w64-mingw32-gcc
 MINGW_CFLAGS = -std=c11 $(WARN) -isystem clap/include
+WINHOST_OBJECTS = winhost/winhost.obj winhost/shim.obj winhost/clap.obj
 WINHOST_TARGETS = openxlr-winhost.exe tests/winhost-plugin.clap
 ifeq ($(WINHOST),1)
 OBJECTS += wine.o
 TEST_OBJECTS += tests/winhost.o
-DEP_TARGETS += $(WINHOST_TARGETS)
+DEP_TARGETS += $(WINHOST_OBJECTS) tests/winhost-plugin.clap
 .PHONY: all
 all: openxlr-lv2-host openxlr-winhost.exe
 endif
@@ -243,9 +247,16 @@ test-lv2: tests/lv2 test-fixtures
 test-vst3: tests/vst3
 	./tests/vst3
 
-openxlr-winhost.exe: winhost/winhost.c
-	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -static $< -o $@ -lole32 -lshell32
+winhost/clap.obj: clap.c
+	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
+
+winhost/%.obj: winhost/%.c
+	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -c $< -o $@
+	@mv $@.d.tmp $@.d
+
+openxlr-winhost.exe: $(WINHOST_OBJECTS)
+	$(MINGW_CC) -static $^ -o $@ -lole32 -lshell32
 
 tests/winhost-plugin.clap: tests/winhost-plugin.c
 	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@
@@ -273,9 +284,9 @@ endif
 
 clean-native: clean-winhost
 clean-winhost:
-	rm -f wine.o tests/winhost tests/winhost.o $(WINHOST_TARGETS)
-	rm -f $(addsuffix .d,wine.o tests/winhost.o $(WINHOST_TARGETS)) \
-	      $(addsuffix .d.tmp,wine.o tests/winhost.o $(WINHOST_TARGETS))
+	rm -f wine.o tests/winhost tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
+	rm -f $(addsuffix .d,wine.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
+	      $(addsuffix .d.tmp,wine.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
 
 .PHONY: clean clean-native clean-deepfilter
 clean: clean-native clean-deepfilter

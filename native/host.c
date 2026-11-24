@@ -1510,7 +1510,7 @@ int main(int argc, char **argv) {
           stderr);
     if (&wine_backend)
       fputs("       openxlr-lv2-host [--own-block] wine clap FILE ID NODE "
-            "CHANNELS RATE\n",
+            "CHANNELS RATE [SYMBOL=VALUE ...]\n",
             stderr);
     return 2;
   }

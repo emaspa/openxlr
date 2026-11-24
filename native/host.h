@@ -10,10 +10,16 @@
 extern "C" {
 #else
 #define _POSIX_C_SOURCE 200809L
+#ifdef _WIN32
+// A backend built for the Windows plugin host (winhost/) is the same source
+// with that host's loop, window types and loader under the names used here.
+#include "winhost/shim.h"
+#else
 #include <X11/Xlib.h>
 #include <pipewire/filter.h>
 #include <pipewire/pipewire.h>
 #include <pipewire/thread.h>
+#endif
 #include <pthread.h>
 #include <semaphore.h>
 #include <setjmp.h>

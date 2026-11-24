@@ -1181,15 +1181,16 @@ exactly one counted event each and recover.
 ## Windows plugin host
 
 ```text
-openxlr-lv2-host [--own-block] wine clap FILE ID NODE CHANNELS RATE
+openxlr-lv2-host [--own-block] wine clap FILE ID NODE CHANNELS RATE [SYMBOL=VALUE ...]
 ```
 
 `make -C native WINHOST=1` builds a second way to run a Windows plugin, one
 that does not go through yabridge. It adds a `wine` backend to the helper
-(`wine.c`) and builds `openxlr-winhost.exe` beside it (`winhost/winhost.c`).
-The backend starts that program under Wine, and the program loads the
-plugin. `FILE` is the Windows `.clap` module by its Linux path and `ID` is
-the plugin's CLAP id.
+(`wine.c`) and builds `openxlr-winhost.exe` beside it. The backend starts
+that program under Wine, and the program loads the plugin. `FILE` is the
+Windows `.clap` module by its Linux path and `ID` is the plugin's CLAP id.
+`SYMBOL=VALUE` sets a parameter before the first block, as for a native CLAP
+plugin.
 
 The default build leaves both out and is unchanged. The flag needs
 `x86_64-w64-mingw32-gcc`, or the compiler `MINGW_CC` names. The program is
@@ -1197,21 +1198,42 @@ linked statically, so it is one file. Building it does not need Wine;
 running it does. Run `make -C native clean-native` when you switch the flag,
 as after any change of flags.
 
-This is the first step of a host that will replace the yabridge companion.
-It carries CLAP audio and latency. It has no parameters, no editor, no
-scanner and no VST3 yet. The daemon does not start it and no package builds
-it, so nothing here reaches a user.
+This is the start of a host that will replace the yabridge companion. It
+carries CLAP audio, parameters and latency. It has no editor, no scanner and
+no VST3 yet. The daemon does not start it and no package builds it, so
+nothing here reaches a user.
 
 The helper keeps the PipeWire node and the Windows program holds the plugin.
-The CLAP host structure, the port layout and a restart the plugin asks for
-stay on the Windows side, next to the plugin. Only what the helper's own
-backend interface carries crosses between the two: load, activate, one block
-of audio, the latency, deactivate. `winhost/wire.h` describes it.
+The Windows program has no CLAP host of its own. It is built from three
+sources:
 
-- One shared file, mapped by both sides, holds the audio of one cycle. It
-  sits in a private directory under `XDG_RUNTIME_DIR`, or under `/dev/shm`
-  where there is none, and the backend removes the directory as soon as the
-  Windows program has opened what is in it.
+- `clap.c`, the same file the helper builds for a native CLAP plugin,
+  compiled for Windows. The port layout, the parameters, a restart the
+  plugin asks for, timers and the thread checks are that one implementation
+  on both systems.
+- `winhost/shim.c`, which gives that backend the services `host.h`
+  declares: the control table, the reports from the audio thread, the main
+  loop's timers and events, and the module loader. `winhost/shim.h` stands
+  in for the PipeWire, X and `dlfcn.h` headers. `clap.c` itself differs in
+  two places on Windows: it skips the `dlfcn.h` include and leaves out its
+  scanner.
+- `winhost/winhost.c`, which talks to the Linux side.
+
+Timers are Windows timers on the main thread's message loop, no finer than
+10 ms. An event signalled from the audio thread waits for the main thread's
+next tick, 33 ms at most, because waking it at once would be a call to
+wineserver inside a block. Windows has no file descriptors to watch, so the
+host refuses a plugin that asks it to watch one.
+
+Only what the helper's own backend interface carries crosses between the
+two: load, activate, one block of audio, the controls, the latency,
+deactivate. `winhost/wire.h` describes it.
+
+- One shared file, mapped by both sides, holds the audio of one cycle and
+  the plugin's controls. It sits in a private directory under
+  `XDG_RUNTIME_DIR`, or under `/dev/shm` where there is none, and the backend
+  removes the directory as soon as the Windows program has opened what is in
+  it.
 - The audio wake is the Windows program's standard input and output, one
   byte each way per cycle. Under Wine a blocking read on an inherited pipe is
   a plain `read` in the calling thread. A cycle costs the Windows audio
@@ -1226,10 +1248,35 @@ of audio, the latency, deactivate. `winhost/wire.h` describes it.
   line at a time. The plugin's log and the `trace:` lines reach the daemon's
   log the way a native backend's do.
 
+The plugin's parameters are controls of the helper, under the names a native
+CLAP plugin's have, so `set`, `control` and `meter` lines read the same.
+Their values cross in the shared file and cost no system call:
+
+- At load the Windows side lists the controls the backend made, and the
+  helper registers the same ones: name, range, value, and whether it is a
+  meter.
+- A value the helper is told to set goes with the next block. The Linux
+  audio thread writes it into the shared file before the wake and the
+  Windows audio thread applies it before the plugin runs, so it is heard in
+  that block. One cycle carries 256 values; more wait for the next.
+- When the plugin moves a value, from its editor for one, or a meter has a
+  new reading, the Windows side publishes it in that control's own word of
+  the shared file. The helper reads those words on its tick and reports the
+  changes to the daemon as it does a native plugin's.
+- Every published value has a count, and a set names the count the helper
+  had seen. The Windows side drops a set made before the helper had seen the
+  plugin's latest move of that control. The plugin's value stands and the
+  helper takes it on its next tick, so the two sides disagree for one tick
+  at most, and the helper never sends a value it took from the plugin back
+  over a newer one.
+
 Each side bounds what it reads from the other. The Windows side checks the
 frame count of every block against the fixed buffers and against what the
-plugin was activated for. The Linux side never uses a value from the shared
-file as a size or an index.
+plugin was activated for, and every set against the control table, the
+control's range and its count. The Linux side never uses a value from the
+shared file as a size or an index. It refuses a list of controls longer than
+the table or with a name that is not one plain word, and checks a published
+value before taking it.
 
 The Windows audio thread takes a name, the helper finds the thread by that
 name under `/proc`, and gives it the scheduling of the thread that waits for
@@ -1281,7 +1328,16 @@ buffers with the Windows program started for real, and checks:
   with the reason;
 - the latency the plugin reports, and a restart the plugin asks for that
   changes it, carried out in the same process;
-- a main-thread callback the plugin asks for from its audio thread;
+- a main-thread callback the plugin asks for from its audio thread, and a
+  timer it registers;
+- the plugin's parameters as controls: a value set before the first block
+  and one set between blocks are heard in the next block, a value the plugin
+  moves reaches the helper, a meter is read, and a hidden parameter and the
+  plugin's own bypass are left out;
+- a plugin with 5000 parameters gets the table's 4096, and a thousand values
+  set at once arrive over four cycles;
+- sets that name no control, carry no number or come with a stale count
+  change nothing, and a list of controls the helper cannot carry is refused;
 - refused blocks, a block 60 ms late, a killed Windows program, a plugin that
   crashes inside a block and one that never returns. In each the audio
   callback keeps returning, plays only the plugin's audio or silence, and
