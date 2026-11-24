@@ -87,6 +87,10 @@ machine setting, not profile state; a refused save returns an error without
 changing the policy. Not managed does not mute playback or bypass an OpenXLR
 system default. See [application names](api.md#application-names).
 
+Send `setBrowserTabVolume` with `locked:true` through `/commands` to hold
+a website's tab volume. Both tab and application volume commands take
+values through 1.5. The tab state reports `volumeLocked`.
+
 The mixer resource also reports `preserveBrowserOutputs` and `browserTabs`
 as documented in [browser tabs](api.md#browser-tabs). A tab's `title` is empty
 unless it is capturing or has an assigned channel; its origin remains

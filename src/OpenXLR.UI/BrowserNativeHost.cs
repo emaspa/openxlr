@@ -462,7 +462,7 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
                     if (Bool(tab, "volumeSupported"))
                     {
                         copy["volume"] = tab["volume"] is JsonValue level && level.TryGetValue<double>(out double volume)
-                            && volume is >= 0 and <= 1 ? volume : null;
+                            && volume is >= 0 and <= 1.5 ? volume : null;
                     }
                     tabs.Add(copy);
                 }

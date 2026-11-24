@@ -71,6 +71,7 @@ public sealed record Command
     /// <summary>assignBrowserTab: the origin the caller saw when it selected the tab.</summary>
     [JsonPropertyName("site")] public string? Site { get; init; }
     [JsonPropertyName("tabs")] public List<BrowserTabRegistration>? Tabs { get; init; }
+    [JsonPropertyName("locked")] public System.Text.Json.JsonElement Locked { get; init; }
     [JsonPropertyName("remember")] public System.Text.Json.JsonElement Remember { get; init; }
 
     /// <summary>

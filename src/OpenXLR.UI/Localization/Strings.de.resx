@@ -4548,4 +4548,7 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
   <data name="GlitchKeyNote" xml:space="preserve">
     <value>Die Störungstaste markiert den Moment wie Ctrl+G, auch während die Oberfläche im Tray liegt. Sammle danach die Diagnose: timeline.txt im Archiv zeigt, was sich in den 30 Sekunden vor jeder Markierung geändert hat.</value>
   </data>
+  <data name="BrowserVolumeLock" xml:space="preserve">
+    <value>Lautstärke für diese Website sperren</value>
+  </data>
 </root>

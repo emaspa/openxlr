@@ -106,6 +106,10 @@ test('tab gain is independent on a shared destination and survives a reroute', a
   f.audio.setVolume(1, 0, teams);
   await f.audio.route(1, 'music');
   assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [0, 1]);
+  f.audio.setVolume(1, 1.5, teams);
+  assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [3.375, 1]);
+  f.audio.setVolume(1, 1.51, teams);
+  assert.equal(f.contexts[0].gain.gain.value, 1);
   f.audio.setVolume(1, null, teams);
   assert.equal(f.contexts[0].gain.gain.value, 1);
   assert.equal(f.acquisitions.length, 2);

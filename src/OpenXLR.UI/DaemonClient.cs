@@ -151,6 +151,10 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
         => EditLayoutAsync(new() { ["cmd"] = "setBrowserTabVolume", ["session"] = session,
             ["tabId"] = tabId, ["site"] = site, ["value"] = volume!, ["remember"] = remember });
 
+    public Task<string?> SetBrowserTabVolumeLockAsync(string session, int tabId, string site, double volume, bool locked)
+        => EditLayoutAsync(new() { ["cmd"] = "setBrowserTabVolume", ["session"] = session,
+            ["tabId"] = tabId, ["site"] = site, ["value"] = volume, ["remember"] = false, ["locked"] = locked });
+
     public Task<string?> AssignBrowserTabAsync(string session, int tabId, string site, string? channel, bool remember)
         => EditLayoutAsync(new() { ["cmd"] = "assignBrowserTab", ["session"] = session,
             ["tabId"] = tabId, ["site"] = site, ["channel"] = channel!, ["remember"] = remember });

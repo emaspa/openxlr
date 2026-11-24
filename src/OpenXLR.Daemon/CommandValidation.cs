@@ -327,7 +327,7 @@ public static class CommandValidation
                 if (cmd.Cmd == "adjustOutputVolume")
                     return Finite(cmd, "value") ?? (cmd.Value.GetDouble() is >= -.5 and <= .5 ? null : "adjustOutputVolume: step must be between -0.5 and 0.5");
                 if (cmd.Cmd == "setOutputDeviceVolume")
-                    return Finite(cmd, "value") ?? (cmd.Value.GetDouble() is >= 0 and <= 1.5 ? null : "setOutputDeviceVolume: volume must be between 0 and 1.5");
+                    return Finite(cmd, "value") ?? (cmd.Value.GetDouble() is >= 0 and <= 1.5 ? null : "setOutputDeviceVolume: volume must be between 0 and 1.5.5");
                 return null;
             case "routeFocusedApp":
                 return cmd.Channel is { Length: > 0 and <= 36 } && layout.HasApplicationChannel(cmd.Channel)
@@ -342,6 +342,8 @@ public static class CommandValidation
                 if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "setBrowserTabVolume: supply a browser session and tabId";
                 if (BrowserTabRouting.CanonicalSite(cmd.Site) is null) return "setBrowserTabVolume: supply the tab's HTTP or HTTPS origin";
                 if (cmd.Remember.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "setBrowserTabVolume: remember must be a boolean";
+                if (cmd.Locked.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.True or JsonValueKind.False))
+                    return "setBrowserTabVolume: locked must be a boolean";
                 return PlaybackVolume(cmd);
             case "assignBrowserTab":
                 if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "assignBrowserTab: supply a browser session and tabId";

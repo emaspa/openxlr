@@ -86,6 +86,12 @@ public sealed partial class MainViewModel : ViewModelBase
         LoadMixerView();
         OutputVolumeRange = new VolumeRangeViewModel(() => OutputVolume = Math.Min(OutputVolume, 1));
         OutputVolumeRange.Changed += RequestDesktopVolumeBoost;
+        OutputVolumeRange.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName != nameof(VolumeRangeViewModel.Maximum)) return;
+            foreach (var app in Apps) app.PlaybackVolume.ApplyBoost(OutputVolumeRange.Boost);
+            foreach (var tab in BrowserTabs) tab.PlaybackVolume.ApplyBoost(OutputVolumeRange.Boost);
+        };
         Inserts = new InsertsViewModel(client, "xlr1", 1, "XLR 1");
         Inserts2 = new InsertsViewModel(client, "xlr2", 1, "XLR 2");
         _client.StateReceived += node =>
@@ -1875,6 +1881,7 @@ public sealed partial class MainViewModel : ViewModelBase
                 existing.Icon = icon;
             }
             existing.ApplyBrowserHold(browserHeld, output);
+            existing.PlaybackVolume.ApplyBoost(OutputVolumeRange.Boost);
             existing.PlaybackVolume.Apply(volumeSupported, true,
                 stream["volume"]?.GetValue<double>(), browserHeld: browserHeld,
                 live: stream["liveVolume"]?.GetValue<double>());

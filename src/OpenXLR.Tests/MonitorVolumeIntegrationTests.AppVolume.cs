@@ -91,6 +91,10 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.True(mixer.TakeAppVolumesChanged());
             Assert.Equal(before["discord"], StreamVolumes()["discord"]);
 
+            mixer.SetAppVolume(app, 1.5);
+            Assert.Equal("150%", StreamVolumes()["teams-second"].Volume);
+            Assert.Equal(before["discord"], StreamVolumes()["discord"]);
+
             // A stream that starts later gets the level from the pass the
             // registry's announcement starts, without a sweep.
             first.Cancel();
@@ -102,7 +106,7 @@ public sealed partial class MonitorVolumeIntegrationTests
             Assert.True(SpinWait.SpinUntil(() =>
             {
                 mixer.SyncAppVolumes();
-                return StreamVolumes().TryGetValue("teams-restarted", out var stream) && stream.Volume == "62%";
+                return StreamVolumes().TryGetValue("teams-restarted", out var stream) && stream.Volume == "150%";
             }, TimeSpan.FromSeconds(5)), string.Join(", ", StreamVolumes()));
 
             // Reset hands the streams back at full volume.

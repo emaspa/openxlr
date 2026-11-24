@@ -543,14 +543,15 @@
                   }
                 },
                 "setBrowserTabVolume": {
-                  "summary": "Save a playback level for a routed browser tab's website",
+                  "summary": "Lock a playback level for a routed browser tab's website",
                   "value": {
                     "cmd": "setBrowserTabVolume",
                     "session": "e3b0c44298fc4c14b9afbf4c8996fb92",
                     "tabId": 42,
                     "site": "https://teams.microsoft.com",
-                    "value": 0.45,
-                    "remember": true
+                    "value": 1.5,
+                    "remember": false,
+                    "locked": true
                   }
                 },
                 "assignBrowserTab": {

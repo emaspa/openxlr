@@ -1380,7 +1380,10 @@ shows the level, and saving one for it settles it.
 
 The browser's application level still applies when individual Chromium
 tab routing is enabled. Set each captured tab or installed web app's
-relative level under **Browser tabs**. See [Browser tab routing](browser-routing.md).
+relative level under **Browser tabs**. The main Monitor's **150%** switch
+opens the wider range in both volume popups. Use the lock beside **Reset**
+for a tab to hold its website level across playback sessions and save it
+with a profile. See [Browser tab routing](browser-routing.md).
 
 An app's playback streams and audio client share the same identity even
 when PipeWire puts the process name only on the client. Windows executable

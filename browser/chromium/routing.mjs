@@ -57,7 +57,7 @@ export function errorText(error) {
 }
 
 export function playbackVolume(value) {
-  return typeof value === 'number' && value >= 0 && value <= 1 ? value : 1;
+  return typeof value === 'number' && value >= 0 && value <= 1.5 ? value : 1;
 }
 
 /** Native Web Audio does the playback. No audio samples enter JavaScript. */

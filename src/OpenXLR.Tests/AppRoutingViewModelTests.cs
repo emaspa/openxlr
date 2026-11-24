@@ -61,6 +61,27 @@ public sealed class AppRoutingViewModelTests
     }
 
     [Fact]
+    public async Task MonitorBoostOpensApplicationRangeAndKeepsReportedBoostWhenDisabled()
+    {
+        await using var client = new DaemonClient();
+        var model = new MainViewModel(client);
+        Invoke(model, "ApplyStreams", JsonNode.Parse("""
+            {"appVolumeSupported":true,"streams":[{"identity":"chrome","label":"Chrome","active":true,"volume":1}]}
+            """));
+        var volume = Assert.Single(model.Apps).PlaybackVolume;
+        Assert.Equal(1, volume.Maximum);
+        model.OutputVolumeRange.Boost = true;
+        Assert.Equal(1.5, volume.Maximum);
+
+        volume.Apply(true, true, 1.4);
+        model.OutputVolumeRange.Boost = false;
+        Assert.Equal(1.4, volume.Maximum);
+        Assert.Equal("140%", volume.Label);
+        volume.Apply(true, true, .9);
+        Assert.Equal(1, volume.Maximum);
+    }
+
+    [Fact]
     public async Task OldDaemonsAndDisconnectedClientsCannotSendThePreference()
     {
         await using var client = new DaemonClient();
