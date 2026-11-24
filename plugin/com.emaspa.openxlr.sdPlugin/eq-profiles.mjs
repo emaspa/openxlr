@@ -84,8 +84,8 @@ export function eqHolds(eq, profile, limits) {
 
 // What an EQ profile key reads, or null when the target is malformed, the
 // microphone is gone, absent or has no EQ, or the daemon lists no such
-// profile: {channel, profile, lit, fits}. A saved profile is found by its
-// name whatever its case, as the daemon finds it.
+// profile: {channel, profile, mix, lit, fits, held}. A saved profile is
+// found by its name whatever its case, as the daemon finds it.
 export function eqProfileTarget(state, target) {
   const parts = parse(target);
   if (!parts) return null;
@@ -102,7 +102,7 @@ export function eqProfileTarget(state, target) {
   // While hardware mixing holds a mix's EQ off, its key shows and sends nothing.
   const held = parts.mix && eqHeldByUnit(mixer, channel.id) !== null;
   return {channel, profile, mix: parts.mix, lit: eqHolds(channel.eq, profile, mixer?.eqLimits),
-    fits: !held && profile.bands.length >= min && profile.bands.length <= max};
+    fits: !held && profile.bands.length >= min && profile.bands.length <= max, held};
 }
 
 // What a press sends, or null when it can do nothing: no such profile,
