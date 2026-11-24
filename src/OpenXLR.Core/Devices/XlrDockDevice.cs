@@ -197,8 +197,9 @@ public sealed class XlrDockDevice : IAudioDevice
     /// <summary>
     /// All control transfers go through here. A transfer that never returns
     /// (issue #6) throws UsbHungException; the handle is then abandoned
-    /// without libusb_close, since the stuck native call may still use it,
-    /// and Connected turns false so the daemon reconnects with a new one.
+    /// without libusb_close, since the stuck native call may still use it.
+    /// Connected follows the ALSA card and stays true; the exception is what
+    /// makes the daemon drop the dock and reconnect it with a new handle.
     /// </summary>
     private int Transfer(byte requestType, byte request, ushort value, byte[] data, int length)
         => _usb.ControlTransfer(requestType, request, value, UsbIndex, data, (ushort)length, 1000);
@@ -370,7 +371,7 @@ public sealed class XlrDockDevice : IAudioDevice
         if (_usb.IsOpen)
         {
             try { blocks["config"] = Convert.ToHexString(ReadConfig()); }
-            catch (Exception ex) { blocks["config"] = $"error: {ex.Message}"; }
+            catch (Exception ex) when (ex is not UsbHungException) { blocks["config"] = $"error: {ex.Message}"; }
             try
             {
                 var buf = new byte[51];
@@ -379,7 +380,7 @@ public sealed class XlrDockDevice : IAudioDevice
                     ? Convert.ToHexString(buf.AsSpan(0, n))
                     : $"error: {LibUsb.StrError(n)}";
             }
-            catch (Exception ex) { blocks["devinfo"] = $"error: {ex.Message}"; }
+            catch (Exception ex) when (ex is not UsbHungException) { blocks["devinfo"] = $"error: {ex.Message}"; }
         }
         return blocks;
     }

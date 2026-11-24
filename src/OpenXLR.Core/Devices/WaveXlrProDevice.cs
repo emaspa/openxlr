@@ -287,9 +287,10 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
         byte[] b4 = Read(BlockSettings, SettingsLen);
         lock (_lock) _settings = b4;
         byte[] b5 = Read(BlockHp, HpLen);
-        // A unit that refuses the ducking block still answers every other control.
+        // A unit that refuses the ducking block still answers every other
+        // control; one whose read hangs throws, as any hung read does.
         try { _ducking = ProDucking.Decode(Read(ProDucking.Block, ProDucking.Length), b1); }
-        catch (IOException) { _ducking = null; }
+        catch (IOException ex) when (ex is not UsbHungException) { _ducking = null; }
         ProMixHeld mix = ProMixPlan.Read(b1);
         byte f = b4[FlagsOffset];
         byte f2 = b4[Xlr2Base + FlagsOffset];
@@ -708,7 +709,7 @@ public sealed class WaveXlrProDevice : IAudioDevice, IDisposable
                             : "too short to hold the compressor and expander";
                     }
             }
-            catch (IOException ex) { blocks[$"0x{block:X4}"] = $"read failed: {ex.Message}"; }
+            catch (IOException ex) when (ex is not UsbHungException) { blocks[$"0x{block:X4}"] = $"read failed: {ex.Message}"; }
         }
         blocks["firmware"] = Firmware ?? "not read";
         blocks["eqSupport"] = EqSupport is { } support ? support.Ready ? "on the unit" : $"in software: {support.Reason}" : "not decided";

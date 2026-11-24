@@ -212,7 +212,10 @@ public interface IAudioDevice : IDisposable
     // override them.
     /// <summary>
     /// Raw vendor state for diagnostics: block name to hex payload. Default
-    /// empty for devices without a block protocol.
+    /// empty for devices without a block protocol. A block that fails to read
+    /// is named with its error; a transfer that hangs throws
+    /// <see cref="UsbHungException"/>, so the caller drops the unit as after
+    /// any hang.
     /// </summary>
     IReadOnlyDictionary<string, string> DumpBlocks() => new Dictionary<string, string>();
 
