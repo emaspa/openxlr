@@ -214,7 +214,8 @@ install -Dm644 README.md %{buildroot}%{_docdir}/openxlr/README.md
 
 %post
 /usr/bin/udevadm control --reload 2>/dev/null || :
-/usr/bin/udevadm trigger 2>/dev/null || :
+# The rule only concerns Elgato's vendor id; replay events for those devices alone.
+/usr/bin/udevadm trigger --subsystem-match=usb --attr-match=idVendor=0fd9 2>/dev/null || :
 cat <<'MSG'
 OpenXLR: replug your interface once so the udev rule applies.
 Start the daemon:  systemctl --user enable --now openxlr-daemon

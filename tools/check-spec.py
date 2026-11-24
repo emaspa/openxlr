@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Every file the RPM %install section puts under %{buildroot} must be
 claimed by a %files entry, and no bare path may sit in %install (rpm
-would execute it as a command). Standard library only, so it runs on any
-CI runner without rpm tools."""
+would execute it as a command). A udevadm trigger in a scriptlet is
+limited to the USB vendor in packaging/70-openxlr.rules and cannot fail
+the install. Standard library only, so it runs on any CI runner without
+rpm tools."""
 import fnmatch
+import os
 import re
 import sys
 
@@ -50,6 +53,24 @@ for target in installed:
         continue
     if not claimed(target):
         errors.append(f"installed but not in %files: {target}")
+# A scriptlet that replays udev events replays them only for the USB
+# vendors the rule names, not for every device on the machine, and a
+# system without udev (a container, a chroot) does not fail the install.
+rule = os.path.join(os.path.dirname(os.path.abspath(path)), "..", "70-openxlr.rules")
+vendors = set(re.findall(r'ATTRS\{idVendor\}=="([0-9a-fA-F]{4})"', open(rule).read()))
+triggered = set()
+for name in ("pre", "post", "preun", "postun"):
+    for line in section(name).splitlines():
+        if "udevadm" not in line or "trigger" not in line:
+            continue
+        matched = re.findall(r"--attr-match=idVendor=([0-9a-fA-F]{4})\b", line)
+        if "--subsystem-match=usb" not in line or len(matched) != 1 or matched[0] not in vendors:
+            errors.append(f"%{name}: udevadm trigger is not limited to one vendor of the rule: {line.strip()}")
+        elif not line.rstrip().endswith("|| :"):
+            errors.append(f"%{name}: udevadm trigger can fail the install: {line.strip()}")
+        triggered.update(matched)
+if triggered and triggered != vendors:
+    errors.append(f"udevadm trigger leaves out vendors of the rule: {', '.join(sorted(vendors - triggered))}")
 for e in errors:
     print(f"spec: {e}", file=sys.stderr)
 print(f"spec: {len(installed)} install targets, {len(claims)} %files entries, {'ok' if not errors else str(len(errors)) + ' problems'}")
