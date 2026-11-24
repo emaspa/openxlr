@@ -90,6 +90,10 @@ builder.Services.AddSingleton<WebSocketHub>();
 ControlApi.Configure(builder, control);
 
 var app = builder.Build();
+// What a USB helper writes to its standard error (why claiming the
+// interface failed, the exception that ended it) goes to the daemon's log.
+ILogger usbHelperLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("OpenXLR.Daemon.UsbHelper");
+OpenXLR.Core.HelperUsbTransport.ErrorLog = line => usbHelperLog.LogWarning("{line}", line);
 app.Services.GetRequiredService<WebSocketHub>();   // construct so it subscribes to StateChanged
 // The timeline's first entry, so an archive shows where its record begins.
 app.Services.GetRequiredService<DeviceManager>().Timeline.Record(OpenXLR.Core.Mixing.TimelineKind.Daemon,

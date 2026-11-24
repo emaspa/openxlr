@@ -320,7 +320,9 @@ binary started with `--usb-helper`) owns it and answers open, close and
 control-transfer requests over length-prefixed frames on its stdin and
 stdout. The helper claims the vendor interface when it opens the device
 and releases it on close; a claim that fails counts as the device not
-opened. Every transfer runs under a watchdog (the libusb timeout plus
+opened. What the helper writes to its standard error, such as why a claim
+failed, goes to the daemon's log, up to 100 lines from each helper. Every
+transfer runs under a watchdog (the libusb timeout plus
 3 s); one that never returns is reported, the helper is killed so the
 operating system reclaims the stuck thread and the device handle, the
 device is dropped and reconnected through a fresh helper, and the

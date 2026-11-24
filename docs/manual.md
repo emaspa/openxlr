@@ -5255,7 +5255,9 @@ UI's header, while the submixer and any other interface keep
 working. Unplug the interface and plug it back in, or restart the
 daemon, to try again. A helper whose device could not be opened at all
 (the udev rule not applied yet, see [section 5.1](#no-device)) is
-killed straight away and the daemon tries again two seconds later. A
+killed straight away and the daemon tries again two seconds later. The
+journal carries the reason the helper gave, such as an interface it could
+not claim. A
 device that opens but answers its reads with errors is dropped and
 reopened after two seconds, and the wait doubles on each failure that
 follows, up to 32 seconds, so the log shows the retries at growing
