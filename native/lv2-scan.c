@@ -464,12 +464,13 @@ static void load_path(LilvWorld *world, const char *lv2_path, const Skips *skips
   unsigned index = 0;
   while (*lv2_path) {
     const char *colon = strchr(lv2_path, ':');
-    size_t length = colon ? (size_t)(colon - lv2_path) : 0;
-    if (!length) {
+    if (!colon) {
       load_directory(world, lv2_path, skips, &index);
       break;
     }
-    char *dir = strndup(lv2_path, length);
+    // An empty entry names no directory; the entries after it still count.
+    size_t length = (size_t)(colon - lv2_path);
+    char *dir = length ? strndup(lv2_path, length) : NULL;
     if (dir)
       load_directory(world, dir, skips, &index);
     free(dir);

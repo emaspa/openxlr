@@ -191,3 +191,22 @@ with tempfile.TemporaryDirectory(prefix="openxlr-lv2-scan-") as directory:
     assert "urn:openxlr:scan:naïve" not in {p["uri"] for p in json.loads(result.stdout)["plugins"]}
     print("PASS: LV2 scan stalled in a manifest and in a plugin's data names each bundle last; "
           "--skip leaves them out and the rest is described")
+
+# An LV2 path is split on colons. An empty entry, at the start, in the middle
+# or at the end, names no directory and the entries after it are still read.
+with tempfile.TemporaryDirectory(prefix="openxlr-lv2-path-") as directory:
+    first, second = Path(directory) / "a", Path(directory) / "b"
+    first.mkdir()
+    second.mkdir()
+    (first / "gain.lv2").symlink_to(root / "tests/gain.lv2")
+    (second / "latency.lv2").symlink_to(root / "tests/latency.lv2")
+    both = {"urn:openxlr:test:gain", "urn:openxlr:test:gain:mono", "urn:openxlr:test:latency"}
+    for path, expected in ((f"{first}:{second}", both), (f"{first}::{second}", both), (f":{first}", both - {
+            "urn:openxlr:test:latency"}), (f"::{second}", {"urn:openxlr:test:latency"}),
+            (f"{first}:", both - {"urn:openxlr:test:latency"}), (f"{first}:{second}:", both)):
+        result = subprocess.run([str(root / "openxlr-lv2-host"), "scan-lv2", path], env=env,
+                                capture_output=True, timeout=30)
+        assert result.returncode == 0, (path, result.stderr)
+        found = {p["uri"] for p in json.loads(result.stdout)["plugins"]}
+        assert found == expected, (path, sorted(found))
+    print("PASS: LV2 path entries after an empty one are still scanned")
