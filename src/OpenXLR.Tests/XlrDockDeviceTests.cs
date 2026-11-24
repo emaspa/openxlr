@@ -45,11 +45,15 @@ public sealed class XlrDockDeviceTests
     {
         private readonly Dictionary<string, string> _values = new();
         private readonly Dictionary<string, string> _types = new();
+        private readonly Dictionary<string, int> _channels = new();
         public List<string> Calls { get; } = [];
 
         public FakeAmixer WithInteger(string name, int value) { _values[name] = value.ToString(); _types[name] = "INTEGER"; return this; }
         public FakeAmixer WithSwitch(string name, bool on) { _values[name] = on ? "on" : "off"; _types[name] = "BOOLEAN"; return this; }
         public string Value(string name) => _values[name];
+
+        /// <summary>Reports the control with this many channels, each holding its value.</summary>
+        public FakeAmixer WithChannels(string name, int channels) { _channels[name] = channels; return this; }
 
         public ProcessResult Run(IReadOnlyList<string> args)
         {
@@ -68,7 +72,11 @@ public sealed class XlrDockDeviceTests
             if (!_values.ContainsKey(name))
                 return new ProcessResult(1, [], "amixer: Cannot find the given element from control sysdefault:7\n", false, false);
             if (verb == "cget")
-                return Ok($"numid=1,iface=MIXER,name='{name}'\n  ; type={_types[name]},access=rw------,values=1\n  : values={_values[name]}\n");
+            {
+                int channels = _channels.GetValueOrDefault(name, 1);
+                string values = string.Join(',', Enumerable.Repeat(_values[name], channels));
+                return Ok($"numid=1,iface=MIXER,name='{name}'\n  ; type={_types[name]},access=rw------,values={channels}\n  : values={values}\n");
+            }
             Assert.Equal("cset", verb);
             _values[name] = args[4];
             return Ok("");
@@ -138,6 +146,28 @@ public sealed class XlrDockDeviceTests
         dev.SetGainDb(20);
         Assert.Equal("40", amixer.Value("Mic Capture Volume"));
         Assert.Empty(usb.Writes);            // never behind the kernel's cache
+    }
+
+    [Fact]
+    public void TwoChannelControlsReadAsTheirFirstValue()
+    {
+        FakeAmixer amixer = FullCard()
+            .WithChannels("Mic Capture Volume", 2)
+            .WithChannels("Mic Capture Switch", 2)
+            .WithChannels("PCM Playback Volume", 2);
+        (XlrDockDevice dev, _, _) = Dock(amixer);
+        dev.Connect();
+        (XlrDockDevice single, _, _) = Dock(FullCard());
+        single.Connect();
+
+        DeviceState s = dev.ReadState();
+        Assert.Equal(75, s.GainDb);
+        Assert.False(s.Mute);
+        Assert.Equal(-31.0, s.HpVolumeDb);
+        Assert.Equal(single.ReadState(), s);
+
+        dev.SetMute(true);                   // one value written sets both channels
+        Assert.True(dev.ReadState().Mute);   // and "off,off" reads as muted
     }
 
     [Fact]
