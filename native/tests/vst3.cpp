@@ -15,11 +15,13 @@ extern "C" Host *test_audio_host_new(unsigned channels);
 extern "C" void test_audio_host_free(Host *h);
 extern "C" bool test_host_audio_failed(Host *h);
 extern "C" void test_host_set_own_block(Host *h, bool own_block);
+extern "C" void test_host_open_editor(Host *h, const Backend *backend);
+extern "C" void test_host_lose_display(void);
 
 class Watch final : public Linux::ITimerHandler, public Linux::IEventHandler {
  public:
   PlugFrame *frame = nullptr;
-  bool timer = false;
+  bool timer = false, lose_display = false;
   unsigned refs = 1, calls = 0;
   tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
     *obj = nullptr;
@@ -33,7 +35,13 @@ class Watch final : public Linux::ITimerHandler, public Linux::IEventHandler {
                   : frame->unregisterEventHandler(this)) == kResultFalse);
     return --refs;
   }
-  void PLUGIN_API onTimer() override { ++calls; }
+  void PLUGIN_API onTimer() override {
+    ++calls;
+    if (lose_display) {
+      lose_display = false;
+      test_host_lose_display();
+    }
+  }
   void PLUGIN_API onFDIsSet(Linux::FileDescriptor) override { ++calls; }
 };
 
@@ -134,6 +142,70 @@ static void editor_watches() {
   close(pipes[1]);
 }
 
+static void iterate_until(Host *h, const unsigned &calls) {
+  for (unsigned i = 0; i < 200 && !calls; ++i)
+    pw_loop_iterate(host_loop(h), 10);
+  assert(calls);
+}
+
+// The display goes while the view's timer runs. The view's sources stop at
+// once, a hung-up descriptor included, and their handlers are released
+// exactly once afterwards: by the plugin, by the next view's release, or
+// at unload. A new view can register and run its own meanwhile.
+static void lost_editor_watches(bool reopen) {
+  Host *h = test_host_new();
+  auto *v = new Vst3();
+  v->h = h;
+  v->frame = new PlugFrame(v);
+  host_set_impl(h, v);
+  int pipes[2];
+  assert(pipe(pipes) == 0);
+  WatchView lost;
+  v->view = &lost;
+  lost.timer.frame = lost.fd.frame = v->frame;
+  lost.timer.timer = true;
+  lost.timer.lose_display = true;
+  assert(v->frame->registerTimer(&lost.timer, 1) == kResultOk);
+  assert(v->frame->registerEventHandler(&lost.fd, pipes[0]) == kResultOk);
+  test_host_open_editor(h, &vst3_backend);
+  pw_loop_enter(host_loop(h));
+  iterate_until(h, lost.timer.calls);
+  assert(!v->view);
+  // The plugin's connection hangs up and stays ready from now on.
+  close(pipes[1]);
+  for (unsigned i = 0; i < 10; ++i)
+    assert(pw_loop_iterate(host_loop(h), 5) == 0);
+  assert(lost.timer.calls == 1 && !lost.fd.calls);
+  assert(lost.timer.refs == 2 && lost.fd.refs == 2);
+  if (reopen) {
+    // The plugin lets go of one itself; the next view's release takes the other.
+    assert(v->frame->unregisterTimer(&lost.timer) == kResultOk);
+    assert(lost.timer.refs == 1);
+    assert(v->frame->unregisterTimer(&lost.timer) == kResultFalse);
+    WatchView view;
+    v->view = &view;
+    view.timer.frame = view.fd.frame = v->frame;
+    view.timer.timer = true;
+    int next[2];
+    assert(pipe(next) == 0);
+    assert(v->frame->registerTimer(&view.timer, 1) == kResultOk);
+    assert(v->frame->registerEventHandler(&view.fd, next[0]) == kResultOk);
+    iterate_until(h, view.timer.calls);
+    assert(write(next[1], "x", 1) == 1);
+    iterate_until(h, view.fd.calls);
+    vst3_editor_close(h);
+    assert(view.released == 1 && lost.fd.refs == 1);
+    close(next[0]);
+    close(next[1]);
+  }
+  pw_loop_leave(host_loop(h));
+  vst3_unload(h);
+  assert(lost.timer.refs == 1 && lost.fd.refs == 1 && !lost.released);
+  assert(lost.timer.calls == 1 && !lost.fd.calls);
+  test_host_free(h);
+  close(pipes[0]);
+}
+
 static void teardown_sources(bool remove_timer, bool remove_fd, bool with_plugin) {
   Host *h = test_host_new();
   auto *v = new Vst3();
@@ -182,8 +254,11 @@ static void teardown() {
     teardown_sources(i & 1, i & 2, true);
   teardown_sources(false, false, false);
   editor_watches();
+  lost_editor_watches(false);
+  lost_editor_watches(true);
   pw_deinit();
   puts("PASS: VST3 teardown unregisters watches once and collects leftovers without closing plugin FDs");
+  puts("PASS: a lost VST3 editor stops its watches at once and releases their handlers once");
 }
 
 static void parameters() {

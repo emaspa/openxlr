@@ -347,6 +347,21 @@ static bool fd_unregister(const clap_host_t *host, int fd) {
 static const clap_host_posix_fd_support_t fd_extension = {
     fd_register, fd_modify, fd_unregister};
 
+// Remove every timer and descriptor the plugin registered, without telling
+// it; a later unregister of one of them is refused, as for any unknown id.
+static void stop_watches(Clap *c) {
+  for (int i = 0; i < MAX_TIMERS; ++i)
+    if (c->timers[i].source) {
+      pw_loop_destroy_source(host_loop(c->h), c->timers[i].source);
+      c->timers[i].source = NULL;
+    }
+  for (int i = 0; i < MAX_FDS; ++i)
+    if (c->fds[i].source) {
+      pw_loop_destroy_source(host_loop(c->h), c->fds[i].source);
+      c->fds[i].source = NULL;
+    }
+}
+
 static void state_mark_dirty(const clap_host_t *host) {}
 
 static const clap_host_state_t state_extension = {state_mark_dirty};
@@ -689,12 +704,7 @@ static void clap_unload(Host *h) {
   // its timers and FDs there. The stopped loop cannot dispatch callbacks.
   if (c->plugin)
     c->plugin->destroy(c->plugin);
-  for (int i = 0; i < MAX_TIMERS; ++i)
-    if (c->timers[i].source)
-      pw_loop_destroy_source(host_loop(h), c->timers[i].source);
-  for (int i = 0; i < MAX_FDS; ++i)
-    if (c->fds[i].source)
-      pw_loop_destroy_source(host_loop(h), c->fds[i].source);
+  stop_watches(c);
   if (c->gui_wake)
     pw_loop_destroy_source(host_loop(h), c->gui_wake);
   if (c->entry)
@@ -897,7 +907,12 @@ static void clap_editor_close(Host *h) {
 static void clap_editor_lost(Host *h) {
   // The plugin's window is inside a display that is gone; destroying it
   // would go through that display. It stays until this process exits.
-  ((Clap *)h->impl)->gui_created = false;
+  // CLAP does not say which timers and descriptors serve the editor, and
+  // those that do would keep firing against the dead display, a hung-up
+  // descriptor on every loop pass, so all of them stop.
+  Clap *c = h->impl;
+  c->gui_created = false;
+  stop_watches(c);
 }
 
 static bool clap_editor_idle(Host *h) {
