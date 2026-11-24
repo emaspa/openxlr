@@ -416,9 +416,9 @@ public abstract class Mk1ClassProtocolDevice : IAudioDevice
     {
         var blocks = new Dictionary<string, string>();
         try { blocks["config"] = Convert.ToHexString(Read(BlockConfig, ConfigLen)); }
-        catch (Exception ex) { blocks["config"] = $"error: {ex.Message}"; }
+        catch (Exception ex) when (ex is not UsbHungException) { blocks["config"] = $"error: {ex.Message}"; }
         try { blocks["devinfo"] = Convert.ToHexString(Read(BlockDevInfo, 51)); }
-        catch (Exception ex) { blocks["devinfo"] = $"error: {ex.Message}"; }
+        catch (Exception ex) when (ex is not UsbHungException) { blocks["devinfo"] = $"error: {ex.Message}"; }
         lock (_lock)
         {
             blocks["alsa"] = _card < 0

@@ -697,7 +697,7 @@ public class Wave3Device : IAudioDevice
                             byte other => $"unknown ({other})",
                         };
                 }
-                catch (Exception ex) { blocks[name] = $"error: {ex.Message}"; }
+                catch (Exception ex) when (ex is not UsbHungException) { blocks[name] = $"error: {ex.Message}"; }
             }
             blocks["alsa"] = _card < 0
                 ? (_mirrorError is string why ? $"not mirrored: {why}" : "not mirrored")

@@ -831,7 +831,7 @@ public class WaveXlrMk2Device : IAudioDevice
                         : "too short to hold the compressor and expander";
                 }
             }
-            catch (Exception ex) { blocks[name] = $"error: {ex.Message}"; }
+            catch (Exception ex) when (ex is not UsbHungException) { blocks[name] = $"error: {ex.Message}"; }
         }
         if (_statusBlocks)
             foreach ((string name, ushort block, int len, Func<byte[], IReadOnlyDictionary<string, string>> describe) in
@@ -845,7 +845,7 @@ public class WaveXlrMk2Device : IAudioDevice
                     blocks[name] = Convert.ToHexString(read);
                     foreach ((string key, string value) in describe(read)) blocks[key] = value;
                 }
-                catch (Exception ex) { blocks[name] = $"error: {ex.Message}"; }
+                catch (Exception ex) when (ex is not UsbHungException) { blocks[name] = $"error: {ex.Message}"; }
             }
         blocks["firmware"] = Firmware ?? "not read";
         if (_ledFirmware is not null)
