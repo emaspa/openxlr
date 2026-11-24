@@ -93,19 +93,9 @@
           render();
         }
         if (!Array.isArray(m.payload?.params)) return;
+        // Sent again whenever the inserts or their controls change.
         const sel = document.getElementById("target");
-        if (document.getElementById("param-group") || !m.payload.params.length) return;
-        const group = document.createElement("optgroup");
-        group.id = "param-group";
-        group.label = "Insert plugin controls";
-        for (const it of m.payload.params) {
-          const opt = document.createElement("option");
-          opt.value = it.target;
-          opt.textContent = it.label;
-          opt.dataset.meta = JSON.stringify(it.meta);
-          group.appendChild(opt);
-        }
-        sel.appendChild(group);
+        replaceOptionGroup(sel, "param-group", "Insert plugin controls", m.payload.params, sel.value);
         render();   // stack entries for insert controls now have readable labels
       };
     }

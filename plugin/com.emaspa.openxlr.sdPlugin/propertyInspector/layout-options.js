@@ -24,6 +24,29 @@ function replaceLayoutOptions(groups, wanted) {
   selectTarget(select, selected);
 }
 
+// Replace one group of live options {target, label, meta?} the plugin sends
+// again whenever its list changes, in the place the group had, and select
+// the saved target again; an empty list removes the group.
+function replaceOptionGroup(select, id, title, items, selected) {
+  const old = document.getElementById(id);
+  if (items.length) {
+    const group = document.createElement("optgroup");
+    group.id = id;
+    group.label = title;
+    for (const it of items) {
+      const opt = document.createElement("option");
+      opt.value = it.target;
+      opt.textContent = it.label;
+      if (it.meta) opt.dataset.meta = JSON.stringify(it.meta);
+      group.appendChild(opt);
+    }
+    if (old) select.insertBefore(group, old);
+    else select.appendChild(group);
+  }
+  old?.remove();
+  selectTarget(select, selected);
+}
+
 function layoutAnchor(select) {
   return select.querySelector ? select.querySelector("[data-layout-anchor]") : null;
 }

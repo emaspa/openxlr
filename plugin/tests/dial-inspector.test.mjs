@@ -127,3 +127,68 @@ test("the add button skips an unavailable entry", () => {
   page.nodes.add.onclick();
   assert.equal(page.settings(), undefined);
 });
+
+// The insert controls the plugin sends again whenever the inserts or the
+// plugin catalogue change: the group is rebuilt, the stack keeps its labels
+// and the picker keeps its choice.
+test("a later list of insert controls replaces the earlier one", async () => {
+  const {Element, option} = await import("./inspector-dom.mjs");
+  const target = new Element("select"); target.id = "target";
+  target.appendChild(option("", "choose…"));
+  const device = new Element("optgroup");
+  device.appendChild(option("gain", "XLR 1 gain"));
+  target.appendChild(device);
+  const anchor = new Element("optgroup"); anchor.dataset.layoutAnchor = "";
+  target.appendChild(anchor);
+  const nodes = {target, add: new Element("button"), stack: new Element("ul"), stepSize: new Element("select")};
+  for (const [id, node] of Object.entries(nodes)) node.id = id;
+  const all = node => [node, ...node.children.filter(child => typeof child !== "string").flatMap(all)];
+  const radios = [new Element("input"), new Element("input")]; radios[0].value = "tap"; radios[1].value = "push";
+  const document = {createElement: tag => new Element(tag),
+    getElementById: id => Object.values(nodes).flatMap(all).find(node => node.id === id),
+    querySelectorAll: () => radios,
+    querySelector: selector => selector.endsWith(":checked") ? radios.find(r => r.checked)
+      : radios.find(r => selector.includes(`value="${r.value}"`))};
+  let socket;
+  class Socket {
+    messages = [];
+    constructor() { socket = this; }
+    send(text) { this.messages.push(JSON.parse(text)); }
+  }
+  const context = vm.createContext({document, WebSocket: Socket, window: {}});
+  vm.runInContext(readFileSync(new URL("../com.emaspa.openxlr.sdPlugin/propertyInspector/layout-options.js", import.meta.url), "utf8"), context);
+  vm.runInContext(script, context);
+  const comp = "insparam|xlr1|ins-3|threshold";
+  context.window.connectOpenActionSocket(1234, "inspector", "registerPropertyInspector", "{}",
+    JSON.stringify({context: "dial", payload: {settings: {targets: ["gain", comp]}}}));
+  socket.onopen();
+  const deliver = payload => socket.onmessage({data: JSON.stringify({event: "sendToPropertyInspector", payload})});
+  const stack = () => nodes.stack.children.map(li => li.children[0].trim());
+  const params = () => target.children.filter(child => child.id === "param-group").map(group => group.children.map(o => o.value));
+
+  // Before the catalogue arrived the insert had no controls to list.
+  deliver({inserts: [], chains: [], params: []});
+  assert.deepEqual(params(), []);
+  assert.deepEqual(stack(), ["XLR 1 gain", comp]);
+  // The catalogue arrives: the controls are listed and the stack reads them.
+  deliver({inserts: [], chains: [], params: [{target: comp, label: "XLR 1: Comp: Threshold", meta: {plugin: "comp", index: 0}}]});
+  assert.deepEqual(params(), [[comp]]);
+  assert.deepEqual(stack(), ["XLR 1 gain", "XLR 1: Comp: Threshold"]);
+  target.value = comp;
+  // A second insert is added while the page is open: one group, both inserts, the choice kept.
+  const gate = "insparam|xlr1|ins-4|open";
+  deliver({inserts: [], chains: [], params: [{target: comp, label: "XLR 1: Comp: Threshold", meta: {plugin: "comp", index: 0}},
+    {target: gate, label: "XLR 1: Gate: Open", meta: {plugin: "gate", index: 1}}]});
+  assert.deepEqual(params(), [[comp, gate]]);
+  assert.equal(target.value, comp);
+  nodes.add.onclick();
+  assert.deepEqual(socket.messages.filter(m => m.event === "setSettings").at(-1).payload.meta, {[comp]: {plugin: "comp", index: 0}});
+  // The compressor is removed: its control stays chosen as unavailable, and the add button skips it.
+  deliver({inserts: [], chains: [], params: [{target: gate, label: "XLR 1: Gate: Open", meta: {plugin: "gate", index: 1}}]});
+  assert.deepEqual(params(), [[gate]]);
+  assert.equal(target.value, comp);
+  assert.equal(target.selectedOptions[0].disabled, true);
+  const saves = socket.messages.length;
+  nodes.add.onclick();
+  assert.equal(socket.messages.length, saves);
+});

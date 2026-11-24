@@ -4804,6 +4804,9 @@ A key keeps its target until you choose another in its settings. While
 OpenXLR is offline, or the output, insert, profile or channel the key names
 is gone, the settings list the target as Unavailable under its saved name.
 Changing the key's icon or press mode then leaves the target alone.
+The lists in a key's or dial's settings update while they are open. An
+insert, its controls or a profile that is added or removed appears or goes
+at once, and the lists fill when OpenXLR comes online.
 An edited or imported OpenDeck profile can hold a key whose target is not
 text. That key shows with no target. The plugin logs and drops any message
 it cannot use, and the other keys and dials keep working.
