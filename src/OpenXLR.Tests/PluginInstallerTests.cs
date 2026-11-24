@@ -810,6 +810,31 @@ public sealed class PluginInstallerTests : IDisposable
         Assert.Equal(3, value.Value);
     }
 
+    /// <summary>
+    /// A removal takes what it removed out of the catalogue without a scan.
+    /// Before the first value there is nothing to change, and a refresh
+    /// published meanwhile is not overwritten with the older value.
+    /// </summary>
+    [Fact]
+    public void AnAmendChangesTheValueWithoutComputingItAgain()
+    {
+        int computed = 0;
+        var value = new Refreshable<IReadOnlyList<int>>(() => [++computed, 10]);
+        value.Amend(list => [.. list.Where(n => n != 10)]);
+        Assert.Equal(0, computed);
+        Assert.Equal([1, 10], value.Value);
+        value.Amend(list => [.. list.Where(n => n != 10)]);
+        Assert.Equal([1], value.Value);
+        Assert.Equal(1, computed);
+
+        value.Amend(list =>
+        {
+            value.Refresh();   // published while the change was being made
+            return [.. list, 99];
+        });
+        Assert.Equal([2, 10], value.Value);
+    }
+
     [Fact]
     public void TheInstallCommandCarriesThePath()
     {

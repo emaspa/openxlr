@@ -2641,7 +2641,9 @@ new version may see them differently, which makes the first scan after
 an update as slow as the first ever. While a scan runs, the mixer and the
 plugin picker keep the plugins they already knew, and new ones appear when
 it finishes. A change to a plugin chain or to an input's source, a profile
-save or load and an undo wait until the scan has finished. OpenXLR remembers each bundle as soon as it has read it, so a
+save or load and an undo do not wait for the scan. Removing a Windows plugin
+folder, or excluding or deleting a Windows plugin, holds them while it changes
+the plugin files, but not during the scan after it. OpenXLR remembers each bundle as soon as it has read it, so a
 scan cut short by a restart does not read those bundles again.
 
 <a name="plugin-search-folders"></a>
@@ -3264,10 +3266,8 @@ and when you switch to it in the device picker. Use it to land on a
 known scene at every login. The reconnect after a passing USB error
 does not count, so the recall never undoes changes you made since.
 Pick "(none)" to stop. Recall waits until the mixer has finished restoring
-its settings, so those settings cannot overwrite the chosen profile. A named
-profile also waits for a plugin install or rescan in progress; restoring the
-last settings does not, so a device plugged in during a rescan comes back at
-its last state rather than its boot values.
+its settings, so those settings cannot overwrite the chosen profile. A plugin
+install or rescan in progress does not hold the recall up.
 A manual profile load supersedes an automatic recall still waiting to run.
 An arrival that belongs to a previous connection is ignored, including a
 replug of the same model. If the chosen profile is missing or unreadable,

@@ -385,6 +385,34 @@ public sealed class WindowsIndividualPluginTests : IDisposable
         Assert.DoesNotContain(Calls, c => c.Contains("--prune"));
     }
 
+    /// <summary>
+    /// The daemon runs the cleanup under its insert lock and names the
+    /// plugins in use only there, after yabridge's sync: an insert made while
+    /// yabridge ran keeps its wrapper.
+    /// </summary>
+    [Fact]
+    public void SyncReadsThePluginsInUseOnlyInsideItsRemoval()
+    {
+        string live = Source("plugins/Live.vst3");
+        string folder = Path.GetDirectoryName(live)!;
+        string missing = Vst3Wrapper("Gone", Path.Combine(folder, "Gone.vst3"));
+        string used = Vst3Wrapper("Used", Path.Combine(folder, "Used.vst3"));
+        var inUse = new List<string>();
+        int sections = 0;
+        var result = Installer([folder]).SyncWindows(inUse, cleanup =>
+        {
+            sections++;
+            Assert.Contains(Calls, c => c.Contains("sync"));
+            inUse.Add(used);
+            cleanup();
+        });
+        Assert.True(result.Ok, result.Message);
+        Assert.Equal(1, sections);
+        Assert.False(Directory.Exists(missing));
+        Assert.True(Directory.Exists(used));
+        Assert.Contains("Kept 1", result.Message);
+    }
+
     [Fact]
     public void FailedSyncNeverCleansMissingSourceWrappers()
     {

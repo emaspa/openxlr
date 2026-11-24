@@ -16,6 +16,32 @@ public sealed class PluginCatalogTests
     private static List<PluginInfo> FullOfLv2()
         => [.. Enumerable.Range(0, 1200).Select(i => Plugin("lv2", $"Plugin {i}", 40))];
 
+    /// <summary>
+    /// After a removal, the plugins whose wrapper is gone leave the catalogue
+    /// at once; those whose files remain, and those elsewhere, stay.
+    /// </summary>
+    [Fact]
+    public void OnlyPluginsWhoseFilesAreGoneUnderTheGivenDirectoriesAreWithdrawn()
+    {
+        string root = Directory.CreateTempSubdirectory("openxlr-withdraw-").FullName;
+        try
+        {
+            string wrappers = Path.Combine(root, "vst3", "yabridge");
+            string kept = Path.Combine(wrappers, "Kept.vst3");
+            Directory.CreateDirectory(kept);
+            PluginInfo present = Plugin("vst3", "Kept", 1) with { Path = kept };
+            PluginInfo removed = Plugin("vst3", "Removed", 1) with { Path = Path.Combine(wrappers, "Removed.vst3") };
+            PluginInfo elsewhere = Plugin("lv2", "Elsewhere", 1) with { Path = Path.Combine(root, "lv2", "Gone.lv2") };
+            PluginInfo builtIn = Plugin("lv2", "BuiltIn", 1);
+            IReadOnlyList<PluginInfo> catalogue = [present, removed, elsewhere, builtIn];
+
+            Assert.Equal([present, elsewhere, builtIn], PluginCatalog.Present(catalogue, [wrappers]));
+            IReadOnlyList<PluginInfo> untouched = [present, elsewhere, builtIn];
+            Assert.Same(untouched, PluginCatalog.Present(untouched, [wrappers]));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     [Fact]
     public void EverySourceIsKeptWholeAndOneThatFailsCostsOnlyItsOwnPlugins()
     {

@@ -753,8 +753,12 @@ Folder-management paths must be absolute, at most 4096 characters and contain
 no control characters. Removing a folder changes the selected provider's
 registry; with `system`, that registry is shared with other applications.
 The daemon never runs a global prune. Wrappers still covered by a retained
-folder are kept. Folder changes, installs and rescans are serialized, as are
-insert-chain replacements and profile loads against those operations. Check
+folder are kept. Folder changes, installs, syncs and rescans are serialized.
+Insert-chain replacements, input binding changes, profile saves, loads and
+deletes, undo and redo never wait for a catalogue scan. They do wait while a
+folder removal, an exclusion, a deletion or a sync removes plugin files. The
+removed wrappers leave the catalogue before those commands run again, without
+waiting for the scan. Check
 `pluginInstall.ok` and `message` for the operation's outcome: a failed cleanup
 can leave the folder unregistered with some wrappers still present. Refresh
 `getPluginSetup` after either success or failure. Profiles are not rewritten.
@@ -2238,8 +2242,9 @@ as a failure and is retried on an explicit rescan. Automatic scans skip
 unchanged failures without repeating the warning. The daemon saves each
 bundle's result as soon as it has it, so a scan it does not finish keeps
 what it learnt. While an install, sync or rescan reads the catalogues
-again, state messages and catalogue reads answer from the old catalogue.
-The new one replaces it whole when the scan is done, before the daemon
+again, state messages and catalogue reads answer from the old catalogue,
+and commands that change inserts or recall a profile are answered without
+waiting. The new one replaces it whole when the scan is done, before the daemon
 sends `pluginInstall`. `source-missing` identifies a missing
 plugin path or dangling bundle link. `windows-module-missing` identifies a
 yabridge wrapper that cannot find its original Windows module; its detail
