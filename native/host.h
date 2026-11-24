@@ -7,6 +7,9 @@
 #pragma once
 #ifdef __cplusplus
 #include <cstdint>
+#ifdef _WIN32
+#include "winhost/shim.h"  // as for a C backend, below
+#endif
 extern "C" {
 #else
 #define _POSIX_C_SOURCE 200809L

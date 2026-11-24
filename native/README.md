@@ -1182,42 +1182,91 @@ exactly one counted event each and recover.
 
 ```text
 openxlr-lv2-host [--own-block] wine clap FILE ID NODE CHANNELS RATE [SYMBOL=VALUE ...]
+openxlr-lv2-host [--own-block] wine vst3 BUNDLE CLASS-ID NODE CHANNELS RATE [SYMBOL=VALUE ...]
 ```
 
 `make -C native WINHOST=1` builds a second way to run a Windows plugin, one
 that does not go through yabridge. It adds a `wine` backend to the helper
 (`wine.c`) and builds `openxlr-winhost.exe` beside it. The backend starts
-that program under Wine, and the program loads the plugin. `FILE` is the
-Windows `.clap` module by its Linux path and `ID` is the plugin's CLAP id.
-`SYMBOL=VALUE` sets a parameter before the first block, as for a native CLAP
-plugin.
+that program under Wine, and the program loads the plugin. The arguments
+after the format mean what they mean for a native plugin of that format:
+
+- For CLAP, `FILE` is the Windows `.clap` module by its Linux path and `ID`
+  is the plugin's CLAP id.
+- For VST3, `BUNDLE` is the Windows plugin by its Linux path: a bundle
+  directory with the module under `Contents/x86_64-win`, or a single `.vst3`
+  file. `CLASS-ID` is the class id as 32 hex digits, in the form a Linux
+  host has for the plugin, described below.
+
+`SYMBOL=VALUE` sets a parameter before the first block.
 
 The default build leaves both out and is unchanged. The flag needs
-`x86_64-w64-mingw32-gcc`, or the compiler `MINGW_CC` names. The program is
-linked statically, so it is one file. Building it does not need Wine;
-running it does. Run `make -C native clean-native` when you switch the flag,
-as after any change of flags.
+`x86_64-w64-mingw32-gcc` and `x86_64-w64-mingw32-g++`, or the compilers
+`MINGW_CC` and `MINGW_CXX` name. The program is linked statically, so it is
+one file. Building it does not need Wine; running it does. Run
+`make -C native clean-native` when you switch the flag, as after any change
+of flags.
 
 This is the start of a host that will replace the yabridge companion. It
-carries CLAP audio, parameters and latency. It has no editor, no scanner and
-no VST3 yet. The daemon does not start it and no package builds it, so
+carries CLAP and VST3 audio, parameters and latency. It has no editor and no
+scanner yet. The daemon does not start it and no package builds it, so
 nothing here reaches a user.
 
 The helper keeps the PipeWire node and the Windows program holds the plugin.
-The Windows program has no CLAP host of its own. It is built from three
-sources:
+The Windows program has no CLAP or VST3 host of its own. It is built from
+these sources:
 
-- `clap.c`, the same file the helper builds for a native CLAP plugin,
-  compiled for Windows. The port layout, the parameters, a restart the
-  plugin asks for, timers and the thread checks are that one implementation
-  on both systems.
-- `winhost/shim.c`, which gives that backend the services `host.h`
+- `clap.c` and `vst3.cpp`, the same files the helper builds for native
+  plugins, compiled for Windows. The port and bus layouts, the parameters, a
+  restart or a reload the plugin asks for, timers and the thread checks are
+  one implementation for each format on both systems.
+- `winhost/shim.c`, which gives those backends the services `host.h`
   declares: the control table, the reports from the audio thread, the main
   loop's timers and events, and the module loader. `winhost/shim.h` stands
-  in for the PipeWire, X and `dlfcn.h` headers. `clap.c` itself differs in
-  two places on Windows: it skips the `dlfcn.h` include and leaves out its
-  scanner.
-- `winhost/winhost.c`, which talks to the Linux side.
+  in for the PipeWire, X and `dlfcn.h` headers.
+- `winhost/winhost.c`, which talks to the Linux side and picks the backend
+  the load names.
+
+The two backends differ on Windows in few places. `clap.c` skips the
+`dlfcn.h` include and leaves out its scanner. `vst3.cpp` skips the system
+headers the shim stands in for, leaves out its scanner, and has one block
+for what a Windows module is.
+
+A Windows VST3 module differs from a Linux one in three ways, and that block
+holds them:
+
+- The Linux side finds the module. `wine.c` looks under
+  `Contents/x86_64-win` for the `.vst3` file and hands the Windows program
+  that file, so the Windows side looks through no directories.
+- The module is entered through `InitDll` and left through `ExitDll`, which
+  take no argument. A Linux module has `ModuleEntry` and `ModuleExit`.
+- An editor's window type is `HWND`. Nothing opens an editor yet.
+
+`vst3.cpp` still offers a plugin the Linux run loop interface on Windows.
+A Windows plugin has no reason to ask for it. One that did would get its
+timers and be refused a file descriptor.
+
+A VST3 class id is 16 bytes, written as 32 hex digits. A Windows plugin
+stores the first eight bytes in COM order, three fields with the low byte
+first, so the digits read straight from its factory differ from the ones a
+Linux host has for the same plugin. yabridge presents the Linux form, and
+that is what the catalogue and every saved insert hold. `CLASS-ID` is the
+Linux form here too, so an insert saved through yabridge names the same
+plugin to this host.
+
+```text
+the bytes in a Windows module   33 22 11 00  55 44  77 66  88 99 AA BB CC DD EE FF
+the class id, on both systems   00112233445566778899AABBCCDDEEFF
+```
+
+The conversion is in one place, `hex_of` and `tuid_of` in `vst3.cpp`. They
+read the order from the SDK's own `INLINE_UID` macro, which lays an id out
+for the system the file is built for, so the Linux build is unchanged and
+the Windows build swaps.
+
+TDR Nova is an example. Its Windows module holds
+`54545356356474616472206E6F766100`, and its class id, through yabridge and
+through this host, is `56535454643561746472206E6F766100`.
 
 Timers are Windows timers on the main thread's message loop, no finer than
 10 ms. An event signalled from the audio thread waits for the main thread's
@@ -1243,13 +1292,16 @@ deactivate. `winhost/wire.h` describes it.
   threads.
 - Paths cross as Linux paths. The Windows side asks Wine for the Windows
   name and falls back to the `\\?\unix\` form, so a prefix with no `Z:`
-  drive works.
+  drive works. Wine reads Linux file names in the locale's character set,
+  so a path with characters outside ASCII needs a UTF-8 locale in the
+  helper's environment. In the C locale such a plugin is not found.
 - The helper reads the Windows program's standard error and passes it on a
   line at a time. The plugin's log and the `trace:` lines reach the daemon's
   log the way a native backend's do.
 
 The plugin's parameters are controls of the helper, under the names a native
-CLAP plugin's have, so `set`, `control` and `meter` lines read the same.
+plugin of the same format has, so `set`, `control` and `meter` lines read
+the same.
 Their values cross in the shared file and cost no system call:
 
 - At load the Windows side lists the controls the backend made, and the
@@ -1269,6 +1321,13 @@ Their values cross in the shared file and cost no system call:
   helper takes it on its next tick, so the two sides disagree for one tick
   at most, and the helper never sends a value it took from the plugin back
   over a newer one.
+
+A CLAP plugin takes a value in the block it arrives with. A VST3 plugin
+takes it a tick later. `vst3.cpp` converts a plain value to the plugin's own
+scale on the main thread, the thread a VST3 controller belongs to, and here
+that is the Windows main thread's tick, 33 ms at most. The native VST3 host
+has the same tick. A value the plugin's controller moves on the Windows main
+thread is published as it happens.
 
 Each side bounds what it reads from the other. The Windows side checks the
 frame count of every block against the fixed buffers and against what the
@@ -1304,8 +1363,8 @@ What happens when the Windows side goes wrong:
 - A block never comes back. After six seconds the helper fails the instance,
   the patience it has with a native plugin stuck inside one callback. Unload
   kills a Windows program that no longer answers.
-- The plugin refuses its blocks. These count like a native CLAP plugin's:
-  each is silence, and half a second of them in a row fails the instance.
+- The plugin refuses its blocks. These count like a native plugin's: each
+  is silence, and half a second of them in a row fails the instance.
 - The helper itself is killed. The kernel sends the Windows program a
   SIGKILL, and it would also leave by itself on reading its closed pipes.
 
@@ -1316,10 +1375,12 @@ which the daemon sets. The backend takes `WAYLAND_DISPLAY` out of the
 Windows program's environment, since an editor will have to be an X11
 window.
 
-`make -C native WINHOST=1 test-winhost` runs `tests/winhost` against a test
-plugin built with mingw (`tests/winhost-plugin.c`), under Wine and with no
+`make -C native WINHOST=1 test-winhost` runs `tests/winhost` against two
+test plugins built with mingw, a CLAP module (`tests/winhost-plugin.c`) and
+a VST3 module (`tests/winhost-plugin-vst3.cpp`), under Wine and with no
 audio server and no display. It calls the host's audio callback on plain
-buffers with the Windows program started for real, and checks:
+buffers with the Windows program started for real. With the CLAP module it
+checks:
 
 - the audio that comes back is the plugin's, sample for sample, at block
   sizes from 1 to 8192 frames, in mono and with one buffer for both
@@ -1347,7 +1408,35 @@ buffers with the Windows program started for real, and checks:
 - a missing plugin, module or Windows program is refused, and nothing is
   left in the runtime directory.
 
-The target says what is missing and passes when the build has no
+With the VST3 module it checks:
+
+- a class is loaded by the class id a Linux host knows it by, from a bundle
+  and as a single file. The module holds its ids in COM order, written out
+  byte by byte, and gives no factory unless it was entered through
+  `InitDll`;
+- the same id with its digits in the module's byte order is refused, and so
+  are a text that is no class id, a bundle with no module and a file that is
+  no module. The test reads the reason each one is refused with;
+- the audio is exact at the same block sizes, with one buffer for both
+  directions too;
+- a plugin that reports stereo and takes mono when asked runs in a mono
+  chain, one with a second input bus runs, and one of the wrong width is
+  refused;
+- the latency the plugin reports, and a reload the plugin asks for that
+  changes it, carried out in the same process;
+- the plugin's parameters as controls with their plain ranges: a value set
+  before the first block and one set between blocks are heard after the
+  Windows side's next tick, a meter the processor writes is read, and a
+  hidden parameter and the plugin's own bypass are left out;
+- a parameter the plugin's controller moves on the Windows main thread, as
+  an editor would, reaches the helper, and a value the helper set before it
+  had seen that move is dropped;
+- refused blocks are silence and half a second of them fails the instance.
+
+`make -C native test-vst3` checks that the Linux build still reads and
+writes a native class id in the order of its bytes.
+
+`test-winhost` says what is missing and passes when the build has no
 `WINHOST=1`, when mingw is not installed or when Wine is not. It keeps a
 Wine prefix of its own under `~/.cache/openxlr-test/wineprefix`, or where
 `OPENXLR_TEST_WINEPREFIX` points, and never uses yours. The first run makes

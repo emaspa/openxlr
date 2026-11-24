@@ -130,7 +130,9 @@ typedef struct {
 } WireShared;
 
 enum { WIRE_HELLO = 1, WIRE_LOAD, WIRE_ACTIVATE, WIRE_DEACTIVATE, WIRE_QUIT };
-enum { WIRE_FORMAT_CLAP = 1 };
+// The plugin formats a load can name. A Windows host that does not know one
+// refuses the load and says so.
+enum { WIRE_FORMAT_CLAP = 1, WIRE_FORMAT_VST3 };
 
 typedef struct {
   uint32_t magic, type;
@@ -141,8 +143,12 @@ typedef struct {
   uint32_t own_block;  // load: the plugin is called with OWN_BLOCK_FRAMES at a time
   uint32_t reserved;
   char thread[WIRE_THREAD_NAME];  // hello: the name the audio thread takes
-  char id[WIRE_ID];               // load: which plugin of the module
-  char path[WIRE_PATH];           // load: the module, as a Unix path
+  // load: which plugin of the module. A CLAP id, or a VST3 class id as the
+  // 32 hex digits a Linux host knows the plugin by.
+  char id[WIRE_ID];
+  // load: the module, as a Unix path. For VST3 it is the module inside the
+  // bundle, which the Linux side has found.
+  char path[WIRE_PATH];
 } WireRequest;
 
 typedef struct {

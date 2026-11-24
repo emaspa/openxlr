@@ -4,11 +4,11 @@
 // and linked statically, so it is one file beside the Linux helper.
 //
 // The plugin is run by the same backend the Linux helper uses for a native
-// plugin of its format (clap.c), built here for Windows and called through
-// its Backend table. shim.c gives that backend the services of host.h. This
-// file is the other half: what crosses to the Linux side, in the form
-// wire.h describes. That is the Backend's own surface and no more: load,
-// activate, one block of audio, the controls, the latency, deactivate.
+// plugin of its format (clap.c, vst3.cpp), built here for Windows and called
+// through its Backend table. shim.c gives that backend the services of
+// host.h. This file is the other half: what crosses to the Linux side, in
+// the form wire.h describes. That is the Backend's own surface and no more:
+// load, activate, one block of audio, the controls, the latency, deactivate.
 //
 // Three threads. The main thread serves the control requests, runs the
 // backend's tick and pumps the Windows messages that timers and plugins
@@ -203,6 +203,16 @@ static void apply_sets(void) {
 
 // --- loading ----------------------------------------------------------------
 
+// The backend for a format the wire names, or NULL for one this build does
+// not carry.
+static const Backend *backend_for(uint32_t format) {
+  switch (format) {
+    case WIRE_FORMAT_CLAP: return &clap_backend;
+    case WIRE_FORMAT_VST3: return &vst3_backend;
+  }
+  return NULL;
+}
+
 // Set up the host the backend sees and have it load the plugin. The reply's
 // text is the plugin's name, or on refusal the reason; what the backend
 // itself has to say goes to standard error, as on Linux.
@@ -215,8 +225,11 @@ static bool load(WireRequest *r, WireReply *reply) {
     snprintf(text, text_size, "a plugin is already loaded");
     return false;
   }
-  if (r->format != WIRE_FORMAT_CLAP) {
-    snprintf(text, text_size, "this Windows plugin host carries CLAP only");
+  const Backend *wanted = backend_for(r->format);
+  if (!wanted) {
+    snprintf(text, text_size,
+             "this Windows plugin host does not carry plugin format %u",
+             (unsigned)r->format);
     return false;
   }
   if (r->channels < 1 || r->channels > WIRE_MAX_CHANNELS || r->rate < 8000 ||
@@ -227,7 +240,7 @@ static bool load(WireRequest *r, WireReply *reply) {
     return false;
   }
   // The path the backend opens and the plugin is told is its Windows one,
-  // in UTF-8 as CLAP asks.
+  // in UTF-8, as CLAP asks and as this side's dlopen takes it.
   static char module[WIRE_PATH * 3];
   WCHAR *path = windows_path(r->path);
   bool named = path && WideCharToMultiByte(CP_UTF8, 0, path, -1, module,
@@ -238,7 +251,7 @@ static bool load(WireRequest *r, WireReply *reply) {
     snprintf(text, text_size, "the module's path cannot be named on Windows");
     return false;
   }
-  backend = &clap_backend;
+  backend = wanted;
   host.backend = backend;
   host.rate = r->rate;
   host.channels = r->channels;

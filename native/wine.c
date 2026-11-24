@@ -18,8 +18,8 @@
 // values cross in the shared file: what this side sets goes with the next
 // block, and what the plugin moves is read on the tick.
 //
-// This step carries CLAP audio, parameters and latency. Editors and VST3
-// come with later ones.
+// This step carries CLAP and VST3 audio, parameters and latency. Editors and
+// scanning come with later ones.
 #define _GNU_SOURCE  // pipe2, realpath, SCHED_RESET_ON_FORK
 #include "host.h"
 #include "winhost/wire.h"
@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
@@ -664,6 +665,35 @@ static bool wine_stop_child(Wine *w) {
   return WIFEXITED(w->wait_status) && WEXITSTATUS(w->wait_status) == 0;
 }
 
+// A VST3 plugin is named by its bundle, as for the native backend: a
+// directory with the Windows module under Contents/x86_64-win, or an older
+// plugin that is the module itself. The module is found here, where the
+// bundle is a directory of this system's, and the Windows side is handed the
+// file. `path` is the bundle on the way in and the module on the way out.
+static bool wine_vst3_module(char *path, size_t size) {
+  struct stat status;
+  if (stat(path, &status) != 0)
+    return false;
+  if (!S_ISDIR(status.st_mode))
+    return true;
+  char directory[PATH_MAX];
+  if (snprintf(directory, sizeof(directory), "%s/Contents/x86_64-win", path) >=
+      (int)sizeof(directory))
+    return false;
+  DIR *entries = opendir(directory);
+  if (!entries)
+    return false;
+  bool found = false;
+  struct dirent *entry;
+  while (!found && (entry = readdir(entries))) {
+    size_t length = strlen(entry->d_name);
+    found = length > 5 && !strcasecmp(entry->d_name + length - 5, ".vst3") &&
+            snprintf(path, size, "%s/%s", directory, entry->d_name) < (int)size;
+  }
+  closedir(entries);
+  return found;
+}
+
 static bool wine_load(Host *h, char **arguments) {
   Wine *w = calloc(1, sizeof(Wine));
   if (!w)
@@ -671,14 +701,21 @@ static bool wine_load(Host *h, char **arguments) {
   h->impl = w;
   w->h = h;
   w->wake_out = w->wake_in = w->request = w->reply = w->log = -1;
-  if (strcmp(arguments[0], "clap") != 0) {
-    fprintf(stderr, "the Windows plugin host carries CLAP only, not %s\n",
+  uint32_t format = !strcmp(arguments[0], "clap")   ? WIRE_FORMAT_CLAP
+                    : !strcmp(arguments[0], "vst3") ? WIRE_FORMAT_VST3
+                                                    : 0;
+  if (!format) {
+    fprintf(stderr, "the Windows plugin host carries CLAP and VST3, not %s\n",
             arguments[0]);
     return false;
   }
   char module[PATH_MAX];
   if (!realpath(arguments[1], module)) {
     fprintf(stderr, "cannot find %s: %s\n", arguments[1], strerror(errno));
+    return false;
+  }
+  if (format == WIRE_FORMAT_VST3 && !wine_vst3_module(module, sizeof(module))) {
+    fprintf(stderr, "no 64-bit Windows plugin module in %s\n", arguments[1]);
     return false;
   }
   if (strlen(module) >= WIRE_PATH || strlen(arguments[2]) >= WIRE_ID) {
@@ -721,7 +758,7 @@ static bool wine_load(Host *h, char **arguments) {
       usleep(10000);
     w->audio_tid = wine_find_thread(w);
   }
-  WireRequest load = {.type = WIRE_LOAD, .format = WIRE_FORMAT_CLAP,
+  WireRequest load = {.type = WIRE_LOAD, .format = format,
                       .channels = h->channels, .rate = h->rate,
                       .own_block = h->own_block};
   snprintf(load.path, sizeof(load.path), "%s", module);
@@ -987,7 +1024,7 @@ static uint32_t wine_latency(Host *h) {
 
 const Backend wine_backend = {
     .name = "Windows plugin",
-    .argument_count = 3,  // FORMAT FILE ID
+    .argument_count = 3,  // FORMAT FILE ID, the last two as that format's own
     .load = wine_load,
     .activate = wine_activate,
     .deactivate = wine_deactivate,
