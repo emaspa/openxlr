@@ -2,9 +2,9 @@
 // daemon ids; labels come from the latest state so renames do not invalidate
 // existing OpenDeck actions.
 import fs from "node:fs";
-import { eqChoices } from "./microphone-eq.mjs";
+import { eqChoices, eqOwner, isEqTarget } from "./microphone-eq.mjs";
 import { voiceChoices } from "./voice-changer.mjs";
-import { eqProfileChoices } from "./eq-profiles.mjs";
+import { eqProfileChoices, eqProfileOwner, isEqProfileTarget } from "./eq-profiles.mjs";
 import { canKeyDucking } from "./unit-inputs.mjs";
 
 // The built-in icon set, generated from LayoutIcons.cs by tools/deck-icons.py.
@@ -205,7 +205,13 @@ export function targetAppearance(mixer, target) {
   if (typeof target !== "string") return { icon: "", path: null, colour: null };
   let item;
   if (/^(mixmute|mixvol):/.test(target)) item = mixer?.mixes?.find(m => m.id === target.split(":")[1]);
-  else if (/^(sendmute|send|sendlink|focus|duckkey|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|eq|eqband|eqtype|eqfreq|eqgain|eqq|voice|eqprofile):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
+  else if (/^(sendmute|send|sendlink|focus|duckkey|chvol|chgain|chmute|chphantom|chlowcut|chclipguard|voice):/.test(target)) item = mixer?.channels?.find(c => c.id === target.split(":")[1]);
+  // EQ, noise removal and EQ profile targets name a channel, or a mix with
+  // "mix:" before its id.
+  else if (isEqTarget(target) || isEqProfileTarget(target)) {
+    const owner = isEqTarget(target) ? eqOwner(target) : eqProfileOwner(target);
+    if (owner) item = (owner.mix ? mixer?.mixes : mixer?.channels)?.find(x => x.id === owner.id);
+  }
   else if (target.startsWith("group:")) {
     const open = openGroupMember(mixer, mixer?.exclusiveGroups?.find(g => g.id === target.slice(6)));
     item = open === null ? undefined : mixer?.channels?.find(c => c.id === open);

@@ -132,6 +132,20 @@ test("a key's appearance follows its stable target and admits only listed icons 
     assert.deepEqual(targetAppearance(state, target), {icon: "♫", path: null, colour: "#12abEF"});
   for (const target of ["mixmute:stream", "mixvol:stream", "inschain|mix:stream", "insparam|mix:stream|id|0"])
     assert.deepEqual(targetAppearance(state, target), {icon: "◆", path: null, colour: "#ABC123"});
+  // EQ and noise removal keys and dials, and EQ profile keys, on a channel or on a mix.
+  for (const target of ["eq:music", "noise:music", "eqband:music:2", "eqgain:music:2", "eqprofile:music:builtin:clear"])
+    assert.deepEqual(targetAppearance(state, target), {icon: "♫", path: null, colour: "#12abEF"}, target);
+  for (const target of ["eq:mix:stream", "eqband:mix:stream:2", "eqtype:mix:stream:1", "eqfreq:mix:stream:4",
+    "eqprofile:mix:stream:builtin:clear", "eqprofile:mix:stream:saved:Night"])
+    assert.deepEqual(targetAppearance(state, target), {icon: "◆", path: null, colour: "#ABC123"}, target);
+  // A channel called mix keeps its own look, and a mix's target never takes it.
+  const named = {...state, channels: [...state.channels, {id: "mix", appearance: {icon: "●", colour: "#123456"}}]};
+  for (const target of ["eq:mix", "eqgain:mix:2", "eqprofile:mix:builtin:clear"])
+    assert.deepEqual(targetAppearance(named, target), {icon: "●", path: null, colour: "#123456"}, target);
+  for (const target of ["eq:mix:stream", "eqprofile:mix:stream:builtin:clear"])
+    assert.deepEqual(targetAppearance(named, target), {icon: "◆", path: null, colour: "#ABC123"}, target);
+  assert.deepEqual(targetAppearance(named, "eq:mix:gone"), {icon: "", path: null, colour: null});
+  assert.deepEqual(targetAppearance(named, "noise:mix:stream"), {icon: "", path: null, colour: null}, "a mix has no noise removal");
   state.channels[0].appearance = {icon: '<image href="file:///etc/passwd"/>', colour: '#fff" onload="alert(1)'};
   assert.deepEqual(targetAppearance(state, "focus:music"), {icon: "", path: null, colour: null});
   assert.deepEqual(targetAppearance(state, "focus:gone"), {icon: "", path: null, colour: null});

@@ -60,6 +60,12 @@ function parse(target) {
   return {channel, profile, mix: !!mixed};
 }
 
+// Whose EQ a profile key loads, {mix, id}, or null when the target is malformed.
+export function eqProfileOwner(target) {
+  const parts = parse(target);
+  return parts && {mix: parts.mix, id: parts.channel};
+}
+
 // The EQ's band count limits the daemon reports; four and four from a daemon that says none.
 function bandLimits(mixer) {
   const limits = mixer?.eqLimits;
