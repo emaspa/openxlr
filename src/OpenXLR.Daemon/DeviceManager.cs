@@ -19,7 +19,6 @@ public sealed partial class DeviceManager : BackgroundService
     private IAudioDevice? _device;
     // The clock for phantom settling and the EQ writer's spacing; tests drive it by hand.
     private readonly TimeProvider _time;
-    private DateTime UtcNow => _time.GetUtcNow().UtcDateTime;
     private long NowMs => (long)((Int128)_time.GetTimestamp() * 1000 / _time.TimestampFrequency);
     private DeviceState? _last;
     // Replaced, never changed in place, so the client-facing readers below
@@ -346,16 +345,19 @@ public sealed partial class DeviceManager : BackgroundService
     // transition (anti-thump) and unmutes it itself, ignoring host unmutes
     // meanwhile. Stamp a settling flag for 15 s after each phantom write so
     // clients can present that hold instead of a stuck mute button.
+    // On the monotonic clock, in milliseconds: a step of the wall clock
+    // neither stretches nor ends a window. Null before the first write.
     private static readonly TimeSpan PhantomSettleWindow = TimeSpan.FromSeconds(15);
-    private DateTime _phantomWroteAt = DateTime.MinValue;
-    private DateTime _phantomWroteAt2 = DateTime.MinValue;
+    private long? _phantomWroteAt;
+    private long? _phantomWroteAt2;
 
     // Whole seconds left in a settle window (0 outside it). The 100 ms poll
     // notices each one-second step, so clients get a ticking countdown from
     // the ordinary state broadcasts.
-    private int SettleSecondsLeft(DateTime wroteAt)
+    private int SettleSecondsLeft(long? wroteAt)
     {
-        double left = (PhantomSettleWindow - (UtcNow - wroteAt)).TotalSeconds;
+        if (wroteAt is not long at) return 0;
+        double left = (PhantomSettleWindow.TotalMilliseconds - (NowMs - at)) / 1000;
         return left > 0 ? (int)Math.Ceiling(left) : 0;
     }
 
@@ -366,11 +368,12 @@ public sealed partial class DeviceManager : BackgroundService
 
     private DeviceState Stamp(DeviceState s)
     {
-        DateTime now = UtcNow;
+        long now = NowMs;
+        long grace = (long)PhantomMuteGrace.TotalMilliseconds;
         bool held1 = SettleSecondsLeft(_phantomWroteAt) > 0
-                     && (s.Mute || now - _phantomWroteAt < PhantomMuteGrace);
+                     && (s.Mute || now - _phantomWroteAt < grace);
         bool held2 = SettleSecondsLeft(_phantomWroteAt2) > 0
-                     && (s.Mute2 || now - _phantomWroteAt2 < PhantomMuteGrace);
+                     && (s.Mute2 || now - _phantomWroteAt2 < grace);
         return s with
         {
             GainLocked = GainIsLocked,
@@ -856,7 +859,8 @@ public sealed partial class DeviceManager : BackgroundService
     // dirty and the poll loop writes it a second later, so a slider drag
     // costs one file write, not hundreds.
     private bool _restorePending;
-    private DateTime? _dirtyAt;
+    // When the readback first differed from what was saved, on the monotonic clock in milliseconds.
+    private long? _dirtyAt;
 
     // The unit connected fresh having stayed on the bus, in the same boot of
     // the system and at the same USB address, since the daemon last opened
@@ -892,7 +896,7 @@ public sealed partial class DeviceManager : BackgroundService
     {
         if (_device is null || _restorePending) return;
         if (_device.Capabilities.RetainsSettings && !_device.DesktopRestoresControls) return;
-        _dirtyAt ??= DateTime.UtcNow;
+        _dirtyAt ??= NowMs;
     }
 
     // A unit the desktop writes saved values to when its card appears
@@ -990,8 +994,8 @@ public sealed partial class DeviceManager : BackgroundService
     {
         lock (_gate)
         {
-            if (_dirtyAt is not DateTime since) return;
-            if (!force && DateTime.UtcNow - since < PersistDelay) return;
+            if (_dirtyAt is not long since) return;
+            if (!force && NowMs - since < (long)PersistDelay.TotalMilliseconds) return;
             _dirtyAt = null;
             if (_device is null || _last is null) return;
             try { DeviceStateStore.SaveLast(DevId(_device), SavedStateLocked(_device, _last)); }
@@ -1383,7 +1387,7 @@ public sealed partial class DeviceManager : BackgroundService
                 case ControlNames.Crossfade: dev.SetCrossfade(value.GetInt32()); break;
                 case ControlNames.Phantom:
                     dev.SetPhantom(value.GetBoolean());
-                    _phantomWroteAt = UtcNow;
+                    _phantomWroteAt = NowMs;
                     break;
                 case ControlNames.ClipGuard: dev.SetClipGuard(value.GetBoolean()); break;
                 case ControlNames.Compressor: dev.SetCompressor(value.GetBoolean()); break;
@@ -1420,7 +1424,7 @@ public sealed partial class DeviceManager : BackgroundService
                 case "voiceTuneStrength2": dev.SetVoiceTuneStrength2(value.GetInt32()); break;
                 case "phantom2":
                     dev.SetPhantom2(value.GetBoolean());
-                    _phantomWroteAt2 = UtcNow;
+                    _phantomWroteAt2 = NowMs;
                     break;
                 case "clipGuard2": dev.SetClipGuard2(value.GetBoolean()); break;
                 case "compressor2": dev.SetCompressor2(value.GetBoolean()); break;
@@ -1635,7 +1639,7 @@ public sealed partial class DeviceManager : BackgroundService
                 if (c.Expander && s.Expander != p.Expander) Write("expander", () => d.SetExpander(p.Expander));
                 if (c.VoiceTune && s.VoiceTune != p.VoiceTune) Write("voice tune", () => d.SetVoiceTune(p.VoiceTune));
                 if (c.VoiceTune && s.VoiceTuneStrength != p.VoiceTuneStrength) Write("voice tune strength", () => d.SetVoiceTuneStrength(p.VoiceTuneStrength));
-                if (c.Phantom && s.Phantom != p.Phantom) Write("phantom power", () => { d.SetPhantom(p.Phantom); _phantomWroteAt = UtcNow; });
+                if (c.Phantom && s.Phantom != p.Phantom) Write("phantom power", () => { d.SetPhantom(p.Phantom); _phantomWroteAt = NowMs; });
                 if (c.ClipGuard && !placeholders && s.ClipGuard != p.ClipGuard) Write("ClipGuard", () => d.SetClipGuard(p.ClipGuard));
                 if (c.Compressor && s.Compressor != p.Compressor) Write("compressor", () => d.SetCompressor(p.Compressor));
                 if (c.Gain && c.XlrInputs > 1 && !lockApplies && s.Gain2Db != p.Gain2Db) Write("gain 2", () => d.SetGain2Db(p.Gain2Db));
@@ -1644,7 +1648,7 @@ public sealed partial class DeviceManager : BackgroundService
                 if (c.Expander && c.XlrInputs > 1 && s.Expander2 != p.Expander2) Write("expander 2", () => d.SetExpander2(p.Expander2));
                 if (c.VoiceTune && c.XlrInputs > 1 && s.VoiceTune2 != p.VoiceTune2) Write("voice tune 2", () => d.SetVoiceTune2(p.VoiceTune2));
                 if (c.VoiceTune && c.XlrInputs > 1 && s.VoiceTuneStrength2 != p.VoiceTuneStrength2) Write("voice tune strength 2", () => d.SetVoiceTuneStrength2(p.VoiceTuneStrength2));
-                if (c.Phantom && c.XlrInputs > 1 && s.Phantom2 != p.Phantom2) Write("phantom power 2", () => { d.SetPhantom2(p.Phantom2); _phantomWroteAt2 = UtcNow; });
+                if (c.Phantom && c.XlrInputs > 1 && s.Phantom2 != p.Phantom2) Write("phantom power 2", () => { d.SetPhantom2(p.Phantom2); _phantomWroteAt2 = NowMs; });
                 if (c.ClipGuard && c.XlrInputs > 1 && s.ClipGuard2 != p.ClipGuard2) Write("ClipGuard 2", () => d.SetClipGuard2(p.ClipGuard2));
                 if (c.Compressor && c.XlrInputs > 1 && s.Compressor2 != p.Compressor2) Write("compressor 2", () => d.SetCompressor2(p.Compressor2));
                 if (c.HpVolume && s.HpVolumeDb != p.HpVolumeDb) Write("headphones", () => d.SetHpVolumeDb(p.HpVolumeDb));

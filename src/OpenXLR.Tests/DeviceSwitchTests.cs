@@ -84,6 +84,30 @@ public sealed class DeviceSwitchTests
         });
     }
 
+    [Fact]
+    public void SettingsAreSavedASecondLaterEvenWhenTheWallClockStepsBack()
+    {
+        WithConfigDir(() =>
+        {
+            var time = new ManualTime();
+            var dock = new CountingDevice(XlrDock, retainsSettings: false);
+            using var manager = new DeviceManager(NullLogger<DeviceManager>.Instance,
+                new ConfigurationBuilder().Build(), () => [dock], time: time);
+            manager.SweepOnce();
+            manager.MarkRestored();
+            using var gain = JsonDocument.Parse("44");
+            Assert.Null(manager.Apply("gain", gain.RootElement));
+            manager.SweepOnce();
+            Assert.Null(DeviceStateStore.LoadLast("0fd9:00a6"));   // inside the one-second debounce
+
+            // A time sync sets the clock back an hour; the debounce still ends a second on.
+            time.StepWallClock(TimeSpan.FromHours(-1));
+            time.Advance(TimeSpan.FromSeconds(1));
+            manager.SweepOnce();
+            Assert.Equal(44, DeviceStateStore.LoadLast("0fd9:00a6")?.GainDb);
+        });
+    }
+
     /// <summary>
     /// A strip bound to a source never stops the unit being driven: with the
     /// software mixer on, a binding on either strip leaves the unit open

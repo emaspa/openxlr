@@ -267,6 +267,32 @@ public sealed class DeviceEqWriterTests
         return 0;
     });
 
+    /// <summary>
+    /// The settle window after a phantom write runs on the monotonic clock: a
+    /// wall clock set back an hour neither stretches it nor holds the EQ back.
+    /// </summary>
+    [Fact]
+    public void APhantomSettleWindowEndsOnTimeWhenTheWallClockStepsBack() => WithConfigDir(() =>
+    {
+        var time = new ManualTime();
+        var usb = new ProHardwareEqTests.Unit();
+        var pro = new WaveXlrProDevice(usb);
+        using DeviceManager manager = Manager(pro, time);
+        using JsonDocument on = JsonDocument.Parse("true");
+        Assert.Null(manager.Apply("phantom", on.RootElement));
+        manager.SweepOnce();
+        Assert.True(manager.Snapshot().State!.PhantomSettling);
+
+        time.StepWallClock(TimeSpan.FromHours(-1));
+        manager.PostEq(1, Eq(true, 12), "XLR 1");
+        // The unit never mutes, so the hold ends with the two second grace.
+        SweepFor(manager, time, 2500);
+        Assert.False(manager.Snapshot().State!.PhantomSettling);
+        Assert.Equal(DeviceEqPhase.Verified, manager.EqStatus(1).Phase);
+        Assert.Equal(Eq(true, 12), WaveFxEq.Decode(usb.Blocks[0x0004].AsSpan(0, 38)));
+        return 0;
+    });
+
     [Fact]
     public void AUnitThatDropsAWriteGetsOneRewriteThenTheInputFails() => WithConfigDir(() =>
     {

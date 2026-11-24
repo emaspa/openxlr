@@ -100,6 +100,23 @@ public sealed class XlrDockDeviceTests
         .WithSwitch("Mic Capture Switch", true);
 
     [Fact]
+    public void AReadIsHeldForOneSecondOfTheMonotonicClockWhateverTheWallClockDoes()
+    {
+        var time = new ManualTime();
+        FakeAmixer amixer = FullCard();
+        var dev = new XlrDockDevice(new FakeUsb(), amixer.Run, () => 7, time);
+        dev.Connect();
+        Assert.Equal(75, dev.ReadState().GainDb);
+
+        amixer.WithInteger("Mic Capture Volume", 100);   // the desktop moved it
+        Assert.Equal(75, dev.ReadState().GainDb);        // the read is still fresh
+        // A time sync sets the clock back an hour; the read still ages a second on.
+        time.StepWallClock(TimeSpan.FromHours(-1));
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(50, dev.ReadState().GainDb);
+    }
+
+    [Fact]
     public void AFullCardKeepsEveryControlOnAlsa()
     {
         (XlrDockDevice dev, FakeUsb usb, FakeAmixer amixer) = Dock(FullCard());
