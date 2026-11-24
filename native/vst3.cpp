@@ -747,12 +747,14 @@ tresult PLUGIN_API PlugFrame::registerEventHandler(Linux::IEventHandler *handler
 
 tresult PLUGIN_API PlugFrame::unregisterEventHandler(
     Linux::IEventHandler *handler) {
+  // One handler may serve several descriptors and is unregistered once.
+  bool found = false;
   for (Fd &f : v_->fds)
     if (f.handler && f.handler == handler) {
       remove_watch(v_, f);
-      return kResultOk;
+      found = true;
     }
-  return kResultFalse;
+  return found ? kResultOk : kResultFalse;
 }
 
 tresult PLUGIN_API PlugFrame::registerTimer(Linux::ITimerHandler *handler,
