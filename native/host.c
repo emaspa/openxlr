@@ -21,6 +21,14 @@
 #include <time.h>
 #include <unistd.h>
 
+// The Windows backend (wine.c) is linked only into a build with WINHOST=1.
+// Without it its address is null, which no backend in use ever is.
+extern const Backend wine_backend __attribute__((weak));
+
+static bool is_wine_backend(const Backend *backend) {
+  return backend && backend == &wine_backend;
+}
+
 sigjmp_buf x_escape;
 volatile sig_atomic_t x_escape_armed;
 // The thread that runs the editor and arms the escape, recorded before any
@@ -368,7 +376,7 @@ static uint32_t own_block_delay(uint32_t frames) {
 
 static bool own_block_allowed(const Backend *backend) {
   return backend == &lv2_backend || backend == &clap_backend ||
-         backend == &vst3_backend;
+         backend == &vst3_backend || is_wine_backend(backend);
 }
 
 static bool own_block_init(Host *h) {
@@ -1286,7 +1294,7 @@ static void trace_own_block(Host *h) {
 // the figure the plugin declares. The built-in stages report their own.
 static bool measures_latency(const Backend *backend) {
   return backend == &lv2_backend || backend == &clap_backend ||
-         backend == &vst3_backend;
+         backend == &vst3_backend || is_wine_backend(backend);
 }
 
 // The figure goes out as a meter of the host's own. Its name has a dot,
@@ -1443,6 +1451,8 @@ static const Backend *backend_named(const char *name) {
     return &clap_backend;
   if (!strcmp(name, "vst3"))
     return &vst3_backend;
+  if (!strcmp(name, "wine"))
+    return &wine_backend;
   return NULL;
 }
 
@@ -1498,6 +1508,10 @@ int main(int argc, char **argv) {
           "       openxlr-lv2-host probe PATH\n"
           "       openxlr-lv2-host bridge NODE 1|2 RATE [quanta=N] [margin=MS]\n",
           stderr);
+    if (&wine_backend)
+      fputs("       openxlr-lv2-host [--own-block] wine clap FILE ID NODE "
+            "CHANNELS RATE\n",
+            stderr);
     return 2;
   }
   int channels = atoi(argv[first + 1]);

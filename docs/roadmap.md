@@ -324,6 +324,17 @@ The first one, when that time comes: an EQ and an insert chain on
 application channels. Today a chain sits on a microphone, a capture input
 or a whole mix, so a compressor on Voice Chat alone is not possible.
 
+One piece of plugin work has started ahead of that order, by the
+maintainer's decision: a Windows plugin host of our own, built into OpenXLR,
+to replace yabridge and the optional companion. A small Windows program
+runs the plugin under Wine and talks to the native plugin host directly.
+The first step is in the tree behind the build flag `WINHOST=1`. It carries
+CLAP audio and latency and has its own test, described in
+[native/README.md](../native/README.md#windows-plugin-host). No package
+builds it and the daemon does not use it yet, so Windows plugins still run
+through yabridge. Still to come: VST3, parameters, scanning, editors, the
+daemon and the UI, and packaging.
+
 ## Parked
 
 - A Windows port. Device control, the UI, the terminal mixer, the HTTP

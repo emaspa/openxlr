@@ -1178,6 +1178,126 @@ within a part per million and hold it within 5, carry a 1 kHz tone with a
 residual under -70 dB and a steady level exactly; the stops must cost
 exactly one counted event each and recover.
 
+## Windows plugin host
+
+```text
+openxlr-lv2-host [--own-block] wine clap FILE ID NODE CHANNELS RATE
+```
+
+`make -C native WINHOST=1` builds a second way to run a Windows plugin, one
+that does not go through yabridge. It adds a `wine` backend to the helper
+(`wine.c`) and builds `openxlr-winhost.exe` beside it (`winhost/winhost.c`).
+The backend starts that program under Wine, and the program loads the
+plugin. `FILE` is the Windows `.clap` module by its Linux path and `ID` is
+the plugin's CLAP id.
+
+The default build leaves both out and is unchanged. The flag needs
+`x86_64-w64-mingw32-gcc`, or the compiler `MINGW_CC` names. The program is
+linked statically, so it is one file. Building it does not need Wine;
+running it does. Run `make -C native clean-native` when you switch the flag,
+as after any change of flags.
+
+This is the first step of a host that will replace the yabridge companion.
+It carries CLAP audio and latency. It has no parameters, no editor, no
+scanner and no VST3 yet. The daemon does not start it and no package builds
+it, so nothing here reaches a user.
+
+The helper keeps the PipeWire node and the Windows program holds the plugin.
+The CLAP host structure, the port layout and a restart the plugin asks for
+stay on the Windows side, next to the plugin. Only what the helper's own
+backend interface carries crosses between the two: load, activate, one block
+of audio, the latency, deactivate. `winhost/wire.h` describes it.
+
+- One shared file, mapped by both sides, holds the audio of one cycle. It
+  sits in a private directory under `XDG_RUNTIME_DIR`, or under `/dev/shm`
+  where there is none, and the backend removes the directory as soon as the
+  Windows program has opened what is in it.
+- The audio wake is the Windows program's standard input and output, one
+  byte each way per cycle. Under Wine a blocking read on an inherited pipe is
+  a plain `read` in the calling thread. A cycle costs the Windows audio
+  thread one `read` and one `write`, and it never calls wineserver.
+- Two FIFOs in the same directory carry the control requests, a fixed-size
+  request one way and a fixed-size reply the other, between the two main
+  threads.
+- Paths cross as Linux paths. The Windows side asks Wine for the Windows
+  name and falls back to the `\\?\unix\` form, so a prefix with no `Z:`
+  drive works.
+- The helper reads the Windows program's standard error and passes it on a
+  line at a time. The plugin's log and the `trace:` lines reach the daemon's
+  log the way a native backend's do.
+
+Each side bounds what it reads from the other. The Windows side checks the
+frame count of every block against the fixed buffers and against what the
+plugin was activated for. The Linux side never uses a value from the shared
+file as a size or an index.
+
+The Windows audio thread takes a name, the helper finds the thread by that
+name under `/proc`, and gives it the scheduling of the thread that waits for
+it: PipeWire's data thread, or the worker of the plugin's own block. A lower
+priority would leave a real-time thread waiting on one that is not, and a
+higher one would let plugin code outrank PipeWire's threads. A Windows
+program cannot ask for this itself. The kernel allows it from outside
+between two processes of one user, within their real-time limit, so the
+user needs a limit that covers PipeWire's priority, as yabridge's host does.
+Without one the helper says so and the thread runs at ordinary priority.
+RTKit is not asked.
+
+What happens when the Windows side goes wrong:
+
+- It dies, killed or crashed. The audio thread reads the end of the pipe at
+  once and the cycle is silence. The next tick writes how the program ended
+  and the helper exits, so the daemon rebuilds the chain as after any other
+  exit. A fault inside the plugin ends the Windows program on the spot with
+  one line naming the exception, without waiting for Wine's debugger.
+- A block comes back late. The cycle waits up to twice the block's own
+  length and at least 20 ms, so a block late by less is heard late, as a
+  native plugin's would be. Past that the cycle is silence, and so is every
+  cycle until the answer arrives. The helper leaves the shared file alone
+  meanwhile, because the Windows side may still be reading it.
+- A block never comes back. After six seconds the helper fails the instance,
+  the patience it has with a native plugin stuck inside one callback. Unload
+  kills a Windows program that no longer answers.
+- The plugin refuses its blocks. These count like a native CLAP plugin's:
+  each is silence, and half a second of them in a row fails the instance.
+- The helper itself is killed. The kernel sends the Windows program a
+  SIGKILL, and it would also leave by itself on reading its closed pipes.
+
+`OPENXLR_WINE` names the Wine to start, `wine` on `PATH` otherwise.
+`OPENXLR_WINHOST` names the Windows program when it is not beside the helper.
+The Wine prefix and the DLL overrides come from the helper's environment,
+which the daemon sets. The backend takes `WAYLAND_DISPLAY` out of the
+Windows program's environment, since an editor will have to be an X11
+window.
+
+`make -C native WINHOST=1 test-winhost` runs `tests/winhost` against a test
+plugin built with mingw (`tests/winhost-plugin.c`), under Wine and with no
+audio server and no display. It calls the host's audio callback on plain
+buffers with the Windows program started for real, and checks:
+
+- the audio that comes back is the plugin's, sample for sample, at block
+  sizes from 1 to 8192 frames, in mono and with one buffer for both
+  directions;
+- a plugin with a sidechain port runs, and one of the wrong width is refused
+  with the reason;
+- the latency the plugin reports, and a restart the plugin asks for that
+  changes it, carried out in the same process;
+- a main-thread callback the plugin asks for from its audio thread;
+- refused blocks, a block 60 ms late, a killed Windows program, a plugin that
+  crashes inside a block and one that never returns. In each the audio
+  callback keeps returning, plays only the plugin's audio or silence, and
+  the failure is reported;
+- the Windows audio thread gets the scheduling of the thread that waits for
+  it, at real-time priority 5 where the user's limit allows;
+- a missing plugin, module or Windows program is refused, and nothing is
+  left in the runtime directory.
+
+The target says what is missing and passes when the build has no
+`WINHOST=1`, when mingw is not installed or when Wine is not. It keeps a
+Wine prefix of its own under `~/.cache/openxlr-test/wineprefix`, or where
+`OPENXLR_TEST_WINEPREFIX` points, and never uses yours. The first run makes
+that prefix, which takes most of a minute. The target is not part of
+`make test` and CI does not run it yet.
+
 ## Scope
 
 For the plugin: URID map and unmap, the worker extension, options, and the

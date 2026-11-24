@@ -30,6 +30,9 @@ native/tests/voice
 native/tests/dynamics
 native/tests/player
 native/tests/bridge
+native/openxlr-winhost.exe
+native/tests/winhost
+native/tests/winhost-plugin.clap
 native/build-config.h
 native/rnnoise/src/*.o
 native/rnnoise/src/x86/*.o
