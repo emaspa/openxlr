@@ -91,6 +91,31 @@ function publishClips() {
   for (const context of clipInspectors)
     send({ event: "sendToPropertyInspector", context, payload: { soundboard: choices } });
 }
+// Insert and profile pickers, sent their lists again whenever they change: an
+// inspector opened before the plugin catalogue or the state arrived, or left
+// open while an insert or profile came or went, kept what it got first.
+const insertInspectors = new Set();
+let lastInserts = "";
+function publishInserts() {
+  if (!insertInspectors.size) return;
+  const choices = insertChoices();
+  const serialized = JSON.stringify(choices);
+  if (serialized === lastInserts) return;
+  lastInserts = serialized;
+  for (const context of insertInspectors)
+    send({ event: "sendToPropertyInspector", context, payload: choices });
+}
+const profileInspectors = new Set();
+let lastProfiles = "";
+function publishProfiles() {
+  if (!profileInspectors.size) return;
+  const profiles = profileChoices();
+  const serialized = JSON.stringify(profiles);
+  if (serialized === lastProfiles) return;
+  lastProfiles = serialized;
+  for (const context of profileInspectors)
+    send({ event: "sendToPropertyInspector", context, payload: { profiles } });
+}
 let daemonState = null;   // last full {"type":"state"} message
 let daemonUp = false;
 // A short word keys and dials show instead of "offline" when the adapter
@@ -158,11 +183,15 @@ function connectDaemon() {
   };
 }
 function onDaemonMessage(m) {
-  if (m.type === "state") { daemonState = stateOf(m); pruneEqTurns(); refreshAll(); refreshMeters(); publishLayout(); publishOutputs(); publishClips(); }
+  if (m.type === "state") {
+    daemonState = stateOf(m); pruneEqTurns(); refreshAll(); refreshMeters();
+    publishLayout(); publishOutputs(); publishClips(); publishInserts(); publishProfiles();
+  }
   else if (m.type === "meters") { meterLevels = levelsOf(m.levels); refreshMeters(); }
   else if (m.type === "plugins") {
     catalog = new Map(listOf(m.plugins, isObject).map((p) => [p.plugin, p]));
     refreshAll();
+    publishInserts();   // the controls of each insert come from the catalogue
   }
   else if (m.type === "commandResult") keyCommands.finish(m.requestId, !!m.error);
   else if (m.type === "error") {
@@ -530,12 +559,18 @@ function onHostMessage(m) {
         lastOutputs = JSON.stringify(outputs);
         send({ event: "sendToPropertyInspector", context: m.context, payload: { outputs } });
       }
-      else if (m.payload?.request === "inserts")
-        send({ event: "sendToPropertyInspector", context: m.context,
-               payload: insertChoices() });
-      else if (m.payload?.request === "profiles")
-        send({ event: "sendToPropertyInspector", context: m.context,
-               payload: { profiles: profileChoices() } });
+      else if (m.payload?.request === "inserts") {
+        insertInspectors.add(m.context);
+        const choices = insertChoices();
+        lastInserts = JSON.stringify(choices);
+        send({ event: "sendToPropertyInspector", context: m.context, payload: choices });
+      }
+      else if (m.payload?.request === "profiles") {
+        profileInspectors.add(m.context);
+        const profiles = profileChoices();
+        lastProfiles = JSON.stringify(profiles);
+        send({ event: "sendToPropertyInspector", context: m.context, payload: { profiles } });
+      }
       else if (m.payload?.request === "soundboard") {
         clipInspectors.add(m.context);
         const choices = clipChoices(daemonState?.mixer, daemonUp);
@@ -547,6 +582,8 @@ function onHostMessage(m) {
       layoutInspectors.delete(m.context);
       outputInspectors.delete(m.context);
       clipInspectors.delete(m.context);
+      insertInspectors.delete(m.context);
+      profileInspectors.delete(m.context);
       break;
   }
 }

@@ -2,55 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {readFileSync} from "node:fs";
 import vm from "node:vm";
-
-// A selector DOM that behaves as a browser's single select does: setting a
-// value no option holds leaves the first enabled option selected, and so does
-// removing the selected option. That is what made the page read empty.
-class Element {
-  constructor(tag) {
-    this.tag = tag; this.children = []; this.dataset = {}; this.listeners = new Map();
-    this.disabled = false; this.hidden = false; this._value = ""; this.selected = null;
-  }
-  appendChild(child) { child.parent = this; this.children.push(child); this.root().settle(); }
-  insertBefore(child, ref) {
-    child.parent = this; this.children.splice(this.children.indexOf(ref), 0, child); this.root().settle();
-  }
-  remove() {
-    const root = this.root();
-    this.parent.children = this.parent.children.filter(child => child !== this);
-    this.parent = null;
-    root.settle();
-  }
-  root() { return this.parent ? this.parent.root() : this; }
-  querySelector(selector) {
-    return selector === "[data-layout-anchor]" ? this.children.find(child => "layoutAnchor" in child.dataset) ?? null : null;
-  }
-  querySelectorAll() { return this.children.filter(child => child.dataset.layoutGroup); }
-  get options() { return this.children.flatMap(child => child.tag === "option" ? [child] : child.options); }
-  get selectedOptions() { return this.selected ? [this.selected] : []; }
-  get value() {
-    if (this.tag === "select") return this.selected?.value ?? "";
-    return this._value;
-  }
-  set value(value) {
-    if (this.tag !== "select") { this._value = value; return; }
-    this.selected = this.options.find(option => option.value === value) ?? null;
-    this.settle();
-  }
-  settle() {
-    if (this.tag !== "select") return;
-    if (!this.options.includes(this.selected)) this.selected = this.options.find(option => !option.disabled) ?? null;
-  }
-  addEventListener(event, callback) { this.listeners.set(event, callback); }
-  // A choice made by the user in the list.
-  choose(value) { this.value = value; this.listeners.get("change")(); }
-}
-
-const option = (value, text = value) => {
-  const element = new Element("option");
-  element.value = value; element.textContent = text;
-  return element;
-};
+import {Element, option} from "./inspector-dom.mjs";
 
 function page(settings) {
   const target = new Element("select"); target.id = "target";
@@ -161,4 +113,43 @@ test("an insert's metadata is saved for the insert the key holds", () => {
   key.deliver({inserts: [{target: "insert|xlr1|ins-3", label: "XLR 1: Gate", meta: {plugin: "gate", index: 0}}], chains: []});
   key.icon.choose("knob");
   assert.deepEqual(key.saved().meta, {"insert|xlr1|ins-3": {plugin: "gate", index: 0}});
+});
+
+// The plugin sends the insert and profile lists again whenever they change.
+test("a later insert or profile list replaces the earlier one and keeps the key's target", () => {
+  const groupValues = (key, id) => key.target.children.find(child => child.id === id)?.children.map(o => o.value);
+  // Opened offline: the lists came empty, and the key's insert is unavailable.
+  const key = page({target: "insert|xlr1|ins-3"});
+  key.deliver({inserts: [], chains: []});
+  key.deliver({profiles: []});
+  assert.equal(key.unavailable().disabled, true);
+  // The daemon is back: the lists fill and the real option replaces the entry.
+  key.deliver({inserts: [{target: "insert|xlr1|ins-3", label: "XLR 1: Gate", meta: {plugin: "gate", index: 0}}],
+    chains: [{target: "inschain|xlr1", label: "XLR 1: whole chain"}]});
+  key.deliver({profiles: [{target: "profile|Evening", label: "Evening"}]});
+  assert.equal(key.unavailable(), undefined);
+  assert.equal(key.target.value, "insert|xlr1|ins-3");
+  assert.equal(key.target.selectedOptions[0].disabled, false);
+  // An insert added and a profile saved while the page is open.
+  key.deliver({inserts: [{target: "insert|xlr1|ins-3", label: "XLR 1: Gate"}, {target: "insert|xlr1|ins-4", label: "XLR 1: Comp"}],
+    chains: [{target: "inschain|xlr1", label: "XLR 1: whole chain"}]});
+  key.deliver({profiles: [{target: "profile|Evening", label: "Evening"}, {target: "profile|Morning", label: "Morning"}]});
+  assert.deepEqual(groupValues(key, "insert-group"), ["insert|xlr1|ins-3", "insert|xlr1|ins-4"]);
+  assert.deepEqual(groupValues(key, "profile-group"), ["profile|Evening", "profile|Morning"]);
+  assert.equal(key.target.children.filter(child => child.id === "insert-group").length, 1, "the group is replaced, not added again");
+  assert.equal(key.target.value, "insert|xlr1|ins-3");
+  // The key's insert is deleted: it stays selected as unavailable, and a save keeps it.
+  key.deliver({inserts: [{target: "insert|xlr1|ins-4", label: "XLR 1: Comp"}], chains: []});
+  assert.equal(key.target.value, "insert|xlr1|ins-3");
+  assert.equal(key.unavailable().disabled, true);
+  assert.equal(groupValues(key, "chain-group"), undefined, "an empty list removes its group");
+  key.icon.choose("knob");
+  assert.equal(key.saved().target, "insert|xlr1|ins-3");
+  // A profile key follows its profile the same way.
+  const profile = page({target: "profile|Morning"});
+  profile.deliver({profiles: [{target: "profile|Evening", label: "Evening"}]});
+  assert.equal(profile.unavailable().disabled, true);
+  profile.deliver({profiles: [{target: "profile|Evening", label: "Evening"}, {target: "profile|Morning", label: "Morning"}]});
+  assert.equal(profile.unavailable(), undefined);
+  assert.equal(profile.target.value, "profile|Morning");
 });

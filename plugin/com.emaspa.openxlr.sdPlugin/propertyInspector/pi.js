@@ -72,23 +72,11 @@ function connect(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inAct
   };
 }
 
-// A group of live options {target, label, meta?}; re-applies the saved
-// selection once the option it refers to exists.
+// A group of live options {target, label, meta?}. The plugin sends it again
+// whenever it changes, so it is rebuilt, keeping the key's target selected.
 function fillGroup(id, title, items, wanted) {
   const sel = document.getElementById("target");
-  if (!sel || document.getElementById(id) || !items.length) return;
-  const group = document.createElement("optgroup");
-  group.id = id;
-  group.label = title;
-  for (const it of items) {
-    const opt = document.createElement("option");
-    opt.value = it.target;
-    opt.textContent = it.label;
-    if (it.meta) opt.dataset.meta = JSON.stringify(it.meta);
-    group.appendChild(opt);
-  }
-  sel.appendChild(group);
-  selectTarget(sel, wanted);
+  if (sel) replaceOptionGroup(sel, id, title, items, wanted);
 }
 
 // The plugin sends the outputs again whenever they change, so both groups
