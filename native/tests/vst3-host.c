@@ -40,3 +40,13 @@ bool test_host_audio_failed(Host *h) {
 }
 
 void test_host_set_own_block(Host *h, bool own_block) { h->own_block = own_block; }
+
+// An editor counted as open, for a loss that has no window to take with it.
+void test_host_open_editor(Host *h, const Backend *backend) {
+  h->backend = backend;
+  h->editor_open = true;
+  x_main_thread = pthread_self();
+}
+
+// What Xlib does when a plugin's call finds the display gone.
+void test_host_lose_display(void) { lost_x_connection(NULL); }

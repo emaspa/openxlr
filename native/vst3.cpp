@@ -654,17 +654,37 @@ void remove_watch(Vst3 *v, Watch &watch) {
   // Releasing a plugin object can call back into the run loop. Detach the
   // record first so it cannot remove this source or handler a second time.
   watch = {};
-  destroy_source(v, source);
+  if (source)  // a watch of a lost editor has none left
+    destroy_source(v, source);
   handler->release();
 }
 
+// A slot is taken while it holds a handler, with or without a source.
 void clear_watches(Vst3 *v) {
   for (Timer &t : v->timers)
-    if (t.source)
+    if (t.handler)
       remove_watch(v, t);
   for (Fd &f : v->fds)
-    if (f.source)
+    if (f.handler)
       remove_watch(v, f);
+}
+
+// The editor's display is gone. Its sources would keep firing against it,
+// a hung-up descriptor on every loop pass, so they go now, without a call
+// into the plugin. The handlers stay held and are released where they
+// would have been: when the plugin unregisters them, when a later view is
+// released, or at unload.
+void stop_watches(Vst3 *v) {
+  for (Timer &t : v->timers)
+    if (t.source) {
+      destroy_source(v, t.source);
+      t.source = nullptr;
+    }
+  for (Fd &f : v->fds)
+    if (f.source) {
+      destroy_source(v, f.source);
+      f.source = nullptr;
+    }
 }
 
 void release_view(Vst3 *v) {
@@ -708,7 +728,7 @@ tresult PLUGIN_API PlugFrame::registerEventHandler(Linux::IEventHandler *handler
   if (v_->stopping_run_loop)
     return kResultFalse;
   for (Fd &f : v_->fds) {
-    if (f.source)
+    if (f.handler)
       continue;
     f.v = v_;
     f.handler = handler;
@@ -728,7 +748,7 @@ tresult PLUGIN_API PlugFrame::registerEventHandler(Linux::IEventHandler *handler
 tresult PLUGIN_API PlugFrame::unregisterEventHandler(
     Linux::IEventHandler *handler) {
   for (Fd &f : v_->fds)
-    if (f.source && f.handler == handler) {
+    if (f.handler && f.handler == handler) {
       remove_watch(v_, f);
       return kResultOk;
     }
@@ -742,7 +762,7 @@ tresult PLUGIN_API PlugFrame::registerTimer(Linux::ITimerHandler *handler,
   if (v_->stopping_run_loop)
     return kResultFalse;
   for (Timer &t : v_->timers) {
-    if (t.source)
+    if (t.handler)
       continue;
     t.v = v_;
     t.handler = handler;
@@ -765,7 +785,7 @@ tresult PLUGIN_API PlugFrame::registerTimer(Linux::ITimerHandler *handler,
 
 tresult PLUGIN_API PlugFrame::unregisterTimer(Linux::ITimerHandler *handler) {
   for (Timer &t : v_->timers)
-    if (t.source && t.handler == handler) {
+    if (t.handler && t.handler == handler) {
       remove_watch(v_, t);
       return kResultOk;
     }
@@ -1407,7 +1427,9 @@ void vst3_editor_close(Host *h) {
 void vst3_editor_lost(Host *h) {
   // The view's window is inside a display that is gone; removing it would
   // go through that display. It stays until this process exits.
-  of(h)->view = nullptr;
+  Vst3 *v = of(h);
+  v->view = nullptr;
+  stop_watches(v);
 }
 
 bool vst3_editor_idle(Host *) { return false; }

@@ -347,6 +347,111 @@ static void clap_requests_off_main_thread(void) {
   pw_main_loop_destroy(h.loop);
 }
 
+// --- a CLAP plugin whose display goes away under its timer ------------------
+
+static unsigned clap_timer_calls, clap_fd_calls;
+static bool clap_lose_on_timer;
+
+static void ct_on_timer(const clap_plugin_t *p, clap_id id) {
+  ++clap_timer_calls;
+  // What Xlib does when the plugin's next call finds the server gone.
+  if (clap_lose_on_timer) {
+    clap_lose_on_timer = false;
+    lost_x_connection(clap_display);
+  }
+}
+static void cf_on_fd(const clap_plugin_t *p, int fd, clap_posix_fd_flags_t flags) {
+  ++clap_fd_calls;
+}
+static const clap_plugin_timer_support_t clap_timer_support = {ct_on_timer};
+static const clap_plugin_posix_fd_support_t clap_fd_support = {cf_on_fd};
+
+static void iterate_until(Host *h, const unsigned *calls) {
+  for (unsigned i = 0; i < 200 && !*calls; ++i)
+    pw_loop_iterate(host_loop(h), 10);
+  assert(*calls);
+}
+
+// The timers and descriptors a plugin registered stop with a lost display:
+// a hung-up descriptor would otherwise be ready on every pass of the loop.
+// The editor opens again afterwards and its new ones run.
+static void clap_lost_display_stops_watches(void) {
+  x_main_thread = pthread_self();
+  Host h = {.backend = &clap_backend, .has_editor = true,
+            .node_name = "openxlr-clap-lost-test",
+            .main_thread = pthread_self()};
+  h.loop = pw_main_loop_new(NULL);
+  assert(h.loop);
+  pw_loop_enter(host_loop(&h));
+  Clap *c = calloc(1, sizeof(Clap));
+  assert(c);
+  c->h = &h;
+  c->plugin = &clap_plugin;
+  c->gui = &clap_gui;
+  c->timer_support = &clap_timer_support;
+  c->fd_support = &clap_fd_support;
+  c->host = (clap_host_t){.host_data = c, .get_extension = host_get_extension};
+  h.impl = c;
+  const clap_host_timer_support_t *timers =
+      c->host.get_extension(&c->host, CLAP_EXT_TIMER_SUPPORT);
+  const clap_host_posix_fd_support_t *fds =
+      c->host.get_extension(&c->host, CLAP_EXT_POSIX_FD_SUPPORT);
+  assert(timers && fds);
+  assert(open_ui(&h));
+  drain(&h);
+
+  int pipes[2];
+  assert(pipe(pipes) == 0);
+  clap_id timer;
+  assert(timers->register_timer(&c->host, 1, &timer));
+  assert(fds->register_fd(&c->host, pipes[0],
+                          CLAP_POSIX_FD_READ | CLAP_POSIX_FD_ERROR));
+  Display *host_display = h.display;
+  Window host_window_id = h.window;
+  unsigned destroys = clap_destroys;
+  clap_lose_on_timer = true;
+  iterate_until(&h, &clap_timer_calls);
+  assert(!h.editor_open && !h.display && !c->gui_created);
+  // The plugin's connection hangs up and stays ready from now on.
+  close(pipes[1]);
+  for (unsigned i = 0; i < 10; ++i)
+    assert(pw_loop_iterate(host_loop(&h), 5) == 0);
+  assert(clap_timer_calls == 1 && clap_fd_calls == 0);
+  assert(!timers->unregister_timer(&c->host, timer));
+  assert(!fds->unregister_fd(&c->host, pipes[0]));
+  assert(clap_destroys == destroys);  // destroying would go through the display
+  // The simulated loss leaves both test connections alive for cleanup.
+  XDestroyWindow(clap_display, clap_window);
+  XCloseDisplay(clap_display);
+  clap_display = NULL;
+  XDestroyWindow(host_display, host_window_id);
+  XCloseDisplay(host_display);
+  close(pipes[0]);
+  puts("PASS: a lost CLAP editor stops the plugin's timers and descriptors");
+
+  assert(open_ui(&h));
+  drain(&h);
+  assert(pipe(pipes) == 0);
+  assert(timers->register_timer(&c->host, 1, &timer));
+  assert(fds->register_fd(&c->host, pipes[0], CLAP_POSIX_FD_READ));
+  clap_timer_calls = 0;
+  iterate_until(&h, &clap_timer_calls);
+  assert(write(pipes[1], "x", 1) == 1);
+  iterate_until(&h, &clap_fd_calls);
+  assert(h.editor_open);
+  assert(timers->unregister_timer(&c->host, timer));
+  assert(fds->unregister_fd(&c->host, pipes[0]));
+  close_ui(&h);
+  assert(clap_destroys == destroys + 1);
+  close(pipes[0]);
+  close(pipes[1]);
+  puts("PASS: a CLAP editor opens again after a lost display and its watches run");
+
+  clap_unload(&h);
+  pw_loop_leave(host_loop(&h));
+  pw_main_loop_destroy(h.loop);
+}
+
 int main(void) {
   // Before any thread or connection of this test exists, so the children
   // inherit nothing but the escape.
@@ -561,6 +666,7 @@ int main(void) {
   pw_loop_leave(host_loop(&h));
   pw_main_loop_destroy(h.loop);
   clap_requests_off_main_thread();
+  clap_lost_display_stops_watches();
   pw_deinit();
   XCloseDisplay(keepalive);
   puts("PASS: closing, reopening and losing a display remove its event source");
