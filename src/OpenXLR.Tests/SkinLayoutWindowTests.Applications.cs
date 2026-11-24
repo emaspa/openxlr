@@ -277,6 +277,10 @@ internal static partial class SkinLayoutWindowTests
             var volume = tiles[i].GetVisualDescendants().OfType<Slider>().Single(s => s.Name == "ApplicationPlaybackLevel");
             AssertInside(volume, tiles[i]);
             AssertNoOverlap([picker, volume]);
+            var percentage = tiles[i].GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "ApplicationPlaybackPercentage");
+            AssertInside(percentage, tiles[i]);
+            AssertNoOverlap([volume, percentage]);
+            Assert.Same(window.FindResource("Ox.Text.Primary"), percentage.Foreground);
             ItemsControl sizer = picker.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "ApplicationChannelSizer");
             TextBlock[] names = [.. sizer.GetVisualDescendants().OfType<TextBlock>()];
             Assert.Equal(picker.ItemCount, names.Length);

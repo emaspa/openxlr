@@ -12,7 +12,8 @@
             AutomationProperties.Name="{loc:Text Key=PlaybackVolume}"/>
     <Panel Grid.Column="1" VerticalAlignment="Center">
       <TextBlock Text="100%" Opacity="0" AutomationProperties.AccessibilityView="Raw"/>
-      <TextBlock Name="ApplicationPlaybackPercentage" Text="{Binding Percentage}" HorizontalAlignment="Right"/>
+      <TextBlock Name="ApplicationPlaybackPercentage" Text="{Binding Percentage}" HorizontalAlignment="Right"
+                 Foreground="{DynamicResource Ox.Text.Primary}"/>
     </Panel>
     <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" TextWrapping="Wrap"
                Classes="warn" IsVisible="{Binding !!Error}"/>
