@@ -1,6 +1,7 @@
 using OpenXLR.Core;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace OpenXLR.Core.Devices;
@@ -260,6 +261,14 @@ public sealed class XlrDockDevice : IAudioDevice
         return m.Groups[1].Value;
     }
 
+    /// <summary>
+    /// The first channel of an integer control. A control with two channels
+    /// reads as "58,58"; a write with one value sets every channel, so the
+    /// first stands for all of them.
+    /// </summary>
+    private int GetFirstInt(string name)
+        => int.Parse(Get(name).Split(',')[0], NumberStyles.Integer, CultureInfo.InvariantCulture);
+
     private void Set(string name, string value)
     {
         lock (_lock)
@@ -281,7 +290,7 @@ public sealed class XlrDockDevice : IAudioDevice
             byte[]? cfg = ReadConfigIfOpen();
             int gainDb = _gainPath switch
             {
-                ControlPath.Alsa => (int)Math.Round(int.Parse(Get(GainCtl)) / 2.0),
+                ControlPath.Alsa => (int)Math.Round(GetFirstInt(GainCtl) / 2.0),
                 ControlPath.Block => (int)Math.Round(BinaryPrimitives.ReadUInt16LittleEndian(cfg.AsSpan(OffGain)) / 256.0),
                 _ => 0,
             };
@@ -293,7 +302,7 @@ public sealed class XlrDockDevice : IAudioDevice
             };
             double hpDb = _hpPath switch
             {
-                ControlPath.Alsa => int.Parse(Get(HpCtl)) / 2.0 - 60.0,
+                ControlPath.Alsa => GetFirstInt(HpCtl) / 2.0 - 60.0,
                 ControlPath.Block => Math.Clamp(BinaryPrimitives.ReadInt16LittleEndian(cfg.AsSpan(OffHpVol)) / 256.0, -60.0, 0.0),
                 _ => 0.0,
             };
