@@ -79,22 +79,26 @@ public sealed class XlrDockDevice : IAudioDevice
 
     private int _card = -1;
     private DeviceState? _cached;
-    private DateTime _cachedAt;
+    // A timestamp of _time: a step of the wall clock cannot keep a stale read.
+    private long _cachedAt;
     private readonly object _lock = new();
     private ControlPath _gainPath, _mutePath, _hpPath;
 
     private readonly IUsbTransport _usb;
     private readonly Func<IReadOnlyList<string>, ProcessResult> _amixer;
     private readonly Func<int> _findCard;
+    private readonly TimeProvider _time;
 
     public XlrDockDevice() : this(UsbTransport.Create(), RunAmixer, null) { }
 
-    /// <summary>Tests substitute the transport, amixer and the card lookup.</summary>
-    internal XlrDockDevice(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult> amixer, Func<int>? findCard)
+    /// <summary>Tests substitute the transport, amixer, the card lookup and the clock.</summary>
+    internal XlrDockDevice(IUsbTransport usb, Func<IReadOnlyList<string>, ProcessResult> amixer, Func<int>? findCard,
+        TimeProvider? time = null)
     {
         _usb = usb;
         _amixer = amixer;
         _findCard = findCard ?? (() => FindCard("/proc/asound", Info.Location));
+        _time = time ?? TimeProvider.System;
     }
 
     public DeviceInfo Info { get; } = UsbTransport.WithLocation(new("Elgato", "XLR Dock", VendorId, ProductId));
@@ -271,7 +275,7 @@ public sealed class XlrDockDevice : IAudioDevice
     {
         lock (_lock)
         {
-            if (_cached is not null && (DateTime.UtcNow - _cachedAt).TotalSeconds < 1)
+            if (_cached is not null && _time.GetElapsedTime(_cachedAt) < TimeSpan.FromSeconds(1))
                 return _cached;
             byte[]? cfg = ReadConfigIfOpen();
             int gainDb = _gainPath switch
@@ -301,7 +305,7 @@ public sealed class XlrDockDevice : IAudioDevice
                 LowImpedance = cfg is not null && cfg[OffLowZ] != 0,
                 Crossfade = 100,   // not a hardware feature here; neutral centre
             };
-            _cachedAt = DateTime.UtcNow;
+            _cachedAt = _time.GetTimestamp();
             return _cached;
         }
     }

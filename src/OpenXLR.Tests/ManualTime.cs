@@ -10,13 +10,18 @@ internal sealed class ManualTime(long timestampFrequency = TimeSpan.TicksPerSeco
 {
     private readonly List<ManualTimer> _timers = [];
     private long _now;
+    private long _wallStep;
 
     public override long TimestampFrequency => timestampFrequency;
 
     public override long GetTimestamp() => (long)((Int128)Interlocked.Read(ref _now) * TimestampFrequency / TimeSpan.TicksPerSecond);
 
-    /// <summary>Wall time moves with the clock, from a fixed start.</summary>
-    public override DateTimeOffset GetUtcNow() => new DateTimeOffset(2026, 10, 20, 12, 0, 0, TimeSpan.Zero).AddTicks(Interlocked.Read(ref _now));
+    /// <summary>Wall time moves with the clock, from a fixed start, plus every <see cref="StepWallClock"/>.</summary>
+    public override DateTimeOffset GetUtcNow() => new DateTimeOffset(2026, 10, 20, 12, 0, 0, TimeSpan.Zero)
+        .AddTicks(Interlocked.Read(ref _now) + Interlocked.Read(ref _wallStep));
+
+    /// <summary>Set the wall clock forward or back, as a time sync does; the timestamps and timers do not move.</summary>
+    public void StepWallClock(TimeSpan by) => Interlocked.Add(ref _wallStep, by.Ticks);
 
     public TimeSpan Elapsed => TimeSpan.FromTicks(Interlocked.Read(ref _now));
 
