@@ -35,8 +35,9 @@ public sealed class InProcessUsbTransport : IUsbTransport
             LibUsb.libusb_close(_handle);
             _handle = IntPtr.Zero;
             // No logger here, and the helper's loop must not see an exception:
-            // say why on stderr (the journal, when libusb runs in the daemon
-            // itself) and report the device as not opened.
+            // say why on stderr (the daemon forwards the helper's to its log,
+            // and in the daemon itself it is the journal) and report the
+            // device as not opened.
             Console.Error.WriteLine($"usb: claiming interface {LibUsb.VendorInterface} failed: {LibUsb.StrError(claim)}");
             return false;
         }

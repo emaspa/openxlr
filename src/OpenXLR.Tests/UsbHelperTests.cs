@@ -178,6 +178,74 @@ public sealed class UsbHelperTests
         }
     }
 
+    /// <summary>The lines a helper's standard error gave, and a wait for them.</summary>
+    private sealed class ErrorLines
+    {
+        private readonly List<string> _lines = [];
+        private readonly SemaphoreSlim _added = new(0);
+        public void Add(string line)
+        {
+            lock (_lines) _lines.Add(line);
+            _added.Release();
+        }
+        public string[] Lines { get { lock (_lines) return [.. _lines]; } }
+        /// <summary>Wait until <paramref name="count"/> lines have come, within a deadline.</summary>
+        public string[] WaitFor(int count)
+        {
+            var deadline = Stopwatch.StartNew();
+            while (Lines.Length < count && deadline.Elapsed < TimeSpan.FromSeconds(10))
+                _added.Wait(TimeSpan.FromMilliseconds(100));
+            return Lines;
+        }
+    }
+
+    [Fact]
+    public void WhyAnOpenFailedReachesTheLogAlthoughTheHelperIsKilledAtOnce()
+    {
+        // What the helper says when the interface cannot be claimed, then
+        // the open's answer: not opened, so the transport kills it.
+        const string script = """
+            import sys, struct
+            n = struct.unpack('<I', sys.stdin.buffer.read(4))[0]; sys.stdin.buffer.read(n)
+            sys.stderr.write('usb: claiming interface 3 failed: Resource busy\n'); sys.stderr.flush()
+            sys.stdout.buffer.write(struct.pack('<Ii', 4, -6)); sys.stdout.buffer.flush()
+            for line in sys.stdin:
+                pass
+            """;
+        var log = new ErrorLines();
+        using var usb = new HelperUsbTransport("python3", ["-c", script], log.Add);
+        Assert.False(usb.Open(0x0fd9, 0x00b4));
+        Assert.False(usb.HelperAlive);
+        Assert.Equal(["usb: claiming interface 3 failed: Resource busy"], log.WaitFor(1));
+    }
+
+    [Fact]
+    public void AHelperThatWritesALotToStandardErrorStillAnswersAndTheLogIsBounded()
+    {
+        // Far more than a pipe holds, before the answer to the open: one
+        // overlong line, then many short ones.
+        const string script = """
+            import sys, struct
+            n = struct.unpack('<I', sys.stdin.buffer.read(4))[0]; sys.stdin.buffer.read(n)
+            sys.stderr.write('x' * 5000 + '\n')
+            for i in range(20000):
+                sys.stderr.write('line %d of a chatty helper\n' % i)
+            sys.stderr.flush()
+            sys.stdout.buffer.write(struct.pack('<Ii', 4, 0)); sys.stdout.buffer.flush()
+            for line in sys.stdin:
+                pass
+            """;
+        var log = new ErrorLines();
+        using var usb = new HelperUsbTransport("python3", ["-c", script], log.Add);
+        Assert.True(usb.Open(0x0fd9, 0x00b4));
+        string[] lines = log.WaitFor(HelperUsbTransport.MaxErrorLines);
+        Assert.Equal(HelperUsbTransport.MaxErrorLines, lines.Length);
+        Assert.Equal(new string('x', HelperUsbTransport.MaxErrorLineLength), lines[0]);
+        Assert.Equal("line 0 of a chatty helper", lines[1]);
+        Assert.EndsWith("(further output from this USB helper is dropped)", lines[^1]);
+        Assert.True(usb.IsOpen);
+    }
+
     [Fact]
     public void AMalformedReplyKillsTheHelperAndAllowsAFreshOpen()
     {

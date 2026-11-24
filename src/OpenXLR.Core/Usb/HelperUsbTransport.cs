@@ -19,6 +19,7 @@ public sealed class HelperUsbTransport : IUsbTransport
 
     private readonly string _exe;
     private readonly IReadOnlyList<string> _args;
+    private readonly Action<string>? _errorLog;
     private readonly object _gate = new();
     private Process? _helper;
     private bool _open;
@@ -27,12 +28,29 @@ public sealed class HelperUsbTransport : IUsbTransport
     public HelperUsbTransport(UsbLocation? location = null)
         : this(Environment.ProcessPath ?? throw new InvalidOperationException("no process path for the USB helper"), ["--usb-helper"]) { _location = location; }
 
-    /// <summary>Any program that speaks <see cref="UsbHelperProtocol"/>; tests use this.</summary>
-    public HelperUsbTransport(string exe, IReadOnlyList<string> args)
+    /// <summary>
+    /// Any program that speaks <see cref="UsbHelperProtocol"/>; tests use
+    /// this. Its standard error goes to <paramref name="errorLog"/>, or to
+    /// <see cref="ErrorLog"/> without one.
+    /// </summary>
+    public HelperUsbTransport(string exe, IReadOnlyList<string> args, Action<string>? errorLog = null)
     {
         _exe = exe;
         _args = args;
+        _errorLog = errorLog;
     }
+
+    /// <summary>
+    /// Where every helper's standard error goes, a line at a time: why a claim
+    /// failed, or the exception that ended the helper. The daemon points it at
+    /// its log at start; until then the lines are read and dropped.
+    /// </summary>
+    public static Action<string>? ErrorLog { get; set; }
+
+    /// <summary>Lines taken from one helper's standard error; the rest is read and dropped.</summary>
+    internal const int MaxErrorLines = 100;
+    /// <summary>The longest line passed on; a longer one is cut there.</summary>
+    internal const int MaxErrorLineLength = 1000;
 
     public bool IsOpen { get { lock (_gate) return _open && _helper is { HasExited: false }; } }
 
@@ -137,7 +155,10 @@ public sealed class HelperUsbTransport : IUsbTransport
         };
         foreach (string a in _args) psi.ArgumentList.Add(a);
         _helper = Process.Start(psi) ?? throw new InvalidOperationException($"failed to start the USB helper {_exe}");
-        _ = _helper.StandardError.BaseStream.CopyToAsync(Stream.Null);   // nothing useful comes back this way
+        // Off this thread: reads that complete at once must not hold the open.
+        StreamReader stderr = _helper.StandardError;
+        Action<string>? errorLog = _errorLog;
+        _ = Task.Run(() => ForwardErrorsAsync(stderr, errorLog));
         _open = false;
     }
 
@@ -180,6 +201,44 @@ public sealed class HelperUsbTransport : IUsbTransport
             throw new IOException("USB helper exited");
         }
         return reply;
+    }
+
+    /// <summary>
+    /// The helper's standard error into the log, for the helper's whole life,
+    /// so a helper that writes a lot never waits on a full pipe and one that
+    /// writes nothing holds no thread. Past <see cref="MaxErrorLines"/> the
+    /// output is still read, and dropped.
+    /// </summary>
+    private static async Task ForwardErrorsAsync(StreamReader stderr, Action<string>? errorLog)
+    {
+        var line = new System.Text.StringBuilder();
+        var buffer = new char[4096];
+        int lines = 0;
+        void Emit()
+        {
+            if (++lines <= MaxErrorLines)
+            {
+                string text = line.ToString().TrimEnd('\r');
+                if (lines == MaxErrorLines) text += " (further output from this USB helper is dropped)";
+                try { (errorLog ?? ErrorLog)?.Invoke(text); }
+                catch (Exception) { /* a failing log must not stop the pipe being read */ }
+            }
+            line.Clear();
+        }
+        try
+        {
+            int n;
+            while ((n = await stderr.ReadAsync(buffer.AsMemory()).ConfigureAwait(false)) > 0)
+                foreach (char c in buffer.AsSpan(0, n))
+                {
+                    if (c == '\n') Emit();
+                    else if (line.Length < MaxErrorLineLength) line.Append(c);
+                }
+            if (line.Length > 0) Emit();
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException) { }
+        // The process leaves a stream it handed out open; this is its only reader.
+        finally { stderr.Dispose(); }
     }
 
     /// <summary>For tests: whether a helper process is alive right now.</summary>
