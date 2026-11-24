@@ -31,7 +31,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <langinfo.h>
 #include <limits.h>
+#include <locale.h>
 #include <math.h>
 #include <poll.h>
 #include <sched.h>
@@ -262,11 +264,67 @@ static bool wine_find_winhost(char *out, size_t size) {
          access(out, R_OK) == 0;
 }
 
+// Whether a locale of this system, by the name an environment variable
+// holds, reads text as UTF-8. A name the system has no locale for reads as
+// the C locale does, which is how a program started under it ends up.
+static bool wine_locale_reads_utf8(const char *name) {
+  locale_t locale = newlocale(LC_CTYPE_MASK, name, (locale_t)0);
+  if (!locale)
+    return false;
+  const char *codeset = nl_langinfo_l(CODESET, locale);
+  bool utf8 = codeset && (!strcasecmp(codeset, "UTF-8") || !strcasecmp(codeset, "UTF8"));
+  freelocale(locale);
+  return utf8;
+}
+
+// Wine reads this system's file names in the character set of its locale.
+// The daemon hands paths over as UTF-8 whatever its own locale is. It runs
+// its scans in the C locale, and a user service may have no locale at all,
+// and there Wine cannot find a plugin whose path has a character outside
+// ASCII. So the Windows host is given a locale that
+// reads UTF-8 when the inherited one does not. It is the inherited locale
+// with UTF-8 as its character set where this system has that one, so the
+// language Wine takes from it stays, and C.UTF-8 otherwise.
+//
+// Only the variable that decides the character set changes: LC_ALL when it
+// is set, since it overrides the rest, else LC_CTYPE. The entry to put in
+// place of it is written to `entry` as NAME=VALUE, and the length of NAME=
+// comes back. 0 means the environment is right as it is. This process's own
+// locale is not touched.
+static size_t wine_utf8_locale(char *entry, size_t size) {
+  const char *variable = "LC_ALL";
+  const char *name = getenv("LC_ALL");
+  if (!name || !name[0]) {
+    variable = "LC_CTYPE";
+    name = getenv("LC_CTYPE");
+  }
+  if (!name || !name[0])
+    name = getenv("LANG");
+  if (!name || !name[0])
+    name = "C";
+  if (wine_locale_reads_utf8(name))
+    return 0;
+  char same[96];
+  size_t stem = strcspn(name, ".@");
+  const char *modifier = strchr(name, '@');
+  const char *chosen = "C.UTF-8";
+  if (stem && snprintf(same, sizeof(same), "%.*s.UTF-8%s", (int)stem, name,
+                       modifier ? modifier : "") < (int)sizeof(same) &&
+      wine_locale_reads_utf8(same))
+    chosen = same;
+  else if (!wine_locale_reads_utf8(chosen))
+    return 0;  // this system has no UTF-8 locale to give
+  if (snprintf(entry, size, "%s=%s", variable, chosen) >= (int)size)
+    return 0;
+  return strlen(variable) + 1;
+}
+
 // Start Wine with the Windows host and its one argument: the directory of
 // the channel, or `scan`. It inherits this process's environment, which the
-// daemon has already given the Wine prefix and the overrides it wants, less
-// WAYLAND_DISPLAY: an editor has to be an X11 window, which is what the
-// frame it will sit in is.
+// daemon has already given the Wine prefix and the overrides it wants, with
+// two changes. WAYLAND_DISPLAY is left out: an editor has to be an X11
+// window, which is what the frame it will sit in is. And the locale reads
+// UTF-8 (wine_utf8_locale).
 static bool wine_spawn(Wine *w, const char *argument) {
   char wine[PATH_MAX], winhost[PATH_MAX];
   const char *named = getenv("OPENXLR_WINE");
@@ -281,13 +339,18 @@ static bool wine_spawn(Wine *w, const char *argument) {
   size_t count = 0;
   while (environ[count])
     ++count;
-  char **environment = calloc(count + 1, sizeof(char *));
+  char **environment = calloc(count + 2, sizeof(char *));
   if (!environment)
     return false;
+  char locale[128];
+  size_t replaced = wine_utf8_locale(locale, sizeof(locale));
   size_t kept = 0;
   for (size_t i = 0; i < count; ++i)
-    if (strncmp(environ[i], "WAYLAND_DISPLAY=", 16) != 0)
+    if (strncmp(environ[i], "WAYLAND_DISPLAY=", 16) != 0 &&
+        !(replaced && !strncmp(environ[i], locale, replaced)))
       environment[kept++] = environ[i];
+  if (replaced)
+    environment[kept++] = locale;
   char *arguments[] = {wine, winhost, (char *)argument, NULL};
 
   int to[2] = {-1, -1}, from[2] = {-1, -1}, log[2] = {-1, -1};

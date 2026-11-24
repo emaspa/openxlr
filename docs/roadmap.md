@@ -334,9 +334,12 @@ plugin for the catalogue, with the same CLAP and VST3 host code that runs
 and scans a native plugin. It has its own test, described in
 [native/README.md](../native/README.md#windows-plugin-host). A VST3 plugin
 keeps the class id and the parameter ids it has through yabridge, so a saved
-insert will still name it and keep its values. No package builds it and the
-daemon does not use it yet, so yabridge still scans and runs Windows
-plugins. Still to come: editors, the daemon and the UI, and packaging.
+insert will still name it and keep its values. No package builds it. In a
+build that has it, the daemon runs one insert of a Windows plugin on it when
+a client asks with `setInsertWindowsHost`
+([docs/api.md](api.md#windows-host)), and back through yabridge the same
+way. yabridge still scans every Windows plugin and runs every insert that
+was not moved. Still to come: editors, the UI's part, and packaging.
 
 ## Parked
 

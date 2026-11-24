@@ -379,16 +379,22 @@ public sealed partial class Mixer
     /// them live, and a name changes nothing that runs. Any other chain is
     /// built again, as <c>setInserts</c> builds it, so a plugin that comes
     /// back starts from its saved control values. An insert keeps the own
-    /// block choice it has now; one that comes back takes the one it had.
+    /// block choice and the Windows host it has now; one that comes back
+    /// takes the ones it had.
     /// </summary>
     private void RestoreChainLocked(string key, InsertChain chain)
     {
         List<InsertDefinition> before = InsertsFor(key);
-        _inserts[key] = [.. chain.Inserts.Select(i => i with
+        _inserts[key] = [.. chain.Inserts.Select(i =>
         {
-            Params = new Dictionary<string, double>(i.Params),
-            NativeHost = i.RunsNatively,
-            OwnBlock = before.FirstOrDefault(b => b.Id == i.Id && b.Kind == i.Kind && b.Plugin == i.Plugin)?.OwnBlock ?? i.OwnBlock,
+            InsertDefinition? now = before.FirstOrDefault(b => b.Id == i.Id && b.Kind == i.Kind && b.Plugin == i.Plugin);
+            return i with
+            {
+                Params = new Dictionary<string, double>(i.Params),
+                NativeHost = i.RunsNatively,
+                OwnBlock = now?.OwnBlock ?? i.OwnBlock,
+                WindowsHost = now is null ? i.WindowsHost : now.WindowsHost,
+            };
         })];
         if (!_built) return;
         bool rebuild;

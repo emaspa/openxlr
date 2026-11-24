@@ -123,6 +123,7 @@ public sealed partial class HistoryPolicyTests
     // Where an insert runs and its editor window are not what it does.
     [Theory]
     [InlineData("setInsertOwnBlock")]
+    [InlineData("setInsertWindowsHost")]
     [InlineData("showInsertUi")]
     public void AnInsertsOwnBlockAndItsEditorAreNotRecorded(string command)
         => Assert.Equal(HistoryClass.Ignored, HistoryPolicy.ClassOf(command));
@@ -157,6 +158,7 @@ public sealed partial class HistoryPolicyTests
         var comp = new InsertDefinition { Id = "comp", Kind = "lv2", Plugin = "urn:test:comp", Params = new() { ["threshold"] = -20 } };
         var chain = new InsertChain([comp]);
         Assert.True(SceneValues.Same(chain, new InsertChain([comp with { OwnBlock = true, Params = new() { ["threshold"] = -20 } }])));
+        Assert.True(SceneValues.Same(chain, new InsertChain([comp with { WindowsHost = "openxlr", Params = new() { ["threshold"] = -20 } }])));
         Assert.False(SceneValues.Same(chain, new InsertChain([comp with { Params = new() { ["threshold"] = -21 } }])));
         Assert.False(SceneValues.Same(chain, new InsertChain([comp with { Params = new() { ["threshold"] = -20, ["ratio"] = 4 } }])));
         Assert.False(SceneValues.Same(chain, new InsertChain([comp with { Bypass = true }])));

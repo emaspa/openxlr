@@ -723,12 +723,23 @@ public sealed partial class MixerService : IHostedService, IDisposable
             LayoutWarning = ResourceWarning,
             Clock = clock,
             ClockChoice = ClockChoice(clock),
-            Inserts = state.Inserts.ToDictionary(e => e.Key, e => (IReadOnlyList<InsertStatus>)e.Value.Select(insert =>
-            {
-                string? reason = EditorPolicy.BlockReason(insert.Insert.Kind, insert.Insert.Plugin);
-                return insert with { NativeUiBlocked = reason is not null, NativeUiBlockReason = reason };
-            }).ToArray()),
+            Inserts = state.Inserts.ToDictionary(e => e.Key, e => (IReadOnlyList<InsertStatus>)e.Value.Select(insert
+                => WithEditorBlock(insert, EditorPolicy.BlockReason(insert.Insert.Kind, insert.Insert.Plugin))).ToArray()),
         };
+    }
+
+    /// <summary>
+    /// An insert's status with what stands between it and its plugin's own
+    /// editor: the compatibility rule for its plugin, in
+    /// <paramref name="rule"/>, or the host it runs on. An insert on the
+    /// Windows plugin host has no editor to open yet. Clients already keep
+    /// the editor away from an insert that says it is blocked and show the
+    /// reason, so no client has to know about that host to get this right.
+    /// </summary>
+    internal static InsertStatus WithEditorBlock(InsertStatus insert, string? rule)
+    {
+        string? reason = rule ?? (insert.WindowsHostRunning ? OpenXLR.Core.Mixing.WindowsPluginHost.NoEditor : null);
+        return insert with { NativeUiBlocked = reason is not null, NativeUiBlockReason = reason };
     }
 
     /// <summary>Selectable sinks and sources, or null when the mixer is off.</summary>
@@ -1952,6 +1963,10 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     break;
                 case "setInsertOwnBlock":
                     _mixer.SetInsertOwnBlock(cmd.Channel!, cmd.InsertId!, cmd.Value.GetBoolean());   // checked by CommandValidation
+                    break;
+                case "setInsertWindowsHost":
+                    _mixer.SetInsertWindowsHost(cmd.Channel!, cmd.InsertId!,
+                        cmd.Value.GetString() == OpenXLR.Core.Mixing.WindowsPluginHost.OpenXlr);   // checked by CommandValidation
                     break;
                 case "setInsertParam":
                     if (cmd.Channel is null || cmd.InsertId is null || cmd.Symbol is null)

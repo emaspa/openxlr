@@ -112,7 +112,7 @@ public sealed record Command
     /// <summary>"soundCheck": record, loop, live or stop.</summary>
     [JsonPropertyName("action")] public string? Action { get; init; }
 
-    /// <summary>"setInsertParam" / "setInsertBypass" / "setInsertOwnBlock" / "renameInsert": which insert.</summary>
+    /// <summary>"setInsertParam" / "setInsertBypass" / "setInsertOwnBlock" / "setInsertWindowsHost" / "renameInsert": which insert.</summary>
     [JsonPropertyName("insertId")] public string? InsertId { get; init; }
 
     /// <summary>"setInsertParam": the control port symbol.</summary>
@@ -223,6 +223,8 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     [JsonPropertyName("searchDirectories")] public IReadOnlyList<PluginSearchDirectory> SearchDirectories => Setup.SearchDirectories;
     [JsonPropertyName("searchPathWarning")] public string? SearchPathWarning => Setup.SearchPathWarning;
     [JsonPropertyName("hostInstalled")] public bool HostInstalled => Setup.HostInstalled;
+    /// <summary>Whether the build has the Windows plugin host that "setInsertWindowsHost" moves an insert to.</summary>
+    [JsonPropertyName("windowsHostInstalled")] public bool WindowsHostInstalled => Setup.WindowsHostInstalled;
     [JsonPropertyName("lv2Directory")] public string Lv2Directory => Setup.Lv2Directory;
     [JsonPropertyName("clapDirectory")] public string ClapDirectory => Setup.ClapDirectory;
     [JsonPropertyName("vst3Directory")] public string Vst3Directory => Setup.Vst3Directory;

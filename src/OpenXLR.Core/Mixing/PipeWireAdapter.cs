@@ -2016,13 +2016,20 @@ public sealed class PipeWireAdapter
                         throw new InvalidOperationException("The native plugin host is not installed.");
                     if (insert.NativeHost && !info.NativeEditorSupported)
                         throw new InvalidOperationException($"{info.Name} has no editor the native host can open; select the filter chain.");
-                    var host = new NativePluginHost(insert, node, channels, rate, info.Path, _note);
+                    // An insert saved to the Windows plugin host runs there
+                    // when this build can do it. When it cannot, the insert
+                    // runs through yabridge as it always could, and says why:
+                    // a saved choice never costs the chain.
+                    WindowsPluginHost.Route? windows = WindowsRoute(insert, info, out string? kept);
+                    var host = new NativePluginHost(insert, node, channels, rate, info.Path, _note, windows);
                     _nativeHosts.Add(host);
-                    Event(TimelineKind.Plugin, $"plugin host started for {InsertName(insert)} on {node}");
+                    Event(TimelineKind.Plugin, windows is null
+                        ? $"plugin host started for {InsertName(insert)} on {node}"
+                        : $"plugin host started for {InsertName(insert)} on {node}, on the Windows plugin host");
                     // Wine starts behind a bridged plugin and outlives this
                     // helper, so from here on it is this daemon's to end.
                     if (host.Bridged) _wine.HelperStarted();
-                    stage = new(node, node, node, host.Process) { NativeHost = host, FilterChainError = refused };
+                    stage = new(node, node, node, host.Process) { NativeHost = host, FilterChainError = refused, WindowsHostError = kept };
                     stages.Add(stage);
                     if (!WaitForPorts(node, "playback", false, TimeSpan.FromSeconds(3), host.Process)
                         || !WaitForPorts(node, "capture", true, TimeSpan.FromSeconds(3), host.Process))
@@ -2050,6 +2057,27 @@ public sealed class PipeWireAdapter
             foreach (FilterHandle stage in stages) StopFilter(stage);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Where an insert saved to the Windows plugin host runs: its route
+    /// there, or null to start it from its bundle. For a saved choice this
+    /// build cannot honour, <paramref name="kept"/> is why yabridge keeps the
+    /// insert, and the journal and the timeline get a line.
+    /// </summary>
+    /// <param name="installed">The host's presence, for a test; the build's own when null.</param>
+    internal WindowsPluginHost.Route? WindowsRoute(InsertDefinition insert, PluginInfo info, out string? kept, bool? installed = null)
+    {
+        kept = null;
+        if (!insert.OnWindowsHost) return null;
+        WindowsPluginHost.Route? route = WindowsPluginHost.Resolve(info, out kept, installed);
+        if (route is null)
+        {
+            string line = $"{InsertName(insert)} is saved to the Windows plugin host and runs through yabridge instead: {kept}";
+            Note(line);
+            Event(TimelineKind.Plugin, line);
+        }
+        return route;
     }
 
     internal static int ParseGraphSampleRate(string metadata)
@@ -3522,6 +3550,11 @@ public sealed record FilterHandle(string Id, string SinkName, string SourceName,
     /// runs in its place; null for a stage that runs where it was saved to.
     /// </summary>
     internal string? FilterChainError { get; init; }
+    /// <summary>
+    /// Why this stage runs through yabridge an insert that is saved to the
+    /// Windows plugin host; null for a stage that runs where it was saved to.
+    /// </summary>
+    internal string? WindowsHostError { get; init; }
     internal bool IsAlive => Stages.Count > 0 ? Stages.All(stage => stage.IsAlive)
         : NativeHost?.IsHealthy ?? !Process.HasExited;
     /// <summary>

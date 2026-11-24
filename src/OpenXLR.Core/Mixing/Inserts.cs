@@ -44,6 +44,26 @@ public sealed record InsertDefinition
     [System.Text.Json.Serialization.JsonIgnore]
     public bool NeedsNativeHost => RunsNatively || OwnBlock;
 
+    /// <summary>
+    /// Which host runs a Windows plugin that is in the catalogue through its
+    /// yabridge bundle: <see cref="WindowsPluginHost.OpenXlr"/> for the
+    /// Windows plugin host built into OpenXLR, and absent for yabridge, which
+    /// is the default, so older settings and builds read the same file. Any
+    /// other value, one a newer build wrote for instance, reads as absent. Set
+    /// with <c>setInsertWindowsHost</c>. A choice the build cannot honour when
+    /// the chain is built runs through yabridge and stays saved.
+    /// </summary>
+    public string? WindowsHost
+    {
+        get => _windowsHost;
+        init => _windowsHost = value == WindowsPluginHost.OpenXlr ? value : null;
+    }
+    private readonly string? _windowsHost;
+
+    /// <summary>Whether the insert is saved to run on the Windows plugin host.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool OnWindowsHost => WindowsHost is not null;
+
     /// <summary>Control values by port symbol; ports not listed keep defaults.</summary>
     public Dictionary<string, double> Params { get; init; } = [];
 
@@ -72,6 +92,13 @@ public sealed record InsertStatus(InsertDefinition Insert, string? Error,
     /// host runs it instead; null when it runs in the host it was saved to.
     /// </summary>
     public string? FilterChainError { get; init; }
+    /// <summary>Whether the insert's plugin is running on the Windows plugin host built into OpenXLR.</summary>
+    public bool WindowsHostRunning { get; init; }
+    /// <summary>
+    /// Why an insert saved to the Windows plugin host runs through yabridge
+    /// instead; null when it runs in the host it was saved to.
+    /// </summary>
+    public string? WindowsHostError { get; init; }
 }
 
 /// <summary>A control port of a plugin, enough to build a sensible slider.</summary>

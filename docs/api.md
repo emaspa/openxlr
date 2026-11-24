@@ -154,7 +154,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `starterSounds` | in answer to `restoreStarterSounds` | `ok` (true when it went through, also when no starter clip was missing), `message`, `clips` (the ids added, in library order) and `skipped` (each clip left out, as `name: reason`). See [Starter sounds](#starter-sounds) |
 | `soundboardImport` | in answer to `importSoundboard` | `ok` (true when at least one clip was imported), `message`, `clips` (the ids added, in library order), `renamed` (the archive's id to the new one, for each clip whose id was in use here), `skipped` (each clip left out, as `name: reason`, and on a refusal each clip that could not be taken) and `replaced` (true when the library was replaced). See [Soundboard](#soundboard) |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo input or mix with two or more |
-| `pluginSetup` | in answer to `getPluginSetup` or `setPluginWineTrace` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
+| `pluginSetup` | in answer to `getPluginSetup` or `setPluginWineTrace` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which no package provides yet), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
 | `windowsPluginFiles` | in answer to `getWindowsPluginFiles` | `ok`, `message` and `plugins`; each plugin file carries `path`, `name`, `format`, `enabled`, `canDelete`, `winePrefix` and `inUse`. Excluded files remain listed |
 | `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
 | `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
@@ -241,7 +241,8 @@ unit sends XLR 1 to the computer before its low cut, with
 [microphone EQ](#microphone-eq)), `inserts`
 (chains by insert key, `xlr1`, `xlr2`, a capture channel id or `mix:<id>`; each entry carries
 `insert`, `error`, `meters`, `nativeHostRunning`, `nativeUiBlocked`,
-`nativeUiBlockReason`, `filterChainError`, `latencyMilliseconds` and
+`nativeUiBlockReason`, `filterChainError`, `windowsHostRunning`,
+`windowsHostError`, `latencyMilliseconds` and
 `measuredLatencyMilliseconds`),
 `soundCheck` (see [Sound Check](#sound-check)), `soundboard` (see
 [Soundboard](#soundboard)),
@@ -358,9 +359,10 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `rescanPlugins` | none | read the plugin directories again, for plugins installed by other means; answered with `pluginInstall` |
 | `addPluginSearchPath` | `kind`, `path` | add an existing folder to the `lv2`, `clap` or `vst3` search path without copying anything, save the list in `daemon.json` and read the catalogues again; answered with `pluginInstall`. See [Plugin search paths](#plugin-search-paths) |
 | `removePluginSearchPath` | `kind`, `path` | stop searching an added folder, keeping its files, and read the catalogues again; works for a folder that no longer exists; answered with `pluginInstall` |
-| `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, ownBlock?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. Only this chain is rebuilt; every other chain keeps its running plugins |
+| `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, ownBlock?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. The daemon does not read a `windowsHost` in the chain. An insert keeps the [host of its Windows plugin](#windows-host), and one being added starts on yabridge. Only this chain is rebuilt; every other chain keeps its running plugins |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert; rebuilds this chain only |
 | `setInsertOwnBlock` | `channel`, `insertId`, `value` | `true` runs one insert's plugin [on its own block](#own-block), `false` back in PipeWire's cycle; saved with the insert as `ownBlock`. Rebuilds this chain only, which starts that insert's host again in the new mode. Refused when the insert is not in the chain, when `value` is not a boolean, and, for `true`, when the native plugin host is not installed |
+| `setInsertWindowsHost` | `channel`, `insertId`, `value` | `"openxlr"` runs one insert's Windows plugin on the [Windows plugin host](#windows-host) built into OpenXLR, `"yabridge"` back through yabridge, which is the default; saved with the insert as `windowsHost`. Needs a build with that host, which no package provides yet. Rebuilds this chain only, which starts that insert's helper again on the other host with the same control values. Refused when the insert is not in the chain, when `value` is neither of the two, and, for `"openxlr"`, when the build has no Windows plugin host, the plugin is not a Windows plugin bridged through yabridge, its Windows module is missing or not 64-bit, or its licence needs the yabridge companion's host. `"yabridge"` is never refused |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points. Refused when the insert is not in the chain or the catalogue does not declare the symbol for its plugin |
 | `renameInsert` | `channel`, `insertId`, `name` | change one insert's label; `name` is 1 to 256 characters with no control characters. The running plugin, its parameters and the audio path stay as they are. Refused when the insert is not in the chain |
 | `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
@@ -785,7 +787,9 @@ syncs and rescans. It never imposes a deadline on an interactive uninstaller.
 
 Native editor compatibility is separate from DSP support. Catalogue entries
 carry `nativeUiBlocked`; live insert status also carries `nativeUiBlocked`
-and `nativeUiBlockReason`. Blocking leaves `supported`, native-host support,
+and `nativeUiBlockReason`. An insert running on the
+[Windows plugin host](#windows-host), which has no editor yet, reports them
+too, whatever the rules say. Blocking leaves `supported`, native-host support,
 processing, parameters and bypass state unchanged. Clients should open their
 generated controls when blocked and refresh availability on
 `nativeEditorRulesChanged`. Existing editor windows are not closed.
@@ -822,6 +826,73 @@ alone. A block the plugin answers late plays as silence and the delay
 stays the same. A bypassed insert is out of the chain, delay included. The
 helper's side is described in
 [native/README.md](../native/README.md#own-block).
+
+<a name="windows-host"></a>
+A CLAP or VST3 insert definition optionally carries `windowsHost: "openxlr"`,
+set with `setInsertWindowsHost`. It is for a Windows plugin, which is in the
+catalogue through the wrapper yabridge made for it. Without the field
+yabridge runs the plugin, as before. With it the native helper runs the
+plugin on the Windows plugin host built into OpenXLR. The daemon reads the
+Windows module back from the wrapper and starts the helper with it. The
+catalogue entry, the class id, the parameter ids and the insert's saved
+values are the same on both hosts, and nothing is scanned again.
+
+This needs a build with the Windows plugin host, made with
+`make -C native WINHOST=1`. No package provides one yet, so every packaged
+build refuses `"openxlr"` and runs every insert through yabridge.
+`windowsHostInstalled` in `pluginSetup` says whether the build has it. The
+daemon looks for `openxlr-winhost.exe` beside the native helper, or where
+`OPENXLR_WINHOST` in its environment names it.
+
+`setInsertWindowsHost` refuses `"openxlr"`, with the reason in the error,
+when:
+
+- the build has no Windows plugin host;
+- the insert's plugin is not a Windows plugin bridged through yabridge. The
+  daemon knows one by its wrapper, a VST3 bundle whose
+  `Contents/x86_64-win/NAME.vst3` is a link, or a CLAP file with a
+  `NAME.clap-win` beside it;
+- the Windows module behind the wrapper is missing, or is not a 64-bit
+  Windows module;
+- the plugin is Elgato Voice Focus, recognised by "voice focus" in the name
+  its module reports or in the file name of its wrapper or its module. Its
+  licence is tied to the disk identity the yabridge companion's host
+  reports. This host does not report it, so the plugin would see a
+  different machine.
+
+`"yabridge"` is never refused, so an insert can always go back.
+
+The choice is saved with the insert, in `mixer.json` and in a profile. It is
+absent while it is yabridge, so a file with no moved insert is one an older
+build reads and writes. A value this build does not know reads as yabridge.
+`setInserts` does not change the choice. An insert that stays in the chain,
+the same plugin under the same id, keeps its host, and an insert being added
+starts on yabridge whatever the chain said. An undo or a redo of the chain
+leaves it alone too.
+
+A saved choice the build cannot honour when the chain is built, for any of
+the reasons above, does not fail the chain. The insert runs through
+yabridge, the daemon's log says why, and the insert's status carries the
+reason in `windowsHostError`, which is absent (null over HTTP) otherwise.
+The saved choice stays. `windowsHostRunning` is true while the insert's
+plugin runs on the Windows plugin host.
+
+The plugin runs in the Wine prefix yabridge would use. That is the daemon's
+own `WINEPREFIX` when it has one, else the nearest directory above the
+Windows module that holds `dosdevices`, else Wine's default. A `WINELOADER` in the
+daemon's environment names the Wine to start, as it does for yabridge.
+Wine's USB driver stays out of the prefix on both hosts.
+
+The Windows plugin host has no plugin editor yet. An insert running on it
+reports `nativeUiBlocked: true` with the reason in `nativeUiBlockReason`,
+and the daemon refuses `showInsertUi` with the same sentence. Clients that follow
+`nativeUiBlocked` open their generated controls.
+
+The helper gets the same eight seconds to start as any other. Wine can take
+longer while it creates or updates its prefix. The chain's inserts then
+report that Wine did not answer in time and the audio goes on without them.
+Turning the insert off and on tries again. The helper's side is described
+in [native/README.md](../native/README.md#windows-plugin-host).
 
 When PipeWire's filter chain refuses to load an LV2 insert and the helper is
 installed, the daemon runs that insert in the helper instead. Each insert is
@@ -954,7 +1025,8 @@ EQ is XLR 1's, run on this computer (see
 [EQ on capture inputs](#eq-on-capture-inputs)).
 
 The `mixer.inserts` map also accepts capture channel ids. `setInserts`,
-`setInsertBypass`, `setInsertOwnBlock`, `setInsertParam`, `renameInsert`
+`setInsertBypass`, `setInsertOwnBlock`, `setInsertWindowsHost`,
+`setInsertParam`, `renameInsert`
 and `showInsertUi` use those ids as `channel`. `removeWindowsPluginInserts {path}` removes matching
 occurrences from capture chains too; it still takes a plugin path, not a
 channel.
@@ -1622,7 +1694,8 @@ chain of one input or mix: each insert in order with its plugin, name,
 bypass, host and control values. The history does not record where
 processing runs (`setEqProcessing`, `setDynamicsProcessing`,
 `setDuckingProcessing`), whether an insert runs on its own block
-(`setInsertOwnBlock`) or the maximizer (`setMixMaximizer`). Every other command leaves the history alone, with these exceptions, which
+(`setInsertOwnBlock`), which host runs an insert's Windows plugin
+(`setInsertWindowsHost`) or the maximizer (`setMixMaximizer`). Every other command leaves the history alone, with these exceptions, which
 empty it once they succeed: `loadProfile`, a profile recalled on connect,
 `deleteChannel`, `deleteMix` (and `setWaveInterfaceEnabled` when it removes
 a unit's capture channels), `setMixing`, `setActiveDevice` and
@@ -2146,6 +2219,7 @@ both.
 `getPluginDiagnostics` reads the daemon's environment, not the UI's shell.
 `discovery` includes `controller`, `wineExecutable`, `winePrefix`,
 `sourceCommit` for a managed bridge, `hostExecutable`, `hostInstalled`,
+`windowsHostExecutable`, `windowsHostInstalled`,
 `processArchitecture`, `searchPaths` and `scans`. `searchPaths.lv2Override`
 is the `LV2_PATH` LV2 hosts are given (the daemon's own, or the standard
 directories plus added plugin folders) or null for lilv defaults; `clap` and

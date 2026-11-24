@@ -126,6 +126,38 @@ public sealed partial class HistoryHubTests
     }
 
     [Fact]
+    public async Task TheHostOfAWindowsPluginIsNoStepAndUndoLeavesItAlone()
+    {
+        using var f = new Fixture();
+        UsePlugins(f);
+        await f.Ok(Chain("xlr1", Insert("comp", Comp), Insert("gate", Gate)));
+        f.Now += 2000;
+        await f.Ok(Chain("xlr1", Insert("gate", Gate)));
+        long step = f.State().History!.Undo!.Step;
+
+        // The hub takes the command and checks it: this plugin is no Windows
+        // plugin, and a build without the host says that first.
+        string refused = await f.Refused("""{"cmd":"setInsertWindowsHost","channel":"xlr1","insertId":"gate","value":"openxlr"}""");
+        Assert.StartsWith("setInsertWindowsHost: ", refused);
+        Assert.True(refused.Contains("no Windows plugin host") || refused.Contains("not a Windows plugin bridged through yabridge"), refused);
+        Assert.Equal("setInsertWindowsHost: value must be 'yabridge' or 'openxlr'",
+            await f.Refused("""{"cmd":"setInsertWindowsHost","channel":"xlr1","insertId":"gate","value":true}"""));
+        // Back to yabridge is always taken, and it is no step.
+        await f.Ok("""{"cmd":"setInsertWindowsHost","channel":"xlr1","insertId":"gate","value":"yabridge"}""");
+        Assert.Equal(step, f.State().History!.Undo!.Step);
+
+        // Where an insert runs is not part of a step: the insert that stays
+        // keeps the host it has now through an undo and a redo.
+        f.Mixer.SetInsertWindowsHost("xlr1", "gate", true);
+        Assert.Equal(step, f.State().History!.Undo!.Step);
+        await f.Ok("""{"cmd":"undo"}""");
+        Assert.Equal([("comp", null), ("gate", "openxlr")], Inserts(f, "xlr1").Select(i => (i.Id, i.WindowsHost)));
+        await f.Ok("""{"cmd":"redo"}""");
+        Assert.Equal("openxlr", Assert.Single(Inserts(f, "xlr1")).WindowsHost);
+        Assert.Equal("openxlr", Assert.Single(f.State().Mixer!.Inserts["xlr1"]).Insert.WindowsHost);
+    }
+
+    [Fact]
     public async Task AChainKeysBurstIsOneStep()
     {
         using var f = new Fixture();

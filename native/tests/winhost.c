@@ -17,6 +17,10 @@
 // the native ones. A module that crashes, hangs or prints while it is
 // described, and a file that is no module, each have to end the helper
 // with the reason and leave no process behind.
+//
+// Last, both modules are loaded and described from a directory whose name is
+// not ASCII while this process is in the C locale, which is how the daemon
+// runs a scan.
 // Usage: winhost WINHOST-EXE CLAP-PLUGIN VST3-PLUGIN
 #define _GNU_SOURCE
 #include "../host.h"
@@ -1275,6 +1279,121 @@ static void check_scan_hang(void) {
   forget(&d);
 }
 
+// --- a path that is not ASCII, in the C locale ------------------------------
+
+// Copies of both modules under a directory whose name is not ASCII. A link
+// would not do: the backend resolves links before Wine is shown a path, so
+// only a file that really is there puts such a name in front of Wine.
+static char umlaut_directory[PATH_MAX], umlaut_clap[PATH_MAX], umlaut_vst3[PATH_MAX];
+
+static void copy_file(const char *from, const char *to) {
+  FILE *in = fopen(from, "rb"), *out = fopen(to, "wb");
+  assert(in && out);
+  char block[65536];
+  size_t count;
+  while ((count = fread(block, 1, sizeof(block), in)) > 0)
+    assert(fwrite(block, 1, count, out) == count);
+  assert(!ferror(in) && fclose(out) == 0);
+  fclose(in);
+}
+
+// The locale variables as this process was given them, set aside so the
+// test can stand in the C locale and hand them back afterwards.
+static const char *const locale_variables[] = {"LC_ALL", "LC_CTYPE", "LANG"};
+static char *kept_locale[3];
+
+static void enter_c_locale(void) {
+  for (unsigned i = 0; i < 3; ++i) {
+    const char *value = getenv(locale_variables[i]);
+    kept_locale[i] = value ? strdup(value) : NULL;
+    unsetenv(locale_variables[i]);
+  }
+  setenv("LC_ALL", "C", 1);
+}
+
+static void leave_c_locale(void) {
+  for (unsigned i = 0; i < 3; ++i) {
+    if (kept_locale[i])
+      setenv(locale_variables[i], kept_locale[i], 1);
+    else
+      unsetenv(locale_variables[i]);
+    free(kept_locale[i]);
+    kept_locale[i] = NULL;
+  }
+}
+
+// What the Windows host is given for a locale, by the variables alone.
+static void check_locale_choice(void) {
+  char entry[128];
+  enter_c_locale();
+  // The daemon's own case: everything forced to C.
+  assert(wine_utf8_locale(entry, sizeof(entry)) == strlen("LC_ALL=") &&
+         !strcmp(entry, "LC_ALL=C.UTF-8"));
+  // No variable at all is the C locale too, and then only the character
+  // set is given.
+  unsetenv("LC_ALL");
+  assert(wine_utf8_locale(entry, sizeof(entry)) == strlen("LC_CTYPE=") &&
+         !strcmp(entry, "LC_CTYPE=C.UTF-8"));
+  setenv("LANG", "C", 1);
+  assert(wine_utf8_locale(entry, sizeof(entry)) == strlen("LC_CTYPE=") &&
+         !strcmp(entry, "LC_CTYPE=C.UTF-8"));
+  // A locale that reads UTF-8 is left as it is, wherever it is set.
+  setenv("LANG", "C.UTF-8", 1);
+  assert(wine_utf8_locale(entry, sizeof(entry)) == 0);
+  setenv("LANG", "C", 1);
+  setenv("LC_CTYPE", "C.UTF-8", 1);
+  assert(wine_utf8_locale(entry, sizeof(entry)) == 0);
+  // LC_ALL overrides both, so it is the one that changes.
+  setenv("LC_ALL", "POSIX", 1);
+  assert(wine_utf8_locale(entry, sizeof(entry)) == strlen("LC_ALL=") &&
+         !strcmp(entry, "LC_ALL=C.UTF-8"));
+  // Another character set keeps its language where this system has that
+  // locale with UTF-8, and a name the system does not know reads as C.
+  setenv("LC_ALL", "en_US.ISO-8859-1", 1);
+  assert(wine_utf8_locale(entry, sizeof(entry)) == strlen("LC_ALL=") &&
+         (!strcmp(entry, "LC_ALL=en_US.UTF-8") || !strcmp(entry, "LC_ALL=C.UTF-8")));
+  setenv("LC_ALL", "xx_XX", 1);
+  assert(wine_utf8_locale(entry, sizeof(entry)) == strlen("LC_ALL=") &&
+         !strcmp(entry, "LC_ALL=C.UTF-8"));
+  leave_c_locale();
+}
+
+// Both modules loaded from the directory, in the C locale, with their audio.
+static void check_locale_loads(void) {
+  enter_c_locale();
+  assert(begin_at(umlaut_clap, PLUGIN "gain", 2));
+  for (unsigned i = 0; i < 20; ++i) {
+    cycle(256);
+    assert(scaled(256, 0.5f));
+  }
+  end();
+  assert(load_as("vst3", umlaut_vst3, VST3_GAIN, 2) && wine_backend.activate(&h));
+  for (unsigned i = 0; i < 20; ++i) {
+    cycle(256);
+    assert(scaled(256, 0.5f));
+  }
+  end();
+  leave_c_locale();
+}
+
+// And described from there, under the path as it was given.
+static void check_locale_scans(void) {
+  enter_c_locale();
+  Described clap = run_scan("scan-clap", umlaut_clap, NULL);
+  char *expected = clap_description(umlaut_clap);
+  assert(described(&clap, expected));
+  free(expected);
+  forget(&clap);
+  Described vst3 = run_scan("scan-vst3", umlaut_vst3, NULL);
+  expected = vst3_description(umlaut_vst3);
+  assert(described(&vst3, expected));
+  free(expected);
+  forget(&vst3);
+  leave_c_locale();
+  puts("PASS: in the C locale, a CLAP and a VST3 module under a directory whose name is "
+       "not ASCII are loaded with their audio exact and described under that path");
+}
+
 static void make_directories(char *path) {
   for (char *slash = strchr(path + 1, '/'); slash; slash = strchr(slash + 1, '/')) {
     *slash = 0;
@@ -1349,6 +1468,12 @@ int main(int argc, char **argv) {
          mkdir(vst3_hollow, 0700) == 0);
   join(clap_link, sizeof(clap_link), runtime, "Pr\xc3\xbc" "fling.clap");
   assert(symlink(plugin, clap_link) == 0);
+  join(umlaut_directory, sizeof(umlaut_directory), runtime, "Pr\xc3\xbc" "fung");
+  join(umlaut_clap, sizeof(umlaut_clap), umlaut_directory, "Gr\xc3\xb6\xc3\x9f" "e.clap");
+  join(umlaut_vst3, sizeof(umlaut_vst3), umlaut_directory, "Gr\xc3\xb6\xc3\x9f" "e.vst3");
+  assert(mkdir(umlaut_directory, 0700) == 0);
+  copy_file(plugin, umlaut_clap);
+  copy_file(vst3, umlaut_vst3);
 
   pw_init(NULL, NULL);
   check_audio();
@@ -1376,6 +1501,8 @@ int main(int argc, char **argv) {
   check_refused(begin_vst3, VST3_REFUSE);
   puts("PASS: blocks a VST3 plugin refuses are silence, and half a second of them fails the instance");
   check_vst3_refusals();
+  check_locale_choice();
+  check_locale_loads();
   pw_deinit();
   assert(scanning_hosts() == 0);
   check_scan_clap();
@@ -1384,7 +1511,11 @@ int main(int argc, char **argv) {
   check_scan_crash();
   check_scan_print();
   check_scan_hang();
+  check_locale_scans();
   // What the test itself put in the runtime directory.
+  unlink(umlaut_clap);
+  unlink(umlaut_vst3);
+  rmdir(umlaut_directory);
   unlink(clap_link);
   unlink(bundled);
   rmdir(inside);

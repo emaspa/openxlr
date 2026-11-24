@@ -1213,8 +1213,10 @@ of flags.
 
 This is the start of a host that will replace the yabridge companion. It
 carries CLAP and VST3 audio, parameters and latency, and it scans. It has no
-editor yet. The daemon does not start it and no package builds it, so
-nothing here reaches a user.
+editor yet. No package builds it, so nothing here reaches a user. In a build
+that has it, the daemon starts it for an insert that asks for it and for no
+other, and never for a scan. [The daemon's side](#the-daemons-side) has
+the rest.
 
 The helper keeps the PipeWire node and the Windows program holds the plugin.
 The Windows program has no CLAP or VST3 host of its own. It is built from
@@ -1297,9 +1299,13 @@ deactivate. `winhost/wire.h` describes it.
   threads.
 - Paths cross as Linux paths. The Windows side asks Wine for the Windows
   name and falls back to the `\\?\unix\` form, so a prefix with no `Z:`
-  drive works. Wine reads Linux file names in the locale's character set,
-  so a path with characters outside ASCII needs a UTF-8 locale in the
-  helper's environment. In the C locale such a plugin is not found.
+  drive works. Wine reads Linux file names in the character set of its
+  locale. The daemon runs its scans in the C locale, and a user service may
+  have no locale at all, which is the C locale too. Wine cannot find a
+  plugin there when its path has a character outside ASCII. So the backend
+  gives the Windows program a locale that reads UTF-8 when the inherited
+  one does not. [The locale](#the-locale-of-the-windows-program) has the
+  rule.
 - The helper reads the Windows program's standard error and passes it on a
   line at a time. The plugin's log and the `trace:` lines reach the daemon's
   log the way a native backend's do.
@@ -1435,7 +1441,92 @@ module with the reason, exit code 1 and nothing on standard output.
 The Wine prefix and the DLL overrides come from the helper's environment,
 which the daemon sets. The backend takes `WAYLAND_DISPLAY` out of the
 Windows program's environment, since an editor will have to be an X11
-window.
+window, and gives it a locale that reads UTF-8.
+
+### The locale of the Windows program
+
+The daemon hands a path over as UTF-8 whatever its own locale is, so Wine
+has to read file names as UTF-8 too. The backend looks at the variable that
+decides the character set, `LC_ALL` when it is set, else `LC_CTYPE`, else
+`LANG`, and at what this system's locale of that name reads:
+
+- UTF-8: the environment goes to Wine as it is.
+- Anything else, the C locale and a name the system has no locale for
+  included: the Windows program gets the same locale with UTF-8 as its
+  character set when the system has that one, so `ja_JP.eucJP` becomes
+  `ja_JP.UTF-8` and Wine keeps the language. Otherwise it gets `C.UTF-8`.
+
+One variable changes. It is `LC_ALL` when that was set, since it overrides
+the others, else `LC_CTYPE`. A daemon scan runs under `LC_ALL=C`, so its
+Windows program runs under `LC_ALL=C.UTF-8`. The helper's own locale is not
+touched, and a system with no UTF-8 locale at all is left as it is.
+
+### The daemon's side
+
+The daemon knows a build has this host by the Windows program. It looks
+for `openxlr-winhost.exe` beside the helper, or where `OPENXLR_WINHOST` in
+its environment names it. `pluginSetup.windowsHostInstalled` reports
+it. A helper built without `WINHOST=1` has no `wine` backend, so the two
+have to come from the same build.
+
+yabridge stays the host of every Windows plugin unless an insert says
+otherwise. `setInsertWindowsHost` moves one insert here and back, and
+[docs/api.md](../docs/api.md#windows-host) has the command, what it refuses
+and the state fields. The catalogue is not scanned again for it. A Windows
+plugin is in the catalogue through the wrapper yabridge made, and the daemon
+reads the Windows module back from that wrapper:
+
+- VST3: `NAME.vst3/Contents/x86_64-win/NAME.vst3` in the wrapper is a link
+  to the module.
+- CLAP: `NAME.clap-win` beside the wrapper's `NAME.clap` is the module or
+  a link to it.
+
+Both are yabridgectl's layouts, the same under the companion's
+`~/.local/share/openxlr/yabridge` and under a system yabridge's
+`~/.vst3/yabridge` and `~/.clap/yabridge`. The daemon follows every link to
+the module's real path, checks that it is a 64-bit Windows module, and
+starts the helper with `wine vst3 MODULE CLASS-ID` or `wine clap MODULE ID`
+and the insert's own id and values. An insert on its own block gets
+`--own-block` in front, as on any other backend.
+
+The helper's environment is the one every plugin helper gets, which keeps
+Wine's USB driver out of the prefix with `wineusb.sys=d`. Two variables come
+on top. Both follow what yabridge does, so a plugin runs in the same Wine
+and the same prefix on either host:
+
+- `WINEPREFIX`. A value the daemon was started with stands. Without one it
+  is the nearest directory above the module that holds a `dosdevices`
+  directory. A module outside every prefix gets none and Wine uses its
+  default.
+- `OPENXLR_WINE`, from `WINELOADER` when the daemon has one.
+
+The daemon gives every helper eight seconds to say `ready`, this one
+included, and ends a helper that has not. The backend itself allows Wine two
+minutes before its first answer, and the daemon does not wait that long. It
+waits with the mixer's lock held, so every command and the sweep wait with
+it, and the service's watchdog stops a daemon whose mixer has made no
+progress for a minute. When Wine is still silent at eight seconds, because
+it is creating or updating its prefix, the chain's inserts report that Wine
+did not answer in time and the audio goes on without them. Turning the
+insert off and on tries again. The backend's two minutes are what a scan or
+a run by hand gets.
+
+Two things a plugin has under the yabridge companion are missing here:
+
+- The system disk's identity. The companion's host reports it to every
+  plugin it runs, as [its own page](../packaging/yabridge/README.md)
+  describes, so nothing in a module says which plugins depend on it. One
+  is known to, Elgato Voice Focus, and the daemon refuses to move it. It
+  recognises the plugin by "voice focus" in the name its module reports or
+  in the file name of its wrapper or its module, whatever the case and
+  whatever stands between the two words.
+- Editors. An insert on this host reports its editor as blocked, with the
+  reason, and the daemon refuses to open one.
+
+A saved choice the build cannot honour when the chain is built, because the
+host is gone after a downgrade or the module is, never fails the chain. The
+insert runs through yabridge, and the daemon's log and the insert's status
+say why.
 
 `make -C native WINHOST=1 test-winhost` runs `tests/winhost` against two
 test plugins built with mingw, a CLAP module (`tests/winhost-plugin.c`) and
@@ -1504,7 +1595,8 @@ of their own, as the daemon would start them, and checks:
   parameters with their ranges, and the path as it was given. A hidden
   parameter, the plugin's own bypass and a plugin that refuses to initialise
   are left out, as a native scan leaves them out. The CLAP module is scanned
-  through a link whose name is not ASCII;
+  through a link whose name is not ASCII. Wine is never shown that name,
+  since the backend resolves links first;
 - the editor field. One CLAP plugin has an editor for a Windows window and
   for no other, and it alone is listed with one;
 - the phase lines, which have to be the native ones line for line;
@@ -1518,6 +1610,12 @@ of their own, as the daemon would start them, and checks:
 - a plugin that never answers: the helper gives up at its limit, which the
   test builds as six seconds, and a helper killed during a scan takes the
   Windows program with it. No Windows program is left after any of these.
+
+Last it checks the locale. It puts a copy of each module under a directory
+whose name is not ASCII and sets `LC_ALL=C`, as the daemon does for a
+scan. Both modules have to load there with their audio exact and be
+described under that path. It also checks which variable the Windows
+program is given for each locale the helper can inherit.
 
 `make -C native test-vst3` checks that the Linux build still reads and
 writes a native class id in the order of its bytes.
