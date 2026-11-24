@@ -206,6 +206,52 @@ static void lost_editor_watches(bool reopen) {
   close(pipes[0]);
 }
 
+// One handler for several descriptors, which a plugin unregisters once.
+class SharedHandler final : public Linux::IEventHandler {
+ public:
+  unsigned refs = 1, calls = 0;
+  tresult PLUGIN_API queryInterface(const TUID, void **obj) override {
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  uint32 PLUGIN_API addRef() override { return ++refs; }
+  uint32 PLUGIN_API release() override { return --refs; }
+  void PLUGIN_API onFDIsSet(Linux::FileDescriptor) override { ++calls; }
+};
+
+static void shared_event_handler() {
+  Host *h = test_host_new();
+  auto *v = new Vst3();
+  v->h = h;
+  v->frame = new PlugFrame(v);
+  host_set_impl(h, v);
+  SharedHandler handler;
+  int pipes[3][2];
+  for (auto &p : pipes) {
+    assert(pipe(p) == 0);
+    assert(v->frame->registerEventHandler(&handler, p[0]) == kResultOk);
+  }
+  assert(handler.refs == 4);
+  assert(v->frame->unregisterEventHandler(&handler) == kResultOk);
+  assert(handler.refs == 1);
+  for (const Fd &f : v->fds)
+    assert(!f.handler && !f.source);
+  assert(v->frame->unregisterEventHandler(&handler) == kResultFalse);
+  for (auto &p : pipes)
+    assert(write(p[1], "x", 1) == 1);
+  pw_loop_enter(host_loop(h));
+  assert(pw_loop_iterate(host_loop(h), 0) == 0);
+  pw_loop_leave(host_loop(h));
+  assert(!handler.calls);
+  vst3_unload(h);
+  assert(handler.refs == 1);
+  test_host_free(h);
+  for (auto &p : pipes) {
+    close(p[0]);
+    close(p[1]);
+  }
+}
+
 static void teardown_sources(bool remove_timer, bool remove_fd, bool with_plugin) {
   Host *h = test_host_new();
   auto *v = new Vst3();
@@ -256,9 +302,11 @@ static void teardown() {
   editor_watches();
   lost_editor_watches(false);
   lost_editor_watches(true);
+  shared_event_handler();
   pw_deinit();
   puts("PASS: VST3 teardown unregisters watches once and collects leftovers without closing plugin FDs");
   puts("PASS: a lost VST3 editor stops its watches at once and releases their handlers once");
+  puts("PASS: unregistering a VST3 event handler removes every descriptor it was registered for");
 }
 
 static void parameters() {
