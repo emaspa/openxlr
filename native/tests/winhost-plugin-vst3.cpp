@@ -3,7 +3,11 @@
 // tests/winhost.c to load through the Windows plugin host. Each class in it
 // halves its input and has one way of behaving beside that, so a test picks
 // the behaviour it wants by the class it loads. One object is the component,
-// the processor and the controller.
+// the processor and the controller. A scan describes every class in the
+// module, so what goes wrong during one is chosen by
+// OPENXLR_TEST_WINHOST_SCAN (see scan_trouble).
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include <pluginterfaces/base/ipluginbase.h>
@@ -12,6 +16,8 @@
 #include <pluginterfaces/vst/ivsteditcontroller.h>
 #include <pluginterfaces/vst/ivstparameterchanges.h>
 #include <pluginterfaces/vst/vstspeaker.h>
+
+#include <windows.h>
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -77,6 +83,29 @@ enum { RESTART_BLOCK = 8 };
 bool entered;
 
 bool is(const TUID iid, const TUID other) { return memcmp(iid, other, sizeof(TUID)) == 0; }
+
+// What a scan of this module runs into, when the test asks for it: a fault,
+// a call that never returns, or text on standard output, written through
+// the C library and through Windows' own handle. Neither text ends its line.
+// With no control character in it, text that landed inside one of the
+// description's strings would leave it readable, so the test compares bytes.
+void scan_trouble() {
+  const char *what = getenv("OPENXLR_TEST_WINHOST_SCAN");
+  if (!what)
+    return;
+  if (!strcmp(what, "crash"))
+    *(volatile int *)nullptr = 1;
+  if (!strcmp(what, "hang"))
+    Sleep(INFINITE);
+  if (!strcmp(what, "print")) {
+    static const char raw[] = "[printed through the Windows handle]";
+    DWORD written = 0;
+    fputs("[printed through the C library]", stdout);
+    fflush(stdout);
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), raw, sizeof(raw) - 1, &written,
+              nullptr);
+  }
+}
 
 class Plugin final : public IComponent, public IAudioProcessor, public IEditController {
  public:
@@ -206,7 +235,11 @@ class Plugin final : public IComponent, public IAudioProcessor, public IEditCont
 
   // The controller.
   tresult PLUGIN_API setComponentState(IBStream *) override { return kResultOk; }
-  int32 PLUGIN_API getParameterCount() override { return kind_ == KIND_PARAMS ? PARAMS : 0; }
+  int32 PLUGIN_API getParameterCount() override {
+    if (kind_ == KIND_GAIN)
+      scan_trouble();
+    return kind_ == KIND_PARAMS ? PARAMS : 0;
+  }
   tresult PLUGIN_API getParameterInfo(int32 index, ParameterInfo &info) override {
     if (index < 0 || index >= getParameterCount())
       return kInvalidArgument;
@@ -276,11 +309,12 @@ class Plugin final : public IComponent, public IAudioProcessor, public IEditCont
   IComponentHandler *handler_ = nullptr;
 };
 
-class Factory final : public IPluginFactory {
+class Factory final : public IPluginFactory2 {
  public:
   tresult PLUGIN_API queryInterface(const TUID iid, void **obj) override {
-    *obj = is(iid, IPluginFactory_iid) || is(iid, FUnknown_iid)
-               ? static_cast<IPluginFactory *>(this)
+    *obj = is(iid, IPluginFactory2_iid) || is(iid, IPluginFactory_iid) ||
+                   is(iid, FUnknown_iid)
+               ? static_cast<IPluginFactory2 *>(this)
                : nullptr;
     return *obj ? kResultOk : kNoInterface;
   }
@@ -300,6 +334,19 @@ class Factory final : public IPluginFactory {
     info->cardinality = PClassInfo::kManyInstances;
     strcpy(info->category, kVstAudioEffectClass);
     strcpy(info->name, names[index]);
+    return kResultOk;
+  }
+  // The vendor and the sub-categories a scan reads.
+  tresult PLUGIN_API getClassInfo2(int32 index, PClassInfo2 *info) override {
+    if (index < 0 || index >= KINDS)
+      return kInvalidArgument;
+    *info = {};
+    memcpy(info->cid, class_id(index).bytes, sizeof(TUID));
+    info->cardinality = PClassInfo::kManyInstances;
+    strcpy(info->category, kVstAudioEffectClass);
+    strcpy(info->name, names[index]);
+    strcpy(info->subCategories, "Fx|Dynamics");
+    strcpy(info->vendor, "OpenXLR");
     return kResultOk;
   }
   tresult PLUGIN_API createInstance(FIDString cid, FIDString iid, void **obj) override {

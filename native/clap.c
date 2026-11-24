@@ -3,6 +3,10 @@
 // and the host services a CLAP plugin expects: timers, file descriptors,
 // thread checks and a log. Also the scanner that describes a bundle for the
 // daemon's catalogue, in a process of its own so a bad plugin costs nothing.
+//
+// The Windows plugin host (winhost/) builds this file for Windows and runs
+// and describes a Windows plugin with it. Two places differ there: the
+// loader's header below, and the kind of window an editor is.
 #include "host.h"
 
 #include <clap/clap.h>
@@ -24,6 +28,21 @@ enum {
   MAX_PORTS = 8,
   MAX_PORT_CHANNELS = 8
 };
+
+// The window an editor is shown in, which is also the window a plugin is
+// asked about when the question is whether it has an editor: an X11 window,
+// or in the Windows plugin host's build a window of Windows' own.
+#ifdef _WIN32
+static const char *const editor_api = CLAP_WINDOW_API_WIN32;
+static void editor_parent(clap_window_t *window, unsigned long handle) {
+  window->win32 = (void *)(uintptr_t)handle;
+}
+#else
+static const char *const editor_api = CLAP_WINDOW_API_X11;
+static void editor_parent(clap_window_t *window, unsigned long handle) {
+  window->x11 = handle;
+}
+#endif
 
 typedef struct Clap Clap;
 
@@ -677,8 +696,7 @@ static bool clap_load(Host *h, char **arguments) {
       c->record_count++;
     }
   }
-  h->has_editor = c->gui && c->gui->is_api_supported(c->plugin,
-                                                    CLAP_WINDOW_API_X11, false);
+  h->has_editor = c->gui && c->gui->is_api_supported(c->plugin, editor_api, false);
   return true;
 }
 
@@ -905,7 +923,7 @@ static bool clap_editor_open(Host *h) {
   Clap *c = h->impl;
   if (!h->has_editor)
     return false;
-  if (!c->gui->create(c->plugin, CLAP_WINDOW_API_X11, false))
+  if (!c->gui->create(c->plugin, editor_api, false))
     return false;
   c->gui_created = true;
   atomic_store(&c->gui_closed, false);
@@ -914,7 +932,8 @@ static bool clap_editor_open(Host *h) {
   uint32_t width = 0, height = 0;
   if (c->gui->get_size(c->plugin, &width, &height) && width && height)
     host_resize_editor(h, width, height);
-  clap_window_t window = {.api = CLAP_WINDOW_API_X11, .x11 = h->window};
+  clap_window_t window = {.api = editor_api};
+  editor_parent(&window, h->window);
   if (!c->gui->set_parent(c->plugin, &window)) {
     c->gui->destroy(c->plugin);
     c->gui_created = false;
@@ -979,7 +998,6 @@ const Backend clap_backend = {
 
 // --- the scanner ------------------------------------------------------------
 
-#ifndef _WIN32  // the Windows plugin host does not scan yet
 static bool scan_main_thread(const clap_host_t *host) { return true; }
 static bool scan_audio_thread(const clap_host_t *host) { return false; }
 static const clap_host_thread_check_t scan_thread_check = {scan_main_thread,
@@ -999,8 +1017,8 @@ static void scan_nothing(const clap_host_t *host) {}
 // Describe every plugin in one bundle as JSON, for the daemon's catalogue.
 // Each plugin is created and destroyed once so its ports and parameters can
 // be read; a plugin that crashes takes this process, and only this bundle,
-// with it.
-int clap_scan(const char *file) {
+// with it. The description goes to `out` and names the bundle by `name`.
+int clap_scan(const char *file, const char *name, FILE *out) {
   // Like the VST3 scanner, phases are always visible in a failed log.
   // Port, editor support and parameter queries share one bounded marker.
   fputs("trace: scan CLAP: module load\n", stderr);
@@ -1026,9 +1044,9 @@ int clap_scan(const char *file) {
       .request_process = scan_nothing,
       .request_callback = scan_nothing,
   };
-  printf("{\"file\":");
-  json_text(file);
-  printf(",\"plugins\":[");
+  fprintf(out, "{\"file\":");
+  json_text(out, name);
+  fprintf(out, ",\"plugins\":[");
   uint32_t count = factory->get_plugin_count(factory);
   bool first = true;
   for (uint32_t i = 0; i < count; ++i) {
@@ -1045,18 +1063,18 @@ int clap_scan(const char *file) {
       plugin->destroy(plugin);
       continue;
     }
-    printf("%s{\"id\":", first ? "" : ",");
+    fprintf(out, "%s{\"id\":", first ? "" : ",");
     first = false;
-    json_text(d->id);
-    printf(",\"name\":");
-    json_text(d->name ? d->name : d->id);
-    printf(",\"vendor\":");
-    json_text(d->vendor ? d->vendor : "");
-    printf(",\"features\":[");
+    json_text(out, d->id);
+    fprintf(out, ",\"name\":");
+    json_text(out, d->name ? d->name : d->id);
+    fprintf(out, ",\"vendor\":");
+    json_text(out, d->vendor ? d->vendor : "");
+    fprintf(out, ",\"features\":[");
     for (const char *const *f = d->features; f && *f; ++f) {
       if (f != d->features)
-        putchar(',');
-      json_text(*f);
+        fputc(',', out);
+      json_text(out, *f);
     }
     fprintf(stderr, "trace: scan CLAP plugin %u: ports, GUI support and parameters\n", i);
     const clap_plugin_audio_ports_t *ports =
@@ -1074,18 +1092,17 @@ int clap_scan(const char *file) {
     char in_why[256] = "", out_why[256] = "";
     bool ins = clap_layout(plugin, ports, true, 0, &in_layout, in_why, sizeof(in_why));
     bool outs = clap_layout(plugin, ports, false, 0, &out_layout, out_why, sizeof(out_why));
-    printf("],\"audioIns\":%u,\"audioOuts\":%u", in_layout.main_channels,
-           out_layout.main_channels);
+    fprintf(out, "],\"audioIns\":%u,\"audioOuts\":%u", in_layout.main_channels,
+            out_layout.main_channels);
     if (!ins || !outs) {
-      printf(",\"layoutRefused\":");
-      json_text(!ins ? in_why : out_why);   // the input's reason first, as the loader reports it
+      fprintf(out, ",\"layoutRefused\":");
+      json_text(out, !ins ? in_why : out_why);   // the input's reason first, as the loader reports it
     }
     const clap_plugin_gui_t *gui = plugin->get_extension(plugin, CLAP_EXT_GUI);
-    printf(",\"gui\":%s",
-           gui && gui->is_api_supported(plugin, CLAP_WINDOW_API_X11, false)
-               ? "true"
-               : "false");
-    printf(",\"params\":[");
+    fprintf(out, ",\"gui\":%s",
+            gui && gui->is_api_supported(plugin, editor_api, false) ? "true"
+                                                                    : "false");
+    fprintf(out, ",\"params\":[");
     const clap_plugin_params_t *params =
         plugin->get_extension(plugin, CLAP_EXT_PARAMS);
     uint32_t parameters = params ? params->count(plugin) : 0;
@@ -1100,27 +1117,27 @@ int clap_scan(const char *file) {
           !isfinite(info.min_value) || !isfinite(info.max_value) ||
           !isfinite(info.default_value))
         continue;
-      printf("%s{\"id\":%u,\"name\":", first_param ? "" : ",", info.id);
+      fprintf(out, "%s{\"id\":%u,\"name\":", first_param ? "" : ",", info.id);
       first_param = false;
-      json_text(info.name);
-      printf(",\"module\":");
-      json_text(info.module);
-      printf(",\"min\":%.9g,\"max\":%.9g,\"default\":%.9g,\"readonly\":%s,"
-             "\"stepped\":%s,\"enum\":%s}",
-             info.min_value, info.max_value, info.default_value,
-             (info.flags & CLAP_PARAM_IS_READONLY) ? "true" : "false",
-             (info.flags & CLAP_PARAM_IS_STEPPED) ? "true" : "false",
-             (info.flags & CLAP_PARAM_IS_ENUM) ? "true" : "false");
+      json_text(out, info.name);
+      fprintf(out, ",\"module\":");
+      json_text(out, info.module);
+      fprintf(out,
+              ",\"min\":%.9g,\"max\":%.9g,\"default\":%.9g,\"readonly\":%s,"
+              "\"stepped\":%s,\"enum\":%s}",
+              info.min_value, info.max_value, info.default_value,
+              (info.flags & CLAP_PARAM_IS_READONLY) ? "true" : "false",
+              (info.flags & CLAP_PARAM_IS_STEPPED) ? "true" : "false",
+              (info.flags & CLAP_PARAM_IS_ENUM) ? "true" : "false");
     }
-    printf("]}");
+    fprintf(out, "]}");
     fprintf(stderr, "trace: scan CLAP plugin %u: destroy\n", i);
     plugin->destroy(plugin);
   }
-  puts("]}");
+  fputs("]}\n", out);
   fputs("trace: scan CLAP: module release\n", stderr);
   c.entry->deinit();
   dlclose(c.library);
   fputs("trace: scan CLAP: complete\n", stderr);
   return 0;
 }
-#endif

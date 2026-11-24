@@ -10,6 +10,13 @@
 // Windows host that is killed, crashes, stalls or is merely late never holds
 // the audio callback and never plays anything but the plugin's audio or
 // silence. Neither side may be led anywhere by what the other writes.
+//
+// It also runs the helper's `wine scan-clap` and `wine scan-vst3` on both
+// modules and compares every byte of each description with the one the
+// native scanner would write for the same plugins, and the phase lines with
+// the native ones. A module that crashes, hangs or prints while it is
+// described, and a file that is no module, each have to end the helper
+// with the reason and leave no process behind.
 // Usage: winhost WINHOST-EXE CLAP-PLUGIN VST3-PLUGIN
 #define _GNU_SOURCE
 #include "../host.h"
@@ -22,8 +29,10 @@ static void *test_dsp_buffer(void *port, uint32_t frames);
 #undef main
 #undef pw_filter_get_dsp_buffer
 // The product waits six seconds on a block that never returns; the stall
-// test runs the same code with less patience.
+// test runs the same code with less patience. The same for a scan, which
+// the product allows three minutes.
 #define WINE_STALL_MS 1500
+#define WINE_SCAN_MS 6000
 #include "../wine.c"
 #include <assert.h>
 
@@ -869,6 +878,403 @@ static void check_vst3_refusals(void) {
        "the host does not carry are each refused with the reason");
 }
 
+// --- scanning ---------------------------------------------------------------
+
+// What a scan wrote and how it ended.
+typedef struct {
+  char *out, *err;  // standard output and standard error, each ended with a zero
+  size_t out_size;
+  int status;       // as waitpid gives it
+  double took_ms;
+} Described;
+
+// The CLAP module under a name of this system's that Wine never sees: a
+// link whose name is not ASCII, to the module.
+static char clap_link[PATH_MAX];
+static char winhost_path[PATH_MAX];
+
+// Everything in a file, ended with a zero.
+static char *file_text(FILE *file, size_t *size) {
+  struct stat status;
+  fflush(file);
+  assert(fstat(fileno(file), &status) == 0);
+  char *text = malloc((size_t)status.st_size + 1);
+  assert(text);
+  ssize_t count = pread(fileno(file), text, (size_t)status.st_size, 0);
+  assert(count >= 0);
+  text[count] = 0;
+  if (size) *size = (size_t)count;
+  return text;
+}
+
+// Start the helper's own main as the daemon would start the helper, in a
+// process of its own: `wine COMMAND PATH`, with what a test plugin is to do
+// wrong during the scan, if anything.
+static pid_t start_scan(const char *command, const char *path, const char *trouble,
+                        FILE *out, FILE *err) {
+  fflush(NULL);
+  pid_t helper = fork();
+  assert(helper >= 0);
+  if (helper == 0) {
+    dup2(fileno(out), STDOUT_FILENO);
+    dup2(fileno(err), STDERR_FILENO);
+    if (trouble) setenv("OPENXLR_TEST_WINHOST_SCAN", trouble, 1);
+    char *arguments[] = {"openxlr-lv2-host", "wine", (char *)command, (char *)path, NULL};
+    int result = host_program_main(4, arguments);
+    fflush(NULL);
+    _exit(result);
+  }
+  return helper;
+}
+
+static Described finish_scan(pid_t helper, FILE *out, FILE *err, double started) {
+  Described d = {0};
+  while (waitpid(helper, &d.status, 0) < 0 && errno == EINTR) {}
+  d.took_ms = now_ms() - started;
+  d.out = file_text(out, &d.out_size);
+  d.err = file_text(err, NULL);
+  fclose(out);
+  fclose(err);
+  fputs(d.err, stderr);
+  return d;
+}
+
+static Described run_scan(const char *command, const char *path, const char *trouble) {
+  FILE *out = tmpfile(), *err = tmpfile();
+  assert(out && err);
+  double started = now_ms();
+  return finish_scan(start_scan(command, path, trouble, out, err), out, err, started);
+}
+
+static void forget(Described *d) {
+  free(d->out);
+  free(d->err);
+}
+
+static bool exited_with(const Described *d, int code) {
+  return WIFEXITED(d->status) && WEXITSTATUS(d->status) == code;
+}
+
+// The Windows hosts this test has running for a scan: every process started
+// as `WINHOST-EXE scan`, which is what the helper hands Wine and what the
+// Windows program's own command line then reads.
+static unsigned scanning_hosts(void) {
+  unsigned count = 0;
+  DIR *proc = opendir("/proc");
+  assert(proc);
+  size_t length = strlen(winhost_path);
+  struct dirent *entry;
+  while ((entry = readdir(proc))) {
+    if (entry->d_name[0] < '0' || entry->d_name[0] > '9') continue;
+    char path[280], line[PATH_MAX + 512];
+    snprintf(path, sizeof(path), "/proc/%s/cmdline", entry->d_name);
+    FILE *file = fopen(path, "r");
+    if (!file) continue;
+    size_t size = fread(line, 1, sizeof(line) - 1, file);
+    fclose(file);
+    line[size] = 0;
+    for (size_t at = 0; at + length + 5 < size; at += strlen(line + at) + 1)
+      if (!strcmp(line + at, winhost_path) && !strcmp(line + at + length + 1, "scan"))
+        ++count;
+  }
+  closedir(proc);
+  return count;
+}
+
+// The scanner's phase lines out of everything a scan wrote to standard
+// error. Wine's own lines and the plugin's are not among them.
+static char *phase_lines(const char *err) {
+  char *text = NULL;
+  size_t size = 0;
+  FILE *f = open_memstream(&text, &size);
+  assert(f);
+  for (const char *line = err; *line;) {
+    const char *end = strchr(line, '\n');
+    size_t length = end ? (size_t)(end - line) + 1 : strlen(line);
+    if (!strncmp(line, "trace: scan ", 12)) fwrite(line, 1, length, f);
+    line += length;
+  }
+  fclose(f);
+  return text;
+}
+
+// Whether the last phase line a scan wrote is this one.
+static bool stopped_in(const Described *d, const char *phase) {
+  char *lines = phase_lines(d->err);
+  size_t all = strlen(lines), length = strlen(phase);
+  bool last = all > length && lines[all - 1] == '\n' &&
+              !strncmp(lines + all - 1 - length, phase, length) &&
+              (all - 1 == length || lines[all - 2 - length] == '\n');
+  free(lines);
+  return last;
+}
+
+static bool same_text(const char *what, const char *got, const char *expected) {
+  if (!strcmp(got, expected)) return true;
+  size_t at = 0;
+  while (got[at] && got[at] == expected[at]) ++at;
+  fprintf(stderr, "FAIL: %s differs at byte %zu: \"%.80s\" where \"%.80s\" was expected\n",
+          what, at, got + at, expected + at);
+  return false;
+}
+
+// A scan that finished: the helper exited with 0, and its standard output
+// is the description and nothing else.
+static bool described(const Described *d, const char *expected) {
+  return exited_with(d, 0) && strlen(d->out) == d->out_size &&
+         same_text("the description", d->out, expected);
+}
+
+// What the native CLAP scanner writes for a module with these plugins
+// (clap_scan), byte for byte. The plugin with a timer needs a host service a
+// scan does not offer and refuses to initialise, so it is left out. Only the
+// first plugin has an editor, and it has one in a window of Windows' own
+// and in no other. Of the five parameters of `params`, the hidden one and
+// the plugin's own bypass are left out.
+static char *clap_description(const char *file) {
+  static const struct {
+    const char *id, *name;
+    int width;
+  } plugins[] = {{"gain", "Test Gain", 2},           {"mono", "Test Mono", 1},
+                 {"latency", "Test Latency", 2},     {"restart", "Test Restart", 2},
+                 {"callback", "Test Callback", 2},   {"sidechain", "Test Sidechain", 2},
+                 {"refuse", "Test Refuse", 2},       {"slow", "Test Slow", 2},
+                 {"stall", "Test Stall", 2},         {"crash", "Test Crash", 2},
+                 {"params", "Test Params", 2},       {"many", "Test Many", 2}};
+  char *text = NULL;
+  size_t size = 0;
+  FILE *f = open_memstream(&text, &size);
+  assert(f);
+  fprintf(f, "{\"file\":\"%s\",\"plugins\":[", file);
+  for (size_t i = 0; i < sizeof(plugins) / sizeof(plugins[0]); ++i) {
+    fprintf(f, "%s{\"id\":\"" PLUGIN "%s\",\"name\":\"%s\",\"vendor\":\"OpenXLR\","
+               "\"features\":[\"audio-effect\"],\"audioIns\":%d,\"audioOuts\":%d,"
+               "\"gui\":%s,\"params\":[",
+            i ? "," : "", plugins[i].id, plugins[i].name, plugins[i].width,
+            plugins[i].width, i == 0 ? "true" : "false");
+    if (!strcmp(plugins[i].id, "params"))
+      fputs("{\"id\":1,\"name\":\"Gain\",\"module\":\"\",\"min\":0,\"max\":1,\"default\":0.5,"
+            "\"readonly\":false,\"stepped\":false,\"enum\":false},"
+            "{\"id\":2,\"name\":\"Move\",\"module\":\"\",\"min\":0,\"max\":1,\"default\":0,"
+            "\"readonly\":false,\"stepped\":false,\"enum\":false},"
+            "{\"id\":3,\"name\":\"Level\",\"module\":\"\",\"min\":0,\"max\":2,\"default\":1,"
+            "\"readonly\":true,\"stepped\":false,\"enum\":false}",
+            f);
+    if (!strcmp(plugins[i].id, "many"))
+      for (unsigned n = 1; n <= 5000; ++n)
+        fprintf(f, "%s{\"id\":%u,\"name\":\"Switch %u\",\"module\":\"\",\"min\":0,\"max\":1,"
+                   "\"default\":0,\"readonly\":false,\"stepped\":true,\"enum\":false}",
+                n > 1 ? "," : "", n, n);
+    fputs("]}", f);
+  }
+  fputs("]}\n", f);
+  fclose(f);
+  return text;
+}
+
+// The native scanner's phase lines for that module (clap_scan): four to a
+// plugin, and three for the one that refuses to initialise.
+static char *clap_phases(void) {
+  char *text = NULL;
+  size_t size = 0;
+  FILE *f = open_memstream(&text, &size);
+  assert(f);
+  fputs("trace: scan CLAP: module load\ntrace: scan CLAP: factory plugins\n", f);
+  for (unsigned i = 0; i < 13; ++i) {
+    fprintf(f, "trace: scan CLAP plugin %u: descriptor and create\n"
+               "trace: scan CLAP plugin %u: initialize\n", i, i);
+    if (i != 12) fprintf(f, "trace: scan CLAP plugin %u: ports, GUI support and parameters\n", i);
+    fprintf(f, "trace: scan CLAP plugin %u: destroy\n", i);
+  }
+  fputs("trace: scan CLAP: module release\ntrace: scan CLAP: complete\n", f);
+  fclose(f);
+  return text;
+}
+
+// The same for the VST3 module (vst3_scan). Every class id is in the form a
+// Linux host has for it, not in the order of the module's own bytes. The
+// first class takes a mono chain when asked and the others are stereo only.
+// Of the five parameters of the last class, the hidden one and the plugin's
+// own bypass are left out, and the meter's range is its plain one. The
+// VST3 scanner never asks about an editor and says every plugin has one.
+static char *vst3_description(const char *file) {
+  static const char *const names[] = {"Gain", "Fixed", "Latency", "Restart", "Refuse", "Params"};
+  char *text = NULL;
+  size_t size = 0;
+  FILE *f = open_memstream(&text, &size);
+  assert(f);
+  fprintf(f, "{\"file\":\"%s\",\"plugins\":[", file);
+  for (unsigned i = 0; i < 6; ++i) {
+    fprintf(f, "%s{\"id\":\"" CLASS "%02X\",\"name\":\"Test VST3 %s\",\"vendor\":\"OpenXLR\","
+               "\"features\":[\"Fx\",\"Dynamics\"],\"audioIns\":2,\"audioOuts\":2,"
+               "\"gui\":true,\"params\":[",
+            i ? "," : "", i, names[i]);
+    if (i == 5)
+      fputs("{\"id\":1,\"name\":\"Gain\",\"module\":\"\",\"min\":0,\"max\":1,\"default\":0.5,"
+            "\"readonly\":false,\"stepped\":false,\"enum\":false},"
+            "{\"id\":2,\"name\":\"Move\",\"module\":\"\",\"min\":0,\"max\":1,\"default\":0,"
+            "\"readonly\":false,\"stepped\":false,\"enum\":false},"
+            "{\"id\":3,\"name\":\"Level\",\"module\":\"\",\"min\":0,\"max\":2,\"default\":1,"
+            "\"readonly\":true,\"stepped\":false,\"enum\":false}",
+            f);
+    fprintf(f, "],\"widths\":[%s]}", i == 0 ? "1,2" : "2");
+  }
+  fputs("]}\n", f);
+  fclose(f);
+  return text;
+}
+
+static char *vst3_phases(void) {
+  char *text = NULL;
+  size_t size = 0;
+  FILE *f = open_memstream(&text, &size);
+  assert(f);
+  fputs("trace: scan VST3: module load\ntrace: scan VST3: factory classes\n", f);
+  for (unsigned i = 0; i < 6; ++i)
+    fprintf(f, "trace: scan VST3 class %u: class info and component\n"
+               "trace: scan VST3 class %u: controller\n"
+               "trace: scan VST3 class %u: buses and parameters\n"
+               "trace: scan VST3 class %u: width probes\n"
+               "trace: scan VST3 class %u: release\n", i, i, i, i, i);
+  fputs("trace: scan VST3: module release\ntrace: scan VST3: complete\n", f);
+  fclose(f);
+  return text;
+}
+
+static void check_scan_clap(void) {
+  // The module is named by a link Wine is never shown, and the description
+  // has to name it by that same path, byte for byte.
+  Described d = run_scan("scan-clap", clap_link, NULL);
+  char *expected = clap_description(clap_link), *phases = clap_phases();
+  char *lines = phase_lines(d.err);
+  assert(described(&d, expected));
+  assert(same_text("the phase lines", lines, phases));
+  printf("PASS: a Windows CLAP module is described as the native scanner describes one, "
+         "byte for byte and under the path it was given, with the same phase lines, "
+         "in %.0f ms\n", d.took_ms);
+  free(expected);
+  free(phases);
+  free(lines);
+  forget(&d);
+}
+
+static void check_scan_vst3(void) {
+  char *phases = vst3_phases();
+  const char *paths[] = {vst3_bundle, vst3_module};
+  double took = 0;
+  for (unsigned i = 0; i < 2; ++i) {
+    Described d = run_scan("scan-vst3", paths[i], NULL);
+    char *expected = vst3_description(paths[i]), *lines = phase_lines(d.err);
+    assert(described(&d, expected));
+    assert(same_text("the phase lines", lines, phases));
+    if (i == 0) took = d.took_ms;
+    free(expected);
+    free(lines);
+    forget(&d);
+  }
+  free(phases);
+  printf("PASS: a Windows VST3 plugin is described as the native scanner describes one, "
+         "from its bundle and as a single file, with its class ids in the form a Linux "
+         "host has for them, in %.0f ms\n", took);
+}
+
+static void check_scan_refusals(void) {
+  static const struct {
+    const char *command, *path, *reason;
+    bool started;  // whether Wine was started at all
+  } cases[] = {
+      {"scan-clap", "/proc/self/exe", "cannot load", true},
+      {"scan-vst3", "/proc/self/exe", "cannot load", true},
+      {"scan-clap", "/nonexistent/plugin.clap", "cannot find /nonexistent/plugin.clap", false},
+      {"scan-vst3", vst3_hollow, "no 64-bit Windows plugin module in", false},
+  };
+  for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+    Described d = run_scan(cases[i].command, cases[i].path, NULL);
+    assert(exited_with(&d, 1) && d.out_size == 0);
+    assert(strstr(d.err, cases[i].reason));
+    assert(!strstr(d.err, "the scan did not finish: the Windows plugin host exited "
+                          "with code 1") == !cases[i].started);
+    assert(scanning_hosts() == 0);
+    forget(&d);
+  }
+  puts("PASS: a file that is no module, a missing file and a bundle with no module are "
+       "each refused with the reason, an exit of 1 and no description");
+}
+
+static void check_scan_crash(void) {
+  static const char *const phases[] = {
+      "trace: scan CLAP plugin 0: ports, GUI support and parameters",
+      "trace: scan VST3 class 0: buses and parameters"};
+  const char *paths[] = {clap_link, vst3_bundle};
+  for (unsigned i = 0; i < 2; ++i) {
+    Described d = run_scan(i ? "scan-vst3" : "scan-clap", paths[i], "crash");
+    assert(exited_with(&d, 1));
+    assert(strstr(d.err, "the Windows plugin crashed: exception 0xc0000005"));
+    assert(strstr(d.err, "the scan did not finish: the Windows plugin host exited with code 3"));
+    assert(stopped_in(&d, phases[i]));
+    assert(scanning_hosts() == 0);
+    forget(&d);
+  }
+  puts("PASS: a plugin that crashes while it is described ends the scan with the "
+       "exception, the phase it was in and an exit of 1, for CLAP and for VST3");
+}
+
+static void check_scan_print(void) {
+  const char *paths[] = {clap_link, vst3_bundle};
+  for (unsigned i = 0; i < 2; ++i) {
+    Described d = run_scan(i ? "scan-vst3" : "scan-clap", paths[i], "print");
+    char *expected = i ? vst3_description(paths[i]) : clap_description(paths[i]);
+    assert(described(&d, expected));
+    assert(strstr(d.err, "[printed through the C library]"));
+    assert(strstr(d.err, "[printed through the Windows handle]"));
+    free(expected);
+    forget(&d);
+  }
+  puts("PASS: what a plugin prints on standard output while it is described, through "
+       "the C library or through Windows, is passed on as its log and the description "
+       "is exact");
+}
+
+static void check_scan_hang(void) {
+  // Never answered, the helper gives the scan up at its limit and ends the
+  // Windows host itself.
+  Described d = run_scan("scan-clap", clap_link, "hang");
+  assert(exited_with(&d, 1));
+  assert(strstr(d.err, "the Windows plugin did not finish its scan in"));
+  assert(stopped_in(&d, "trace: scan CLAP plugin 0: ports, GUI support and parameters"));
+  assert(d.took_ms >= WINE_SCAN_MS && d.took_ms < WINE_SCAN_MS + WINE_QUIT_MS + 1000);
+  assert(scanning_hosts() == 0);
+  double gave_up = d.took_ms;
+  forget(&d);
+
+  // The daemon's own deadline kills the helper outright. The Windows host
+  // is then stuck inside the plugin with nobody to end it, and has to go
+  // by itself.
+  FILE *out = tmpfile(), *err = tmpfile();
+  assert(out && err);
+  double started = now_ms();
+  pid_t helper = start_scan("scan-vst3", vst3_bundle, "hang", out, err);
+  bool stuck = false;
+  for (unsigned i = 0; i < 3000 && !stuck; ++i) {
+    char *so_far = file_text(err, NULL);
+    stuck = strstr(so_far, "trace: scan VST3 class 0: buses and parameters") != NULL;
+    free(so_far);
+    sleep_ms(2);
+  }
+  assert(stuck && scanning_hosts() == 1);
+  kill(helper, SIGKILL);
+  double killed = now_ms();
+  d = finish_scan(helper, out, err, started);
+  assert(WIFSIGNALED(d.status));
+  while (scanning_hosts() != 0 && now_ms() - killed < 2000) sleep_ms(1);
+  assert(scanning_hosts() == 0);
+  printf("PASS: a plugin that never answers while it is described is given up after "
+         "%.1f s with the phase it was in, and a helper that is killed during a scan "
+         "takes its Windows host with it in %.0f ms\n",
+         gave_up / 1e3, now_ms() - killed);
+  forget(&d);
+}
+
 static void make_directories(char *path) {
   for (char *slash = strchr(path + 1, '/'); slash; slash = strchr(slash + 1, '/')) {
     *slash = 0;
@@ -919,6 +1325,7 @@ int main(int argc, char **argv) {
   unsetenv("DISPLAY");
   unsetenv("WAYLAND_DISPLAY");
   setenv("OPENXLR_WINHOST", winhost, 1);
+  snprintf(winhost_path, sizeof(winhost_path), "%s", winhost);
   plugin_path = plugin;
   // A runtime directory of the test's own, so what the backend leaves in it
   // can be told exactly: nothing.
@@ -940,6 +1347,8 @@ int main(int argc, char **argv) {
   assert(mkdir(vst3_bundle, 0700) == 0 && mkdir(contents, 0700) == 0 &&
          mkdir(inside, 0700) == 0 && symlink(vst3, bundled) == 0 &&
          mkdir(vst3_hollow, 0700) == 0);
+  join(clap_link, sizeof(clap_link), runtime, "Pr\xc3\xbc" "fling.clap");
+  assert(symlink(plugin, clap_link) == 0);
 
   pw_init(NULL, NULL);
   check_audio();
@@ -968,7 +1377,15 @@ int main(int argc, char **argv) {
   puts("PASS: blocks a VST3 plugin refuses are silence, and half a second of them fails the instance");
   check_vst3_refusals();
   pw_deinit();
+  assert(scanning_hosts() == 0);
+  check_scan_clap();
+  check_scan_vst3();
+  check_scan_refusals();
+  check_scan_crash();
+  check_scan_print();
+  check_scan_hang();
   // What the test itself put in the runtime directory.
+  unlink(clap_link);
   unlink(bundled);
   rmdir(inside);
   rmdir(contents);

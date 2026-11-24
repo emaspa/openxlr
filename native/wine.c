@@ -18,8 +18,12 @@
 // values cross in the shared file: what this side sets goes with the next
 // block, and what the plugin moves is read on the tick.
 //
-// This step carries CLAP and VST3 audio, parameters and latency. Editors and
-// scanning come with later ones.
+// A scan is the other thing this file starts the Windows host for
+// (wine_scan): one module described and the process gone again, with none of
+// the above between the two sides.
+//
+// This step carries CLAP and VST3 audio, parameters, latency and scanning.
+// Editors come with a later one.
 #define _GNU_SOURCE  // pipe2, realpath, SCHED_RESET_ON_FORK
 #include "host.h"
 #include "winhost/wire.h"
@@ -38,6 +42,7 @@
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -68,6 +73,14 @@ enum {
 // patience the host has with a native plugin inside one callback.
 #ifndef WINE_STALL_MS
 #define WINE_STALL_MS 6000
+#endif
+
+// How long a scan may take from start to end: what Wine may need to start,
+// as before a load, and the minute the daemon gives the scan of one native
+// bundle. The daemon's own deadline may well come first. A helper it kills
+// takes the Windows host with it.
+#ifndef WINE_SCAN_MS
+#define WINE_SCAN_MS (WINE_HELLO_MS + 60000)
 #endif
 
 extern char **environ;
@@ -249,11 +262,12 @@ static bool wine_find_winhost(char *out, size_t size) {
          access(out, R_OK) == 0;
 }
 
-// Start Wine with the Windows host. It inherits this process's environment,
-// which the daemon has already given the Wine prefix and the overrides it
-// wants, less WAYLAND_DISPLAY: an editor has to be an X11 window, which is
-// what the frame it will sit in is.
-static bool wine_spawn(Wine *w, const char *directory) {
+// Start Wine with the Windows host and its one argument: the directory of
+// the channel, or `scan`. It inherits this process's environment, which the
+// daemon has already given the Wine prefix and the overrides it wants, less
+// WAYLAND_DISPLAY: an editor has to be an X11 window, which is what the
+// frame it will sit in is.
+static bool wine_spawn(Wine *w, const char *argument) {
   char wine[PATH_MAX], winhost[PATH_MAX];
   const char *named = getenv("OPENXLR_WINE");
   if (!wine_find_program(named && named[0] ? named : "wine", wine, sizeof(wine))) {
@@ -274,7 +288,7 @@ static bool wine_spawn(Wine *w, const char *directory) {
   for (size_t i = 0; i < count; ++i)
     if (strncmp(environ[i], "WAYLAND_DISPLAY=", 16) != 0)
       environment[kept++] = environ[i];
-  char *arguments[] = {wine, winhost, (char *)directory, NULL};
+  char *arguments[] = {wine, winhost, (char *)argument, NULL};
 
   int to[2] = {-1, -1}, from[2] = {-1, -1}, log[2] = {-1, -1};
   if (pipe2(to, O_CLOEXEC) != 0 || pipe2(from, O_CLOEXEC) != 0 ||
@@ -1020,6 +1034,121 @@ static uint32_t wine_latency(Host *h) {
   if (!w->activated)
     return UINT32_MAX;
   return atomic_load(&w->shared->latency);
+}
+
+// --- scanning ---------------------------------------------------------------
+
+// Pass on what the Windows host has written of its description so far.
+// False once every writer has closed the pipe.
+static bool wine_pass_description(int from) {
+  char buffer[16384];
+  for (;;) {
+    ssize_t count = read(from, buffer, sizeof(buffer));
+    if (count > 0)
+      fwrite(buffer, 1, (size_t)count, stdout);
+    else if (count == 0 || errno != EINTR)
+      return count != 0;
+  }
+}
+
+// `wine scan-clap FILE` and `wine scan-vst3 BUNDLE`: what `scan-clap` and
+// `scan-vst3` are for a native plugin. The Windows host is started with
+// `scan` and handed the module on its standard input. It describes the
+// module with the scanner this helper has for a native plugin of the format,
+// and what it writes is passed on as it comes: the description from its
+// standard output, the phase lines and the plugin's own from its standard
+// error. The description names the plugin by `path` as it was given.
+//
+// A scan runs plugin code, so it is waited for with a limit. The pipe the
+// request went down stays open meanwhile, and the Windows host ends itself
+// when it closes. That is how a scan is given up here, and it is what
+// happens by itself when this process is killed. The result is 0 only when
+// the Windows host finished and said the description is whole.
+int wine_scan(const char *format, const char *path) {
+  static Wine scan;
+  static WireScan request;
+  Wine *w = &scan;
+  w->wake_out = w->wake_in = w->request = w->reply = w->log = -1;
+  request.magic = WIRE_MAGIC;
+  request.version = WIRE_VERSION;
+  request.format = !strcmp(format, "clap") ? WIRE_FORMAT_CLAP : WIRE_FORMAT_VST3;
+  char module[PATH_MAX];
+  if (!realpath(path, module)) {
+    fprintf(stderr, "cannot find %s: %s\n", path, strerror(errno));
+    return 1;
+  }
+  if (request.format == WIRE_FORMAT_VST3 && !wine_vst3_module(module, sizeof(module))) {
+    fprintf(stderr, "no 64-bit Windows plugin module in %s\n", path);
+    return 1;
+  }
+  if (strlen(module) >= sizeof(request.module) || strlen(path) >= sizeof(request.name)) {
+    fputs("the plugin's path is too long to carry\n", stderr);
+    return 1;
+  }
+  strcpy(request.module, module);
+  strcpy(request.name, path);
+  // A write to a Windows host that has just died must come back as an
+  // error, not end this process.
+  signal(SIGPIPE, SIG_IGN);
+  if (!wine_spawn(w, "scan"))
+    return 1;
+  // Readable once the child has exited, so its end is seen at once. On a
+  // kernel without it the poll below runs to its timeout.
+  int exited = (int)syscall(SYS_pidfd_open, w->child, 0);
+  int description = w->wake_in, log = w->log;
+  size_t sent = 0;
+  int64_t deadline = wine_now_ms() + WINE_SCAN_MS;
+  bool ended;
+  while (!(ended = wine_reap(w)) && wine_now_ms() < deadline) {
+    struct pollfd fds[4] = {{description, POLLIN, 0},
+                            {log, POLLIN, 0},
+                            {sent < sizeof(request) ? w->wake_out : -1, POLLOUT, 0},
+                            {exited, POLLIN, 0}};
+    if (poll(fds, 4, 100) <= 0)
+      continue;
+    if (fds[2].revents) {
+      ssize_t count = write(w->wake_out, (const char *)&request + sent,
+                            sizeof(request) - sent);
+      if (count > 0)
+        sent += (size_t)count;
+      else if (errno != EAGAIN && errno != EINTR)
+        sent = sizeof(request);  // nobody is reading: the child's end follows
+    }
+    // A pipe every writer has closed is no longer listened to, or the loop
+    // would spin on its hang-up until the child can be waited for.
+    if (fds[0].revents && !wine_pass_description(description))
+      description = -1;
+    wine_drain_log(w);
+    if ((fds[1].revents & (POLLHUP | POLLERR)) && !(fds[1].revents & POLLIN))
+      log = -1;
+  }
+  if (exited >= 0)
+    close(exited);
+  if (!ended) {
+    // Time is up. Closing the pipe tells the Windows host to end, and one
+    // that does not hear it is killed.
+    close(w->wake_out);
+    w->wake_out = -1;
+    wine_stop_child(w);
+  }
+  // What it wrote before it ended.
+  wine_pass_description(w->wake_in);
+  wine_drain_log(w);
+  if (w->log_size)
+    fprintf(stderr, "%.*s\n", (int)w->log_size, w->log_line);
+  int *fds[] = {&w->wake_out, &w->wake_in, &w->log};
+  for (size_t i = 0; i < sizeof(fds) / sizeof(fds[0]); ++i)
+    if (*fds[i] >= 0)
+      close(*fds[i]);
+  bool whole = ended && WIFEXITED(w->wait_status) && WEXITSTATUS(w->wait_status) == 0;
+  char ending[96];
+  if (!ended)
+    fprintf(stderr, "the Windows plugin did not finish its scan in %d s\n",
+            WINE_SCAN_MS / 1000);
+  else if (!whole)
+    fprintf(stderr, "the scan did not finish: %s\n",
+            wine_ending(w, ending, sizeof(ending), 0));
+  return fflush(stdout) == 0 && !ferror(stdout) && whole ? 0 : 1;
 }
 
 const Backend wine_backend = {
