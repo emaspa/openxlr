@@ -347,6 +347,48 @@ public sealed class ProfileStartupTests
         }
     }
 
+    [Fact]
+    public async Task ANamedProfileIsRecalledOnConnectWhileAPluginScanRuns()
+    {
+        string dir = Directory.CreateTempSubdirectory("openxlr-profile-").FullName;
+        string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+        try
+        {
+            new DaemonSettings { Submixer = false }.Save();
+            var config = new ConfigurationBuilder().Build();
+            var dock = new Dock();
+            using var devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [dock]);
+            devices.SweepOnce();
+            ProfileStore.Save("0fd9:00a6", "Night", new() { Device = new() { GainDb = 45 } });
+            ProfileStore.SetRecallOnConnect("0fd9:00a6", "Night");
+            using var lifetime = new Lifetime();
+            using var mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
+            var hub = new WebSocketHub(devices, mixer, NullLogger<WebSocketHub>.Instance, lifetime);
+            await mixer.StartAsync(CancellationToken.None);
+            using var entered = new ManualResetEventSlim();
+            using var release = new ManualResetEventSlim();
+            hub.Catalogue = () => [];
+            hub.RefreshCatalogue = () => { entered.Set(); release.Wait(TimeSpan.FromSeconds(30)); };
+            Task<ApiCommandResult> scan = hub.ExecuteForApiAsync("""{"cmd":"rescanPlugins"}""");
+            try
+            {
+                Assert.True(entered.Wait(TimeSpan.FromSeconds(10)), "the rescan did not start");
+                await Task.Run(() => hub.RecallOnArrivalAsync(devices.CurrentConnection!.Value)).WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.Equal(45, dock.Gain);
+                Assert.Equal("Night", hub.Snapshot().ActiveProfile);
+                Assert.False(scan.IsCompleted);
+            }
+            finally { release.Set(); }
+            Assert.True((await scan.WaitAsync(TimeSpan.FromSeconds(10))).Ok);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData("valid")]
     [InlineData("missing")]

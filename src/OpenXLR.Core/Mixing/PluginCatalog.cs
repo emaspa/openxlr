@@ -78,10 +78,6 @@ public static class PluginCatalog
         return plugins;
     }
 
-    /// <summary>Every plugin listed now, by format and identifier: enough to tell what a rescan gained.</summary>
-    public static HashSet<(string Kind, string Plugin)> Identities()
-        => [.. Plugins.Select(p => (p.Kind, p.Plugin))];
-
     /// <summary>Plugin identities supplied by exactly these files or bundle directories.</summary>
     public static HashSet<(string Kind, string Plugin)> IdentitiesUnder(IReadOnlyCollection<string> paths)
         => IdentitiesUnder(Plugins, paths);
@@ -94,10 +90,33 @@ public static class PluginCatalog
             .Select(p => (p.Kind, p.Plugin))];
     }
 
-    /// <summary>The same, but only for plugins that came from one of these directories.</summary>
-    public static int CountUnder(IReadOnlyCollection<string> directories, HashSet<(string Kind, string Plugin)> known)
-        => Plugins.Count(p => !known.Contains((p.Kind, p.Plugin))
+    /// <summary>Plugins in the catalogue not among <paramref name="known"/>, only those that came from one of these directories when any are given.</summary>
+    public static int CountUnder(IEnumerable<PluginInfo> catalogue, IReadOnlyCollection<string> directories, HashSet<(string Kind, string Plugin)> known)
+        => catalogue.Count(p => !known.Contains((p.Kind, p.Plugin))
             && (directories.Count == 0 || p.Path is null || directories.Any(d => p.Path.StartsWith(d, StringComparison.Ordinal))));
+
+    /// <summary>
+    /// Take out of the catalogue, now and without a scan, the plugins under
+    /// these directories whose file is gone. Whatever removes plugin files
+    /// calls this before inserts can be made again: the scan that follows
+    /// can take minutes, and an insert checked against a catalogue that still
+    /// lists a removed plugin would be made from files that are not there.
+    /// Nothing happens before the first catalogue is built.
+    /// </summary>
+    public static void WithdrawMissing(IReadOnlyCollection<string> directories)
+    {
+        string[] roots = [.. directories.Select(WindowsPluginWrappers.Normalize)];
+        All.Amend(plugins => Present(plugins, roots));
+    }
+
+    /// <summary>The catalogue without the plugins under <paramref name="roots"/> whose file is gone; the same list when none is.</summary>
+    internal static IReadOnlyList<PluginInfo> Present(IReadOnlyList<PluginInfo> catalogue, IReadOnlyCollection<string> roots)
+    {
+        bool Gone(PluginInfo p) => p.Path is not null
+            && roots.Any(root => WindowsPluginWrappers.Under(WindowsPluginWrappers.Normalize(p.Path), root))
+            && !Path.Exists(p.Path);
+        return catalogue.Any(Gone) ? [.. catalogue.Where(p => !Gone(p))] : catalogue;
+    }
 
     /// <summary>
     /// Kick both scans off without waiting for them. <paramref name="then"/>

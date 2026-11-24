@@ -38,4 +38,20 @@ public sealed class Refreshable<T>
             Volatile.Write(ref _current, next);
         }
     }
+
+    /// <summary>
+    /// Publish a change to the current value without computing it again, for
+    /// what is known without one. Nothing happens while no value has been
+    /// computed or the last computation threw, nor when the change returns
+    /// the same value. A refresh that publishes meanwhile is kept, and one
+    /// still running replaces the change when it is done.
+    /// </summary>
+    public void Amend(Func<T, T> change)
+    {
+        Lazy<T> current = Volatile.Read(ref _current);
+        if (!current.IsValueCreated) return;
+        T next = change(current.Value);
+        if (!EqualityComparer<T>.Default.Equals(next, current.Value))
+            Interlocked.CompareExchange(ref _current, new Lazy<T>(next), current);
+    }
 }

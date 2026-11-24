@@ -478,7 +478,8 @@ public sealed partial class WebSocketHub
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(installer =>
                     cmd.Cmd == "addWindowsPluginFolder"
                         ? installer.AddWindowsFolder(cmd.Path!)
-                        : installer.RemoveWindowsFolder(cmd.Path!, InsertPluginPaths()))));
+                        : installer.RemoveWindowsFolder(cmd.Path!, InsertPluginPaths()),
+                    removes: cmd.Cmd == "removeWindowsPluginFolder")));
                 break;
             case "getWindowsPluginFiles":
                 error = CommandValidation.CheckPluginPath(cmd);
@@ -507,10 +508,24 @@ public sealed partial class WebSocketHub
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(installer =>
                     cmd.Cmd == "setWindowsPluginEnabled"
                         ? installer.SetWindowsPluginEnabled(cmd.Path!, cmd.Value.GetBoolean(), InsertPluginPaths())
-                        : installer.DeleteWindowsPlugin(cmd.Path!, InsertPluginPaths()))));
+                        : installer.DeleteWindowsPlugin(cmd.Path!, InsertPluginPaths()),
+                    removes: true)));
                 break;
             case "syncWindowsPlugins":
-                await ReplyOperationAsync(await Task.Run(() => InstallPlugin(installer => installer.SyncWindows(InsertPluginPaths()))));
+                await ReplyOperationAsync(await Task.Run(() => InstallPlugin(installer =>
+                {
+                    // yabridge's own sync runs without the insert gate. The
+                    // cleanup after it takes the gate, and reads the plugins
+                    // the inserts use only then: they may have changed while
+                    // yabridge ran.
+                    var inUse = new List<string>();
+                    return installer.SyncWindows(inUse, cleanup => RemovingPlugins(installer, () =>
+                    {
+                        inUse.AddRange(InsertPluginPaths());
+                        cleanup();
+                        return true;
+                    }));
+                })));
                 break;
             case "addPluginSearchPath":
             case "removePluginSearchPath":
@@ -527,9 +542,10 @@ public sealed partial class WebSocketHub
             case "setInserts":
                 // Profile recall and input binding changes share this gate.
                 // A folder cannot be removed between checking its users and
-                // creating an insert from it on another client. The
-                // connection only tells the undo history who sent it.
-                lock (_installGate) error = ApplyMixer(cmd, browserOwner);
+                // creating an insert from it on another client. A plugin scan
+                // does not hold it. The connection only tells the undo
+                // history who sent it.
+                lock (_insertGate) error = ApplyMixer(cmd, browserOwner);
                 stateOnError = true;
                 break;
             case "setMixing" when cmd.Check.ValueKind == JsonValueKind.True:
@@ -679,18 +695,18 @@ public sealed partial class WebSocketHub
             case "saveProfile":
             case "loadProfile":
             case "deleteProfile":
-                lock (_installGate) error = HandleProfile(cmd);
+                lock (_insertGate) error = HandleProfile(cmd);
                 if (error is null && HistoryPolicy.ClassOf(cmd.Cmd) == HistoryClass.Barrier) ClearHistory();
                 if (error is null) Broadcast(Snapshot());   // list (and loaded state) changed
                 break;
             case "undo":
             case "redo":
                 error = CommandValidation.CheckHistory(cmd);
-                if (error is null) lock (_installGate) error = ApplyHistory(cmd);
+                if (error is null) lock (_insertGate) error = ApplyHistory(cmd);
                 stateOnError = true;
                 break;
             case "setRecallOnConnect":
-                lock (_installGate) error = HandleRecallOnConnect(cmd);
+                lock (_insertGate) error = HandleRecallOnConnect(cmd);
                 if (error is null) Broadcast(Snapshot());
                 break;
             case "setLed":
@@ -783,7 +799,7 @@ public sealed partial class WebSocketHub
     {
         if (devId == GenericProfileId)
         {
-            lock (_installGate)
+            lock (_insertGate)
             {
                 if (ActiveDeviceId() != GenericProfileId) return "an interface connected before profile recall";
                 OpenXLR.Core.Profile? generic = OpenXLR.Core.ProfileStore.Load(devId, name);
@@ -795,7 +811,7 @@ public sealed partial class WebSocketHub
         }
         if (_devices.CurrentConnection is not { } connection || connection.DeviceId != devId)
             return "the active device changed before profile recall";
-        lock (_installGate)
+        lock (_insertGate)
         {
             OpenXLR.Core.Profile? profile = OpenXLR.Core.ProfileStore.Load(devId, name);
             string? error = profile is null ? $"no profile named '{name}'" : ApplyLoadedProfile(connection, name, profile);
@@ -808,7 +824,7 @@ public sealed partial class WebSocketHub
     private string? ApplyLoadedProfile(DeviceManager.Connection connection, string name, OpenXLR.Core.Profile p)
     {
         string? devErr = "the active device changed before profile recall";
-        // Never wait for the install gate while holding the device gate.
+        // Never wait for the insert gate while holding the device gate.
         // Only hardware restoration holds both; native plugin startup and
         // graph rewiring must not prevent the device poller making progress.
         if (!_devices.WithConnection(connection, () =>
@@ -889,7 +905,7 @@ public sealed partial class WebSocketHub
             }
             else
             {
-                lock (_installGate)
+                lock (_insertGate)
                 {
                     // Re-check after both waits, including a replug of the same model.
                     if (_stopping.IsCancellationRequested || _devices.CurrentConnection != connection ||
@@ -925,25 +941,32 @@ public sealed partial class WebSocketHub
     /// <summary>
     /// Run one install step, then read the catalogues again and say what
     /// they gained. Installs are serialised: two at once would copy over
-    /// each other and race yabridge.
+    /// each other and race yabridge. A step that <paramref name="removes"/>
+    /// plugin files checks the inserts' plugins first, so it runs under the
+    /// insert gate too; the scan after it does not.
     /// </summary>
-    private PluginInstallMessage InstallPlugin(Func<OpenXLR.Core.Mixing.PluginInstaller, OpenXLR.Core.Mixing.InstallOutcome> step)
+    private PluginInstallMessage InstallPlugin(Func<OpenXLR.Core.Mixing.PluginInstaller, OpenXLR.Core.Mixing.InstallOutcome> step, bool removes = false)
     {
         lock (_installGate)
         {
             // Only the plugins' identities are kept across the rescan: the
             // catalogue itself is large, and holding the old one here would
             // keep it alive after the refresh has replaced it.
-            HashSet<(string Kind, string Plugin)> before = OpenXLR.Core.Mixing.PluginCatalog.Identities();
+            HashSet<(string Kind, string Plugin)> before = [.. Catalogue().Select(p => (p.Kind, p.Plugin))];
             OpenXLR.Core.Mixing.InstallOutcome outcome;
-            try { outcome = step(new OpenXLR.Core.Mixing.PluginInstaller()); }
+            try
+            {
+                var installer = new OpenXLR.Core.Mixing.PluginInstaller();
+                outcome = removes ? RemovingPlugins(installer, () => step(installer)) : step(installer);
+            }
             catch (Exception ex) { outcome = new(false, ex.Message, []); }
-            if (outcome.RefreshCatalogue) OpenXLR.Core.Mixing.PluginCatalog.Refresh();
+            if (outcome.RefreshCatalogue) RefreshCatalogue();
             // What this install brought: plugins not listed before, and when
             // the install landed somewhere, only those found there, so
             // plugins that arrived by other means are not credited to it.
-            int added = OpenXLR.Core.Mixing.PluginCatalog.CountUnder(outcome.Destinations ?? [], before);
-            int total = OpenXLR.Core.Mixing.PluginCatalog.Plugins.Count;
+            IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo> catalogue = Catalogue();
+            int added = OpenXLR.Core.Mixing.PluginCatalog.CountUnder(catalogue, outcome.Destinations ?? [], before);
+            int total = catalogue.Count;
             if (outcome.Ok) _log.LogInformation("plugins: {message} {added} new in the catalogue", outcome.Message, added);
             else _log.LogInformation("plugins: {message}", outcome.Message);
             // A bundle the scan could not read costs the catalogue a plugin,
@@ -958,9 +981,26 @@ public sealed partial class WebSocketHub
         }
     }
 
+    /// <summary>
+    /// Run a removal of plugin files under the insert gate, and take the
+    /// bridge wrappers it removed out of the catalogue before letting go.
+    /// The scan that follows runs without the gate, and until it is done an
+    /// insert is checked against the catalogue from before the removal.
+    /// </summary>
+    private T RemovingPlugins<T>(OpenXLR.Core.Mixing.PluginInstaller installer, Func<T> removal)
+    {
+        lock (_insertGate)
+        {
+            try { return removal(); }
+            finally { OpenXLR.Core.Mixing.PluginCatalog.WithdrawMissing(installer.WrapperDirectories); }
+        }
+    }
+
     private PluginInstallMessage RemoveWindowsPluginInserts(string path)
     {
+        // The wrappers are read under the install gate, the inserts changed under the insert gate.
         lock (_installGate)
+        lock (_insertGate)
         {
             try
             {
@@ -986,7 +1026,28 @@ public sealed partial class WebSocketHub
             .Select(id => OpenXLR.Core.Mixing.PluginCatalog.Find(id.Kind, id.Plugin)?.Path)
             .OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
 
+    /// <summary>
+    /// Held for the whole of an install step and the catalogue scan after it,
+    /// which can take minutes: two at once would copy over each other and race
+    /// yabridge. Taken before <see cref="_insertGate"/> when both are held,
+    /// never after it.
+    /// </summary>
     private readonly object _installGate = new();
+
+    /// <summary>
+    /// Held briefly by whatever makes inserts (a chain, an input binding, a
+    /// scene from a profile or the history) and by whatever removes plugin
+    /// files, from its check of the plugins the inserts use until the removed
+    /// plugins have left the catalogue. A file in use is never removed, and an
+    /// insert is never made from one that was. No scan runs under it.
+    /// </summary>
+    private readonly object _insertGate = new();
+
+    /// <summary>The catalogue an install is counted against; a test hands in its own.</summary>
+    internal Func<IReadOnlyList<OpenXLR.Core.Mixing.PluginInfo>> Catalogue { get; set; } = () => OpenXLR.Core.Mixing.PluginCatalog.Plugins;
+
+    /// <summary>Read the plugin directories again and swap the new catalogue in; a test hands in a scan it holds.</summary>
+    internal Action RefreshCatalogue { get; set; } = () => OpenXLR.Core.Mixing.PluginCatalog.Refresh();
 
     /// <summary>Save, load, or delete a named profile (per device). Null on success.</summary>
     private string? HandleProfile(Command cmd)

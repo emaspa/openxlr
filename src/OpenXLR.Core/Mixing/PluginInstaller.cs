@@ -817,7 +817,14 @@ public sealed class PluginInstaller
     }
 
     /// <summary>Bridge again whatever yabridge knows, for plugins installed into those folders since.</summary>
-    public InstallOutcome SyncWindows(IReadOnlyCollection<string>? inUsePluginPaths = null)
+    /// <param name="inUsePluginPaths">The plugin files inserts use; their wrappers are kept even when their source is gone.</param>
+    /// <param name="removing">
+    /// Runs the removal of wrappers whose source is gone, which reads
+    /// <paramref name="inUsePluginPaths"/> only inside it. The daemon fills
+    /// that list and runs the removal under the lock its insert changes take,
+    /// after yabridge's own sync, which can take minutes, has finished.
+    /// </param>
+    public InstallOutcome SyncWindows(IReadOnlyCollection<string>? inUsePluginPaths = null, Action<Action>? removing = null)
     {
         if (_yabridgectl is null) return new(false, "yabridge is not installed.", []);
         if (_wine is null) return new(false, "Wine is not installed, and yabridge needs it.", []);
@@ -831,12 +838,15 @@ public sealed class PluginInstaller
         int removed = 0, kept = 0;
         try
         {
-            foreach (var wrapper in WindowsPluginWrappers.Missing(BridgedVst3Directory, BridgedClapDirectory, directories))
+            (removing ?? (cleanup => cleanup()))(() =>
             {
-                if (WindowsPluginWrappers.InUse(wrapper, inUsePluginPaths)) { kept++; continue; }
-                wrapper.Remove();
-                removed++;
-            }
+                foreach (var wrapper in WindowsPluginWrappers.Missing(BridgedVst3Directory, BridgedClapDirectory, directories))
+                {
+                    if (WindowsPluginWrappers.InUse(wrapper, inUsePluginPaths)) { kept++; continue; }
+                    wrapper.Remove();
+                    removed++;
+                }
+            });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -849,6 +859,9 @@ public sealed class PluginInstaller
         if (kept > 0) message += $" Kept {kept} missing-source wrappers still used by insert chains.";
         return new(true, message, directories.Select(Shorten).ToList(), [BridgedVst3Directory, BridgedClapDirectory]);
     }
+
+    /// <summary>Where the bridge wrappers go, the only plugin files a Windows plugin command removes.</summary>
+    public IReadOnlyList<string> WrapperDirectories => [BridgedVst3Directory, BridgedClapDirectory];
 
     private string BridgedVst3Directory => _managed is null ? Path.Combine(_vst3, "yabridge")
         : Path.Combine(ManagedYabridge.PluginHome, "vst3");
