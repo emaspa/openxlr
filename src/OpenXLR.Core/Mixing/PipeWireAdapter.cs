@@ -796,15 +796,25 @@ public sealed class PipeWireAdapter
     internal void SetApplicationStreamVolume(AudioStream stream, double volume)
     {
         long started = Stopwatch.GetTimestamp();
-        SetSinkInputVolume(stream.Serial, volume, ApplicationStreamVolumeTimeout);
-        if (stream.NodeGain == 1) return;
+        // pipewire-pulse sets channelVolumes. When clearing a separate gain,
+        // lower its contribution before raising any channel to avoid a spike.
+        if (stream.NodeGain > 1)
+            ClearStreamNodeGain(stream.Id, ApplicationStreamVolumeTimeout);
+        SetSinkInputVolume(stream.Serial, volume, Remaining());
+        if (stream.NodeGain < 1)
+            ClearStreamNodeGain(stream.Id, Remaining());
 
-        // pipewire-pulse sets channelVolumes. Clear the independent node gain
-        // after those channels have reached their requested level.
-        TimeSpan remaining = ApplicationStreamVolumeTimeout - Stopwatch.GetElapsedTime(started);
-        if (remaining <= TimeSpan.Zero)
-            throw new InvalidOperationException("application stream volume write timed out");
-        Run("pw-cli", remaining, "set-param", stream.Id.ToString(), "Props", "{ volume: 1.0 }");
+        TimeSpan Remaining()
+        {
+            TimeSpan remaining = ApplicationStreamVolumeTimeout - Stopwatch.GetElapsedTime(started);
+            return remaining > TimeSpan.Zero ? remaining
+                : throw new InvalidOperationException("application stream volume write timed out");
+        }
+    }
+
+    private void ClearStreamNodeGain(int id, TimeSpan timeout)
+    {
+        Run("pw-cli", timeout, "set-param", id.ToString(), "Props", "{ volume: 1.0 }");
         InvalidateDump();
     }
 
