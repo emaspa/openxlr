@@ -442,6 +442,133 @@ static void restart_in_place(void) {
   puts("PASS: a CLAP plugin that asks for a restart is reactivated in place and keeps processing");
 }
 
+// A plugin that asks for parameter flushes, whose callbacks stand in for the
+// other thread arriving at the worst moment. Its flush runs an audio block,
+// as an audio thread that starts processing during a flush would; its
+// start_processing and process run the main thread's tick with a flush
+// requested, as a main thread that looked at `processing` a moment earlier
+// would. CLAP forbids flush beside process, so neither may get through.
+static Host *flush_host;
+static unsigned flush_calls, flush_starts, flush_processed, flush_events;
+static double flush_value;
+static bool flush_audio_in_flush, flush_tick_in_start, flush_tick_in_process,
+    flush_refuse_start, flush_answered_in_flush;
+
+static void flush_tick(void) {
+  Clap *c = flush_host->impl;
+  params_request_flush(&c->host);
+  clap_main_thread(flush_host);
+}
+
+static void flush_params(const clap_plugin_t *p, const clap_input_events_t *in,
+                         const clap_output_events_t *out) {
+  ++flush_calls;
+  if (flush_audio_in_flush) {
+    flush_audio_in_flush = false;
+    flush_answered_in_flush = restart_block(flush_host);
+  }
+}
+
+static bool flush_start(const clap_plugin_t *p) {
+  ++flush_starts;
+  if (flush_tick_in_start) {
+    flush_tick_in_start = false;
+    flush_tick();
+  }
+  return !flush_refuse_start;
+}
+
+static clap_process_status flush_process(const clap_plugin_t *p, const clap_process_t *pr) {
+  ++flush_processed;
+  flush_events = 0;
+  for (uint32_t i = 0; i < pr->in_events->size(pr->in_events); ++i) {
+    const clap_event_param_value_t *e = (const void *)pr->in_events->get(pr->in_events, i);
+    if (e->header.type == CLAP_EVENT_PARAM_VALUE && e->param_id == 11) {
+      ++flush_events;
+      flush_value = e->value;
+    }
+  }
+  if (flush_tick_in_process) {
+    flush_tick_in_process = false;
+    flush_tick();
+  }
+  return fake_process(p, pr);
+}
+
+static const clap_plugin_params_t flush_ext = {.flush = flush_params};
+
+static void flush_beside_process(void) {
+  Host h = {.rate = 48000, .channels = 2, .backend = &clap_backend,
+            .main_thread = pthread_self()};
+  Clap *c = fresh(&h);
+  clap_plugin_t plugin = fake;
+  plugin.start_processing = flush_start;
+  plugin.process = flush_process;
+  c->plugin = &plugin;
+  c->host = (clap_host_t){.host_data = c, .get_extension = host_get_extension};
+  c->params = &flush_ext;
+  c->in_list = (clap_input_events_t){c, in_size, in_get};
+  c->out_list = (clap_output_events_t){c, out_push};
+  in_side = out_side = (Side){.count = 1, .channels = {2}, .main = 0, .flag_main = true};
+  assert(clap_map_ports(c, &h, &ap_ext, true));
+  assert(clap_map_ports(c, &h, &ap_ext, false));
+  Param record = {.id = 11, .last_sent = 0.5f};
+  record.ctl = host_add_control(&h, "gain", 0, 1, 0.5f, false, &record);
+  assert(record.ctl);
+  c->records = &record;
+  c->record_count = 1;
+  flush_host = &h;
+
+  // The audio thread arrives while the main thread is inside flush: that
+  // block is silence and the plugin is not started. The next block starts
+  // it and carries the parameter that moved meanwhile.
+  atomic_store(&record.ctl->desired, 0.9f);
+  flush_audio_in_flush = true;
+  flush_tick();
+  assert(flush_calls == 1 && !flush_answered_in_flush);
+  assert(flush_starts == 0 && flush_processed == 0);
+  assert(restart_block(&h) && flush_starts == 1 && flush_processed == 1);
+  assert(flush_events == 1 && flush_value == 0.9f);
+
+  // Main thread ticks inside process find the node running and leave the
+  // flush to the process calls, as before.
+  flush_tick_in_process = true;
+  assert(restart_block(&h) && flush_calls == 1 && flush_processed == 2);
+
+  // A restart stops processing, and with it the audio thread's claim on the
+  // plugin: a flush on the main thread goes ahead again.
+  c->activated = true;
+  host_request_restart(&c->host);
+  clap_main_thread(&h);
+  assert(!restart_block(&h));
+  flush_tick();
+  assert(atomic_load(&c->restart) == RESTART_NONE && flush_calls == 2);
+
+  // The main thread ticks inside start_processing: no flush there. The
+  // start is refused this time, and the request kept for the next tick,
+  // which flushes while nothing is processing.
+  atomic_store(&record.ctl->desired, 0.2f);
+  flush_tick_in_start = flush_refuse_start = true;
+  assert(!restart_block(&h) && flush_starts == 2 && flush_calls == 2);
+  clap_main_thread(&h);
+  assert(flush_calls == 3);
+  // The same with a start that succeeds: the next tick finds the node
+  // running, drops the request, and the block carries the parameter.
+  flush_refuse_start = false;
+  flush_tick_in_start = true;
+  assert(restart_block(&h) && flush_starts == 3 && flush_calls == 3);
+  assert(flush_events == 1 && flush_value == 0.2f);
+  clap_main_thread(&h);
+  assert(flush_calls == 3 && !atomic_load(&c->flush_requested));
+
+  // Deactivation stops processing too, and a flush goes ahead after it.
+  clap_deactivate(&h);
+  flush_tick();
+  assert(flush_calls == 4);
+  release(c);
+  puts("PASS: a CLAP parameter flush and the audio thread's processing never overlap");
+}
+
 typedef struct {
   const clap_host_t *host;
   clap_id timer;
@@ -603,6 +730,7 @@ int main(void) {
   readonly_parameters_use_main_thread();
   latency_reports();
   restart_in_place();
+  flush_beside_process();
   Host h = {.rate = 48000, .channels = 2};
 
   // 1. main stereo in + stereo sidechain in, one stereo out.

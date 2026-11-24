@@ -73,6 +73,14 @@ struct Clap {
   _Atomic bool gui_closed, gui_destroyed;
   struct spa_source *gui_wake;
   _Atomic bool processing;  // start_processing has run, on the audio thread
+  // CLAP forbids a parameter flush beside process. The main thread flushes
+  // only while nothing is processing, but the audio thread may start just
+  // after the main thread has looked, so a test of `processing` cannot settle
+  // it. Each side raises its own flag and then reads the other's, and at most
+  // one goes on: the main thread holds `flushing` up through a flush, the
+  // audio thread holds `entering` up from before start_processing until it
+  // has stopped processing again.
+  _Atomic bool flushing, entering;
   _Atomic bool callback_requested, flush_requested;
   // A restart the plugin asked for, from any thread, and how far the host
   // has got with it: the main thread moves NONE to HOLD and HELD to NONE,
@@ -694,6 +702,7 @@ static void clap_deactivate(Host *h) {
   // cycle, which every plugin tested tolerates.
   if (atomic_exchange(&c->processing, false))
     c->plugin->stop_processing(c->plugin);
+  atomic_store(&c->entering, false);
   c->plugin->deactivate(c->plugin);
   c->activated = false;
 }
@@ -731,6 +740,7 @@ static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
     if (restart == RESTART_HOLD) {
       if (atomic_exchange(&c->processing, false))
         c->plugin->stop_processing(c->plugin);
+      atomic_store(&c->entering, false);
       atomic_store(&c->restart, RESTART_HELD);
     }
     for (unsigned i = 0; i < h->channels; ++i)
@@ -744,7 +754,17 @@ static void clap_process_audio(Host *h, uint32_t frames, float *const *in,
     c->out_channels[c->main_out][i] = out[i];
   }
   if (!atomic_load(&c->processing)) {
+    // A flush under way on the main thread keeps the plugin: this block is
+    // silence, and the next one tries again.
+    atomic_store(&c->entering, true);
+    if (atomic_load(&c->flushing)) {
+      atomic_store(&c->entering, false);
+      for (unsigned i = 0; i < h->channels; ++i)
+        memset(out[i], 0, frames * sizeof(float));
+      return;
+    }
     if (!c->plugin->start_processing(c->plugin)) {
+      atomic_store(&c->entering, false);
       host_processing_result(h, false, frames);
       for (unsigned i = 0; i < h->channels; ++i)
         memset(out[i], 0, frames * sizeof(float));
@@ -853,11 +873,19 @@ static void clap_main_thread(Host *h) {
   if (atomic_exchange(&c->callback_requested, false))
     host_run_guarded(h, on_main_thread, c);
   // A plugin that is not being processed flushes parameter changes here
-  // instead; once the node runs, every process call carries them.
+  // instead; once the node runs, every process call carries them. If the
+  // audio thread is entering the plugin (see `flushing`), the flush gives way
+  // and stays requested for the next tick.
   if (atomic_exchange(&c->flush_requested, false) && c->params &&
       !atomic_load(&c->processing)) {
-    c->in_count = 0;
-    c->params->flush(c->plugin, &c->in_list, &c->out_list);
+    atomic_store(&c->flushing, true);
+    if (atomic_load(&c->entering))
+      atomic_store(&c->flush_requested, true);
+    else {
+      c->in_count = 0;
+      c->params->flush(c->plugin, &c->in_list, &c->out_list);
+    }
+    atomic_store(&c->flushing, false);
   }
   // CLAP get_value is main-thread only. Read-only meters still refresh
   // with the host's status tick, without calling plugin queries from audio.
