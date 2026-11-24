@@ -132,7 +132,11 @@ not turn a native plugin into a sandbox or cap its own allocations.
 `make -C native test-scan` checks the ordinary CLAP and VST3 phase markers
 against a fixture that exits inside each phase. It also scans 200 plugins
 with 32 parameters each and checks that markers stay at four lines per
-CLAP plugin and five per VST3 audio class, plus four per module. The same
+CLAP plugin and five per VST3 audio class, plus four per module. Each of
+those plugins also has a parameter with a NaN bound, one with an infinite
+default and one whose name is not UTF-8. The description must still
+parse, only the first two may be left out, and the name comes back with
+U+FFFD. The same
 script runs the LV2 scan over bundles with escaped and non-ASCII names,
 an infinite range, a missing range, more ports than the limit, a Turtle
 syntax error and bytes that are not UTF-8, and checks the JSON, the
@@ -1236,7 +1240,10 @@ node with no cycles running holds the request until audio comes back. A
 plugin that will not activate again ends the helper like any other
 failure. The same binary describes a CLAP
 bundle for the daemon's catalogue (`openxlr-lv2-host scan-clap FILE`), in a
-process of its own so the daemon never loads plugin code. The headers are
+process of its own so the daemon never loads plugin code. The CLAP and
+VST3 scanners write text through the LV2 scanner's writer, so it is always
+valid UTF-8. They leave out a parameter whose bound or default is NaN or
+infinite, since JSON has no number for it. The headers are
 vendored under `clap/` (MIT, version 1.2.10).
 
 For VST3: the component and its controller, wired through their connection

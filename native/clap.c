@@ -934,20 +934,6 @@ const Backend clap_backend = {
 
 // --- the scanner ------------------------------------------------------------
 
-static void json_string(const char *s) {
-  putchar('"');
-  for (; s && *s; ++s) {
-    unsigned char ch = (unsigned char)*s;
-    if (ch == '"' || ch == '\\')
-      printf("\\%c", ch);
-    else if (ch < 0x20)
-      printf("\\u%04x", ch);
-    else
-      putchar(ch);
-  }
-  putchar('"');
-}
-
 static bool scan_main_thread(const clap_host_t *host) { return true; }
 static bool scan_audio_thread(const clap_host_t *host) { return false; }
 static const clap_host_thread_check_t scan_thread_check = {scan_main_thread,
@@ -995,7 +981,7 @@ int clap_scan(const char *file) {
       .request_callback = scan_nothing,
   };
   printf("{\"file\":");
-  json_string(file);
+  json_text(file);
   printf(",\"plugins\":[");
   uint32_t count = factory->get_plugin_count(factory);
   bool first = true;
@@ -1015,16 +1001,16 @@ int clap_scan(const char *file) {
     }
     printf("%s{\"id\":", first ? "" : ",");
     first = false;
-    json_string(d->id);
+    json_text(d->id);
     printf(",\"name\":");
-    json_string(d->name ? d->name : d->id);
+    json_text(d->name ? d->name : d->id);
     printf(",\"vendor\":");
-    json_string(d->vendor ? d->vendor : "");
+    json_text(d->vendor ? d->vendor : "");
     printf(",\"features\":[");
     for (const char *const *f = d->features; f && *f; ++f) {
       if (f != d->features)
         putchar(',');
-      json_string(*f);
+      json_text(*f);
     }
     fprintf(stderr, "trace: scan CLAP plugin %u: ports, GUI support and parameters\n", i);
     const clap_plugin_audio_ports_t *ports =
@@ -1046,7 +1032,7 @@ int clap_scan(const char *file) {
            out_layout.main_channels);
     if (!ins || !outs) {
       printf(",\"layoutRefused\":");
-      json_string(!ins ? in_why : out_why);   // the input's reason first, as the loader reports it
+      json_text(!ins ? in_why : out_why);   // the input's reason first, as the loader reports it
     }
     const clap_plugin_gui_t *gui = plugin->get_extension(plugin, CLAP_EXT_GUI);
     printf(",\"gui\":%s",
@@ -1061,14 +1047,18 @@ int clap_scan(const char *file) {
     for (uint32_t p = 0; p < parameters; ++p) {
       clap_param_info_t info;
       // The plugin's own bypass is left out: the chain has a Bypass of its own.
+      // So is a parameter with a NaN or infinite bound or default, which has
+      // no JSON number and no usable range, as the LV2 scanner does.
       if (!params->get_info(plugin, p, &info) ||
-          (info.flags & (CLAP_PARAM_IS_HIDDEN | CLAP_PARAM_IS_BYPASS)))
+          (info.flags & (CLAP_PARAM_IS_HIDDEN | CLAP_PARAM_IS_BYPASS)) ||
+          !isfinite(info.min_value) || !isfinite(info.max_value) ||
+          !isfinite(info.default_value))
         continue;
       printf("%s{\"id\":%u,\"name\":", first_param ? "" : ",", info.id);
       first_param = false;
-      json_string(info.name);
+      json_text(info.name);
       printf(",\"module\":");
-      json_string(info.module);
+      json_text(info.module);
       printf(",\"min\":%.9g,\"max\":%.9g,\"default\":%.9g,\"readonly\":%s,"
              "\"stepped\":%s,\"enum\":%s}",
              info.min_value, info.max_value, info.default_value,

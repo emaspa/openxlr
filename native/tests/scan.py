@@ -37,12 +37,17 @@ with tempfile.TemporaryDirectory(prefix="openxlr-scan-phases-") as directory:
             assert result.returncode == 73, (kind, stop, result.stderr)
             assert result.stderr.splitlines()[-1].endswith(": " + marker), (kind, stop, result.stderr)
         result = subprocess.run(command, env=env | {"OPENXLR_TEST_SCAN_COUNT": "200"},
-                                capture_output=True, text=True, timeout=10)
+                                capture_output=True, encoding="utf-8", timeout=10)
         assert result.returncode == 0, result.stderr
         plugins = json.loads(result.stdout)["plugins"]
-        # The fixture's 33rd parameter is its own bypass, which the scan leaves out.
-        assert len(plugins) == 200 and all(len(p["params"]) == 32 for p in plugins)
-        assert all(q["id"] != 32 for p in plugins for q in p["params"])
+        # The fixture's 33rd parameter is its own bypass, which the scan leaves
+        # out. A NaN bound and an infinite default have no JSON number, so the
+        # scan leaves those two out as well, and only them; a name that is not
+        # UTF-8 is written with U+FFFD in its place.
+        assert len(plugins) == 200 and all(len(p["params"]) == 33 for p in plugins)
+        assert all(q["id"] not in (32, 33, 34) for p in plugins for q in p["params"])
+        bad = {"CLAP": "Bad \ufffd byte", "VST3": "Bad \ufffd\ufffd\ufffd surrogate"}[kind]
+        assert all(p["params"][-1]["id"] == 35 and p["params"][-1]["name"] == bad for p in plugins), plugins[0]
         lines = result.stderr.splitlines()
         assert len(lines) == 200 * per_plugin + 4, (kind, len(lines))
         assert lines[-1] == f"trace: scan {kind}: complete"

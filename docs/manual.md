@@ -3227,8 +3227,10 @@ The message limit includes escaped Unicode names, parameter labels and
 native-plugin metadata such as bundle paths. A large or unusually named
 collection is shortened before sending, so it cannot make the UI
 discard the entire list as an oversized message.
-Controls with malformed metadata are left out; the rest of the plugin and
-the catalogue remain available.
+Controls with malformed metadata, such as a range or default that is not
+a finite number, are left out; the rest of the plugin and the catalogue
+remain available. A name that is not valid UTF-8 shows a replacement
+character where the bad bytes were.
 
 <a name="profiles"></a>
 ### 3.6 Save and recall a scene
