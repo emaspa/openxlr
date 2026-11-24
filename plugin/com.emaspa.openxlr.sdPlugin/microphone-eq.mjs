@@ -48,6 +48,14 @@ function parts(target) {
   return {kind, mix, id, number, extra};
 }
 
+// Whose EQ a target names, {mix, id}, by the parts eqTarget reads, or null
+// when it is no EQ target or names noise removal on a mix, which has none.
+export function eqOwner(target) {
+  if (!isEqTarget(target)) return null;
+  const {kind, mix, id} = parts(target);
+  return mix && kind === "noise" ? null : {mix, id};
+}
+
 // The daemon's sentence while hardware mixing holds a mix's EQ off, or null.
 export function eqHeldByUnit(mixer, id) {
   const mode = mixer?.hardwareMixing;
