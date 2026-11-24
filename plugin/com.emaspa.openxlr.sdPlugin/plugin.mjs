@@ -148,9 +148,11 @@ function connectDaemon() {
     clearDialTurns();
     meterLevels = {};
     keyCommands.disconnect();
-    // The daemon releases this connection's held clips when it closes.
+    // The daemon releases this connection's held clips when it closes. It
+    // does not switch off a voice held from here: that voice stays on, and
+    // the key's release has no connection to go to.
     heldClips.clear(); holdCount.clear();
-    heldVoices.clear();
+    heldVoices.clear(); voiceHoldCount.clear();
     refreshAll();
     refreshMeters();
     publishClips();
@@ -434,6 +436,7 @@ function onHostMessage(m) {
   switch (m.event) {
     case "willAppear":
       releaseHeldClip(m.context);
+      releaseHeldVoice(m.context);
       keyCommands.clear(m.context);
       clearEqTurns(m.context);
       dialLook.delete(m.context);   // it appears in the manifest's layout
@@ -464,6 +467,8 @@ function onHostMessage(m) {
       if (typeof m.device !== "string" || !m.device) break;
       for (const context of heldClips.keys())
         if (instances.get(context)?.device === m.device) releaseHeldClip(context);
+      for (const context of heldVoices.keys())
+        if (instances.get(context)?.device === m.device) releaseHeldVoice(context);
       break;
     case "didReceiveSettings":
       releaseHeldClip(m.context);
@@ -1117,20 +1122,29 @@ function onClipDown(context, inst, inMultiAction) {
 }
 // A voice key switches its voice on the press; in hold mode the release
 // switches the voice changer off again. The release goes as it is, never
-// dropped behind an unanswered press.
-const heldVoices = new Map();   // context -> channel held in hold mode
+// dropped behind an unanswered press. With two hold keys on one microphone
+// the voice changer goes off when the last of them lets go.
+const heldVoices = new Map();       // context -> channel held in hold mode
+const voiceHoldCount = new Map();   // channel -> keys holding a voice on it
 function onVoiceDown(context, inst, target, inMultiAction) {
   const entry = voiceTarget(mixer(), target);
   const press = daemonUp ? voicePress(entry, voiceMode(inst.settings), inMultiAction) : null;
   if (!press) { send({ event: "showAlert", context }); return; }
   releaseHeldVoice(context);
   // A press that was not sent holds nothing, so its key up releases nothing.
-  if (keyCommands.enqueue(context, press.payload) && press.hold) heldVoices.set(context, entry.channel.id);
+  if (keyCommands.enqueue(context, press.payload) && press.hold) {
+    const channel = entry.channel.id;
+    heldVoices.set(context, channel);
+    voiceHoldCount.set(channel, (voiceHoldCount.get(channel) ?? 0) + 1);
+  }
 }
 function releaseHeldVoice(context) {
   const channel = heldVoices.get(context);
   if (channel === undefined) return;
   heldVoices.delete(context);
+  const left = (voiceHoldCount.get(channel) ?? 1) - 1;
+  if (left > 0) { voiceHoldCount.set(channel, left); return; }
+  voiceHoldCount.delete(channel);
   cmd(voiceRelease(channel));
 }
 function releaseHeldClip(context) {

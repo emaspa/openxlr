@@ -4876,7 +4876,12 @@ key per voice. The key wears the microphone's icon and colour and lights
 while the microphone plays that voice. **Press** in the key's settings
 chooses how it works. **Toggle** switches the voice on, or off when it is
 the voice playing; **Hold** plays the voice while the key is down and
-switches the voice changer off when it comes up. Inside a multi-action a
+switches the voice changer off when it comes up. With two hold keys on the
+same microphone, the voice changer goes off when the last of them comes up.
+If OpenDeck reports that a Deck has disconnected, its hold keys let go as
+if they came up. A voice held while the plugin loses its connection to
+OpenXLR stays on; press the key again, or switch the voice off in the UI.
+Inside a multi-action a
 hold key toggles, since OpenDeck lets the key up straight away there. A key
 cannot switch a voice on without the native plugin host. The saved target
 is `voice:<channel>:<voice>`, with the voice's name as the API spells it.

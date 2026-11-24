@@ -86,6 +86,61 @@ test("a voice key toggles or holds its voice with one command per press", async 
     await press("robot");
     assert.equal(sent().length, count);
     assert.equal(alerts("robot"), 1);
+    await push();
+
+    // Every press waiting for its answer gets one.
+    const answerAll = async () => {
+      for (const message of daemon.messages.filter(m => m.requestId))
+        daemon.receive({type: "commandResult", requestId: message.requestId, error: null});
+      await flush();
+    };
+    const offs = () => sent().filter(m => m.enabled === false).length;
+    const down = context => host.receive({event: "keyDown", context, payload: {}});
+    const up = context => host.receive({event: "keyUp", context, payload: {}});
+    const appearOn = (context, device, voice = "witch") => {
+      host.receive({event: "willAppear", context, device, action: "com.emaspa.openxlr.toggle",
+        payload: {settings: {target: `voice:xlr1:${voice}`, voiceMode: "hold"}}});
+      host.receive({event: "titleParametersDidChange", context, payload: {title: ""}});
+    };
+
+    // Two hold keys on one microphone: the voice goes off when the last lets go.
+    appearOn("hold-a", "deck-1");
+    appearOn("hold-b", "deck-1", "robot");
+    down("hold-a"); await flush(); await answerAll();
+    down("hold-b"); await flush(); await answerAll();
+    let off = offs();
+    up("hold-a"); await flush();
+    assert.equal(offs(), off, "the other key still holds a voice on the microphone");
+    up("hold-b"); await flush();
+    assert.equal(offs(), off + 1);
+    assert.deepEqual(sent().at(-1), {cmd: "setVoiceChanger", channel: "xlr1", enabled: false});
+
+    // A deck that disconnects lets go of its held voices without a key up,
+    // and a key on another deck still holding the microphone keeps it on.
+    appearOn("hold-remote", "deck-2");
+    down("hold-a"); await flush(); await answerAll();
+    down("hold-remote"); await flush(); await answerAll();
+    off = offs();
+    host.receive({event: "deviceDidDisconnect", device: "deck-1"}); await flush();
+    assert.equal(offs(), off, "the key on deck-2 still holds the voice");
+    up("hold-a"); await flush();
+    assert.equal(offs(), off, "a late key up from the disconnected deck sends nothing");
+    up("hold-remote"); await flush();
+    assert.equal(offs(), off + 1);
+    off = offs();
+    down("hold-a"); await flush(); await answerAll();
+    host.receive({event: "deviceDidDisconnect", device: "deck-1"}); await flush();
+    assert.equal(offs(), off + 1, "the disconnected deck's last hold switches the voice off");
+    up("hold-a"); await flush();
+    assert.equal(offs(), off + 1, "and its late key up sends nothing");
+
+    // A key that appears again lets go of its previous hold.
+    off = offs();
+    down("hold-b"); await flush(); await answerAll();
+    appearOn("hold-b", "deck-1", "robot"); await flush();
+    assert.equal(offs(), off + 1);
+    up("hold-b"); await flush();
+    assert.equal(offs(), off + 1, "a release is sent once");
   } finally {
     globalThis.WebSocket = previous.socket;
     globalThis.setInterval = previous.interval;
