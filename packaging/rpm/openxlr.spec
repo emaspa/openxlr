@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.9.3
+Version: 0.9.4
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -257,6 +257,9 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Tue Nov 24 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.4-1
+- An application's playback volume counts a separate gain PipeWire holds on its stream, and a change of the volume sets that gain back to unity.
+
 * Fri Nov 20 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.3-1
 - The UI and the terminal mixer read the chosen skin again when its files change, so a skin written by a theme tool follows the desktop.
 - Reload brings back a chosen skin whose folder was missing once the folder returns.

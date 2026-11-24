@@ -1,3 +1,9 @@
+openxlr (0.9.4) resolute; urgency=medium
+
+  * An application's playback volume counts a separate gain PipeWire holds on its stream, and a change of the volume sets that gain back to unity.
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Tue, 24 Nov 2026 10:45:14 +0000
+
 openxlr (0.9.3) resolute; urgency=medium
 
   * The UI and the terminal mixer read the chosen skin again when its files change, so a skin written by a theme tool follows the desktop.
