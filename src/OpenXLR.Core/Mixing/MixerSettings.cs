@@ -152,7 +152,6 @@ public sealed record MixerSettings
 
     /// <summary>Remembered playback volume for routed browser tabs by website origin.</summary>
     public Dictionary<string, double> BrowserSiteVolumes { get; init; } = [];
-    public Dictionary<string, double> BrowserVolumeLocks { get; init; } = [];
 
     /// <summary>Every app ever seen, so the list survives silence and restarts.</summary>
     public List<SavedApp> KnownApps { get; init; } = [];

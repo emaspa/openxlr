@@ -257,6 +257,24 @@ public sealed class BrowserNativeHostTests
     }
 
     [Fact]
+    public void NativeHostCarriesBoostSupportAndTheEffectiveTabLevel()
+    {
+        string session = new('a', 32);
+        var tab = Tab();
+        tab["session"] = session;
+        tab["volumeSupported"] = true;
+        Assert.False(Assert.Single(BrowserNativeHost.ReadTabs(new JsonArray(tab.DeepClone()))).VolumeBoostSupported);
+        tab["volumeBoostSupported"] = true;
+        Assert.True(Assert.Single(BrowserNativeHost.ReadTabs(new JsonArray(tab.DeepClone()))).VolumeBoostSupported);
+
+        JsonObject state = State(session);
+        tab["volume"] = 1.25;
+        state["mixer"]!["browserTabs"] = new JsonArray(tab);
+        JsonNode? outgoing = Assert.Single(BrowserNativeHost.FilterState(state, session)["tabs"]!.AsArray());
+        Assert.Equal(1.25, outgoing!["volume"]!.GetValue<double>());
+    }
+
+    [Fact]
     public async Task SessionIsQueriedAfterStateAndCachedTabsAreReannouncedAfterReconnect()
     {
         var reconnect = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

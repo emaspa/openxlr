@@ -286,6 +286,7 @@ public sealed partial record MixerState
 
     /// <summary>Application streams currently placed in channels.</summary>
     public bool AppVolumeSupported { get; init; }
+    public double AppVolumeMaximum { get; init; } = PipeWireAdapter.MaxSinkVolume;
     public IReadOnlyList<StreamAssignment> Streams { get; init; } = [];
 
     public bool PreserveBrowserOutputs { get; init; }

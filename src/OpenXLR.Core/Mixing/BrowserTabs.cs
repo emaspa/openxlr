@@ -10,6 +10,7 @@ public sealed record BrowserTabRegistration
     public string Title { get; init; } = "";
     public bool Capturing { get; init; }
     public bool VolumeSupported { get; init; }
+    public bool VolumeBoostSupported { get; init; }
     public string? Error { get; init; }
     /// <summary>Where an activation OpenXLR asked for stands in the browser; null when none is in progress.</summary>
     public string? Activation { get; init; }
@@ -21,13 +22,15 @@ public sealed record BrowserTabState(string Session, int Id, string Site, string
     bool Remember, bool Capturing, string? Error, string? Activation = null)
 {
     public bool VolumeSupported { get; init; }
+    public double VolumeMaximum { get; init; } = 1;
     public double? Volume { get; init; }
     public bool RememberVolume { get; init; }
-    public bool VolumeLocked { get; init; }
 }
 
 public static class BrowserTabRouting
 {
+    public const double MaxTabVolume = 1.25;
+
     public const int MaxProviders = 8, MaxTabs = 128, MaxSites = 128;
     public const int MaxOrigin = 512, MaxTitle = 160, MaxError = 200;
 
@@ -89,7 +92,6 @@ public sealed partial class Mixer
     }
     private readonly Dictionary<string, Dictionary<int, BrowserTab>> _browserSessions = new(StringComparer.Ordinal);
     private Dictionary<string, string> _browserSiteChannels = new(StringComparer.Ordinal);
-    private Dictionary<string, double> _browserVolumeLocks = new(StringComparer.Ordinal);
     private Dictionary<string, double> _browserSiteVolumes = new(StringComparer.Ordinal);
     private bool _preserveBrowserOutputs;
 
@@ -188,44 +190,28 @@ public sealed partial class Mixer
         return (tabs, tab);
     }
 
-    internal static bool ValidPlaybackVolume(double volume) => volume is >= 0 and <= 1.5;
+    internal static bool ValidPlaybackVolume(double volume) => volume is >= 0 and <= PipeWireAdapter.MaxSinkVolume;
 
     private static double SnapPlaybackVolume(double volume) => Math.Round(volume * 100) / 100;
 
     public void SetBrowserTabVolume(string session, int tabId, string site, double? volume, bool remember,
-        Func<MixerSettings, string?> persist, bool? locked = null)
+        Func<MixerSettings, string?> persist)
     {
-        if (volume is double level && !ValidPlaybackVolume(level))
-            throw new ArgumentOutOfRangeException(nameof(volume), "playback volume must be between 0 and 1.5");
+        if (volume is double level && !(level is >= 0 and <= BrowserTabRouting.MaxTabVolume))
+            throw new ArgumentOutOfRangeException(nameof(volume), "tab volume must be between 0 and 1.25");
         lock (_gate)
         {
             var (tabs, tab) = FindBrowserTabLocked(session, tabId, site, "setBrowserTabVolume");
             if (!tab.Metadata.VolumeSupported) throw new InvalidOperationException("update the browser companion to adjust tab volume");
+            if (volume > TabVolumeMaximum(tab))
+                throw new InvalidOperationException("update the browser companion to boost tab volume");
             double? next = volume is double value ? SnapPlaybackVolume(value) : null;
-            string origin = tab.Metadata.Site;
-            if (locked is bool lockVolume)
-            {
-                var locks = new Dictionary<string, double>(_browserVolumeLocks, StringComparer.Ordinal);
-                if (lockVolume)
-                {
-                    if (!locks.ContainsKey(origin) && locks.Count >= BrowserTabRouting.MaxSites)
-                        throw new InvalidOperationException("Too many website volume locks");
-                    // An existing lock must be removed before its value can change.
-                    locks.TryAdd(origin, next ?? tab.Volume ?? _browserSiteVolumes.GetValueOrDefault(origin, 1));
-                }
-                else locks.Remove(origin);
-                if (persist(ExportSettings() with { BrowserVolumeLocks = locks }) is string lockError)
-                    throw new IOException(lockError);
-                _browserVolumeLocks = locks;
-                return;
-            }
-            if (_browserVolumeLocks.ContainsKey(origin))
-                throw new InvalidOperationException("Unlock the website volume before editing it");
             if (!remember)
             {
                 tabs[tabId] = tab with { Volume = next };
                 return;
             }
+            string origin = tab.Metadata.Site;
             if (next is not null && !_browserSiteVolumes.ContainsKey(origin) && _browserSiteVolumes.Count >= BrowserTabRouting.MaxSites)
                 throw new InvalidOperationException($"at most {BrowserTabRouting.MaxSites} browser site volumes can be remembered");
             var saved = new Dictionary<string, double>(_browserSiteVolumes, StringComparer.Ordinal);
@@ -274,6 +260,15 @@ public sealed partial class Mixer
         }
     }
 
+    private static double TabVolumeMaximum(BrowserTab tab)
+        => tab.Metadata.VolumeSupported && tab.Metadata.VolumeBoostSupported ? BrowserTabRouting.MaxTabVolume : 1;
+
+    private double? EffectiveTabVolume(BrowserTab tab)
+    {
+        double? volume = tab.Volume ?? (_browserSiteVolumes.TryGetValue(tab.Metadata.Site, out double saved) ? saved : null);
+        return volume is double level ? Math.Min(level, TabVolumeMaximum(tab)) : null;
+    }
+
     private IReadOnlyList<BrowserTabState> BrowserTabsLocked()
         => [.. _browserSessions.OrderBy(s => s.Key, StringComparer.Ordinal).SelectMany(s => s.Value.Values.OrderBy(t => t.Metadata.Id)
             .Select(t => new BrowserTabState(s.Key, t.Metadata.Id, t.Metadata.Site,
@@ -283,15 +278,14 @@ public sealed partial class Mixer
                 t.Metadata.Activation)
             {
                 VolumeSupported = t.Metadata.VolumeSupported,
-                VolumeLocked = _browserVolumeLocks.ContainsKey(t.Metadata.Site),
-                Volume = _browserVolumeLocks.TryGetValue(t.Metadata.Site, out double locked) ? locked : t.Volume ?? (_browserSiteVolumes.TryGetValue(t.Metadata.Site, out double volume) ? volume : null),
+                VolumeMaximum = TabVolumeMaximum(t),
+                Volume = EffectiveTabVolume(t),
                 RememberVolume = t.Volume is null && _browserSiteVolumes.ContainsKey(t.Metadata.Site),
             }))];
 
     private void RestoreBrowserSettingsLocked(MixerSettings settings)
     {
         SetPreserveBrowserOutputs(settings.PreserveBrowserOutputs);
-        _browserVolumeLocks = SavedMixerValidation.SiteVolumes(settings.BrowserVolumeLocks, null);
         _browserSiteVolumes = SavedMixerValidation.SiteVolumes(settings.BrowserSiteVolumes, null);
         _browserSiteChannels = BrowserTabRouting.SiteChannels(settings.BrowserSiteChannels)
             .Where(p => !_built || HasApplicationChannel(p.Value)).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);

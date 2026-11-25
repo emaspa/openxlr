@@ -13,7 +13,6 @@ namespace OpenXLR.Core;
 /// </summary>
 public sealed record MixerScene
 {
-    public Dictionary<string, double>? BrowserVolumeLocks { get; init; }
     public Dictionary<string, double> MixVolumes { get; init; } = [];
     public List<string> MixMuted { get; init; } = [];
     /// <summary>"channel|mix" to level.</summary>

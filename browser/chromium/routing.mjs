@@ -35,6 +35,7 @@ export function tabRecords(tabs, captures = new Map(), requests = new Map()) {
       title: boundedText(tab.title || siteOf(tab.url), 160),
       capturing: captures.get(tab.id)?.capturing === true,
       volumeSupported: true,
+      volumeBoostSupported: true,
       error: captures.get(tab.id)?.error?.slice(0, 200) || null,
       activation: requests.get(tab.id)?.stage ?? null,
     }));
@@ -56,8 +57,9 @@ export function errorText(error) {
   return boundedText(error?.message || error || t('routingFailed'), 200);
 }
 
+// Desktop percentage scale: 125% is about +5.8 dB after cubing.
 export function playbackVolume(value) {
-  return typeof value === 'number' && value >= 0 && value <= 1.5 ? value : 1;
+  return typeof value === 'number' && value >= 0 && value <= 1.25 ? value : 1;
 }
 
 /** Native Web Audio does the playback. No audio samples enter JavaScript. */

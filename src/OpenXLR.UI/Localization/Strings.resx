@@ -5001,7 +5001,7 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="GlitchKeyNote" xml:space="preserve">
     <value>The glitch key marks the moment as Ctrl+G does, also while the UI is hidden in the tray. Collect diagnostics afterwards: timeline.txt in the archive shows what changed in the 30 seconds before each mark.</value>
   </data>
-  <data name="BrowserVolumeLock" xml:space="preserve">
-    <value>Lock volume for this website</value>
+  <data name="TabPlaybackBoostUnavailable" xml:space="preserve">
+    <value>Update OpenXLR and the browser companion to boost this tab above 100%.</value>
   </data>
 </root>

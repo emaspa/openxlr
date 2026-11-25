@@ -52,7 +52,6 @@ internal static class SavedMixerValidation
             AppOverrides = Mapping(settings.AppOverrides, "appOverrides", notes),
             BrowserSiteChannels = BrowserSites(settings.BrowserSiteChannels, notes),
             AppVolumes = AppVolumes(settings.AppVolumes, notes),
-            BrowserVolumeLocks = SiteVolumes(settings.BrowserVolumeLocks, notes, "browserVolumeLocks"),
             BrowserSiteVolumes = SiteVolumes(settings.BrowserSiteVolumes, notes),
             KnownApps = Apps(settings.KnownApps, notes),
             Inserts = Inserts(settings, notes),
@@ -107,10 +106,6 @@ internal static class SavedMixerValidation
     {
         Levels(scene.MixVolumes, "mixVolumes");
         Levels(scene.Levels, "levels");
-        if (scene.BrowserVolumeLocks is { } locks)
-            Require(locks.Count <= BrowserTabRouting.MaxSites && locks.All(pair =>
-                BrowserTabRouting.CanonicalSite(pair.Key) == pair.Key && Mixer.ValidPlaybackVolume(pair.Value)),
-                "invalid website volume lock", "browserVolumeLocks");
         if (scene.ChannelVolumes is not null) Levels(scene.ChannelVolumes, "channelVolumes");
         Names(scene.MixMuted, "mixMuted");
         Names(scene.ChannelMuted, "channelMuted");
@@ -282,14 +277,14 @@ internal static class SavedMixerValidation
         return kept;
     }
 
-    internal static Dictionary<string, double> SiteVolumes(IReadOnlyDictionary<string, double>? entries, List<string>? notes,
-        string field = "browserSiteVolumes")
+    internal static Dictionary<string, double> SiteVolumes(IReadOnlyDictionary<string, double>? entries, List<string>? notes)
     {
         var kept = new Dictionary<string, double>(StringComparer.Ordinal);
+        const string field = "browserSiteVolumes";
         if (entries is null) notes?.Add($"{field}: {NullEntry}");
         foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
         {
-            if (BrowserTabRouting.CanonicalSite(key) is { } site && Mixer.ValidPlaybackVolume(volume)
+            if (BrowserTabRouting.CanonicalSite(key) is { } site && volume is >= 0 and <= BrowserTabRouting.MaxTabVolume
                 && kept.Count < BrowserTabRouting.MaxSites)
                 kept.TryAdd(site, Math.Round(volume * 100) / 100);
             else if (notes is not null && !notes.Contains(field)) notes.Add(field);

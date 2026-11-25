@@ -252,8 +252,7 @@ every save. Every field is optional on read; an absent one is empty or off.
 | `blockSize` | the quantum forced on OpenXLR's graph in frames, 256, 512 or 1024; absent leaves it to PipeWire. Another value is dropped on load. Machine setting, never recalled by a profile; [API behaviour](api.md#block-size) |
 | `preserveBrowserOutputs` | leave recognized Chromium playback on its browser/desktop-selected output; false when absent. Machine setting, never recalled by a profile |
 | `browserSiteChannels` | up to 128 canonical HTTP(S) origins to application channel ids for the optional [browser companion](browser-routing.md). Deleting a channel moves its defaults to the fallback application channel; unknown channels in loaded settings are discarded. Machine settings only; live tab titles, ids and sessions are not saved |
-| `browserSiteVolumes` | up to 128 canonical HTTP(S) origins to the playback volume remembered for their routed tabs, 0 to 1.5 in hundredths; `setBrowserTabVolume` with `remember` writes it. Machine settings, never in a profile |
-| `browserVolumeLocks` | up to 128 canonical HTTP(S) origins to fixed playback levels, 0 to 1.5 in hundredths. Profile mixer scenes also carry this map. An empty map clears the locks on recall. A profile without the field leaves them as they are |
+| `browserSiteVolumes` | up to 128 canonical HTTP(S) origins to the playback volume remembered for their routed tabs, 0 to 1.25 in hundredths; `setBrowserTabVolume` with `remember` writes it. Machine settings, never in a profile |
 | `knownApps` | `{identity, label, channelId}` for every application seen |
 | `lowCutHz` | the software low cut, 0, 80 or 120 |
 | `softClipGuard` | the software ClipGuard |

@@ -31,16 +31,12 @@ public sealed class BrowserTabViewModel : ViewModelBase
     public BrowserTabViewModel(string session, int id,
         Func<string, int, string, string?, bool, Task<string?>> assign, Action<string> reportError,
         Func<string, int, string, Task<string?>>? activate = null, TimeSpan? activationTimeout = null,
-        Func<string, int, string, double?, bool, Task<string?>>? setVolume = null,
-        Func<string, int, string, double, bool, Task<string?>>? setLock = null)
+        Func<string, int, string, double?, bool, Task<string?>>? setVolume = null)
     {
         Session = session; Id = id; _assign = assign; _reportError = reportError;
         _activate = activate; _activationTimeout = activationTimeout ?? ActivationAnswerTimeout;
         PlaybackVolume = new((level, remember) => setVolume is null ? Task.FromResult<string?>(null)
-            : setVolume(Session, Id, Site, level, remember), website: true)
-        {
-            SendLock = setLock is null ? null : (level, locked) => setLock(Session, Id, Site, level, locked)
-        };
+            : setVolume(Session, Id, Site, level, remember), website: true);
     }
 
     public string Session { get; }

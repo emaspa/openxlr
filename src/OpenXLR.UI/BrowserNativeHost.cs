@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace OpenXLR.UI;
 
-internal sealed record BrowserNativeTab(int Id, string Site, string Title, bool Capturing, string? Error = null, string? Activation = null, bool VolumeSupported = false);
+internal sealed record BrowserNativeTab(int Id, string Site, string Title, bool Capturing, string? Error = null, string? Activation = null, bool VolumeSupported = false, bool VolumeBoostSupported = false);
 
 /// <summary>A bounded native-messaging bridge. Only browser routing crosses its standard output.</summary>
 internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Stream output, Func<long>? clock = null)
@@ -423,7 +423,7 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
             // as a host holding "*" or an IPv4-mapped IPv6 address, leaves that
             // tab unlisted. The other tabs still register.
             if (ValidSite(site)) tabs.Add(new(id, site, title, capturing, String(tab, "error"), String(tab, "activation"),
-                Bool(tab, "volumeSupported")));
+                Bool(tab, "volumeSupported"), Bool(tab, "volumeBoostSupported")));
         }
         return tabs;
     }
@@ -462,7 +462,7 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
                     if (Bool(tab, "volumeSupported"))
                     {
                         copy["volume"] = tab["volume"] is JsonValue level && level.TryGetValue<double>(out double volume)
-                            && volume is >= 0 and <= 1.5 ? volume : null;
+                            && volume is >= 0 and <= 1.25 ? volume : null;
                     }
                     tabs.Add(copy);
                 }

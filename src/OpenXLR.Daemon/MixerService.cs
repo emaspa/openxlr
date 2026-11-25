@@ -1674,9 +1674,8 @@ public sealed partial class MixerService : IHostedService, IDisposable
                 {
                     bool remember = cmd.Remember.GetBoolean();
                     double? volume = cmd.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : cmd.Value.GetDouble();
-                    bool? locked = cmd.Locked.ValueKind == System.Text.Json.JsonValueKind.Undefined ? null : cmd.Locked.GetBoolean();
-                    void ApplyVolume() => _mixer.SetBrowserTabVolume(cmd.Session!, cmd.TabId!.Value, cmd.Site!, volume, remember, s => s.Save(), locked);
-                    if (remember || locked is not null) _saves.RunSaved(ApplyVolume);
+                    void ApplyVolume() => _mixer.SetBrowserTabVolume(cmd.Session!, cmd.TabId!.Value, cmd.Site!, volume, remember, s => s.Save());
+                    if (remember) _saves.RunSaved(ApplyVolume);
                     else ApplyVolume();
                     Changed?.Invoke();
                     return null;

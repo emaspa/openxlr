@@ -70,7 +70,7 @@ public sealed partial class MainViewModel
             if (!existing.TryGetValue((session, id), out BrowserTabViewModel? tab))
             {
                 tab = new(session, id, _client.AssignBrowserTabAsync, ReportError, _client.ActivateBrowserTabAsync,
-                    setVolume: _client.SetBrowserTabVolumeAsync, setLock: _client.SetBrowserTabVolumeLockAsync);
+                    setVolume: _client.SetBrowserTabVolumeAsync);
                 BrowserTabs.Add(tab);
             }
             tab.ApplyFromDaemon(node["title"]?.GetValue<string>() ?? "", node["site"]?.GetValue<string>() ?? "",
@@ -82,7 +82,7 @@ public sealed partial class MainViewModel
             tab.PlaybackVolume.ApplyBoost(OutputVolumeRange.Boost);
             tab.PlaybackVolume.Apply(node["volumeSupported"]?.GetValue<bool>() == true, tab.CanEdit,
                 node["volume"]?.GetValue<double>(), node["rememberVolume"]?.GetValue<bool>() == true,
-                locked: node["volumeLocked"]?.GetValue<bool>());
+                supportedMaximum: node["volumeMaximum"]?.GetValue<double>() ?? 1);
         }
         for (int i = BrowserTabs.Count - 1; i >= 0; i--)
             if (!seen.Contains((BrowserTabs[i].Session, BrowserTabs[i].Id)))

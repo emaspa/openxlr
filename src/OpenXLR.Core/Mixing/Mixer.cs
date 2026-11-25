@@ -1728,7 +1728,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 RouteAppsByDefault = Matcher.RouteByDefault,
                 BlockSize = _blockSize,
                 PreserveBrowserOutputs = _preserveBrowserOutputs,
-                BrowserVolumeLocks = new(_browserVolumeLocks, StringComparer.Ordinal),
                 BrowserSiteVolumes = new Dictionary<string, double>(_browserSiteVolumes, StringComparer.Ordinal),
                 BrowserSiteChannels = _browserSiteChannels.Where(p => HasApplicationChannel(p.Value))
                     .ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal),
@@ -1997,7 +1996,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         {
             return new MixerScene
             {
-                BrowserVolumeLocks = new(_browserVolumeLocks, StringComparer.Ordinal),
                 MixVolumes = new Dictionary<string, double>(_mixVolume),
                 MixMuted = [.. _mixMuted],
                 Levels = new Dictionary<string, double>(_levels),
@@ -2064,8 +2062,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         lock (_gate)
         {
             SavedMixerValidation.Validate(s);
-            if (s.BrowserVolumeLocks is not null)
-                _browserVolumeLocks = new(s.BrowserVolumeLocks, StringComparer.Ordinal);
             if (s.Ducking is { } ducking)
             {
                 DuckingSetup previous = DuckingSetupLocked();

@@ -123,7 +123,7 @@ internal sealed class AppsView : View
         private void Level(double by)
         {
             double from = stream.Volume ?? stream.LiveVolume ?? 1;
-            double to = Math.Round(Math.Clamp(from + by, 0, 1), 2);
+            double to = Math.Round(Math.Clamp(from + by, 0, state.Mixer.AppVolumeMaximum), 2);
             if (to == Math.Round(from, 2)) return;
             app.Link.Send("setAppVolume", body =>
             {

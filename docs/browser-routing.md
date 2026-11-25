@@ -25,15 +25,15 @@ activate the tab or PWA as usual. Select the volume button beside
 its channel picker. The level takes effect once the companion routes that
 tab. You can adjust two routed tabs independently even when they play
 into the same channel. A volume change leaves the capture running.
-Enable **150%** at the main **Monitor** control to turn either playback
-slider above 100%. A level already above 100% remains in place when the
-range is disabled and can still be lowered. Application and tab gains
-combine, so high levels on both can cause clipping.
-
 Chromium's volume control in APPLICATIONS or **Manage** sets the shared
 browser level, including installed web apps. The tab control adjusts each
 captured tab relative to that shared level. If all tabs are quiet, check
 the shared browser level in **Manage** or the desktop volume controls.
+
+The main Monitor's **150%** option opens the application slider to 150%
+and a routed tab's slider to 125% (about +5.8 dB). Older Chromium
+companions are limited to 100%. The tab's volume popup shows when an
+update is needed. The tab and application gains combine.
 
 The tab volume control follows the browser output selection switch as soon
 as the daemon confirms the change.
@@ -46,12 +46,6 @@ or the companion's connection to OpenXLR ends.
 the website's saved level. The browser's normal playback level applies
 when there is no volume preference. Update the browser extension and
 OpenXLR together to see the tab volume control.
-
-Use the lock beside **Reset** to hold a routed tab's volume for its
-website. A new tab on that same origin uses the locked level when its
-capture starts. Unlock it to edit the volume again. Saving a profile
-captures the website locks, and recalling it restores them. Older
-profiles leave existing locks in place.
 
 ## Firefox
 

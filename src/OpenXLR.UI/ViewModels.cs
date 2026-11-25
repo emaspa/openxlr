@@ -1884,7 +1884,7 @@ public sealed partial class MainViewModel : ViewModelBase
             existing.PlaybackVolume.ApplyBoost(OutputVolumeRange.Boost);
             existing.PlaybackVolume.Apply(volumeSupported, true,
                 stream["volume"]?.GetValue<double>(), browserHeld: browserHeld,
-                live: stream["liveVolume"]?.GetValue<double>());
+                live: stream["liveVolume"]?.GetValue<double>(), supportedMaximum: mixer["appVolumeMaximum"]?.GetValue<double>() ?? 1);
         }
         for (int i = Apps.Count - 1; i >= 0; i--)
             if (!seen.Contains(Apps[i].Identity))

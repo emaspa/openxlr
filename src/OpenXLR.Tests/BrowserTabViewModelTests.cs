@@ -535,6 +535,29 @@ public sealed class BrowserTabViewModelTests
         }
     }
 
+    [Fact]
+    public async Task MonitorBoostRespectsTheCompanionsPlaybackCeiling()
+    {
+        await using var client = new DaemonClient();
+        var model = new MainViewModel(client);
+        model.OutputVolumeRange.Boost = true;
+        var legacy = Tab(id: 1);
+        legacy["volumeSupported"] = true;
+        legacy["volume"] = 1d;
+        var modern = Tab(id: 2);
+        modern["volumeSupported"] = true;
+        modern["volumeMaximum"] = 1.25;
+        modern["volume"] = 1.22;
+        Report(model, true, new JsonArray(legacy, modern));
+
+        var oldVolume = model.BrowserTabs[0].PlaybackVolume;
+        Assert.Equal(1, oldVolume.Maximum);
+        Assert.Equal(Localizer.Text("TabPlaybackBoostUnavailable"), oldVolume.Hint);
+        var newVolume = model.BrowserTabs[1].PlaybackVolume;
+        Assert.Equal(1.25, newVolume.Maximum);
+        Assert.Equal("122%", newVolume.Label);
+    }
+
     internal static JsonObject Tab(string session = Session, int id = 7, string title = "A browser tab", string? channel = null,
         bool remember = false, bool capturing = false, string? activation = null)
     {

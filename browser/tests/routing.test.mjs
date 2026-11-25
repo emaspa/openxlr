@@ -62,7 +62,7 @@ test('a tab record carries the stage of an activation OpenXLR asked for', () => 
   const tabs = [{ id: 1, url: 'https://one.example' }, { id: 2, url: 'https://two.example' }];
   const records = tabRecords(tabs, new Map(), new Map([[2, { stage: 'popup' }]]));
   assert.deepEqual(records.map(tab => [tab.id, tab.activation]), [[1, null], [2, 'popup']]);
-  assert.deepEqual(Object.keys(records[0]), ['id', 'site', 'title', 'capturing', 'volumeSupported', 'error', 'activation']);
+  assert.deepEqual(Object.keys(records[0]), ['id', 'site', 'title', 'capturing', 'volumeSupported', 'volumeBoostSupported', 'error', 'activation']);
 });
 
 test('only the refusal for a tab the user did not invoke the extension on counts as one', () => {
@@ -106,9 +106,9 @@ test('tab gain is independent on a shared destination and survives a reroute', a
   f.audio.setVolume(1, 0, teams);
   await f.audio.route(1, 'music');
   assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [0, 1]);
-  f.audio.setVolume(1, 1.5, teams);
-  assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [3.375, 1]);
-  f.audio.setVolume(1, 1.51, teams);
+  f.audio.setVolume(1, 1.25, teams);
+  assert.deepEqual(f.contexts.map(context => context.gain.gain.value), [1.953125, 1]);
+  f.audio.setVolume(1, 1.26, teams);
   assert.equal(f.contexts[0].gain.gain.value, 1);
   f.audio.setVolume(1, null, teams);
   assert.equal(f.contexts[0].gain.gain.value, 1);
