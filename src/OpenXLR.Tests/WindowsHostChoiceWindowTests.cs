@@ -12,8 +12,8 @@ namespace OpenXLR.Tests;
 /// The choice of host for a Windows plugin in a real controls window, run
 /// inside the Xvfb layout test's UI dispatcher: the chain asks the daemon
 /// once whether its build has the host, the switch sits with the other
-/// actions, and an insert blocked only by that host gets no Native editors
-/// button.
+/// actions, and an insert running on that host keeps its Plugin UI button
+/// and gets the Native editors button only under a compatibility rule.
 /// </summary>
 internal static class WindowsHostChoiceWindowTests
 {
@@ -124,14 +124,21 @@ internal static class WindowsHostChoiceWindowTests
                 Capture(controls, "plugin-windows-host-" + width);
             }
 
-            // On the Windows plugin host: its own block, which no rule made.
-            view.Apply(Chain(ClassId, "openxlr", running: true,
-                blockReason: "This insert runs on the Windows plugin host, which has no plugin editor yet."));
+            // On the Windows plugin host the plugin's editor opens as on
+            // yabridge, and no rule blocks it.
+            view.Apply(Chain(ClassId, "openxlr", running: true));
             Layout(controls, 420, 560);
             Assert.True(choice.IsChecked);
             Assert.Equal(Localizer.Text("RunsOnTheWindowsPluginHost"), state.Text);
+            Assert.True(insert.NativeEditorAvailable);
             Assert.False(rules.IsVisible);
             Capture(controls, "plugin-windows-host-running-420");
+
+            // A compatibility rule blocks it there too and offers its list.
+            view.Apply(Chain(ClassId, "openxlr", running: true, blockReason: "Known editor issue."));
+            Layout(controls, 420, 560);
+            Assert.False(insert.NativeEditorAvailable);
+            Assert.True(rules.IsVisible);
 
             // Saved there and running through yabridge, with the reason.
             const string missing = "the Windows plugin behind 'Deep Verb' is missing: "

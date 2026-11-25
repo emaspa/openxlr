@@ -533,34 +533,57 @@ public sealed class InsertWindowsHostTests : IDisposable
     // --- the editor ---------------------------------------------------------------
 
     [Fact]
-    public void AnInsertOnTheWindowsHostSaysItsEditorIsBlockedAndTheUiKeepsItsButtonOff()
+    public void AnInsertOnTheWindowsHostHasItsEditorAndTheUiOffersIt()
     {
         var running = new InsertStatus(Voice with { WindowsHost = "openxlr" }, null, NativeHostRunning: true) { WindowsHostRunning = true };
-        InsertStatus blocked = MixerService.WithEditorBlock(running, null);
-        Assert.True(blocked.NativeUiBlocked);
-        Assert.Equal(WindowsPluginHost.NoEditor, blocked.NativeUiBlockReason);
-        // A compatibility rule for the plugin comes first, and an insert that
-        // fell back to yabridge has its editor.
-        Assert.Equal("Known editor issue.", MixerService.WithEditorBlock(running, "Known editor issue.").NativeUiBlockReason);
-        InsertStatus kept = MixerService.WithEditorBlock(running with { WindowsHostRunning = false, WindowsHostError = "no host" }, null);
-        Assert.False(kept.NativeUiBlocked);
-        Assert.Null(kept.NativeUiBlockReason);
+        InsertStatus open = MixerService.WithEditorBlock(running, null);
+        Assert.False(open.NativeUiBlocked);
+        Assert.Null(open.NativeUiBlockReason);
+        // A compatibility rule for the plugin blocks the editor on this host
+        // as on any other.
+        InsertStatus ruled = MixerService.WithEditorBlock(running, "Known editor issue.");
+        Assert.True(ruled.NativeUiBlocked);
+        Assert.Equal("Known editor issue.", ruled.NativeUiBlockReason);
 
         // What the daemon sends is what the UI already reads: the button for
-        // the plugin's own editor stays visible and cannot be pressed, the
-        // reason is shown, and the cog opens OpenXLR's controls.
+        // the plugin's own editor can be pressed while the insert runs here.
         var owner = new InsertsViewModel(new DaemonClient(), "mix:monitor", 2);
         owner.PluginChoices.Add(new(ClassId, "Deep Verb", "Reverb", new JsonArray(), true, true, "vst3"));
-        owner.Apply(new JsonArray(JsonSerializer.SerializeToNode(blocked, Wire)));
+        owner.Apply(new JsonArray(JsonSerializer.SerializeToNode(open, Wire)));
         InsertViewModel insert = Assert.Single(owner.Items);
         Assert.True(insert.NativeHostRunning);
         Assert.True(insert.NativeEditorSupported);
-        Assert.False(insert.NativeEditorAvailable);
-        Assert.Equal(WindowsPluginHost.NoEditor, insert.NativeUiBlockReason);
-        Assert.Equal("Open this plugin's controls", insert.ControlsHint);
-        // Back on yabridge the same insert has its editor again.
-        owner.Apply(new JsonArray(JsonSerializer.SerializeToNode(MixerService.WithEditorBlock(running with { WindowsHostRunning = false }, null), Wire)));
         Assert.True(insert.NativeEditorAvailable);
+        Assert.Null(insert.NativeUiBlockReason);
+        // And cannot under the rule, with the reason shown.
+        owner.Apply(new JsonArray(JsonSerializer.SerializeToNode(ruled, Wire)));
+        Assert.False(insert.NativeEditorAvailable);
+        Assert.Equal("Known editor issue.", insert.NativeUiBlockReason);
+    }
+
+    [Fact]
+    public void AHelperOnTheWindowsHostIsAskedForItsEditorLikeAnyOther()
+    {
+        // The helper's answer to `show` is the daemon's answer to
+        // showInsertUi, whichever backend the helper runs.
+        const string helper = """
+            import sys
+            print('ready', flush=True)
+            for line in sys.stdin:
+                if line.strip() == 'show':
+                    print(REPLY, flush=True)
+            """;
+        NativePluginHost Start(string reply)
+            => new(Voice, "node", 2, 48000, "/usr/bin/python3", ["-u", "-c", helper.Replace("REPLY", reply)], TimeSpan.FromSeconds(8),
+                bundle: "/data/openxlr/yabridge/vst3/Deep Verb.vst3", windows: new WindowsPluginHost.Route("vst3", "/m.vst3", null));
+        using (NativePluginHost opened = Start("'ui opened'"))
+        {
+            Assert.True(opened.WindowsHost);
+            opened.ShowUi();
+        }
+        using NativePluginHost refused = Start("'ui unavailable: this plugin has no editor the host can show'");
+        Assert.Equal("unavailable: this plugin has no editor the host can show",
+            Assert.Throws<InvalidOperationException>(refused.ShowUi).Message);
     }
 
     // --- the wait for the helper --------------------------------------------------

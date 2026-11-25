@@ -535,16 +535,6 @@ public sealed class InsertViewModel : ViewModelBase
         : null;
 
     /// <summary>
-    /// The editor is blocked by a compatibility rule, which the Native
-    /// editors list can change. The catalogue says when a rule blocks the
-    /// plugin. Live, the daemon blocks the editor of an insert on the Windows
-    /// plugin host too, which has none yet, and a rule there wins the reason;
-    /// so a live block counts as a rule's unless that host runs the insert.
-    /// </summary>
-    public bool NativeUiBlockedByRule => _owner.PluginChoices.Any(p => p.Kind == Kind && p.Uri == Plugin && p.NativeUiBlocked)
-        || (_nativeUiBlocked && !_windowsHostRunning);
-
-    /// <summary>
     /// The editor follows the host that runs the insert, which is the native
     /// host for a saved choice and for an LV2 insert PipeWire's filter chain
     /// refused.
@@ -701,7 +691,6 @@ public sealed class InsertViewModel : ViewModelBase
         Raise(nameof(HasWindowsHostState));
         Raise(nameof(WindowsHostNote));
         Raise(nameof(HasWindowsHostNote));
-        Raise(nameof(NativeUiBlockedByRule));
     }
 
     /// <summary>The live side of the host: whether the Windows plugin host runs the plugin, and why it does not when it should.</summary>

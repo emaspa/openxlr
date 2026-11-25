@@ -81,6 +81,7 @@ make -C native test-audio test-clap test-lv2 test-vst3 test-scan  # audio bounds
 dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~Lv2BundleTests|FullyQualifiedName~PluginSearchPathTests"  # run with lilv installed, even if the earlier suite ran without it
 python3 tools/test-monitor-volume.py  # private PipeWire server and session bus; pipewire-pulse, wireplumber, pactl, dbus-daemon
 xvfb-run -a make -C native test-editor  # also needs Xvfb and xauth
+xvfb-run -a make -C native WINHOST=1 test-winhost-editor  # a Windows plugin's editor on the Windows plugin host, on a display of its own: mingw-w64, Wine and libXtst as well, and it says which is missing instead of failing
 make -C native test-sound-check  # Sound Check loop backend, no audio server
 make -C native test-eq  # microphone EQ backend against the cookbook table, no audio server
 make -C native test-duck  # duck detector, gain depth and timing, no audio server

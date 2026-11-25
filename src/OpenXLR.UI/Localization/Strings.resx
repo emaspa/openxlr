@@ -1936,7 +1936,7 @@ Saving will replace it with the current scene.</value>
     <value>Run on OpenXLR's Windows plugin host</value>
   </data>
   <data name="RunOnOpenXlrSWindowsPluginHostTip" xml:space="preserve">
-    <value>Experimental. Runs this Windows plugin on the Windows plugin host built into OpenXLR instead of yabridge. Switching starts the plugin again with the same control values and interrupts its audio for a moment. The plugin's own editor does not open on this host yet.</value>
+    <value>Experimental. Runs this Windows plugin on the Windows plugin host built into OpenXLR instead of yabridge. Switching starts the plugin again with the same control values and interrupts its audio for a moment. Plugin UI opens the plugin's own editor on either host.</value>
   </data>
   <data name="RunsOnTheWindowsPluginHost" xml:space="preserve">
     <value>Running on OpenXLR's Windows plugin host.</value>

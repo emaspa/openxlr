@@ -731,16 +731,12 @@ public sealed partial class MixerService : IHostedService, IDisposable
     /// <summary>
     /// An insert's status with what stands between it and its plugin's own
     /// editor: the compatibility rule for its plugin, in
-    /// <paramref name="rule"/>, or the host it runs on. An insert on the
-    /// Windows plugin host has no editor to open yet. Clients already keep
-    /// the editor away from an insert that says it is blocked and show the
-    /// reason, so no client has to know about that host to get this right.
+    /// <paramref name="rule"/>, and nothing else. The host an insert runs on
+    /// is no reason: one on the Windows plugin host opens its editor in the
+    /// helper's frame like any other.
     /// </summary>
     internal static InsertStatus WithEditorBlock(InsertStatus insert, string? rule)
-    {
-        string? reason = rule ?? (insert.WindowsHostRunning ? OpenXLR.Core.Mixing.WindowsPluginHost.NoEditor : null);
-        return insert with { NativeUiBlocked = reason is not null, NativeUiBlockReason = reason };
-    }
+        => insert with { NativeUiBlocked = rule is not null, NativeUiBlockReason = rule };
 
     /// <summary>Selectable sinks and sources, or null when the mixer is off.</summary>
     /// <summary>

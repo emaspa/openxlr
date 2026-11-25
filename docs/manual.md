@@ -2946,11 +2946,12 @@ yabridge. The line under the buttons says which host runs the plugin
 now. The choice is saved with the insert, in the mixer and in profiles.
 Effect presets and undo leave it alone.
 
-The plugin's own editor does not open on this host yet. Plugin UI stays
-unavailable, the cog opens OpenXLR's controls, and the controls window
-says why. The **Native editors** button does not show for this, since no
-compatibility rule is involved. Move the plugin back to yabridge to use its
-editor.
+Plugin UI opens the plugin's own editor on this host as it does through
+yabridge, in the same kind of window. What you change in the editor shows
+in the controls window and is saved the same way. A rule in the **Native
+editors** list blocks the editor on either host. The window resizes by its
+border only where the plugin allows it. A menu the plugin has open closes
+when you resize or close the window.
 
 OpenXLR refuses the switch, and says why under the buttons, when the
 plugin is not a 64-bit Windows module or when its module is missing.

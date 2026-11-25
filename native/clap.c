@@ -928,7 +928,7 @@ static bool clap_editor_open(Host *h) {
   c->gui_created = true;
   atomic_store(&c->gui_closed, false);
   atomic_store(&c->gui_destroyed, false);
-  c->gui->set_scale(c->plugin, 1.0);
+  c->gui->set_scale(c->plugin, host_editor_scale(h));
   uint32_t width = 0, height = 0;
   if (c->gui->get_size(c->plugin, &width, &height) && width && height)
     host_resize_editor(h, width, height);
@@ -939,9 +939,33 @@ static bool clap_editor_open(Host *h) {
     c->gui_created = false;
     return false;
   }
+#ifdef _WIN32
+  host_set_editor_resizable(h, c->gui->can_resize(c->plugin));
+#endif
   c->gui->show(c->plugin);
   return true;
 }
+
+#ifdef _WIN32
+// A Windows editor sits in a window of the host's and hears of a new size
+// only through these calls. On Linux the frame resizes the plugin's own X11
+// window, and that is what a plugin follows there.
+static void clap_editor_constrain(Host *h, unsigned *width, unsigned *height) {
+  Clap *c = h->impl;
+  uint32_t fitted_width = *width, fitted_height = *height;
+  if (c->gui_created &&
+      c->gui->adjust_size(c->plugin, &fitted_width, &fitted_height)) {
+    *width = fitted_width;
+    *height = fitted_height;
+  }
+}
+
+static void clap_editor_resized(Host *h, unsigned width, unsigned height) {
+  Clap *c = h->impl;
+  if (c->gui_created)
+    c->gui->set_size(c->plugin, width, height);
+}
+#endif
 
 static void clap_editor_close(Host *h) {
   Clap *c = h->impl;
@@ -989,7 +1013,12 @@ const Backend clap_backend = {
     .editor_idle = clap_editor_idle,
     .editor_lost = clap_editor_lost,
     .editor_focus = NULL,   // CLAP has no call for it
+#ifdef _WIN32
+    .editor_resized = clap_editor_resized,
+    .editor_constrain = clap_editor_constrain,
+#else
     .editor_resized = NULL,
+#endif
     .main_thread = clap_main_thread,
     .unload = clap_unload,
     .latency = clap_latency,

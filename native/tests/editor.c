@@ -582,6 +582,22 @@ int main(void) {
   puts("PASS: bounds refresh after scaling and native editors get no Wine nudge");
   close_ui(&h);
 
+  // A window Wine owns carries Wine's own size hints, which say nothing of
+  // the editor in it. A backend that says so keeps them off the frame.
+  Backend foreign_backend = native_backend;
+  foreign_backend.foreign_window_hints = true;
+  h.backend = &foreign_backend;
+  assert(open_ui(&h));
+  drain(&h);
+  XSetWMNormalHints(plugin_display, plugin_window, &hints);
+  XSync(plugin_display, False);
+  drain(&h);
+  assert_bounds(&h, 1, 1, 16384, 16384);
+  resize_to(&h, 300, 200);
+  assert_size(&h, 300, 200);
+  puts("PASS: size hints that are not the editor's leave the frame's bounds alone");
+  close_ui(&h);
+
   // Fixed-size VST3 editors still resize through their own scaling controls.
   h.backend = &test_backend;
   fixed_editor = true;

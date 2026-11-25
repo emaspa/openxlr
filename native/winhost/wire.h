@@ -30,6 +30,15 @@
 //   is behind: the plugin has moved that control since, and its newer value
 //   is already on its way.
 //
+// The plugin's editor is a window of Windows' own, which under Wine is an X11
+// window. The Linux side has the frame the user sees and takes that window
+// into it. The order is what Wine and a window manager need: the Windows
+// side makes its window hidden and puts the editor in it, the Linux side
+// takes the still hidden X11 window into the frame, and only then is it
+// shown. These cross as requests like the rest. What the plugin does by
+// itself, a size it asks for or an editor it closes, comes back as a note: a
+// reply nobody asked for, which the Linux side reads on its tick.
+//
 // A scan uses none of this. The Windows host started with the one argument
 // `scan` reads one WireScan from its standard input, writes the module's
 // description to its standard output and leaves. The Linux side holds that
@@ -46,7 +55,7 @@
 
 enum {
   WIRE_MAGIC = 0x4857584f,  // "OXWH"
-  WIRE_VERSION = 2,
+  WIRE_VERSION = 3,
   WIRE_MAX_FRAMES = 8192,    // MAX_FRAMES in host.h
   WIRE_MAX_CHANNELS = 2,     // MAX_CHANNELS in host.h
   WIRE_MAX_CONTROLS = 4096,  // MAX_CONTROLS in host.h
@@ -135,7 +144,32 @@ typedef struct {
   WireControl controls[WIRE_MAX_CONTROLS];
 } WireShared;
 
-enum { WIRE_HELLO = 1, WIRE_LOAD, WIRE_ACTIVATE, WIRE_DEACTIVATE, WIRE_QUIT };
+enum {
+  WIRE_HELLO = 1,
+  WIRE_LOAD,
+  WIRE_ACTIVATE,
+  WIRE_DEACTIVATE,
+  WIRE_QUIT,
+  // Make the editor's window, hidden, with the plugin's editor in it. The
+  // reply names the X11 window Wine gave it and its size.
+  WIRE_EDITOR_OPEN,
+  // That window is inside the frame now: show it.
+  WIRE_EDITOR_SHOW,
+  // The size nearest to this one that the editor would take. Nothing changes.
+  WIRE_EDITOR_FIT,
+  // The frame has this size now. The reply has the size the editor took.
+  WIRE_EDITOR_RESIZE,
+  WIRE_EDITOR_CLOSE,
+  // Notes, from the Windows side and in answer to nothing: the plugin asked
+  // for its editor to be this size, and the plugin closed its editor.
+  WIRE_NOTE_EDITOR_SIZE = 64,
+  WIRE_NOTE_EDITOR_CLOSED
+};
+// What a reply's `flags` say.
+enum {
+  WIRE_HAS_EDITOR = 1,        // load, and a refused editor open: the plugin has one
+  WIRE_EDITOR_RESIZABLE = 2,  // editor open: the frame may be resized by hand
+};
 // The plugin formats a load can name. A Windows host that does not know one
 // refuses the load and says so.
 enum { WIRE_FORMAT_CLAP = 1, WIRE_FORMAT_VST3 };
@@ -148,6 +182,8 @@ typedef struct {
   uint32_t rate;       // load
   uint32_t own_block;  // load: the plugin is called with OWN_BLOCK_FRAMES at a time
   uint32_t reserved;
+  uint32_t width, height;  // editor fit and resize, in pixels
+  float scale;             // editor open: what the editor is drawn at, 1 for 96 dpi
   char thread[WIRE_THREAD_NAME];  // hello: the name the audio thread takes
   // load: which plugin of the module. A CLAP id, or a VST3 class id as the
   // 32 hex digits a Linux host knows the plugin by.
@@ -164,7 +200,11 @@ typedef struct {
   uint32_t shared_size;  // hello: sizeof(WireShared) as this side built it
   uint32_t latency;      // activate
   uint32_t controls;     // load: how many entries of `controls` are filled
-  uint32_t reserved;
+  uint32_t flags;        // WIRE_HAS_EDITOR and the rest
+  uint32_t window;       // editor open: the editor's X11 window
+  // The editor's size in pixels, after an open, a fit or a resize, and the
+  // size a note says the plugin asked for.
+  uint32_t width, height;
   // The plugin's name after a load, the reason after a refusal.
   char text[WIRE_TEXT];
 } WireReply;
@@ -194,7 +234,9 @@ _Static_assert(sizeof(WireShared) ==
                        WIRE_MAX_CONTROLS * (8 + sizeof(WireControl)),
                "the shared file's layout");
 _Static_assert(sizeof(WireRequest) ==
-                   32 + WIRE_THREAD_NAME + WIRE_ID + WIRE_PATH,
+                   44 + WIRE_THREAD_NAME + WIRE_ID + WIRE_PATH,
                "a request's layout");
-_Static_assert(sizeof(WireReply) == 32 + WIRE_TEXT, "a reply's layout");
+_Static_assert(sizeof(WireReply) == 44 + WIRE_TEXT, "a reply's layout");
+// A note is written whole or not at all, which a FIFO promises up to here.
+_Static_assert(sizeof(WireReply) <= 512, "a reply fits one write to a FIFO");
 _Static_assert(sizeof(WireScan) == 16 + 2 * WIRE_PATH, "a scan's layout");

@@ -1504,9 +1504,6 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 .FirstOrDefault(stage => stage.Id == insertId).Stage?.NativeHost;
             if (host is null)
                 throw new InvalidOperationException("No native editor is running for this insert. Enable it and install the optional native host.");
-            // The helper would answer that it has no editor. Say what that
-            // means and what to do, as the insert's status already does.
-            if (host.WindowsHost) throw new InvalidOperationException(WindowsPluginHost.NoEditor);
         }
         host.ShowUi();
     }

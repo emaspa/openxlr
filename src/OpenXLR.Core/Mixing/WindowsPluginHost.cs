@@ -32,10 +32,6 @@ internal static class WindowsPluginHost
     /// <summary>Names the Wine the helper starts, <c>wine</c> on PATH otherwise.</summary>
     internal const string WineVariable = "OPENXLR_WINE";
 
-    /// <summary>What a client is told about the editor of an insert that runs here.</summary>
-    internal const string NoEditor =
-        "This insert runs on the Windows plugin host, which has no plugin editor yet. Move it back to yabridge to open the plugin's own editor.";
-
     /// <summary>What the helper's startup error says when Wine was still silent at the daemon's deadline.</summary>
     internal const string SilentStart =
         "Wine did not answer in time. It may be creating or updating its prefix; turn the insert off and on to try again";

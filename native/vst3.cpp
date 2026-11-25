@@ -28,6 +28,7 @@
 #include <pluginterfaces/base/ibstream.h>
 #include <pluginterfaces/base/ipluginbase.h>
 #include <pluginterfaces/gui/iplugview.h>
+#include <pluginterfaces/gui/iplugviewcontentscalesupport.h>
 #include <pluginterfaces/vst/ivstattributes.h>
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
 #include <pluginterfaces/vst/ivstcomponent.h>
@@ -1455,6 +1456,18 @@ bool vst3_editor_open(Host *h) {
     return false;
   }
   v->view->setFrame(v->frame);
+#ifdef _WIN32
+  // A Windows editor is told the scale it is shown at, before it is asked
+  // for its size. An X11 editor reads the display's own settings.
+  IPlugViewContentScaleSupport *scaled = nullptr;
+  if (v->view->queryInterface(IID(IPlugViewContentScaleSupport),
+                              (void **)&scaled) == kResultOk &&
+      scaled) {
+    scaled->setContentScaleFactor(
+        (IPlugViewContentScaleSupport::ScaleFactor)host_editor_scale(h));
+    scaled->release();
+  }
+#endif
   ViewRect rect;
   if (v->view->getSize(&rect) == kResultOk && rect.getWidth() > 0 &&
       rect.getHeight() > 0)
@@ -1538,6 +1551,7 @@ extern "C" const Backend vst3_backend = {
     nullptr,
     nullptr,
     false,  // guards_input: a plugin's input is checked by the host
+    false,  // foreign_window_hints: an editor's size hints are its own
 };
 
 // --- the scanner ------------------------------------------------------------

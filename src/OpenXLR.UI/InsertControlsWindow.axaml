@@ -66,7 +66,7 @@
                 ToolTip.Tip="{loc:Text Key=SaveLoadImportAndExportPresetsFor}"/>
         <ToggleButton Content="{loc:Text Key=Bypass}" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"/>
         <Button Name="ManageNativeEditors" Content="{loc:Text Key=NativeEditors}" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditorRules"
-                IsVisible="{Binding NativeUiBlockedByRule}" ToolTip.Tip="{loc:Text Key=ManageThisPluginSNativeEditorCompatibilityRule}"/>
+                IsVisible="{Binding NativeUiBlocked}" ToolTip.Tip="{loc:Text Key=ManageThisPluginSNativeEditorCompatibilityRule}"/>
         <ToggleButton Content="{loc:Text Key=NativeHost}" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"
                       IsVisible="{Binding CanChooseNativeHost}"
                       ToolTip.Tip="{loc:Text Key=RunThisInsertInItsOwnProcessWhich}"/>
