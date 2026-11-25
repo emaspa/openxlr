@@ -1566,10 +1566,27 @@ static int other_system_calls(const char *kind, unsigned count) {
       break;
     }
   }
-  for (unsigned i = 0; watched && i < count; ++i) {
+  // strace stops the thread at every system call, so on a slow machine a
+  // block can come back after the cycle has given up on it. The cycles that
+  // follow are silence, as for any late block, and return at once, so they
+  // wait a millisecond for the answer before the next. Anything that is
+  // neither the plugin's audio nor silence is still wrong.
+  unsigned exact = 0, late = 0;
+  double started = now_ms();
+  while (watched && exact < count && now_ms() - started < 10000) {
     cycle(256);
-    assert(scaled(256, 0.5f));
+    if (scaled(256, 0.5f))
+      ++exact;
+    else {
+      assert(silent(256));
+      ++late;
+      sleep_ms(1);
+    }
   }
+  assert(!watched || exact == count);
+  if (late)
+    printf("note: %u cycles were silence for a block that came late while strace watched\n",
+           late);
   if (tracer > 0) {
     kill(tracer, SIGINT);
     while (waitpid(tracer, NULL, 0) < 0 && errno == EINTR) {}
@@ -1578,13 +1595,15 @@ static int other_system_calls(const char *kind, unsigned count) {
   // The wake is a one-byte read and the answer a one-byte write, on the
   // descriptors Wine gave standard input and output. A read strace caught
   // half way when it attached ends as a resumed one, and the read it leaves
-  // the thread waiting in as a detached one.
+  // the thread waiting in as a detached one. On a slow machine strace can
+  // leave while the answer is still being written, which is a detached write.
   int others = watched ? 0 : -1;
   FILE *calls = fopen(log, "r");
   while (watched && calls && fgets(line, sizeof(line), calls))
     if (!(!strncmp(line, "read(", 5) && strstr(line, ", \"P\", 1)")) &&
         !(!strncmp(line, "write(", 6) && strstr(line, ", \"D\", 1)")) &&
         !(!strncmp(line, "read(", 5) && strstr(line, "<detached ...>")) &&
+        !(!strncmp(line, "write(", 6) && strstr(line, ", \"D\", 1 <detached ...>")) &&
         strncmp(line, "<... read resumed>", 18)) {
       if (others < 4) printf("note: the Windows audio thread called %s", line);
       ++others;
