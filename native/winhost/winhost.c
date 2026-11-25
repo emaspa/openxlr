@@ -22,11 +22,16 @@
 // DIRECTORY is a Unix path. It holds the shared audio file and the two
 // control FIFOs under the names wire.h gives them.
 //
-// Usage: openxlr-winhost.exe scan
+// Usage: openxlr-winhost.exe scan [DIRECTORY]
 // Describes one module and leaves, with none of the above: the module is
 // named on standard input and its description goes to standard output (see
 // "scanning" below).
+//
+// Either way, the directory may hold the system disk's identity, which a
+// plugin is then given when it asks (disk-hook.h). It is read before any
+// plugin is loaded.
 #include "winhost.h"
+#include "disk-hook.h"
 #include "wire.h"
 
 #include <fcntl.h>
@@ -128,6 +133,26 @@ static HANDLE open_in(const char *directory, const char *name, DWORD access) {
                             NULL, OPEN_EXISTING, 0, NULL);
   HeapFree(GetProcessHeap(), 0, path);
   return file;
+}
+
+// The disk identity the Linux side left in the directory, if it left one:
+// when it did not, it has said why. The hook goes in before any plugin
+// module is loaded, which is all it needs.
+static void install_disk_identity(const char *directory) {
+  HANDLE file = open_in(directory, DISK_IDENTITY_FILE, GENERIC_READ);
+  if (file == INVALID_HANDLE_VALUE)
+    return;
+  static unsigned char descriptor[DISK_IDENTITY_SIZE + 1];
+  DWORD count = 0;
+  BOOL read = ReadFile(file, descriptor, sizeof(descriptor), &count, NULL);
+  CloseHandle(file);
+  if (!read || count != DISK_IDENTITY_SIZE) {
+    fputs("trace: disk identity: the descriptor the Linux side left is not one; "
+          "leaving Wine's answer\n",
+          stderr);
+    return;
+  }
+  disk_hook_install(descriptor);
 }
 
 // --- the pipes --------------------------------------------------------------
@@ -621,15 +646,22 @@ int main(void) {
   _setmode(_fileno(stderr), _O_BINARY);
   int argc = 0;
   WCHAR **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-  static char directory[WIRE_PATH];
-  if (!argv || argc != 2 ||
+  static char directory[WIRE_PATH], disk[WIRE_PATH];
+  if (!argv || argc < 2 || argc > 3 ||
       !WideCharToMultiByte(CP_UTF8, 0, argv[1], -1, directory,
-                           sizeof(directory), NULL, NULL)) {
+                           sizeof(directory), NULL, NULL) ||
+      (argc == 3 && (strcmp(directory, "scan") != 0 ||
+                     !WideCharToMultiByte(CP_UTF8, 0, argv[2], -1, disk,
+                                          sizeof(disk), NULL, NULL)))) {
     fputs("usage: openxlr-winhost.exe DIRECTORY\n"
-          "       openxlr-winhost.exe scan\n",
+          "       openxlr-winhost.exe scan [DIRECTORY]\n",
           stderr);
     return 2;
   }
+  if (strcmp(directory, "scan") != 0)
+    install_disk_identity(directory);
+  else if (argc == 3)
+    install_disk_identity(disk);
   // Windows plugins expect their host to have done this on the thread that
   // creates them.
   OleInitialize(NULL);

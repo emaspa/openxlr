@@ -217,40 +217,21 @@ public sealed class InsertWindowsHostTests : IDisposable
         Assert.Null(WindowsPluginHost.PrefixOf(Path.Combine(plain, "A.vst3")));
     }
 
-    // --- the plugin whose licence needs the companion's host ------------------
-
-    [Theory]
-    [InlineData("Acme Voice Focus", "AcmeVf.vst3", "AcmeVf.vst3", true)]        // by the name its module reports
-    [InlineData("Acme VF", "AcmeVoiceFocus_v9.8.vst3", "plugin.vst3", true)]    // by its wrapper's file name
-    [InlineData("Acme VF", "AcmeVf.vst3", "acme-voice_focus.vst3", true)]       // by its module's file name
-    [InlineData("ACME VOICEFOCUS 2", "a.vst3", "a.vst3", true)]
-    [InlineData("Acme Voice Tuner", "AcmeVoiceTuner.vst3", "AcmeVoiceTuner.vst3", false)]
-    [InlineData("Focus on Voice", "Focus.vst3", "Voice.vst3", false)]
-    public void ThePluginThatNeedsTheCompanionsDiskIdentityIsKnownByItsNames(string name, string wrapper, string module, bool needs)
-        => Assert.Equal(needs, WindowsPluginHost.NeedsDiskIdentity(name, wrapper, module));
+    // --- a plugin that ties its licence to the disk -----------------------------
 
     [Fact]
-    public void ThePluginThatNeedsTheCompanionsDiskIdentityStaysOnYabridge()
+    public void APluginThatTiesItsLicenceToTheDiskMovesLikeAnyOther()
     {
-        (_, string module) = InstalledVst3("AcmeVoiceFocus_v9.8");
+        // The Windows plugin host reports the system disk's identity as the
+        // companion's host does, so nothing is held back by its name.
+        (string prefix, string module) = InstalledVst3("AcmeVoiceFocus_v9.8");
         PluginInfo licensed = Plugin("vst3", ClassId, "Acme Voice Focus", Vst3Wrapper("yabridge/vst3", "AcmeVoiceFocus_v9.8", module));
-        Assert.Equal("'Acme Voice Focus' ties its licence to the disk identity that only the yabridge companion reports to a plugin, "
-            + "so on the Windows plugin host it would see a different machine", Refusal(licensed));
-        // The file is never opened to decide it: an unreadable module is refused the same way.
-        File.WriteAllText(module, "not even a module");
-        Assert.Contains("ties its licence", Refusal(licensed));
+        WindowsPluginHost.Route route = Route(licensed);
+        Assert.Equal((module, prefix), (route.Module, route.Prefix));
 
         using var mixer = new Mixer();
-        var insert = new InsertDefinition { Id = "voice", Kind = "vst3", Plugin = ClassId };
-        mixer.SetInserts("xlr1", [insert]);
-        Assert.StartsWith("setInsertWindowsHost: 'Acme Voice Focus' ties its licence to the disk identity",
-            Check(mixer, licensed, WindowsPluginHost.OpenXlr));
-        // A chain saved by hand to say so runs through yabridge.
-        var notes = new List<string>();
-        var adapter = new PipeWireAdapter(() => { }, notes.Add);
-        Assert.Null(adapter.WindowsRoute(insert with { WindowsHost = "openxlr" }, licensed, out string? kept, installed: true));
-        Assert.Contains("ties its licence", kept);
-        Assert.Contains("runs through yabridge instead", Assert.Single(notes));
+        mixer.SetInserts("xlr1", [new InsertDefinition { Id = "voice", Kind = "vst3", Plugin = ClassId }]);
+        Assert.Null(Check(mixer, licensed, WindowsPluginHost.OpenXlr));
     }
 
     // --- the command -----------------------------------------------------------

@@ -5,6 +5,8 @@
 // its id, so a test picks the behaviour it wants by the plugin it loads.
 // A scan describes every plugin in the module, so what goes wrong during
 // one is chosen by OPENXLR_TEST_WINHOST_SCAN (see scan_trouble).
+#include "disk-probe.h"
+
 #include <clap/clap.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -12,6 +14,7 @@
 #include <string.h>
 
 #include <windows.h>
+#include <winioctl.h>
 
 #define ID "org.openxlr.test.winhost."
 
@@ -29,6 +32,7 @@ enum {
   KIND_PARAMS,     // five parameters; see PARAM_GAIN and the rest
   KIND_MANY,       // more parameters than a host carries; see MANY_PARAMS
   KIND_TIMER,      // asks for a timer when it is made, quarters after three calls
+  KIND_DISK,       // asks for the disk's identity; see probe_disk and ask_per_block
   KINDS
 };
 
@@ -70,6 +74,7 @@ static const clap_plugin_descriptor_t descriptors[KINDS] = {
     [KIND_PARAMS] = DESCRIPTOR("params", "Test Params"),
     [KIND_MANY] = DESCRIPTOR("many", "Test Many"),
     [KIND_TIMER] = DESCRIPTOR("timer", "Test Timer"),
+    [KIND_DISK] = DESCRIPTOR("disk", "Test Disk"),
 };
 
 typedef struct {
@@ -88,12 +93,89 @@ typedef struct {
   // KIND_TIMER
   clap_id timer;
   _Atomic int timer_calls;
+  // KIND_DISK: the handle the blocks ask on, the answer it gave when the
+  // plugin was activated, and the latest answer, which a block writes.
+  HANDLE drive;
+  ProbeRecord activated, block;
 } Instance;
 
 static Instance *of(const clap_plugin_t *plugin) { return plugin->plugin_data; }
 
+// --- KIND_DISK ----------------------------------------------------------------
+
+// One storage property query, made from this module, so that it goes through
+// whatever its imports were pointed at.
+static void ask(HANDLE drive, int property, int type, DWORD size, ProbeRecord *record) {
+  STORAGE_PROPERTY_QUERY query = {property, type, {0}};
+  memset(record, 0, sizeof(*record));
+  DWORD returned = 0;
+  BOOL ok = DeviceIoControl(drive, IOCTL_STORAGE_QUERY_PROPERTY, &query, sizeof(query),
+                            record->bytes, size, &returned, NULL);
+  record->ok = ok != 0;
+  record->returned = returned;
+  record->error = ok ? 0 : GetLastError();
+}
+
+static HANDLE open_drive(const char *name) {
+  return CreateFileA(name, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+}
+
+static HANDLE open_wide(const WCHAR *name, DWORD access) {
+  return CreateFileW(name, access, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0,
+                     NULL);
+}
+
+// The questions disk-probe.h lists, asked when the plugin is made, in a load
+// and in a scan alike, and written to the file OPENXLR_TEST_WINHOST_DISK
+// names as a Linux path. Nothing is asked without it.
+static void probe_disk(void) {
+  const char *named = getenv("OPENXLR_TEST_WINHOST_DISK");
+  typedef WCHAR *(CDECL * ToDos)(const char *);
+  ToDos to_dos = (ToDos)(void *)GetProcAddress(GetModuleHandleW(L"kernel32.dll"),
+                                               "wine_get_dos_file_name");
+  WCHAR *path = named && to_dos ? to_dos(named) : NULL;
+  if (!path)
+    return;
+  static ProbeRecord records[PROBE_RECORDS];
+  const int device = StorageDeviceProperty, standard = PropertyStandardQuery;
+  HANDLE drive = open_drive("\\\\.\\PhysicalDrive0");
+  ask(drive, device, standard, PROBE_BUFFER, &records[PROBE_FIRST]);
+  ask(drive, device, standard, PROBE_BUFFER, &records[PROBE_REPEAT]);
+  ask(drive, device, standard, sizeof(STORAGE_DESCRIPTOR_HEADER), &records[PROBE_HEADER]);
+  ask(drive, StorageAdapterProperty, standard, PROBE_BUFFER, &records[PROBE_ADAPTER]);
+  ask(drive, device, PropertyExistsQuery, PROBE_BUFFER, &records[PROBE_EXISTS]);
+  HANDLE volume = open_wide(L"\\\\.\\C:", 0);
+  ask(volume, device, standard, PROBE_BUFFER, &records[PROBE_VOLUME]);
+  CloseHandle(volume);
+  CloseHandle(drive);
+  ask(drive, device, standard, PROBE_BUFFER, &records[PROBE_CLOSED]);
+  HANDLE again = open_wide(L"\\\\?\\PHYSICALDRIVE0", 0);
+  ask(again, device, standard, PROBE_BUFFER, &records[PROBE_REOPENED]);
+  CloseHandle(again);
+  HANDLE plain = open_wide(L"C:\\windows\\win.ini", GENERIC_READ);
+  ask(plain, device, standard, PROBE_BUFFER, &records[PROBE_REUSED]);
+  records[PROBE_REUSED].same = plain == again;
+  CloseHandle(plain);
+  HANDLE out = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+  DWORD written = 0;
+  WriteFile(out, records, sizeof(records), &written, NULL);
+  CloseHandle(out);
+  HeapFree(GetProcessHeap(), 0, path);
+}
+
+// On the audio thread, once per block, as a plugin that checks its licence
+// as it goes: the answer has to be the one the plugin was given when it was
+// activated. A different one, or none, is a processing error.
+static bool ask_per_block(Instance *p) {
+  ask(p->drive, StorageDeviceProperty, PropertyStandardQuery, PROBE_BUFFER, &p->block);
+  return p->block.ok && p->block.returned == p->activated.returned &&
+         !memcmp(p->block.bytes, p->activated.bytes, p->block.returned);
+}
+
 static bool plugin_init(const clap_plugin_t *plugin) {
   Instance *p = of(plugin);
+  if (p->kind == KIND_DISK)
+    probe_disk();
   if (p->kind == KIND_TIMER) {
     const clap_host_timer_support_t *timers =
         p->host->get_extension(p->host, CLAP_EXT_TIMER_SUPPORT);
@@ -163,11 +245,21 @@ static void take_events(Instance *p, const clap_input_events_t *in,
 
 static bool plugin_activate(const clap_plugin_t *plugin, double rate,
                             uint32_t min, uint32_t max) {
-  of(plugin)->activations++;
+  Instance *p = of(plugin);
+  p->activations++;
+  if (p->kind == KIND_DISK) {
+    p->drive = open_drive("\\\\.\\PhysicalDrive0");
+    ask(p->drive, StorageDeviceProperty, PropertyStandardQuery, PROBE_BUFFER, &p->activated);
+    return p->activated.ok;
+  }
   return true;
 }
 
-static void plugin_deactivate(const clap_plugin_t *plugin) {}
+static void plugin_deactivate(const clap_plugin_t *plugin) {
+  Instance *p = of(plugin);
+  if (p->kind == KIND_DISK && p->drive != INVALID_HANDLE_VALUE)
+    CloseHandle(p->drive);
+}
 static bool plugin_start(const clap_plugin_t *plugin) { return true; }
 static void plugin_stop(const clap_plugin_t *plugin) {}
 static void plugin_reset(const clap_plugin_t *plugin) {}
@@ -182,7 +274,7 @@ static clap_process_status plugin_process(const clap_plugin_t *plugin,
   unsigned block = ++p->blocks;
   uint32_t inputs = p->kind == KIND_SIDECHAIN ? 2 : 1;
   if (process->audio_inputs_count != inputs || process->audio_outputs_count != 1 ||
-      p->kind == KIND_REFUSE)
+      p->kind == KIND_REFUSE || (p->kind == KIND_DISK && !ask_per_block(p)))
     return CLAP_PROCESS_ERROR;
   if (p->kind == KIND_RESTART && block == RESTART_BLOCK)
     p->host->request_restart(p->host);

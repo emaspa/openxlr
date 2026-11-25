@@ -2953,9 +2953,10 @@ compatibility rule is involved. Move the plugin back to yabridge to use its
 editor.
 
 OpenXLR refuses the switch, and says why under the buttons, when the
-plugin is not a 64-bit Windows module, when its module is missing, or when
-it ties its licence to the disk identity that only the yabridge companion
-reports, as Elgato Voice Focus does. A plugin can also be saved to the host
+plugin is not a 64-bit Windows module or when its module is missing.
+A plugin that ties its licence to the system disk, such as Elgato Voice
+Focus, sees the same machine on both hosts, since this host reports the
+disk's identity the way the companion's does. A plugin can also be saved to the host
 and fail to run there when its chain starts, for one of those reasons or
 because the build has no host. It then runs through yabridge, and the
 controls window says why. The saved choice stays, and so does the button,

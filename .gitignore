@@ -30,6 +30,7 @@ native/tests/voice
 native/tests/dynamics
 native/tests/player
 native/tests/bridge
+native/tests/disk-identity
 native/openxlr-winhost.exe
 native/winhost/*.obj
 native/tests/winhost
