@@ -34,8 +34,8 @@ class CiTestScopeTests(unittest.TestCase):
         output = subprocess.check_output([SCRIPT, event, before], cwd=self.root, text=True)
         return dict(line.split("=") for line in output.splitlines())
 
-    def assert_scope(self, actual, *, code="false", unit="false", omarchy="false"):
-        self.assertEqual({"code": code, "unit": unit, "omarchy": omarchy}, actual)
+    def assert_scope(self, actual, *, code="false", unit="false", omarchy="false", winhost="false"):
+        self.assertEqual({"code": code, "unit": unit, "omarchy": omarchy, "winhost": winhost}, actual)
 
     def test_prose_images_and_deck_scripts_only_need_checks(self):
         for path in ("README.md", "docs/screenshot.png", "plugin/tests/example.mjs",
@@ -72,6 +72,38 @@ class CiTestScopeTests(unittest.TestCase):
         self.git("commit", "-qm", "Rename inputs")
         self.assert_scope(self.scope(), unit="true", omarchy="true")
 
+    def test_native_sources_and_ci_files_run_the_windows_plugin_host(self):
+        for path in ("native/wine.c", "native/winhost/winhost.c", "native/tests/winhost.c",
+                     "native/Makefile"):
+            with self.subTest(path=path):
+                self.add(path)
+                self.git("commit", "-qm", f"Edit {path}")
+                self.assert_scope(self.scope(), code="true", unit="true", winhost="true")
+        for path in ("tools/ci-install-packages.sh", "tools/ci-test-scope.sh"):
+            with self.subTest(path=path):
+                self.add(path)
+                self.git("commit", "-qm", f"Edit {path}")
+                self.assert_scope(self.scope(), code="true", unit="true", winhost="true")
+        self.add(".github/workflows/ci.yml")
+        self.git("commit", "-qm", "Edit the workflow")
+        self.assert_scope(self.scope(), code="true", unit="true", omarchy="true", winhost="true")
+
+    def test_native_prose_and_other_code_leave_the_windows_plugin_host_out(self):
+        self.add("native/README.md")
+        self.git("commit", "-qm", "Edit native prose")
+        self.assert_scope(self.scope())
+        self.add("src/OpenXLR.Core/Mixing/WindowsPluginHost.cs")
+        self.git("commit", "-qm", "Edit the daemon's side")
+        self.assert_scope(self.scope(), code="true", unit="true")
+
+    def test_rename_out_of_native_runs_the_windows_plugin_host(self):
+        self.add("native/wine.c")
+        self.git("commit", "-qm", "Add source")
+        (self.root / "docs").mkdir()
+        self.git("mv", "native/wine.c", "docs/wine.md")
+        self.git("commit", "-qm", "Rename source to prose")
+        self.assert_scope(self.scope(), code="true", unit="true", winhost="true")
+
     def test_manual_run_missing_base_and_empty_diff_run_everything(self):
         before = self.git("rev-parse", "HEAD")
         self.add("README.md")
@@ -79,7 +111,8 @@ class CiTestScopeTests(unittest.TestCase):
         for event, base in (("workflow_dispatch", ""), ("push", "0" * 40),
                             ("push", self.git("rev-parse", "HEAD"))):
             with self.subTest(event=event, base=base):
-                self.assert_scope(self.scope(event, base), code="true", unit="true", omarchy="true")
+                self.assert_scope(self.scope(event, base), code="true", unit="true", omarchy="true",
+                                  winhost="true")
         self.assert_scope(self.scope("push", before))
 
 

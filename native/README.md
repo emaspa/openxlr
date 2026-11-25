@@ -1206,7 +1206,10 @@ forms describe a module for the catalogue and run no audio.
 
 The default build leaves both out and is unchanged. The flag needs
 `x86_64-w64-mingw32-gcc` and `x86_64-w64-mingw32-g++`, or the compilers
-`MINGW_CC` and `MINGW_CXX` name. The program is linked statically, so it is
+`MINGW_CC` and `MINGW_CXX` name. Either of mingw's thread models builds it,
+since the program starts its threads through Windows itself. On Debian and Ubuntu
+the compilers are the packages `gcc-mingw-w64-x86-64` and
+`g++-mingw-w64-x86-64`. The program is linked statically, so it is
 one file. Building it does not need Wine; running it does. Run
 `make -C native clean-native` when you switch the flag, as after any change
 of flags.
@@ -1716,7 +1719,8 @@ writes a native class id in the order of its bytes.
 Wine prefix of its own under `~/.cache/openxlr-test/wineprefix`, or where
 `OPENXLR_TEST_WINEPREFIX` points, and never uses yours. The first run makes
 that prefix, which takes most of a minute. The target is not part of
-`make test` and CI does not run it yet.
+`make test`. CI runs it in a job of its own, with Ubuntu's mingw and Wine,
+whenever a source file under `native/` changes.
 
 ## Scope
 
