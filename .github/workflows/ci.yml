@@ -242,7 +242,7 @@ jobs:
       # which the native job builds.
       - name: Build the Windows plugin host with mingw
         run: |
-          tools/ci-install-packages.sh g++ make pkg-config libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev libsndfile1-dev gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix wine wine64 xvfb xauth strace
+          tools/ci-install-packages.sh g++ make pkg-config libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev libsndfile1-dev gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix wine wine64 xvfb xauth strace pipewire pipewire-bin
           wine --version
           make -C native -j"$(nproc)" WINHOST=1 DEEPFILTER=0 MINGW_CC=x86_64-w64-mingw32-gcc-posix MINGW_CXX=x86_64-w64-mingw32-g++-posix
 
@@ -260,6 +260,15 @@ jobs:
           sudo sysctl -q kernel.yama.ptrace_scope=0 || echo "strace may not attach to the Windows program."
           xvfb-run -a make -C native WINHOST=1 DEEPFILTER=0 MINGW_CC=x86_64-w64-mingw32-gcc-posix MINGW_CXX=x86_64-w64-mingw32-g++-posix test-winhost 2>&1 | tee winhost.log
           if grep -q '^SKIP: test-winhost' winhost.log; then exit 1; fi
+
+      # The same backend as a node of a private PipeWire server, between a
+      # node that plays a known signal and one that records it.
+      - name: Windows plugin host as a node in a PipeWire graph
+        shell: bash
+        run: |
+          sudo prlimit --pid "$$" --rtprio=20:20 || echo "The real-time limit could not be raised."
+          make -C native WINHOST=1 DEEPFILTER=0 MINGW_CC=x86_64-w64-mingw32-gcc-posix MINGW_CXX=x86_64-w64-mingw32-g++-posix test-winhost-graph 2>&1 | tee graph.log
+          if grep -q '^SKIP: test-winhost-graph' graph.log; then exit 1; fi
 
   # The private PipeWire suites run their tests one at a time and wait for
   # each graph to settle, so they take most of the time CI spends. Each

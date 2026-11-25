@@ -93,6 +93,7 @@ python3 tools/eq-reference.py --check  # regenerate with no flag after changing 
 python3 tools/starter-sounds.py --check  # the soundboard's starter sounds; regenerate with no flag after changing their table
 make -C native clean-native && make -C native WINHOST=1  # the Windows plugin host; mingw-w64 gcc and g++, either thread model; clean-native again before a default build
 xvfb-run -a make -C native WINHOST=1 test-winhost  # the wine backend against the fixture plugins; Wine and Xvfb; a SKIP line names what is missing
+make -C native WINHOST=1 test-winhost-graph  # the wine backend as a node of a private PipeWire server; Wine, pipewire, pw-link and pw-dump
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
 python3 tools/test-mixer-fit.py --no-build  # the detached mixer's Fit to window mode across window sizes and display scales, one Xvfb session per scale
