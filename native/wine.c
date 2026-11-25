@@ -46,7 +46,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <sys/inotify.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
@@ -1196,28 +1195,18 @@ int wine_scan(const char *format, const char *path) {
   signal(SIGPIPE, SIG_IGN);
   // A scan loads the plugin as a run does, so it gets the disk identity the
   // same way, in a directory of its own. A scan has no hello to say when the
-  // Windows host has read it, so the file is watched instead: the directory
-  // goes once the Windows host has closed it, and at the end of the scan
-  // whatever happened. A helper killed before that leaves it behind.
+  // Windows host has read the file, and a close of the file does not say it
+  // either: Wine opens a file it is asked for once more than once on some
+  // starts, and closes it in between. So the Windows host removes the file
+  // and the directory itself once it has read the file, and whatever is
+  // still there when the scan ends is removed here.
   static char disk[PATH_MAX];
-  int read_out = -1;
   if (wine_make_directory(disk, sizeof(disk)) && !wine_leave_disk_identity(disk)) {
     rmdir(disk);
     disk[0] = 0;
   }
-  if (disk[0]) {
-    char file[PATH_MAX + 16];
-    snprintf(file, sizeof(file), "%s/%s", disk, DISK_IDENTITY_FILE);
-    read_out = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
-    if (read_out >= 0 && inotify_add_watch(read_out, file, IN_CLOSE_NOWRITE) < 0) {
-      close(read_out);
-      read_out = -1;
-    }
-  }
   if (!wine_spawn(w, "scan", disk[0] ? disk : NULL)) {
     wine_remove_channel(disk);
-    if (read_out >= 0)
-      close(read_out);
     return 1;
   }
   // Readable once the child has exited, so its end is seen at once. On a
@@ -1228,19 +1217,12 @@ int wine_scan(const char *format, const char *path) {
   int64_t deadline = wine_now_ms() + WINE_SCAN_MS;
   bool ended;
   while (!(ended = wine_reap(w)) && wine_now_ms() < deadline) {
-    struct pollfd fds[5] = {{description, POLLIN, 0},
+    struct pollfd fds[4] = {{description, POLLIN, 0},
                             {log, POLLIN, 0},
                             {sent < sizeof(request) ? w->wake_out : -1, POLLOUT, 0},
-                            {exited, POLLIN, 0},
-                            {read_out, POLLIN, 0}};
-    if (poll(fds, 5, 100) <= 0)
+                            {exited, POLLIN, 0}};
+    if (poll(fds, 4, 100) <= 0)
       continue;
-    if (fds[4].revents) {
-      wine_remove_channel(disk);
-      disk[0] = 0;
-      close(read_out);
-      read_out = -1;
-    }
     if (fds[2].revents) {
       ssize_t count = write(w->wake_out, (const char *)&request + sent,
                             sizeof(request) - sent);
@@ -1259,8 +1241,6 @@ int wine_scan(const char *format, const char *path) {
   }
   if (exited >= 0)
     close(exited);
-  if (read_out >= 0)
-    close(read_out);
   if (!ended) {
     // Time is up. Closing the pipe tells the Windows host to end, and one
     // that does not hear it is killed.

@@ -1494,11 +1494,14 @@ The helper works the descriptor out before it starts Wine, in
 The helper writes the 396 bytes to a file named `disk-identity` in the
 private directory it hands the Windows program, and the file goes with the
 directory. A scan has a directory of its own for it, named after `scan` on
-the Windows program's command line. It goes once the Windows program has
-closed the file, or when the scan ends. When there is nothing to give,
-because the prefix is not on a block device, the disk is not an NVMe drive
-or its identity cannot be read, there is no file and one `trace:` line says
-why. A prefix with no `drive_c` yet gets no line, as under the companion.
+the Windows program's command line. The Windows program removes the file
+and that directory itself once it has read the file, and the helper removes
+what is left when the scan ends. The helper cannot tell from a close of the
+file that the program has read it, because Wine opens a file more than once
+on some starts. When there is nothing to give, because the prefix is not on
+a block device, the disk is not an NVMe drive or its identity cannot be
+read, there is no file and one `trace:` line says why. A prefix with no
+`drive_c` yet gets no line, as under the companion.
 When there is one, the line names the disk, its model and revision, and
 the shape of its serial with every letter and digit masked.
 
@@ -1655,7 +1658,12 @@ lists, and again in every block. With it the test checks:
   priority 10 where the user's limit allows, and strace on the Windows
   audio thread sees nothing beside the wake's read and the answer's write.
   The test prints the same figures with Wine answering, for comparison;
-- a scan gives the plugin the same answer, and Wine's when there is none.
+- a scan gives the plugin the same answer, and Wine's when there is none;
+- a stand-in for Wine that reads the scan's file, waits and reads it again
+  finds it both times, and the scan's directory is gone when the scan ends.
+  The scan whose helper is killed part way leaves no directory behind
+  either, because the Windows program has removed it by then. The test's
+  last check, that its runtime directory is empty, fails if one is left.
 
 `make -C native test-disk-identity` runs the helper's side alone on
 made-up disks, and `test-audio` runs it too, so CI does. It checks an NVMe
