@@ -1686,6 +1686,56 @@ static void check_disk_identity_scan(void) {
        "there is none");
 }
 
+// Wine opens a file it is asked for once more than once on some starts, and
+// closes it in between. A stand-in for Wine that reads the identity, waits
+// and reads it again finds it both times, and the directory it was in is
+// gone once the scan is over.
+static void check_disk_identity_scan_kept(void) {
+  static char script[PATH_MAX], seen[PATH_MAX], directory[PATH_MAX];
+  const char *runtime = getenv("XDG_RUNTIME_DIR");
+  join(script, sizeof(script), runtime, "wine-reads-twice");
+  join(seen, sizeof(seen), runtime, "wine-reads-twice.seen");
+  // WINHOST scan DIRECTORY, as the helper starts Wine for a scan.
+  FILE *file = fopen(script, "w");
+  assert(file);
+  fputs("#!/bin/sh\n"
+        "first=$(wc -c < \"$3/disk-identity\")\n"
+        "sleep 0.5\n"
+        "second=$(wc -c < \"$3/disk-identity\")\n"
+        "{ echo \"$first $second\"; echo \"$3\"; } > \"$OPENXLR_TEST_WINHOST_SEEN\"\n"
+        "exit 3\n",
+        file);
+  assert(fclose(file) == 0 && chmod(script, 0700) == 0);
+  const char *named = getenv("OPENXLR_WINE");
+  char *wine = named ? strdup(named) : NULL;
+  setenv("OPENXLR_WINE", script, 1);
+  setenv("OPENXLR_TEST_WINHOST_SEEN", seen, 1);
+  disk_mounted_on(true);
+  Described d = run_scan("scan-clap", plugin_path, NULL);
+  disk_identity_test_root = NULL;
+  unsetenv("OPENXLR_TEST_WINHOST_SEEN");
+  if (wine)
+    setenv("OPENXLR_WINE", wine, 1);
+  else
+    unsetenv("OPENXLR_WINE");
+  free(wine);
+  // The stand-in described no plugin and said so, which fails the scan.
+  assert(exited_with(&d, 1));
+  forget(&d);
+  unsigned first = 0, second = 0;
+  file = fopen(seen, "r");
+  assert(file && fscanf(file, "%u %u\n", &first, &second) == 2 &&
+         fgets(directory, sizeof(directory), file));
+  fclose(file);
+  directory[strcspn(directory, "\n")] = 0;
+  assert(first == DISK_IDENTITY_SIZE && second == DISK_IDENTITY_SIZE);
+  assert(directory[0] == '/' && access(directory, F_OK) != 0 && errno == ENOENT);
+  unlink(script);
+  unlink(seen);
+  puts("PASS: the scan's disk identity is still there for a Wine that opens the file twice, "
+       "and gone when the scan ends");
+}
+
 static void make_directories(char *path) {
   for (char *slash = strchr(path + 1, '/'); slash; slash = strchr(slash + 1, '/')) {
     *slash = 0;
@@ -1806,6 +1856,7 @@ int main(int argc, char **argv) {
   check_scan_hang();
   check_locale_scans();
   check_disk_identity_scan();
+  check_disk_identity_scan_kept();
   // What the test itself put in the runtime directory.
   char command[PATH_MAX + 32];
   assert(strstr(disk_tree, "/openxlr-test-winhost."));

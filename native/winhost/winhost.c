@@ -155,6 +155,29 @@ static void install_disk_identity(const char *directory) {
   disk_hook_install(descriptor);
 }
 
+// A scan's directory holds the identity and nothing else, and the Linux side
+// cannot tell when the file has been read: a scan has no hello, and Wine
+// opens a file more than once on some starts, so a close of it says nothing.
+// The one that read it removes it, then. The Linux side removes what is
+// still there when the scan ends.
+static void remove_scan_directory(const char *directory) {
+  char unix_path[WIRE_PATH];
+  int length = snprintf(unix_path, sizeof(unix_path), "%s/%s", directory,
+                        DISK_IDENTITY_FILE);
+  WCHAR *path = length > 0 && (size_t)length < sizeof(unix_path)
+                    ? windows_path(unix_path)
+                    : NULL;
+  if (path) {
+    DeleteFileW(path);
+    HeapFree(GetProcessHeap(), 0, path);
+  }
+  path = windows_path(directory);
+  if (path) {
+    RemoveDirectoryW(path);
+    HeapFree(GetProcessHeap(), 0, path);
+  }
+}
+
 // --- the pipes --------------------------------------------------------------
 
 static bool read_all(HANDLE from, void *buffer, DWORD size) {
@@ -660,8 +683,10 @@ int main(void) {
   }
   if (strcmp(directory, "scan") != 0)
     install_disk_identity(directory);
-  else if (argc == 3)
+  else if (argc == 3) {
     install_disk_identity(disk);
+    remove_scan_directory(disk);
+  }
   // Windows plugins expect their host to have done this on the thread that
   // creates them.
   OleInitialize(NULL);
