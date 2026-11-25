@@ -1,2 +1,2 @@
 module Quickshell
-singleton Quickshell Quickshell.qml
+singleton Quickshell 1.0 Quickshell.qml
