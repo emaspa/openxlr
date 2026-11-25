@@ -939,6 +939,13 @@ the device. It adds a fixed delay to that chain, 32 ms at a block size of
 controls window and the API, and saved with the chain. See
 [a plugin that cannot keep up](manual.md#own-block).
 
+A Windows plugin bridged through yabridge can run on the Windows plugin
+host built into OpenXLR instead, one insert at a time, from a switch in its
+controls window or the API. It is experimental. No package provides it yet,
+only a source build made with `WINHOST=1`, and plugin editors do not open on
+it yet. yabridge stays the default. See
+[OpenXLR's Windows plugin host](manual.md#windows-plugin-host).
+
 A block size option forces PipeWire's quantum for the graph OpenXLR runs
 in to 256, 512 or 1024 samples, or leaves it to PipeWire. It holds against
 other applications' requests, and it works on a Wave XLR Pro in the

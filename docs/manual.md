@@ -2929,6 +2929,42 @@ manager" and import the plugins you want individually. Remove affected
 inserts first if the manager asks you to. Removing a folder refreshes the
 catalogue and the open plugin pickers.
 
+<a name="windows-plugin-host"></a>
+**OpenXLR's Windows plugin host (experimental).** OpenXLR has its own
+Windows plugin host, which can run a Windows plugin in place of yabridge.
+No package provides it yet. Only a build from source
+made with `make -C native WINHOST=1` has it
+([native/README.md](../native/README.md#windows-plugin-host)). yabridge
+stays the default, and in a build without the host none of this shows.
+
+In a build with the host, the controls window of a Windows VST3 or CLAP
+plugin bridged through yabridge has a **Run on OpenXLR's Windows plugin
+host** button beside **Run on its own block**. Turn it on and that one
+plugin starts again on OpenXLR's host with the same control values. Its
+chain stops for a moment while it does. Turn it off to go back to
+yabridge. The line under the buttons says which host runs the plugin
+now. The choice is saved with the insert, in the mixer and in profiles.
+Effect presets and undo leave it alone.
+
+The plugin's own editor does not open on this host yet. Plugin UI stays
+unavailable, the cog opens OpenXLR's controls, and the controls window
+says why. The **Native editors** button does not show for this, since no
+compatibility rule is involved. Move the plugin back to yabridge to use its
+editor.
+
+OpenXLR refuses the switch, and says why under the buttons, when the
+plugin is not a 64-bit Windows module, when its module is missing, or when
+it ties its licence to the disk identity that only the yabridge companion
+reports, as Elgato Voice Focus does. A plugin can also be saved to the host
+and fail to run there when its chain starts, for one of those reasons or
+because the build has no host. It then runs through yabridge, and the
+controls window says why. The saved choice stays, and so does the button,
+so you can turn it off.
+
+The first start in a Wine prefix can take longer than OpenXLR waits for a
+plugin. If the plugin reports that Wine did not answer in time, turn the
+insert off and on again.
+
 <a name="bundle-not-read"></a>
 **A bridged plugin is not in the picker.** A successful yabridge sync means
 the wrapper exists, not that OpenXLR could read the plugin. Each CLAP or

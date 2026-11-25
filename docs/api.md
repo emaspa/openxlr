@@ -886,7 +886,10 @@ Wine's USB driver stays out of the prefix on both hosts.
 The Windows plugin host has no plugin editor yet. An insert running on it
 reports `nativeUiBlocked: true` with the reason in `nativeUiBlockReason`,
 and the daemon refuses `showInsertUi` with the same sentence. Clients that follow
-`nativeUiBlocked` open their generated controls.
+`nativeUiBlocked` open their generated controls. No compatibility rule makes
+this block, so the UI offers its editor rules only when the catalogue entry
+carries `nativeUiBlocked` or the insert is blocked while `windowsHostRunning`
+is false. A rule's reason comes first when both apply.
 
 The helper gets the same eight seconds to start as any other. Wine can take
 longer while it creates or updates its prefix. The chain's inserts then

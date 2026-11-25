@@ -1001,6 +1001,14 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "setInsertOwnBlock", ["channel"] = channel, ["insertId"] = insertId, ["value"] = ownBlock });
 
+    /// <summary>
+    /// Run one insert's Windows plugin on the Windows plugin host built into
+    /// OpenXLR ("openxlr") or through yabridge ("yabridge"), and wait for the
+    /// daemon's answer: null once applied, or why it refused.
+    /// </summary>
+    public Task<string?> SetInsertWindowsHostAsync(string channel, string insertId, string host)
+        => EditLayoutAsync(new() { ["cmd"] = "setInsertWindowsHost", ["channel"] = channel, ["insertId"] = insertId, ["value"] = host });
+
     public Task ShowInsertUiAsync(string channel, string insertId)
         => SendAsync(new Dictionary<string, object>
         { ["cmd"] = "showInsertUi", ["channel"] = channel, ["insertId"] = insertId });
