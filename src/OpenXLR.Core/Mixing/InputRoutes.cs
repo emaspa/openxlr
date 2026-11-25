@@ -2,7 +2,7 @@ namespace OpenXLR.Core.Mixing;
 
 /// <summary>
 /// What decides how an insert chain is built: its plugins in order, with each
-/// one's bypass, host and own block, and on XLR 1 the software low cut and ClipGuard.
+/// one's bypass, host, own block and Windows host, and on XLR 1 the software low cut and ClipGuard.
 /// Control values and labels are not part of it. Two chains with the same
 /// structure are made of the same nodes, so a running chain takes new control
 /// values live instead of being built again.
@@ -15,11 +15,11 @@ internal sealed record ChainStructure(int LowCutHz, bool ClipGuard, IReadOnlyLis
     /// the chain was built is only loaded by building the chain again.
     /// </summary>
     internal readonly record struct Slot(string Id, string Kind, string Plugin, bool Bypass, bool Native, bool Installed,
-        bool OwnBlock = false);
+        bool OwnBlock = false, bool WindowsHost = false);
 
     internal static ChainStructure Of(IEnumerable<InsertDefinition> inserts, int lowCutHz = 0, bool clipGuard = false)
         => new(lowCutHz, clipGuard, [.. inserts.Select(i =>
-            new Slot(i.Id, i.Kind, i.Plugin, i.Bypass, i.RunsNatively, PluginCatalog.Find(i) is not null, i.OwnBlock))]);
+            new Slot(i.Id, i.Kind, i.Plugin, i.Bypass, i.RunsNatively, PluginCatalog.Find(i) is not null, i.OwnBlock, i.OnWindowsHost))]);
 
     public bool Equals(ChainStructure? other)
         => other is not null && LowCutHz == other.LowCutHz && ClipGuard == other.ClipGuard && Slots.SequenceEqual(other.Slots);

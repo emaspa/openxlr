@@ -59,6 +59,11 @@ public sealed record PluginSetup(
     public string? BridgeDirectory { get; init; }
     public string? WindowsPluginDirectory { get; init; }
     public string? WindowsImportDirectory { get; init; }
+    /// <summary>
+    /// Whether this build has the Windows plugin host built into OpenXLR,
+    /// so <c>setInsertWindowsHost</c> can move an insert to it.
+    /// </summary>
+    public bool WindowsHostInstalled { get; init; }
 }
 
 /// <summary>
@@ -1002,6 +1007,8 @@ public sealed class PluginInstaller
             skippedFailedCount = skipped.Count, skippedFailedBundles = skipped.Bundles,
             sourceCommit = _managed?.SourceCommit, status,
             hostExecutable = NativePluginHost.Executable, hostInstalled = _hostInstalled,
+            windowsHostExecutable = WindowsPluginHost.Executable,
+            windowsHostInstalled = _hostInstalled && File.Exists(WindowsPluginHost.Executable),
             processArchitecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
             searchPaths = new { lv2Override = PluginSearchPaths.Lv2Path() ?? Environment.GetEnvironmentVariable("LV2_PATH"), clap = ClapCatalog.SearchPath().Take(64), vst3 = Vst3Catalog.SearchPath().Take(64) },
             scans = PluginScanDiagnostics.Snapshot(),
@@ -1069,6 +1076,7 @@ public sealed class PluginInstaller
             BridgeDirectory = _managed is null ? null : Shorten(_managed.Directory),
             WindowsPluginDirectory = _managed is null ? null : Shorten(ManagedYabridge.PluginHome),
             WindowsImportDirectory = Shorten(_windowsImports),
+            WindowsHostInstalled = _hostInstalled && File.Exists(WindowsPluginHost.Executable),
             WindowsEditorNote = _managed is null && EditorsIgnoreTheMouse(version, wineVersion)
                 ? $"A Windows plugin's own editor can ignore the mouse with yabridge {version} and {wineVersion}: since Wine 9.22 its clicks can arrive somewhere else entirely. The optional openxlr-yabridge package includes the input fix. The manual covers bridge selection."
                 : null,

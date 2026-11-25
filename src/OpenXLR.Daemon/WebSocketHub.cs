@@ -615,6 +615,7 @@ public sealed partial class WebSocketHub
             case "watchInputMeter":
             case "setInsertBypass":
             case "setInsertOwnBlock":
+            case "setInsertWindowsHost":
             case "setInsertParam":
             case "renameInsert":
             case "showInsertUi":

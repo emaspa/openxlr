@@ -69,8 +69,9 @@ internal static class HistoryPolicy
 
     // Everything else. The locks and the live switches (capture mute, the
     // monitoring pause) stay here for good, and so does where processing runs
-    // (setEqProcessing, setDynamicsProcessing, setDuckingProcessing, and an
-    // insert's own block, setInsertOwnBlock), which is machine wiring;
+    // (setEqProcessing, setDynamicsProcessing, setDuckingProcessing, an
+    // insert's own block, setInsertOwnBlock, and the host of its Windows
+    // plugin, setInsertWindowsHost), which is machine wiring;
     // phantom power, the hardware mute and the unit's locks reach set, which
     // records only DeviceHistory's controls. The layout commands wait for
     // their milestones. The maximizer belongs to hardware mixing, which the
@@ -96,7 +97,7 @@ internal static class HistoryPolicy
         "setMonitorFeed", "setMonitorIdleRelease", "setOutputVolume", "setOutputVolumeLock", "setEnforcedDefaults", "setAuxPortEnabled",
         "setMixLatencyCompensation",
         "soundCheck", "setSoundCheckRaw", "setSoundCheckHearMyself", "watchInputMeter",
-        "setInsertOwnBlock", "showInsertUi",
+        "setInsertOwnBlock", "setInsertWindowsHost", "showInsertUi",
         "setEqProcessing", "setMixMaximizer", "setDynamicsProcessing", "watchDynamics", "setDuckingProcessing",
         "setSoundboard", "updateClip", "renameClipPage", "deleteClip", "setClipOrder", "playClip", "releaseClip",
         "stopClip", "stopClips", "auditionClip", "stopAudition",

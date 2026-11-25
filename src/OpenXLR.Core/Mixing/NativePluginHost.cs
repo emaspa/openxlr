@@ -83,6 +83,13 @@ internal sealed class NativePluginHost : IDisposable
     /// </summary>
     public bool Bridged { get; }
 
+    /// <summary>
+    /// Whether this helper runs a Windows plugin on the Windows plugin host
+    /// built into OpenXLR, through the helper's <c>wine</c> backend. Wine
+    /// runs behind it too, so it is <see cref="Bridged"/> as well.
+    /// </summary>
+    public bool WindowsHost { get; }
+
     public bool IsRunning
     {
         get
@@ -195,16 +202,21 @@ internal sealed class NativePluginHost : IDisposable
             or "http://lv2plug.in/ns/extensions/ui#resize"
             or "http://lv2plug.in/ns/extensions/ui#idleInterface");
 
+    /// <param name="windows">
+    /// Where the plugin runs on the Windows plugin host, for an insert that
+    /// chose it; null starts the plugin from <paramref name="bundle"/>, which
+    /// for a Windows plugin is its yabridge wrapper.
+    /// </param>
     public NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate, string? bundle = null,
-        Action<string>? note = null)
+        Action<string>? note = null, WindowsPluginHost.Route? windows = null)
         : this(insert, node, channels, sampleRate, Executable, [], bundle: bundle,
             meterSymbols: PluginCatalog.Find(insert)?.Params.Select(p => p.Symbol).ToHashSet(StringComparer.Ordinal)
-                ?? new HashSet<string>(StringComparer.Ordinal), note: note) { }
+                ?? new HashSet<string>(StringComparer.Ordinal), note: note, windows: windows) { }
 
     internal NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate,
         string executable, IReadOnlyList<string> prefixArguments, TimeSpan? startupTimeout = null,
         TimeSpan? patience = null, string? bundle = null, IReadOnlySet<string>? meterSymbols = null,
-        Action<string>? note = null)
+        Action<string>? note = null, WindowsPluginHost.Route? windows = null)
     {
         if (patience is { } chosen) _patience = chosen;
         _note = note;
@@ -212,7 +224,8 @@ internal sealed class NativePluginHost : IDisposable
         _meterSymbols = meterSymbols;
         if (insert.Kind == "soundcheck") _pendingTake = new(StringComparer.Ordinal);
         _sampleRate = sampleRate;
-        Bridged = WineSession.Bridged(bundle);
+        WindowsHost = windows is not null;
+        Bridged = WindowsHost || WineSession.Bridged(bundle);
         if (!File.Exists(executable))
             throw new InvalidOperationException(
                 "The native plugin host is not installed. Build it with -p:EnableNativeLv2Host=true, or switch this insert back to the filter chain.");
@@ -225,7 +238,7 @@ internal sealed class NativePluginHost : IDisposable
         foreach (string argument in prefixArguments) start.ArgumentList.Add(argument);
         // The helper takes the format first, then what that format needs to
         // find the plugin: an LV2 URI, or a CLAP bundle and the id inside it.
-        foreach (string argument in Arguments(insert, bundle))
+        foreach (string argument in Arguments(insert, bundle, windows))
             start.ArgumentList.Add(argument);
         foreach (string argument in new[] { node, channels.ToString(CultureInfo.InvariantCulture), sampleRate.ToString(CultureInfo.InvariantCulture) })
             start.ArgumentList.Add(argument);
@@ -234,26 +247,44 @@ internal sealed class NativePluginHost : IDisposable
         foreach ((string name, string value) in SessionDisplay())
             start.Environment[name] = value;
         new PluginHostEnvironment(ManagedYabridge.Discover()).Apply(start);
+        // After the overlay every helper gets, so the prefix and the Wine a
+        // Windows plugin runs in are decided against what the helper inherits.
+        if (windows is not null)
+            foreach ((string name, string value) in WindowsPluginHost.HelperEnvironment(windows,
+                         variable => start.Environment.TryGetValue(variable, out string? inherited) ? inherited : null))
+                start.Environment[name] = value;
         PluginSearchPaths.ApplyLv2(start);
         Process = Process.Start(start) ?? throw new InvalidOperationException("Could not start the native LV2 host.");
         _outputReader = ReadOutputAsync();
         _errorReader = ReadErrorsAsync();
+        // The helper's Windows backend waits two minutes for Wine's first
+        // answer, since Wine may be creating or updating its prefix. This
+        // wait is shorter on purpose and the same for every helper: the
+        // caller holds the mixer's lock, so every command and the sweep wait
+        // with it. A helper that is killed here takes its Wine child along.
         try { _ready.Task.WaitAsync(startupTimeout ?? TimeSpan.FromSeconds(8)).GetAwaiter().GetResult(); }
         catch (Exception ex)
         {
             Dispose();
-            throw new InvalidOperationException($"Native LV2 startup failed: {_error}", ex);
+            // Wine says nothing while it prepares a prefix, and an error with
+            // no reason would leave the user nothing to act on.
+            string said = windows is not null && ex is TimeoutException && string.IsNullOrWhiteSpace(_error)
+                ? WindowsPluginHost.SilentStart : _error;
+            throw new InvalidOperationException($"Native LV2 startup failed: {said}", ex);
         }
     }
 
     /// <summary>
     /// The helper's arguments up to the node: <c>--own-block</c> for a plugin
     /// run on its own block, then the format and what it needs to find the
-    /// plugin. The built-in stages never run on their own block.
+    /// plugin. The built-in stages never run on their own block. With
+    /// <paramref name="windows"/>, a CLAP or VST3 plugin is started on the
+    /// Windows plugin host from its Windows module, not from its bundle.
     /// </summary>
-    internal static IReadOnlyList<string> Arguments(InsertDefinition insert, string? bundle)
+    internal static IReadOnlyList<string> Arguments(InsertDefinition insert, string? bundle, WindowsPluginHost.Route? windows = null)
     {
-        IReadOnlyList<string> format = FormatArguments(insert, bundle);
+        IReadOnlyList<string> format = windows is not null && insert.Kind is "clap" or "vst3"
+            ? WindowsPluginHost.Arguments(windows, insert.Plugin) : FormatArguments(insert, bundle);
         return insert.OwnBlock && insert.Kind is "lv2" or "clap" or "vst3" ? ["--own-block", .. format] : format;
     }
 

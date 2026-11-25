@@ -1313,17 +1313,27 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
 
     // --- plugin inserts ---
 
-    /// <summary>Replace a channel's insert chain (order matters); rewires when built.</summary>
+    /// <summary>
+    /// Replace a channel's insert chain (order matters); rewires when built.
+    /// Which host runs a Windows plugin is not the chain's to change: an
+    /// insert that stays, the same plugin under the same id, keeps the one it
+    /// has, and one being added starts on yabridge, whatever a client sent.
+    /// A client that rewrites the chain to reorder it or to add an insert
+    /// need not know the choice exists. <see cref="SetInsertWindowsHost"/>
+    /// changes it.
+    /// </summary>
     public void SetInserts(string channel, IReadOnlyList<InsertDefinition> inserts)
     {
         lock (_gate)
         {
+            List<InsertDefinition> before = InsertsFor(channel);
             // A CLAP or VST3 plugin only ever runs in the native host, so its record
             // says so whatever a client sent; the window then shows it without a switch.
             _inserts[channel] = [.. inserts.Select(i => i with
             {
                 Params = new Dictionary<string, double>(i.Params),
                 NativeHost = i.RunsNatively,
+                WindowsHost = before.FirstOrDefault(b => b.Id == i.Id && b.Kind == i.Kind && b.Plugin == i.Plugin)?.WindowsHost,
             })];
             if (_built) RewireInsertKeyLocked(channel);
         }
@@ -1421,6 +1431,24 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
         }
     }
 
+    /// <summary>
+    /// Run one insert's Windows plugin on the Windows plugin host built into
+    /// OpenXLR, or back through yabridge; rewires when built, which starts
+    /// that insert's helper again on the other host with the same control
+    /// values.
+    /// </summary>
+    public void SetInsertWindowsHost(string channel, string insertId, bool windowsHost)
+    {
+        lock (_gate)
+        {
+            if (!_inserts.TryGetValue(channel, out List<InsertDefinition>? list)) return;
+            int idx = list.FindIndex(i => i.Id == insertId);
+            if (idx < 0 || list[idx].OnWindowsHost == windowsHost) return;
+            list[idx] = list[idx] with { WindowsHost = windowsHost ? WindowsPluginHost.OpenXlr : null };
+            if (_built) RewireInsertKeyLocked(channel);
+        }
+    }
+
     /// <summary>Change one insert's label. A display edit: the running plugin and its ports are kept.</summary>
     public void RenameInsert(string channel, string insertId, string name)
     {
@@ -1476,6 +1504,9 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                 .FirstOrDefault(stage => stage.Id == insertId).Stage?.NativeHost;
             if (host is null)
                 throw new InvalidOperationException("No native editor is running for this insert. Enable it and install the optional native host.");
+            // The helper would answer that it has no editor. Say what that
+            // means and what to do, as the insert's status already does.
+            if (host.WindowsHost) throw new InvalidOperationException(WindowsPluginHost.NoEditor);
         }
         host.ShowUi();
     }
@@ -1539,6 +1570,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
                     : null, host?.Meters, host?.IsRunning == true)
                 {
                     FilterChainError = stage?.FilterChainError, LatencyMilliseconds = InsertLatencyLocked(channel, i),
+                    WindowsHostRunning = host is { WindowsHost: true, IsRunning: true }, WindowsHostError = stage?.WindowsHostError,
                     MeasuredLatencyMilliseconds = InsertMeasuredLatencyLocked(channel, i),
                 };
             })];

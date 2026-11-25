@@ -106,8 +106,9 @@ public static class CommandValidation
     public static string? Check(Command cmd, ILayoutInfo layout, Func<InsertDefinition, PluginInfo?> findPlugin)
         => Check(cmd, layout, findPlugin, nativeHostInstalled: null);
 
+    /// <param name="windowsHostInstalled">Whether the build has the Windows plugin host, for a test; the build's own when null.</param>
     internal static string? Check(Command cmd, ILayoutInfo layout, Func<InsertDefinition, PluginInfo?> findPlugin,
-        bool? nativeHostInstalled)
+        bool? nativeHostInstalled, bool? windowsHostInstalled = null)
     {
         switch (cmd.Cmd)
         {
@@ -473,6 +474,18 @@ public static class CommandValidation
                 // turning it on needs the host; turning it off never does.
                 return cmd.Value.GetBoolean() && !(nativeHostInstalled ?? PluginCatalog.HostInstalled)
                     ? "setInsertOwnBlock: the native plugin host is not installed on this machine" : null;
+            case "setInsertWindowsHost":
+            {
+                if (cmd.Channel is null || cmd.InsertId is null || !layout.IsInsertKey(cmd.Channel)
+                    || layout.InsertInChain(cmd.Channel, cmd.InsertId) is not { } insert) return "setInsertWindowsHost: select an existing insert";
+                if (cmd.Value.ValueKind != JsonValueKind.String || cmd.Value.GetString() is not (WindowsPluginHost.Yabridge or WindowsPluginHost.OpenXlr))
+                    return $"setInsertWindowsHost: value must be '{WindowsPluginHost.Yabridge}' or '{WindowsPluginHost.OpenXlr}'";
+                // Going back to yabridge is never refused, so an insert can
+                // always leave a host that is gone or that cannot run it.
+                if (cmd.Value.GetString() == WindowsPluginHost.Yabridge) return null;
+                return WindowsPluginHost.Resolve(findPlugin(insert), out string? reason, windowsHostInstalled) is null
+                    ? $"setInsertWindowsHost: {reason}" : null;
+            }
             case "setInsertBypass":
             case "showInsertUi":
                 if (cmd.Channel is not null && !layout.IsInsertKey(cmd.Channel)) return $"{cmd.Cmd}: '{Short(cmd.Channel)}' has no insert chain";
