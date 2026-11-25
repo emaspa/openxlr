@@ -339,7 +339,8 @@ build that has it, the daemon runs one insert of a Windows plugin on it when
 a client asks with `setInsertWindowsHost`
 ([docs/api.md](api.md#windows-host)), and back through yabridge the same
 way. yabridge still scans every Windows plugin and runs every insert that
-was not moved. Still to come: editors, the UI's part, and packaging.
+was not moved. The UI offers the move in a bridged plugin's controls window
+on a build that has the host. Still to come: editors and packaging.
 
 ## Parked
 

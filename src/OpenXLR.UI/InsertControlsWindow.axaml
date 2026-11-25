@@ -66,7 +66,7 @@
                 ToolTip.Tip="{loc:Text Key=SaveLoadImportAndExportPresetsFor}"/>
         <ToggleButton Content="{loc:Text Key=Bypass}" IsChecked="{Binding Bypass, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"/>
         <Button Name="ManageNativeEditors" Content="{loc:Text Key=NativeEditors}" Padding="12,4" Margin="0,0,6,6" Click="OnNativeEditorRules"
-                IsVisible="{Binding NativeUiBlocked}" ToolTip.Tip="{loc:Text Key=ManageThisPluginSNativeEditorCompatibilityRule}"/>
+                IsVisible="{Binding NativeUiBlockedByRule}" ToolTip.Tip="{loc:Text Key=ManageThisPluginSNativeEditorCompatibilityRule}"/>
         <ToggleButton Content="{loc:Text Key=NativeHost}" IsChecked="{Binding NativeHost, Mode=TwoWay}" Padding="12,4" Margin="0,0,6,6"
                       IsVisible="{Binding CanChooseNativeHost}"
                       ToolTip.Tip="{loc:Text Key=RunThisInsertInItsOwnProcessWhich}"/>
@@ -75,11 +75,18 @@
         <ToggleButton Name="PluginOwnBlock" Content="{loc:Text Key=RunOnItsOwnBlock}" IsChecked="{Binding OwnBlock, Mode=TwoWay}"
                       Padding="12,4" Margin="0,0,6,6" IsVisible="{Binding CanChooseOwnBlock}"
                       ToolTip.Tip="{loc:Text Key=RunOnItsOwnBlockTip}"/>
+        <ToggleButton Name="PluginWindowsHost" Content="{loc:Text Key=RunOnOpenXlrSWindowsPluginHost}" IsChecked="{Binding OnWindowsHost, Mode=TwoWay}"
+                      Padding="12,4" Margin="0,0,6,6" IsVisible="{Binding CanChooseWindowsHost}"
+                      ToolTip.Tip="{loc:Text Key=RunOnOpenXlrSWindowsPluginHostTip}"/>
       </WrapPanel>
+      <TextBlock Name="PluginWindowsHostState" Text="{Binding WindowsHostState}" Classes="hint" TextWrapping="Wrap"
+                 Margin="0,0,0,8" IsVisible="{Binding HasWindowsHostState}"/>
       <TextBlock Text="{Binding NativeUiBlockReason}" Foreground="{DynamicResource Ox.Text.Secondary}" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding NativeUiBlocked}"/>
       <TextBlock Text="{Binding Error}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="{DynamicResource UiText.FontSize11}" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding HasError}"/>
+      <TextBlock Name="PluginWindowsHostNote" Text="{Binding WindowsHostNote}" Foreground="{DynamicResource Ox.Text.Warning}" FontSize="{DynamicResource UiText.FontSize11}"
+                 TextWrapping="Wrap" Margin="0,0,0,8" IsVisible="{Binding HasWindowsHostNote}"/>
       <ItemsControl ItemsSource="{Binding Groups}" Margin="0,0,10,0">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:InsertParamGroup">

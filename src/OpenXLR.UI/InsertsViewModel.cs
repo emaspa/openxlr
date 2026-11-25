@@ -10,11 +10,23 @@ using Avalonia.Threading;
 namespace OpenXLR.UI;
 
 /// <summary>A plugin the picker offers at this chain's width.</summary>
+/// <param name="Bridged">A Windows plugin in the catalogue through the wrapper yabridge made for it.</param>
 public sealed record PluginChoice(string Uri, string Name, string Category, JsonNode Params,
-    bool NativeEditorAvailable = false, bool NativeEditorSupported = false, string Kind = "lv2", bool NativeUiBlocked = false)
+    bool NativeEditorAvailable = false, bool NativeEditorSupported = false, string Kind = "lv2", bool NativeUiBlocked = false,
+    bool Bridged = false)
 {
     /// <summary>The format, as the picker shows it: two plugins can share a name and differ in nothing else.</summary>
     public string Format => Kind.ToUpperInvariant();
+
+    /// <summary>
+    /// Whether a catalogue entry is a Windows plugin bridged through
+    /// yabridge: a CLAP or VST3 bundle under a directory named after the
+    /// bridge, the companion's own (.../openxlr/yabridge/vst3) or a system
+    /// bridge's (~/.vst3/yabridge). It is the rule the daemon uses to know
+    /// that loading a bundle starts Wine.
+    /// </summary>
+    internal static bool IsBridged(string kind, string? path)
+        => kind is "clap" or "vst3" && path is not null && path.Split('/').Contains("yabridge");
 
     public override string ToString() => Category.Length > 0 ? $"{Name}  ({Category}, {Format})" : $"{Name}  ({Format})";
 }
@@ -183,9 +195,11 @@ public sealed partial class InsertsViewModel : ViewModelBase
                     p["nativeEditorAvailable"]?.GetValue<bool>() == true,
                     p["nativeEditorSupported"]?.GetValue<bool>() == true,
                     p["kind"]?.GetValue<string>() ?? "lv2",
-                    p["nativeUiBlocked"]?.GetValue<bool>() == true));
+                    p["nativeUiBlocked"]?.GetValue<bool>() == true,
+                    PluginChoice.IsBridged(p["kind"]?.GetValue<string>() ?? "lv2", p["path"]?.GetValue<string>())));
             }
             foreach (InsertViewModel insert in Items) insert.RefreshCatalogue();
+            EnsureWindowsHostKnown();
             bool mono = _channels == 1;
             Note = PluginChoices.Count == 0
                 ? (mono ? Localizer.Text("NoMonoPlugins") : Localizer.Text("NoStereoPlugins"))
@@ -210,12 +224,63 @@ public sealed partial class InsertsViewModel : ViewModelBase
         return channels == 1 ? ins == 1 && outs == 1 : ins >= 2 && outs >= 2;
     }
 
+    // Whether the daemon's build has the Windows plugin host, asked once per
+    // connection and only by a chain that holds a Windows plugin, since the
+    // answer costs the daemon a look at yabridge and Wine.
+    private static Task<JsonNode?>? _setupTask;
+    private bool _setupRequested;
+    private int _setupGeneration;
+
+    private bool _windowsHostInstalled;
+    /// <summary>The daemon's build has the Windows plugin host, so a bridged Windows plugin can move to it.</summary>
+    internal bool WindowsHostInstalled
+    {
+        get => _windowsHostInstalled;
+        set
+        {
+            if (_windowsHostInstalled == value) return;
+            _windowsHostInstalled = value;
+            foreach (InsertViewModel insert in Items) insert.RaiseWindowsHost();
+        }
+    }
+
+    /// <summary>Ask the daemon about the Windows plugin host once a Windows plugin is in this chain.</summary>
+    internal void EnsureWindowsHostKnown()
+    {
+        if (IsDetached || _setupRequested || !Items.Any(i => i.Bridged)) return;
+        _setupRequested = true;
+        _ = LoadWindowsHostAsync();
+    }
+
+    private async Task LoadWindowsHostAsync()
+    {
+        int generation = _setupGeneration;
+        Task<JsonNode?> request = _setupTask ??= _client.RequestPluginSetupAsync(TimeSpan.FromSeconds(20));
+        JsonNode? setup = await request.ConfigureAwait(false);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (generation != _setupGeneration || IsDetached) return;
+            if (setup is null)
+            {
+                // No answer: the next state or catalogue asks again.
+                _setupRequested = false;
+                if (ReferenceEquals(_setupTask, request)) _setupTask = null;
+                return;
+            }
+            WindowsHostInstalled = setup["windowsHostInstalled"]?.GetValue<bool>() == true;
+        });
+    }
+
     public void ResetForNewConnection()
     {
         MicSetup.Reset();
         _catalogGeneration++;
         _pluginsRequested = false;
         _catalogTask = null;
+        _setupGeneration++;
+        _setupRequested = false;
+        _setupTask = null;
+        WindowsHostInstalled = false;
         PluginChoices.Clear();
         SelectedPlugin = null;
         Note = null;
@@ -279,6 +344,8 @@ public sealed partial class InsertsViewModel : ViewModelBase
                     entry?["nativeHostRunning"]?.GetValue<bool>() == true,
                     entry?["nativeUiBlocked"]?.GetValue<bool>() == true,
                     entry?["nativeUiBlockReason"]?.GetValue<string>());
+                vm.ApplyWindowsHost(entry?["windowsHostRunning"]?.GetValue<bool>() == true,
+                    entry?["windowsHostError"]?.GetValue<string>());
                 vm.LatencyMilliseconds = entry?["latencyMilliseconds"]?.GetValue<double>();
                 vm.MeasuredLatencyMilliseconds = entry?["measuredLatencyMilliseconds"]?.GetValue<double>();
                 next.Add(vm);
@@ -296,6 +363,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
         }
         finally { _applying = false; }
         CheckComparison();
+        EnsureWindowsHostKnown();
     }
 
     // --- edits, all expressed as a new whole chain ---
@@ -345,6 +413,24 @@ public sealed partial class InsertsViewModel : ViewModelBase
     internal void SendOwnBlock(InsertViewModel item, bool ownBlock)
     {
         if (!_applying && !IsDetached) { EffectEdited(); _ = _client.SetInsertOwnBlockAsync(_channel, item.Id, ownBlock); }
+    }
+
+    /// <summary>The two values of <c>setInsertWindowsHost</c>.</summary>
+    internal const string WindowsHostOpenXlr = "openxlr", WindowsHostYabridge = "yabridge";
+
+    /// <summary>
+    /// Move one insert to the Windows plugin host or back to yabridge. The
+    /// choice is machine wiring, not part of the effect, so the effect
+    /// workflow is left alone, as the daemon's history leaves it. A refusal
+    /// comes back as its reason, after the daemon's state has put the switch
+    /// back where it was.
+    /// </summary>
+    internal async Task SendWindowsHostAsync(InsertViewModel item, bool on)
+    {
+        if (_applying || IsDetached) return;
+        item.WindowsHostRefusal = null;
+        string? error = await _client.SetInsertWindowsHostAsync(_channel, item.Id, on ? WindowsHostOpenXlr : WindowsHostYabridge);
+        if (!item.IsDetached) item.WindowsHostRefusal = error;
     }
 
     internal void SendParam(InsertViewModel item, string symbol, double value)
@@ -449,6 +535,16 @@ public sealed class InsertViewModel : ViewModelBase
         : null;
 
     /// <summary>
+    /// The editor is blocked by a compatibility rule, which the Native
+    /// editors list can change. The catalogue says when a rule blocks the
+    /// plugin. Live, the daemon blocks the editor of an insert on the Windows
+    /// plugin host too, which has none yet, and a rule there wins the reason;
+    /// so a live block counts as a rule's unless that host runs the insert.
+    /// </summary>
+    public bool NativeUiBlockedByRule => _owner.PluginChoices.Any(p => p.Kind == Kind && p.Uri == Plugin && p.NativeUiBlocked)
+        || (_nativeUiBlocked && !_windowsHostRunning);
+
+    /// <summary>
     /// The editor follows the host that runs the insert, which is the native
     /// host for a saved choice and for an LV2 insert PipeWire's filter chain
     /// refused.
@@ -484,6 +580,7 @@ public sealed class InsertViewModel : ViewModelBase
         Raise(nameof(CanTurnNativeHostOn));
         Raise(nameof(CanChooseOwnBlock));
         Raise(nameof(ControlsHint));
+        RaiseWindowsHost();
     }
 
     private bool _nativeHost;
@@ -529,6 +626,91 @@ public sealed class InsertViewModel : ViewModelBase
     /// is on, so it can be turned off again.
     /// </summary>
     public bool CanChooseOwnBlock => OwnBlock || NativeHostRunning || NativeHostInstalled;
+
+    /// <summary>A Windows plugin bridged through yabridge, by its catalogue entry.</summary>
+    public bool Bridged => _owner.PluginChoices.Any(p => p.Kind == Kind && p.Uri == Plugin && p.Bridged);
+
+    private bool _onWindowsHost;
+    /// <summary>
+    /// The insert is saved to the Windows plugin host built into OpenXLR
+    /// instead of yabridge. Switching starts its plugin again on the other
+    /// host with the same control values.
+    /// </summary>
+    public bool OnWindowsHost
+    {
+        get => _onWindowsHost;
+        set
+        {
+            if (IsDetached) return;
+            if (Set(ref _onWindowsHost, value))
+            {
+                RaiseWindowsHost();
+                _ = _owner.SendWindowsHostAsync(this, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Offered for a bridged Windows plugin when the daemon's build has the
+    /// host, and always while it is on, so the insert can go back to yabridge.
+    /// </summary>
+    public bool CanChooseWindowsHost => _onWindowsHost || (_owner.WindowsHostInstalled && Bridged);
+
+    private bool _windowsHostRunning;
+    /// <summary>The plugin is running on the Windows plugin host now.</summary>
+    public bool WindowsHostRunning => _windowsHostRunning;
+
+    private string? _windowsHostError;
+    private string? _windowsHostRefusal;
+
+    /// <summary>Why the daemon refused the last switch, or the client's own reason it did not get through; null once sent again.</summary>
+    internal string? WindowsHostRefusal
+    {
+        get => _windowsHostRefusal;
+        set { if (Set(ref _windowsHostRefusal, value)) RaiseWindowsHost(); }
+    }
+
+    /// <summary>Which host runs the plugin now, beside the switch; null while nothing runs it or the switch is not offered.</summary>
+    public string? WindowsHostState => !CanChooseWindowsHost ? null
+        : _windowsHostRunning ? Localizer.Text("RunsOnTheWindowsPluginHost")
+        : NativeHostRunning ? Localizer.Text("RunsThroughYabridge")
+        : null;
+    public bool HasWindowsHostState => WindowsHostState is not null;
+
+    private const string RefusalPrefix = "setInsertWindowsHost: ";
+
+    /// <summary>
+    /// What went wrong with the host: the daemon refused the switch, or the
+    /// insert is saved to the Windows plugin host and runs through yabridge
+    /// instead. Shown with the insert's error.
+    /// </summary>
+    public string? WindowsHostNote => _windowsHostRefusal is { } refusal
+        ? refusal.StartsWith(RefusalPrefix, StringComparison.Ordinal)
+            ? Localizer.Format("WindowsHostRefused", refusal[RefusalPrefix.Length..])
+            : refusal
+        : _windowsHostError is { } kept ? Localizer.Format("WindowsHostKept", kept)
+        : null;
+    public bool HasWindowsHostNote => WindowsHostNote is not null;
+
+    internal void RaiseWindowsHost()
+    {
+        Raise(nameof(Bridged));
+        Raise(nameof(CanChooseWindowsHost));
+        Raise(nameof(WindowsHostRunning));
+        Raise(nameof(WindowsHostState));
+        Raise(nameof(HasWindowsHostState));
+        Raise(nameof(WindowsHostNote));
+        Raise(nameof(HasWindowsHostNote));
+        Raise(nameof(NativeUiBlockedByRule));
+    }
+
+    /// <summary>The live side of the host: whether the Windows plugin host runs the plugin, and why it does not when it should.</summary>
+    internal void ApplyWindowsHost(bool running, string? error)
+    {
+        _windowsHostRunning = running;
+        _windowsHostError = error;
+        RaiseWindowsHost();
+    }
 
     private bool _bypass;
     public bool Bypass
@@ -647,8 +829,14 @@ public sealed class InsertViewModel : ViewModelBase
         _bypass = ins["bypass"]?.GetValue<bool>() ?? false;
         _nativeHost = ins["nativeHost"]?.GetValue<bool>() ?? false;
         _ownBlock = ins["ownBlock"]?.GetValue<bool>() ?? false;
+        // A refusal is about the switch as it was; once the saved host moves,
+        // by this window or another client, it no longer applies.
+        bool onWindowsHost = ins["windowsHost"]?.GetValue<string>() == InsertsViewModel.WindowsHostOpenXlr;
+        if (onWindowsHost != _onWindowsHost) _windowsHostRefusal = null;
+        _onWindowsHost = onWindowsHost;
         Raise(nameof(NativeHost));
         Raise(nameof(OwnBlock));
+        Raise(nameof(OnWindowsHost));
         Raise(nameof(Bypass));
         Raise(nameof(StateText));
         Raise(nameof(IsActive));
