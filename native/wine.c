@@ -2,9 +2,9 @@
 // The Windows backend: a Windows plugin that runs under Wine in a process of
 // its own, openxlr-winhost.exe (winhost/winhost.c), while this side keeps
 // the PipeWire node. The cut is at this file's Backend: load, activate, one
-// block of audio, the latency, deactivate. Everything the plugin's own
-// interface needs stays next to the plugin, on the Windows side. wire.h
-// describes what crosses.
+// block of audio, the latency, the editor, deactivate. Everything the
+// plugin's own interface needs stays next to the plugin, on the Windows
+// side. wire.h describes what crosses.
 //
 // The Windows side is another program running plugin code, so nothing here
 // waits for it without a limit, and nothing it writes is used as a size or
@@ -26,13 +26,16 @@
 // in a file of a private directory, as disk-identity.h describes, so a
 // plugin that asks for it is told what the yabridge companion tells it.
 //
-// This step carries CLAP and VST3 audio, parameters, latency and scanning.
-// Editors come with a later one.
+// The plugin's editor is a window of the Windows side's, which under Wine is
+// an X11 window. It is shown in the frame the host has for every editor
+// (host.c): this file takes Wine's window into that frame and keeps Wine
+// told where on the screen it is ("the editor" below).
 #define _GNU_SOURCE  // pipe2, realpath, SCHED_RESET_ON_FORK
 #include "host.h"
 #include "disk-identity.h"
 #include "winhost/wire.h"
 
+#include <X11/Xutil.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -142,6 +145,19 @@ typedef struct {
   // recorded by that thread on its first block.
   _Atomic int waiter_policy, waiter_priority;
   _Atomic bool waiter_known;
+  // The editor, all of it the main thread's. `editor` is Wine's X11 window
+  // for it while it sits in the frame, else 0.
+  Window editor;
+  // Where on the root, and at what size, Wine was last told that window is.
+  bool told;
+  int told_x, told_y, told_width, told_height;
+  bool focus_owed;     // the frame has the keyboard and the window not yet
+  bool editor_closed;  // the plugin closed its editor: the frame follows
+  // A size the plugin asked for that the frame has not been given yet.
+  uint32_t asked_width, asked_height;
+  // What has been read of a note that has not arrived whole.
+  WireReply note;
+  size_t note_size;
 } Wine;
 
 static int64_t wine_now_ms(void) {
@@ -517,9 +533,45 @@ static void wine_remove_channel(const char *directory) {
   rmdir(directory);
 }
 
+// A note is the Windows side saying something it was not asked: what the
+// plugin did about its editor by itself. It is kept for the tick, the
+// latest of a kind standing for the ones before. False for anything else.
+static bool wine_keep_note(Wine *w, const WireReply *note) {
+  if (note->magic != WIRE_MAGIC)
+    return false;
+  if (note->type == WIRE_NOTE_EDITOR_SIZE) {
+    w->asked_width = note->width;
+    w->asked_height = note->height;
+    return true;
+  }
+  if (note->type == WIRE_NOTE_EDITOR_CLOSED) {
+    w->editor_closed = true;
+    return true;
+  }
+  return false;
+}
+
+// The notes that arrived since the last look. Anything else on the reply
+// channel while nothing is being asked breaks the protocol.
+static void wine_read_notes(Wine *w) {
+  while (!atomic_load(&w->dead)) {
+    ssize_t count = read(w->reply, (char *)&w->note + w->note_size,
+                         sizeof(w->note) - w->note_size);
+    if (count <= 0)
+      return;
+    w->note_size += (size_t)count;
+    if (w->note_size < sizeof(w->note))
+      continue;
+    w->note_size = 0;
+    if (!wine_keep_note(w, &w->note))
+      atomic_store(&w->dead, true);
+  }
+}
+
 // One request and its reply, on the main thread. False when the Windows
 // host did not answer in time, went away, or answered something else; what
-// it said no to comes back as a reply with `ok` clear.
+// it said no to comes back as a reply with `ok` clear. A note that arrives
+// ahead of the reply is kept.
 static bool wine_exchange(Wine *w, WireRequest *request, WireReply *reply,
                           int timeout_ms) {
   if (atomic_load(&w->dead))
@@ -537,7 +589,10 @@ static bool wine_exchange(Wine *w, WireRequest *request, WireReply *reply,
     done += (size_t)count;
   }
   char *in = (char *)reply;
-  size_t got = 0;
+  // The start of a note the tick has already read, if any.
+  size_t got = w->note_size;
+  memcpy(in, &w->note, got);
+  w->note_size = 0;
   int64_t deadline = wine_now_ms() + timeout_ms;
   while (got < sizeof(*reply)) {
     struct pollfd fds[2] = {{w->reply, POLLIN, 0}, {w->log, POLLIN, 0}};
@@ -547,6 +602,8 @@ static bool wine_exchange(Wine *w, WireRequest *request, WireReply *reply,
       ssize_t count = read(w->reply, in + got, sizeof(*reply) - got);
       if (count > 0)
         got += (size_t)count;
+      if (got == sizeof(*reply) && wine_keep_note(w, reply))
+        got = 0;
       continue;
     }
     // Nothing more to read and nobody left to write it, a child that has
@@ -890,6 +947,7 @@ static bool wine_load(Host *h, char **arguments) {
     return false;
   }
   host_set_plugin_name(h, reply.text);
+  h->has_editor = (reply.flags & WIRE_HAS_EDITOR) != 0;
   if (!wine_take_controls(h, w, reply.controls))
     return false;
   w->log_source = pw_loop_add_io(host_loop(h), w->log, SPA_IO_IN | SPA_IO_HUP,
@@ -1065,6 +1123,239 @@ static void wine_process(Host *h, uint32_t frames, float *const *in,
   host_processing_result(h, ok, frames);
 }
 
+// --- the editor ---------------------------------------------------------------
+
+// The host opens its frame and calls these inside its guard against a lost
+// display, as for any backend. The order of an opening is the one that
+// works under a window manager and without one:
+//
+// 1. The Windows side makes its window hidden, puts the plugin's editor in
+//    it and names the X11 window Wine has for it.
+// 2. That window, still unmapped, is taken into the frame.
+// 3. The Windows side shows it.
+// 4. It is marked as a window manager marks a window it has mapped, and
+//    Wine is told where on the screen it is.
+//
+// A window shown before it is taken has been placed by the window manager
+// as a window of its own, and Wine keeps it at the place it had there.
+// Wine 11 waits for the mark before the window takes its first click, and
+// no window manager will set it on a window inside another.
+
+enum { WINE_EDITOR_SIDE = 16384 };  // the longest side the host's frame takes
+
+static bool wine_editor_size_ok(uint32_t width, uint32_t height) {
+  return width >= 1 && height >= 1 && width <= WINE_EDITOR_SIDE &&
+         height <= WINE_EDITOR_SIDE;
+}
+
+static int wine_x_error_expected(Display *display, XErrorEvent *event) {
+  return 0;
+}
+
+// Tell the Windows side to take its editor down, when there is one to tell.
+static void wine_editor_end(Wine *w) {
+  WireRequest request = {.type = WIRE_EDITOR_CLOSE};
+  WireReply reply;
+  wine_exchange(w, &request, &reply, WINE_CONTROL_MS);
+}
+
+static void wine_editor_close(Host *h) {
+  Wine *w = h->impl;
+  if (w->editor && h->display) {
+    // The window goes back to the root before its owner destroys it and
+    // before the frame goes, since a window destroyed with the frame is
+    // destroyed under Wine's feet. With the Windows host gone the window is
+    // gone too, and the server's complaint about that is no news.
+    int (*report)(Display *, XErrorEvent *) = XSetErrorHandler(wine_x_error_expected);
+    XUnmapWindow(h->display, w->editor);
+    XReparentWindow(h->display, w->editor, DefaultRootWindow(h->display), 0, 0);
+    XSync(h->display, False);
+    XSetErrorHandler(report);
+  }
+  w->editor = 0;
+  wine_editor_end(w);
+}
+
+// The display is gone and the frame with it, which took Wine's window
+// along. The Windows side still has its editor to take down.
+static void wine_editor_lost(Host *h) {
+  Wine *w = h->impl;
+  w->editor = 0;
+  wine_editor_end(w);
+}
+
+static bool wine_editor_open(Host *h) {
+  Wine *w = h->impl;
+  WireRequest request = {.type = WIRE_EDITOR_OPEN,
+                         .scale = (float)host_editor_scale(h)};
+  WireReply reply;
+  if (!wine_exchange(w, &request, &reply, WINE_CONTROL_MS))
+    return false;  // gone, which the tick reports
+  if (!reply.ok) {
+    // An editor the plugin does not have, or will not open, is not asked
+    // for again. Wine without a display to draw on is another matter.
+    if (!(reply.flags & WIRE_HAS_EDITOR))
+      h->has_editor = false;
+    fprintf(stderr, "editor: %s\n",
+            reply.text[0] ? reply.text : "the Windows plugin host opened no editor");
+    return false;
+  }
+  // The window is named by another program. It has to be a window of this
+  // display, hidden as agreed, and not the frame.
+  Window window = reply.window;
+  XWindowAttributes inside;
+  if (!window || window == h->window ||
+      !wine_editor_size_ok(reply.width, reply.height) ||
+      !XGetWindowAttributes(h->display, window, &inside) ||
+      inside.class != InputOutput || inside.map_state != IsUnmapped) {
+    fputs("editor: the Windows plugin host named no window that can be shown\n", stderr);
+    wine_editor_end(w);
+    return false;
+  }
+  host_set_editor_resizable(h, (reply.flags & WIRE_EDITOR_RESIZABLE) != 0);
+  host_resize_editor(h, reply.width, reply.height);
+  XReparentWindow(h->display, window, h->window, 0, 0);
+  XSync(h->display, False);
+  w->editor = window;
+  w->told = w->focus_owed = w->editor_closed = false;
+  w->asked_width = w->asked_height = 0;
+  request = (WireRequest){.type = WIRE_EDITOR_SHOW};
+  if (!wine_exchange(w, &request, &reply, WINE_CONTROL_MS) || !reply.ok) {
+    wine_editor_close(h);
+    return false;
+  }
+  Atom state = XInternAtom(h->display, "WM_STATE", False);
+  long normal[2] = {NormalState, None};
+  XChangeProperty(h->display, window, state, state, 32, PropModeReplace,
+                  (unsigned char *)normal, 2);
+  return true;
+}
+
+// The keyboard. A window manager gives it to the frame, and Wine takes its
+// own window for the active one only once that window has it.
+static void wine_editor_take_focus(Host *h, Wine *w) {
+  XWindowAttributes inside;
+  if (!XGetWindowAttributes(h->display, w->editor, &inside) ||
+      inside.map_state != IsViewable)
+    return;  // not on the screen yet: the next tick tries again
+  XSetInputFocus(h->display, w->editor, RevertToParent, CurrentTime);
+  w->focus_owed = false;
+}
+
+static void wine_editor_focus(Host *h, bool focused) {
+  Wine *w = h->impl;
+  if (!w->editor || atomic_load(&w->dead))
+    return;
+  // Handing the keyboard on is itself a loss of it for the frame, which is
+  // told here as one.
+  w->focus_owed = focused;
+  if (focused)
+    wine_editor_take_focus(h, w);
+}
+
+// Each tick, what keeps Wine's window where the frame is.
+//
+// Wine learns where a window is on the screen from the ConfigureNotify the
+// server sends when it moves. A window inside another gets none when the
+// outer one moves, so Wine would go on placing clicks and its menus where
+// the frame used to be. It takes a ConfigureNotify sent by a client as
+// carrying the place on the root, and is sent one whenever that place or
+// the window's size is not what it was last told.
+//
+// Wine 9.0 sets a window's position with every change of its size, to the
+// one it has on the screen, which inside the frame puts it that far from
+// the frame's corner. It is put back. Wine 11 leaves the position alone.
+//
+// On some desktops a Wine window ends up unmapped inside the frame (see
+// show_wine_windows in host.c). It is mapped again, a bounded number of
+// times.
+static void wine_editor_settle(Host *h, Wine *w) {
+  XWindowAttributes frame, inside;
+  if (!XGetWindowAttributes(h->display, h->window, &frame) ||
+      frame.map_state != IsViewable ||
+      !XGetWindowAttributes(h->display, w->editor, &inside))
+    return;
+  if (inside.x != 0 || inside.y != 0)
+    XMoveWindow(h->display, w->editor, 0, 0);
+  if (inside.map_state == IsUnmapped && h->wine_maps < 16) {
+    if (h->wine_maps++ == 0)
+      fprintf(stderr, "editor: the Wine window 0x%lx was left unmapped in the frame; mapped it\n",
+              (unsigned long)w->editor);
+    XMapWindow(h->display, w->editor);
+  }
+  if (w->focus_owed)
+    wine_editor_take_focus(h, w);
+  int x, y;
+  Window below;
+  if (!XTranslateCoordinates(h->display, h->window, frame.root, 0, 0, &x, &y, &below))
+    return;
+  if (w->told && x == w->told_x && y == w->told_y &&
+      inside.width == w->told_width && inside.height == w->told_height)
+    return;
+  XEvent event = {0};
+  event.xconfigure.type = ConfigureNotify;
+  event.xconfigure.display = h->display;
+  event.xconfigure.event = w->editor;
+  event.xconfigure.window = w->editor;
+  event.xconfigure.x = x;
+  event.xconfigure.y = y;
+  event.xconfigure.width = inside.width;
+  event.xconfigure.height = inside.height;
+  XSendEvent(h->display, w->editor, False, StructureNotifyMask, &event);
+  w->told = true;
+  w->told_x = x;
+  w->told_y = y;
+  w->told_width = inside.width;
+  w->told_height = inside.height;
+}
+
+// True when the plugin closed its editor, for the host to close the frame.
+// A Windows host that died is the tick's to report: the instance fails and
+// the frame closes with it.
+static bool wine_editor_idle(Host *h) {
+  Wine *w = h->impl;
+  if (!w->editor || atomic_load(&w->dead))
+    return false;
+  if (w->editor_closed)
+    return true;
+  wine_editor_settle(h, w);
+  return false;
+}
+
+// The size nearest to the one the user gave the frame that the editor
+// would take.
+static void wine_editor_constrain(Host *h, unsigned *width, unsigned *height) {
+  Wine *w = h->impl;
+  WireRequest request = {.type = WIRE_EDITOR_FIT, .width = *width, .height = *height};
+  WireReply reply;
+  if (w->editor && wine_exchange(w, &request, &reply, WINE_CONTROL_MS) && reply.ok &&
+      wine_editor_size_ok(reply.width, reply.height)) {
+    *width = reply.width;
+    *height = reply.height;
+  }
+}
+
+// The frame has a new size. The Windows side gives it to its window, which
+// Wine carries to the X11 window, and has the plugin lay out for it.
+static void wine_editor_resized(Host *h, unsigned width, unsigned height) {
+  Wine *w = h->impl;
+  WireRequest request = {.type = WIRE_EDITOR_RESIZE, .width = width, .height = height};
+  WireReply reply;
+  if (w->editor)
+    wine_exchange(w, &request, &reply, WINE_CONTROL_MS);
+}
+
+// Main thread, each tick: what the plugin did about its editor by itself.
+// A size it asked for goes to the frame as a native plugin's request does.
+// An editor it closed is left for the editor's own pass (wine_editor_idle).
+static void wine_take_notes(Host *h, Wine *w) {
+  wine_read_notes(w);
+  uint32_t width = w->asked_width, height = w->asked_height;
+  w->asked_width = w->asked_height = 0;
+  if (w->editor && wine_editor_size_ok(width, height))
+    host_resize_editor(h, width, height);
+}
+
 // --- main thread ------------------------------------------------------------
 
 // Give the Windows audio thread the scheduling of the thread that waits for
@@ -1105,6 +1396,7 @@ static void wine_main_thread(Host *h) {
   if (!w->scheduled && atomic_load(&w->waiter_known))
     wine_schedule(w);
   wine_take_values(h, w);
+  wine_take_notes(h, w);
   // A Windows host that died while no audio was running has no pipe to
   // close on anybody, so it is looked at here as well.
   if (atomic_load(&w->dead) || wine_gone(w)) {
@@ -1276,7 +1568,15 @@ const Backend wine_backend = {
     .activate = wine_activate,
     .deactivate = wine_deactivate,
     .process = wine_process,
+    .editor_open = wine_editor_open,
+    .editor_close = wine_editor_close,
+    .editor_idle = wine_editor_idle,
+    .editor_lost = wine_editor_lost,
+    .editor_focus = wine_editor_focus,
+    .editor_resized = wine_editor_resized,
+    .editor_constrain = wine_editor_constrain,
     .main_thread = wine_main_thread,
     .unload = wine_unload,
     .latency = wine_latency,
+    .foreign_window_hints = true,
 };

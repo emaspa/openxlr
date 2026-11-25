@@ -4,7 +4,8 @@
 // links against there: the control table, the thread checks, the reports
 // from the audio thread, timers and events on the Windows main thread's
 // message loop, and the module loader. The audio node, the command pipe
-// and the editor's frame stay on the Linux side.
+// and the editor's frame stay on the Linux side. What a backend asks of
+// that frame is in editor.c, with the editor's window.
 //
 // The functions that only keep a value do what host.c's do. Where host.c
 // prints a line for the daemon, the value is published for the Linux side
@@ -289,13 +290,6 @@ void host_fail(Host *h, const char *why) {
   fflush(stderr);
   TerminateProcess(GetCurrentProcess(), 1);
 }
-
-// The editor comes with a later step. Until then a backend finds no editor
-// it can show, and what it asks of the frame goes nowhere.
-void host_resize_editor(Host *h, unsigned width, unsigned height) {}
-void host_set_editor_resizable(Host *h, bool resizable) {}
-void host_show_editor(Host *h, bool show) {}
-void host_editor_lost(Host *h) {}
 
 // --- the dynamic loader -----------------------------------------------------
 

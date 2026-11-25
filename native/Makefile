@@ -104,13 +104,13 @@ MINGW_CC ?= x86_64-w64-mingw32-gcc
 MINGW_CXX ?= x86_64-w64-mingw32-g++
 MINGW_CFLAGS = -std=c11 $(WARN) -isystem clap/include
 MINGW_CXXFLAGS = -std=c++17 $(WARN) -fno-exceptions -fno-rtti -isystem vst3
-WINHOST_OBJECTS = winhost/winhost.obj winhost/shim.obj winhost/clap.obj winhost/vst3.obj \
-                  winhost/json.obj winhost/disk-hook.obj
+WINHOST_OBJECTS = winhost/winhost.obj winhost/shim.obj winhost/editor.obj winhost/clap.obj \
+                  winhost/vst3.obj winhost/json.obj winhost/disk-hook.obj
 WINHOST_PLUGINS = tests/winhost-plugin.clap tests/winhost-plugin.vst3
 WINHOST_TARGETS = openxlr-winhost.exe $(WINHOST_PLUGINS)
 ifeq ($(WINHOST),1)
 OBJECTS += wine.o disk-identity.o
-TEST_OBJECTS += tests/winhost.o
+TEST_OBJECTS += tests/winhost.o tests/winhost-editor.o
 DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS) tests/winhost-graph
 .PHONY: all
 all: openxlr-lv2-host openxlr-winhost.exe
@@ -266,14 +266,14 @@ winhost/%.obj: winhost/%.c
 # The C++ driver links it, for vst3.cpp. Static, so the C++ runtime is
 # inside and the program stays one file.
 openxlr-winhost.exe: $(WINHOST_OBJECTS)
-	$(MINGW_CXX) -static $^ -o $@ -lole32 -lshell32
+	$(MINGW_CXX) -static $^ -o $@ -lole32 -lshell32 -luser32 -lgdi32
 
 tests/winhost-plugin.clap: tests/winhost-plugin.c
-	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@
+	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@ -lgdi32
 	@mv $@.d.tmp $@.d
 
 tests/winhost-plugin.vst3: tests/winhost-plugin-vst3.cpp
-	$(MINGW_CXX) $(MINGW_CXXFLAGS) $(DEPFLAGS) -shared -static $< -o $@
+	$(MINGW_CXX) $(MINGW_CXXFLAGS) $(DEPFLAGS) -shared -static $< -o $@ -lgdi32
 	@mv $@.d.tmp $@.d
 
 # This one compiles host.c and wine.c into itself, to drive the audio
@@ -286,6 +286,11 @@ tests/winhost-graph: tests/winhost-graph.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 	@mv $@.d.tmp $@.d
 
+# The same for the editor test, which is the user in front of an editor and
+# needs XTest for the pointer and the keyboard.
+tests/winhost-editor: tests/winhost-editor.o lv2.o lv2-scan.o json.o clap.o vst3.o disk-identity.o
+	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS) $(shell pkg-config --libs xtst)
+
 # The Windows backend against the Windows test plugin, under Wine and with
 # no audio server. Not part of `test`: it needs a build with WINHOST=1,
 # mingw and Wine, and says which one is missing instead of failing.
@@ -293,15 +298,18 @@ tests/winhost-graph: tests/winhost-graph.c
 # test-winhost-graph runs the helper with that backend as a node of a private
 # PipeWire server, between the two nodes of tests/winhost-graph, and needs
 # Wine and PipeWire's server and tools as well (tests/winhost-graph.py).
-.PHONY: test-winhost test-winhost-graph clean-winhost
+#
+# test-winhost-editor opens the test plugins' editors and needs a display as
+# well, a private one: xvfb-run -a make -C native WINHOST=1 test-winhost-editor
+.PHONY: test-winhost test-winhost-graph test-winhost-editor clean-winhost
 ifneq ($(WINHOST),1)
-test-winhost test-winhost-graph:
+test-winhost test-winhost-graph test-winhost-editor:
 	@echo "SKIP: $@ needs a build with WINHOST=1"
 else ifeq ($(shell command -v $(MINGW_CC) 2>/dev/null),)
-test-winhost test-winhost-graph:
+test-winhost test-winhost-graph test-winhost-editor:
 	@echo "SKIP: $@ needs $(MINGW_CC) to build the Windows plugin host"
 else ifeq ($(shell command -v $(MINGW_CXX) 2>/dev/null),)
-test-winhost test-winhost-graph:
+test-winhost test-winhost-graph test-winhost-editor:
 	@echo "SKIP: $@ needs $(MINGW_CXX) to build the Windows plugin host"
 else
 test-winhost: tests/winhost $(WINHOST_TARGETS)
@@ -310,13 +318,21 @@ test-winhost: tests/winhost $(WINHOST_TARGETS)
 test-winhost-graph: openxlr-lv2-host tests/winhost-graph $(WINHOST_TARGETS)
 	python3 tests/winhost-graph.py ./openxlr-lv2-host ./openxlr-winhost.exe $(WINHOST_PLUGINS) \
 	        ./tests/winhost-graph
+ifeq ($(shell pkg-config --exists xtst 2>/dev/null && echo yes),)
+test-winhost-editor:
+	@echo "SKIP: $@ needs the XTest development files (libxtst)"
+else
+test-winhost-editor: tests/winhost-editor $(WINHOST_TARGETS)
+	./tests/winhost-editor ./openxlr-winhost.exe $(WINHOST_PLUGINS)
+endif
 endif
 
+WINHOST_TESTS = tests/winhost tests/winhost.o tests/winhost-editor tests/winhost-editor.o tests/winhost-graph
 clean-native: clean-winhost
 clean-winhost:
-	rm -f wine.o disk-identity.o tests/winhost tests/winhost.o tests/winhost-graph $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
-	rm -f $(addsuffix .d,wine.o disk-identity.o tests/winhost.o tests/winhost-graph $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
-	      $(addsuffix .d.tmp,wine.o disk-identity.o tests/winhost.o tests/winhost-graph $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
+	rm -f wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
+	rm -f $(addsuffix .d,wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
+	      $(addsuffix .d.tmp,wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
 
 .PHONY: clean clean-native clean-deepfilter
 clean: clean-native clean-deepfilter

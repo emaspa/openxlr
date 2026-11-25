@@ -1215,9 +1215,9 @@ one file. Building it does not need Wine; running it does. Run
 of flags.
 
 This is the start of a host that will replace the yabridge companion. It
-carries CLAP and VST3 audio, parameters and latency, it scans, and it
-reports the system disk's identity to a plugin as the companion's host does.
-It has no editor yet. No package builds it, so nothing here reaches a user. In a build
+carries CLAP and VST3 audio, parameters and latency, it shows a plugin's
+editor, it scans, and it reports the system disk's identity to a plugin as
+the companion's host does. No package builds it, so nothing here reaches a user. In a build
 that has it, the daemon starts it for an insert that asks for it and for no
 other, and never for a scan. [The daemon's side](#the-daemons-side) has
 the rest.
@@ -1237,11 +1237,16 @@ these sources:
   in for the PipeWire, X and `dlfcn.h` headers.
 - `winhost/winhost.c`, which talks to the Linux side and picks the backend
   the load names.
+- `winhost/editor.c`, which has the window an editor is put in and answers
+  what a backend asks of the frame around it.
 
 The two backends differ on Windows in few places. `clap.c` skips the
-`dlfcn.h` include and has one block for the window an editor sits in, which
-is Windows' own kind there. `vst3.cpp` skips the system headers the shim
-stands in for and has one block for what a Windows module is.
+`dlfcn.h` include, has one block for the window an editor sits in, which
+is Windows' own kind there, and one that asks a plugin whether its editor
+may be resized and tells it a new size. On Linux the frame resizes the
+plugin's own X11 window instead. `vst3.cpp` skips the system headers the shim
+stands in for, has one block for what a Windows module is, and tells an
+editor its scale.
 
 A Windows VST3 module differs from a Linux one in three ways, and that block
 holds them:
@@ -1251,7 +1256,7 @@ holds them:
   that file, so the Windows side looks through no directories.
 - The module is entered through `InitDll` and left through `ExitDll`, which
   take no argument. A Linux module has `ModuleEntry` and `ModuleExit`.
-- An editor's window type is `HWND`. Nothing opens an editor yet.
+- An editor's window type is `HWND`.
 
 `vst3.cpp` still offers a plugin the Linux run loop interface on Windows.
 A Windows plugin has no reason to ask for it. One that did would get its
@@ -1286,8 +1291,8 @@ wineserver inside a block. Windows has no file descriptors to watch, so the
 host refuses a plugin that asks it to watch one.
 
 Only what the helper's own backend interface carries crosses between the
-two: load, activate, one block of audio, the controls, the latency,
-deactivate. `winhost/wire.h` describes it.
+two: load, activate, one block of audio, the controls, the latency, the
+editor, deactivate. `winhost/wire.h` describes it.
 
 - One shared file, mapped by both sides, holds the audio of one cycle and
   the plugin's controls. It sits in a private directory under
@@ -1383,6 +1388,114 @@ What happens when the Windows side goes wrong:
 - The helper itself is killed. The kernel sends the Windows program a
   SIGKILL, and it would also leave by itself on reading its closed pipes.
 
+### The editor of a Windows plugin
+
+`show` opens a Windows plugin's editor in the frame the helper has for every
+editor, with the same title, icon, close button and size rules. The plugin's
+editor is a window of Windows' own, an `HWND`, which under Wine's X11 driver
+is an X11 window, and the helper takes that window into its frame.
+`winhost/editor.c` is the Windows side and the editor part of `wine.c` the
+Linux side.
+
+An opening goes in the order that works under a window manager and without
+one:
+
+1. The Windows program makes a window with no border, hidden, and has the
+   backend put the plugin's editor in it: `IPlugView::attached` with an
+   `HWND`, or CLAP's `set_parent` with a `win32` window. It answers with the
+   X11 window Wine has for it, which Wine keeps in the window's
+   `__wine_x11_whole_window` property, the editor's size, and whether the
+   plugin lets a host resize it.
+2. The helper gives its frame that size and reparents the X11 window, still
+   unmapped, into it.
+3. The Windows program shows its window.
+4. The helper sets `WM_STATE` to normal on Wine's window, as a window manager
+   does for a window it has mapped. Wine 11.22 waits for that before the
+   window takes its first click, and no window manager sets it on a window
+   inside another.
+
+A window that is shown before it is reparented has been placed by the window
+manager as a window of its own, and Wine keeps it at the place it had there.
+
+Wine learns where a window is on the screen from the X server, and a window
+inside another hears nothing when the outer one moves. On every tick the
+helper compares the frame's place on the root window, and the size of Wine's
+window, with what it last told Wine, and sends Wine a `ConfigureNotify` of
+its own when they differ. Wine reads one sent by a client as the place on the
+root. Without it, clicks and the plugin's menus land where the frame used to
+be. The same pass does two more things. Wine 9.0 sets a window's position
+with every change of its size, to the one it has on the screen, which inside
+the frame moves it away from the frame's corner, so the helper puts it back.
+Wine 11.22 leaves the position alone. And it maps a Wine window that was left unmapped in the frame, as
+it does for a bridged editor.
+
+A window manager gives the keyboard to the frame. The helper hands it on to
+Wine's window with `XSetInputFocus`, and the plugin's own window takes it
+from there on a click, as on Windows.
+
+Sizes cross in both directions:
+
+- The plugin asks for a size through `IPlugFrame::resizeView` or CLAP's
+  `request_resize`. The Windows side gives its window that size at once and
+  sends it to the helper as a note, a message on the reply FIFO that answers
+  no request. The helper reads notes on its tick and resizes the frame as
+  for a native plugin's request.
+- When the user resizes the frame, the helper asks the Windows side which
+  size near it the plugin takes (`checkSizeConstraint`, `adjust_size`) and
+  gives the frame that size. It then tells the Windows side, which resizes
+  its window and has the plugin lay out (`onSize`, `set_size`).
+- An editor the plugin does not let a host resize (`canResize`,
+  `can_resize`) pins the frame to its size, and can still change that size
+  itself.
+- Wine writes size hints of its own on every window it owns, and for a
+  window with no border they allow one size. They are not the editor's, so
+  the frame ignores them for this backend (`foreign_window_hints` in
+  `host.h`).
+
+The helper opens every editor at one scale, 1 (`host_editor_scale`). It
+crosses with the request to open, and the plugin is told through
+`IPlugViewContentScaleSupport` or CLAP's `set_scale` before it is asked for
+its size. The helper does not read the desktop's scale yet, for any editor.
+
+All of the plugin's editor calls run on the Windows main thread, whose
+message loop also serves the requests. Nothing about the editor reaches the
+audio thread. With an editor open that thread still makes one `read` and one
+`write` per cycle and no other system call.
+
+Windows runs a loop of its own while a menu is up, inside the plugin's
+window procedure, and the main loop does not come round until it ends. A
+request made meanwhile, because the user resizes or closes the frame, would
+wait for the menu. So every request also reaches the Windows program as a
+message to a window nobody sees, which whatever loop is running dispatches.
+When that is not the main loop, the Windows program ends the menu. The main
+loop then serves the request, after the plugin's code has returned. Nothing
+ends any other loop a plugin runs on the main thread, a dialog of its own
+for one. A request made meanwhile waits thirty seconds and then fails the
+instance.
+
+What happens when something goes wrong:
+
+- The plugin has no editor, or will not open it. `show` answers that the
+  plugin has no editor the host can show, the reason is on standard error,
+  no frame is left and the audio goes on. The helper does not ask again.
+- Wine has no X11 window for the editor, because it has no display or runs
+  another driver. `show` answers that there is no X display.
+- The Windows program dies with its editor open. The instance fails as it
+  does without one, and the frame closes with the helper. What the X server
+  says about a window that vanished is written to the log and has no other
+  effect.
+- The plugin closes its editor itself, which CLAP has a call for. The
+  Windows side sends a note and the helper closes the frame.
+
+Three things are not carried: a CLAP plugin asking for its editor to be
+shown or hidden, VST3's `onFocus`, and dragging between the desktop and an
+editor, which nothing here has tried.
+
+A Wine server that was started without a display keeps a desktop without
+one for as long as it runs. A Windows program started in that prefix
+meanwhile gets no X11 window, and its editor does not open until the server
+has ended, which it does a few seconds after its last program.
+
 ### Scanning a Windows plugin
 
 `wine scan-clap FILE` and `wine scan-vst3 BUNDLE` describe a Windows module
@@ -1399,8 +1512,7 @@ plugin, three of the fields read as follows:
 - `gui` is about a window of Windows' own. A CLAP plugin is asked whether it
   has an editor for `win32`, where a native one is asked about `x11`. The
   VST3 scanner asks no plugin and answers `true` for every class, on both
-  systems. This host opens no editor yet, so `gui` says what the plugin has
-  and not what can be shown.
+  systems.
 
 A scan starts the Windows program with the argument `scan`, followed by the
 directory that holds [the disk identity](#the-disk-identity) when there is
@@ -1445,8 +1557,8 @@ module with the reason, exit code 1 and nothing on standard output.
 `OPENXLR_WINHOST` names the Windows program when it is not beside the helper.
 The Wine prefix and the DLL overrides come from the helper's environment,
 which the daemon sets. The backend takes `WAYLAND_DISPLAY` out of the
-Windows program's environment, since an editor will have to be an X11
-window, and gives it a locale that reads UTF-8.
+Windows program's environment, since an editor has to be an X11 window, and
+gives it a locale that reads UTF-8.
 
 ### The locale of the Windows program
 
@@ -1576,10 +1688,10 @@ did not answer in time and the audio goes on without them. Turning the
 insert off and on tries again. The backend's two minutes are what a scan or
 a run by hand gets.
 
-Editors are the one thing a plugin has under the yabridge companion that
-this host lacks. An insert on this host reports its editor as blocked, with
-the reason, and the daemon refuses to open one. The system disk's identity
-is there too, as [the disk identity](#the-disk-identity) describes.
+A plugin is told the system disk's identity here as under the yabridge
+companion, as [the disk identity](#the-disk-identity) describes. Its editor
+opens as on any other host: `showInsertUi` sends the helper `show`, and a
+compatibility rule blocks it the same way.
 
 A saved choice the build cannot honour when the chain is built, because the
 host is gone after a downgrade or the module is, never fails the chain. The
@@ -1615,7 +1727,8 @@ checks:
   callback keeps returning, plays only the plugin's audio or silence, and
   the failure is reported;
 - the Windows audio thread gets the scheduling of the thread that waits for
-  it, at real-time priority 5 where the user's limit allows;
+  it, at real-time priority 5 where the user's limit allows, and the test
+  notes what a block's round trip costs there;
 - a missing plugin, module or Windows program is refused, and nothing is
   left in the runtime directory.
 
@@ -1691,8 +1804,8 @@ of their own, as the daemon would start them, and checks:
   are left out, as a native scan leaves them out. The CLAP module is scanned
   through a link whose name is not ASCII. Wine is never shown that name,
   since the backend resolves links first;
-- the editor field. One CLAP plugin has an editor for a Windows window and
-  for no other, and it alone is listed with one;
+- the editor field. Two CLAP plugins have an editor for a Windows window
+  and for no other, and they alone are listed with one;
 - the phase lines, which have to be the native ones line for line;
 - a file that is no module, a missing file and a bundle with no module are
   refused with the reason and exit code 1;
@@ -1714,13 +1827,66 @@ program is given for each locale the helper can inherit.
 `make -C native test-vst3` checks that the Linux build still reads and
 writes a native class id in the order of its bytes.
 
-`test-winhost` says what is missing and passes when the build has no
-`WINHOST=1`, when mingw is not installed or when Wine is not. It keeps a
-Wine prefix of its own under `~/.cache/openxlr-test/wineprefix`, or where
-`OPENXLR_TEST_WINEPREFIX` points, and never uses yours. The first run makes
-that prefix, which takes most of a minute. The target is not part of
-`make test`. CI runs it in a job of its own, with Ubuntu's mingw and Wine,
-whenever a source file under `native/` changes.
+`xvfb-run -a make -C native WINHOST=1 test-winhost-editor` runs
+`tests/winhost-editor`, which opens the editors of the two test plugins with
+the Windows program started for real, in the helper's own frame and with its
+event loop and tick. Each test plugin has a small real editor
+(`tests/winhost-plugin-editor.h`): one colour, two squares, and something to
+do for a click, a key and a right click. The test is the user in front of
+it, on an X11 connection of its own. It reads the frame's pixels and moves
+the pointer and presses keys through XTest, so it needs the XTest
+development files. For a CLAP and a VST3 plugin it checks:
+
+- the editor opens in the frame at the plugin's size, with Wine's window in
+  the frame's corner, and the frame shows the plugin's picture;
+- a click in the editor moves a parameter on the Linux side and in the
+  audio, before and after the frame is moved;
+- a window the plugin puts up at a click, as it would a menu, appears at
+  that place on the screen after the move;
+- the keyboard given to the frame reaches the editor;
+- a size the plugin asks for reaches the frame, and a frame resized by hand
+  ends at the size the plugin takes, with the editor filling it;
+- a frame resized while the plugin has a real menu up gets its answer at
+  once, and the menu is gone;
+- the editor closes, its Windows window goes, and it opens again and takes
+  clicks;
+- at scale 2 the plugin is told and draws twice as large;
+- an editor the plugin does not let a host resize keeps its size.
+
+It then checks an editor the plugin closes itself, a plugin that says it has
+an editor and fails to open it, plugins with none, and a Windows program
+killed with its editor open, for both formats. Last it measures the audio
+round trip at real-time priority 5 with the editor closed, open, and open
+with the frame moved and resized throughout, and every block has to come
+back exact.
+
+The test places the frame and its clicks from the size of the screen it
+finds. 640x480 is enough, which is what `xvfb-run` gives by default on some
+systems, and on a smaller screen the test says what it needs and passes.
+
+The test moves the display's pointer, so it is for a display of its own. On
+one with a window manager it only runs with `OPENXLR_TEST_WINHOST_WM=1`,
+which is for a private one: a headless `kwin_wayland --virtual --xwayland`
+with its own session bus and runtime directory serves, with
+`XwaylandEisNoPrompt=true` under `[Xwayland]` in that KWin's `kwinrc` so
+XTest may move its pointer. The test ends the Wine server of its own prefix
+before it starts, for the reason above.
+
+By hand, `tests/winhost-editor try clap|vst3 PLUGIN ID PICTURE.ppm [X Y]...`
+opens a real plugin's editor in the prefix `WINEPREFIX` names, saves the
+frame's picture, clicks at each `X Y`, prints the parameters the plugin
+moves, and closes and reopens the editor. Give it a screen larger than the
+editor, with `xvfb-run -a -s '-screen 0 1600x1000x24'` for one.
+
+`test-winhost` and `test-winhost-editor` say what is missing and pass when
+the build has no `WINHOST=1`, when mingw is not installed or when Wine is
+not, and the second also without a display or the XTest files. They keep a
+Wine prefix of their own under `~/.cache/openxlr-test/wineprefix`, or where
+`OPENXLR_TEST_WINEPREFIX` points, and never use yours. The first run makes
+that prefix, which takes most of a minute. Neither target is part of
+`make test`. CI runs `test-winhost` in a job of its own, with Ubuntu's
+mingw and Wine, whenever a source file under `native/` changes, and does not
+run `test-winhost-editor`.
 
 `make -C native WINHOST=1 test-winhost-graph` runs the helper with the
 `wine` backend as a real node in a PipeWire graph

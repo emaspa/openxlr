@@ -7,8 +7,8 @@ namespace OpenXLR.Tests;
 /// <summary>
 /// The UI's choice of host for a Windows plugin: offered for a plugin bridged
 /// through yabridge on a build with the Windows plugin host, sent as one
-/// command, showing the host that runs it and why it does not, and keeping
-/// the Native editors button for a block a rule made.
+/// command, showing the host that runs it and why it does not, and leaving
+/// the plugin's editor and its compatibility rule as they are on yabridge.
 /// </summary>
 public sealed class InsertWindowsHostChoiceTests
 {
@@ -104,29 +104,30 @@ public sealed class InsertWindowsHostChoiceTests
     }
 
     [Fact]
-    public void AnInsertOnlyOnTheWindowsHostHasNoRuleToManage()
+    public void AnInsertOnTheWindowsHostHasItsEditorAndItsRuleLikeAnyOther()
     {
         var owner = new InsertsViewModel(new DaemonClient(), "mix:monitor", 2) { WindowsHostInstalled = true };
         owner.PluginChoices.Add(Choice(bridged: true));
-        const string noEditor = "This insert runs on the Windows plugin host, which has no plugin editor yet.";
-        owner.Apply(Chain(windowsHost: "openxlr", running: true, blocked: true, reason: noEditor));
+        owner.Apply(Chain(windowsHost: "openxlr", running: true));
         InsertViewModel insert = Assert.Single(owner.Items);
-        Assert.True(insert.NativeUiBlocked);
-        Assert.Equal(noEditor, insert.NativeUiBlockReason);
-        Assert.False(insert.NativeEditorAvailable);
-        Assert.False(insert.NativeUiBlockedByRule);
+        Assert.True(insert.WindowsHostRunning);
+        Assert.False(insert.NativeUiBlocked);
+        Assert.Null(insert.NativeUiBlockReason);
+        Assert.True(insert.NativeEditorAvailable, "Plugin UI opens the editor on this host.");
 
-        // A rule for the plugin still offers its list, on either host.
+        // A block is a compatibility rule's on this host as on yabridge, with
+        // its reason, whether the insert's status or the catalogue carries it.
+        owner.Apply(Chain(windowsHost: "openxlr", running: true, blocked: true, reason: "Known editor issue."));
+        Assert.True(insert.NativeUiBlocked);
+        Assert.Equal("Known editor issue.", insert.NativeUiBlockReason);
+        Assert.False(insert.NativeEditorAvailable);
+        owner.Apply(Chain(windowsHost: "openxlr", running: true));
+        Assert.False(insert.NativeUiBlocked);
         owner.PluginChoices.Clear();
         owner.PluginChoices.Add(Choice(bridged: true, ruleBlocked: true));
         insert.RefreshCatalogue();
-        Assert.True(insert.NativeUiBlockedByRule);
-        owner.PluginChoices.Clear();
-        owner.PluginChoices.Add(Choice(bridged: true));
-        owner.Apply(Chain(blocked: true, reason: "Known editor issue."));
-        Assert.True(insert.NativeUiBlockedByRule, "A live block on yabridge is a rule's.");
-        owner.Apply(Chain());
-        Assert.False(insert.NativeUiBlockedByRule);
+        Assert.True(insert.NativeUiBlocked);
+        Assert.False(insert.NativeEditorAvailable);
     }
 
     [Fact]

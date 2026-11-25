@@ -8,7 +8,8 @@
 // through its Backend table. shim.c gives that backend the services of
 // host.h. This file is the other half: what crosses to the Linux side, in
 // the form wire.h describes. That is the Backend's own surface and no more:
-// load, activate, one block of audio, the controls, the latency, deactivate.
+// load, activate, one block of audio, the controls, the latency, deactivate,
+// and the requests about the editor, whose window is in editor.c.
 //
 // Three threads. The main thread serves the control requests, runs the
 // backend's tick and pumps the Windows messages that timers and plugins
@@ -68,6 +69,12 @@ static char start_failure[WIRE_TEXT];
 static WireRequest request;
 static HANDLE request_ready, request_taken;
 static _Atomic bool channel_closed;
+// A window nobody sees, which the reader thread posts a message to with
+// every request (see request_proc), and whether the main loop is the one
+// dispatching to it right now.
+static HWND request_window;
+static bool main_loop_dispatching;
+enum { WM_REQUEST_WAITING = WM_APP + 1 };
 
 // The plugin, as its backend sees it. Everything here is the main thread's
 // unless it is atomic.
@@ -323,6 +330,8 @@ static bool load(WireRequest *r, WireReply *reply) {
   if (!list_controls(text, text_size))
     return false;
   reply->controls = host.control_count;
+  if (host.has_editor)
+    reply->flags |= WIRE_HAS_EDITOR;
   snprintf(text, text_size, "%s", host.plugin_name);
   loaded = true;
   return true;
@@ -380,6 +389,7 @@ static void on_tick(void) {
   if (activated)
     publish_latency();
   shim_publish_meters(&host);
+  winhost_editor_tick(&host);
 }
 
 // --- the audio thread -------------------------------------------------------
@@ -448,16 +458,77 @@ static DWORD WINAPI audio_thread(void *unused) {
 
 // --- the control channel ----------------------------------------------------
 
+// The main loop takes a request by its event. A plugin can have a loop of
+// its own running on the main thread meanwhile, inside one of its window
+// procedures: Windows runs one for as long as a menu is up. The main loop
+// does not come round until that loop ends, and the Linux side would wait
+// for its answer all that time, with the frame's close button and its
+// border dead. So every request also arrives as a message to this window,
+// which whatever loop is running dispatches. When that is not the main
+// loop, a menu the plugin has up is taken down, which ends its loop. The
+// request itself is still served by the main loop, once the plugin's code
+// has returned, never underneath it.
+static LRESULT CALLBACK request_proc(HWND window, UINT message, WPARAM w,
+                                     LPARAM l) {
+  if (message == WM_REQUEST_WAITING && !main_loop_dispatching)
+    EndMenu();
+  return DefWindowProcW(window, message, w, l);
+}
+
+static void make_request_window(void) {
+  WNDCLASSEXW description = {.cbSize = sizeof(description),
+                             .lpfnWndProc = request_proc,
+                             .hInstance = GetModuleHandleW(NULL),
+                             .lpszClassName = L"OpenXLRRequests"};
+  if (RegisterClassExW(&description))
+    request_window = CreateWindowExW(0, description.lpszClassName, L"", 0, 0, 0,
+                                     0, 0, HWND_MESSAGE, NULL,
+                                     description.hInstance, NULL);
+}
+
 static DWORD WINAPI read_requests(void *unused) {
   for (;;) {
     if (!read_all(request_in, &request, sizeof(request)))
       break;
     SetEvent(request_ready);
+    if (request_window)
+      PostMessageW(request_window, WM_REQUEST_WAITING, 0, 0);
     WaitForSingleObject(request_taken, INFINITE);
   }
   atomic_store(&channel_closed, true);
   SetEvent(request_ready);
   return 0;
+}
+
+// A note goes out on the channel the replies use, whole in one write, so it
+// lands between two replies and never inside one.
+void winhost_note(uint32_t type, uint32_t width, uint32_t height) {
+  WireReply note = {.magic = WIRE_MAGIC, .type = type, .ok = true,
+                    .width = width, .height = height};
+  write_all(reply_out, &note, sizeof(note));
+}
+
+// The editor requests. They are refused before a plugin is loaded, like an
+// activation, and all but an open do nothing while no editor is open.
+static void serve_editor(WireRequest *r, WireReply *reply) {
+  reply->width = r->width;
+  reply->height = r->height;
+  if (!loaded)
+    snprintf(reply->text, sizeof(reply->text), "no plugin is loaded");
+  else if (r->type == WIRE_EDITOR_OPEN)
+    reply->ok = winhost_editor_open(&host, r, reply);
+  else if (r->type == WIRE_EDITOR_SHOW)
+    reply->ok = winhost_editor_show();
+  else if (r->type == WIRE_EDITOR_FIT) {
+    winhost_editor_fit(&host, &reply->width, &reply->height);
+    reply->ok = true;
+  } else if (r->type == WIRE_EDITOR_RESIZE) {
+    winhost_editor_resize(&host, &reply->width, &reply->height);
+    reply->ok = true;
+  } else {
+    winhost_editor_close(&host);
+    reply->ok = true;
+  }
 }
 
 static bool hello(WireRequest *r, WireReply *reply) {
@@ -512,7 +583,9 @@ static int serve(WireRequest *r) {
   } else if (r->type == WIRE_DEACTIVATE) {
     deactivate();
     reply.ok = true;
-  } else if (r->type == WIRE_QUIT) {
+  } else if (r->type >= WIRE_EDITOR_OPEN && r->type <= WIRE_EDITOR_CLOSE)
+    serve_editor(r, &reply);
+  else if (r->type == WIRE_QUIT) {
     reply.ok = true;
     quit = true;
   } else
@@ -701,6 +774,7 @@ int main(void) {
     fputs("openxlr-winhost: cannot open the control channel\n", stderr);
     return 1;
   }
+  make_request_window();
   HANDLE reader = CreateThread(NULL, 0, read_requests, NULL, 0, NULL);
   if (!reader)
     return 1;
@@ -719,7 +793,9 @@ int main(void) {
     MSG message;
     while (PeekMessageW(&message, NULL, 0, 0, PM_REMOVE)) {
       TranslateMessage(&message);
+      main_loop_dispatching = message.hwnd == request_window;
       DispatchMessageW(&message);
+      main_loop_dispatching = false;
     }
     if (woke == WAIT_OBJECT_0) {
       if (atomic_load(&channel_closed))
@@ -741,6 +817,7 @@ int main(void) {
   // nothing about the audio thread: leave without touching the plugin.
   if (!orderly)
     TerminateProcess(GetCurrentProcess(), 0);
+  winhost_editor_close(&host);
   deactivate();
   if (host.impl)
     backend->unload(&host);

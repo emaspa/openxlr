@@ -136,6 +136,10 @@ void host_set_editor_resizable(Host *h, bool resizable) {
   h->editor_resizable = resizable;
 }
 
+double host_editor_scale(const Host *h) {
+  return h->editor_scale > 0 ? h->editor_scale : 1.0;
+}
+
 void host_resize_editor(Host *h, unsigned width, unsigned height) {
   if (!h->display || !h->window || width < 1 || height < 1 ||
       width > 16384 || height > 16384 || dragging(h))
@@ -748,7 +752,8 @@ static void update_editor_hints(Host *h) {
   long supplied;
   h->editor_min_width = h->editor_min_height = 1;
   h->editor_max_width = h->editor_max_height = 16384;
-  if (h->child && XGetWMNormalHints(h->display, h->child, &child, &supplied)) {
+  if (h->child && !h->backend->foreign_window_hints &&
+      XGetWMNormalHints(h->display, h->child, &child, &supplied)) {
     if ((child.flags & PMinSize) && child.min_width > 0 && child.min_height > 0 &&
         child.min_width <= 16384 && child.min_height <= 16384) {
       h->editor_min_width = (unsigned)child.min_width;

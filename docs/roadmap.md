@@ -329,10 +329,11 @@ maintainer's decision: a Windows plugin host of our own, built into OpenXLR,
 to replace yabridge and the optional companion. A small Windows program
 runs the plugin under Wine and talks to the native plugin host directly.
 What exists is in the tree behind the build flag `WINHOST=1`. It carries
-CLAP and VST3 audio, parameters and latency, and it describes a Windows
-plugin for the catalogue, with the same CLAP and VST3 host code that runs
-and scans a native plugin. It reports the system disk's identity to a
-plugin as the companion's host does. It has its own test, described in
+CLAP and VST3 audio, parameters and latency, it shows a plugin's own editor
+in the window every other plugin editor opens in, and it describes a
+Windows plugin for the catalogue, with the same CLAP and VST3 host code that
+runs and scans a native plugin. It reports the system disk's identity to a
+plugin as the companion's host does. It has its own tests, described in
 [native/README.md](../native/README.md#windows-plugin-host). A VST3 plugin
 keeps the class id and the parameter ids it has through yabridge, so a saved
 insert will still name it and keep its values. No package builds it. In a
@@ -341,7 +342,7 @@ a client asks with `setInsertWindowsHost`
 ([docs/api.md](api.md#windows-host)), and back through yabridge the same
 way. yabridge still scans every Windows plugin and runs every insert that
 was not moved. The UI offers the move in a bridged plugin's controls window
-on a build that has the host. Still to come: editors and packaging.
+on a build that has the host. Still to come: packaging.
 
 ## Parked
 

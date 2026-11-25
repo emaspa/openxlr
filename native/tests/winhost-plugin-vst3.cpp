@@ -11,6 +11,8 @@
 #include <cstring>
 
 #include <pluginterfaces/base/ipluginbase.h>
+#include <pluginterfaces/gui/iplugview.h>
+#include <pluginterfaces/gui/iplugviewcontentscalesupport.h>
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
 #include <pluginterfaces/vst/ivstcomponent.h>
 #include <pluginterfaces/vst/ivsteditcontroller.h>
@@ -18,6 +20,8 @@
 #include <pluginterfaces/vst/vstspeaker.h>
 
 #include <windows.h>
+
+#include "winhost-plugin-editor.h"
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -30,7 +34,7 @@ enum {
   KIND_LATENCY,  // reports 480 frames
   KIND_RESTART,  // asks to be reloaded on block 8; reports 100 frames, then 300
   KIND_REFUSE,   // every block is refused
-  KIND_PARAMS,   // five parameters; see PARAM_GAIN and the rest
+  KIND_PARAMS,   // five parameters and an editor; see PARAM_GAIN and the rest
   KINDS
 };
 
@@ -73,7 +77,8 @@ static_assert(same_bytes(id_by_macro, class_id(0)),
 // edit, on the main thread, as an editor would. The level is a meter the
 // processor writes, twice the gain. The last two must never reach the host's
 // control table: one is hidden, and the plugin's own bypass is left to the
-// chain's.
+// chain's. This class has the editor of winhost-plugin-editor.h, which
+// moves the gain the same way. The other classes have no editor.
 enum { PARAM_GAIN = 1, PARAM_MOVE, PARAM_LEVEL, PARAM_HIDDEN, PARAM_BYPASS, PARAMS = 5 };
 
 enum { RESTART_BLOCK = 8 };
@@ -106,6 +111,91 @@ void scan_trouble() {
               nullptr);
   }
 }
+
+// The editor's view. The plugin it belongs to outlives it.
+class View final : public IPlugView, public IPlugViewContentScaleSupport {
+ public:
+  View(void *plugin, const TestEditorCalls *calls) {
+    editor_.scale = 1;
+    editor_.calls = calls;
+    editor_.plugin = plugin;
+  }
+
+  tresult PLUGIN_API queryInterface(const TUID iid, void **obj) override {
+    *obj = nullptr;
+    if (is(iid, IPlugView_iid) || is(iid, FUnknown_iid))
+      *obj = static_cast<IPlugView *>(this);
+    else if (is(iid, IPlugViewContentScaleSupport_iid))
+      *obj = static_cast<IPlugViewContentScaleSupport *>(this);
+    if (!*obj)
+      return kNoInterface;
+    addRef();
+    return kResultOk;
+  }
+  uint32 PLUGIN_API addRef() override { return ++refs_; }
+  uint32 PLUGIN_API release() override {
+    uint32 left = --refs_;
+    if (left == 0)
+      delete this;
+    return left;
+  }
+
+  tresult PLUGIN_API isPlatformTypeSupported(FIDString type) override {
+    return type && !strcmp(type, kPlatformTypeHWND) ? kResultTrue : kResultFalse;
+  }
+  tresult PLUGIN_API attached(void *parent, FIDString type) override {
+    if (isPlatformTypeSupported(type) != kResultTrue)
+      return kResultFalse;
+    return test_editor_create(&editor_, (HWND)parent) ? kResultOk : kResultFalse;
+  }
+  tresult PLUGIN_API removed() override {
+    test_editor_destroy(&editor_);
+    return kResultOk;
+  }
+  tresult PLUGIN_API onWheel(float) override { return kResultFalse; }
+  tresult PLUGIN_API onKeyDown(char16, int16, int16) override { return kResultFalse; }
+  tresult PLUGIN_API onKeyUp(char16, int16, int16) override { return kResultFalse; }
+  tresult PLUGIN_API getSize(ViewRect *size) override {
+    int width, height;
+    test_editor_wanted(&editor_, &width, &height);
+    *size = ViewRect(0, 0, width, height);
+    return kResultOk;
+  }
+  tresult PLUGIN_API onSize(ViewRect *size) override {
+    test_editor_set_size(&editor_, size->getWidth(), size->getHeight());
+    return kResultOk;
+  }
+  tresult PLUGIN_API onFocus(TBool) override { return kResultOk; }
+  tresult PLUGIN_API setFrame(IPlugFrame *frame) override {
+    frame_ = frame;
+    return kResultOk;
+  }
+  tresult PLUGIN_API canResize() override {
+    return test_editor_fixed() ? kResultFalse : kResultTrue;
+  }
+  tresult PLUGIN_API checkSizeConstraint(ViewRect *rect) override {
+    int width = rect->getWidth(), height = rect->getHeight();
+    test_editor_fit(&width, &height);
+    rect->right = rect->left + width;
+    rect->bottom = rect->top + height;
+    return kResultOk;
+  }
+  tresult PLUGIN_API setContentScaleFactor(ScaleFactor factor) override {
+    editor_.scale = factor;
+    return kResultOk;
+  }
+
+  // The host resizes the view itself when it agrees.
+  bool ask_size(int width, int height) {
+    ViewRect wanted(0, 0, width, height);
+    return frame_ && frame_->resizeView(this, &wanted) == kResultOk;
+  }
+
+ private:
+  uint32 refs_ = 1;
+  TestEditor editor_ = {};
+  IPlugFrame *frame_ = nullptr;
+};
 
 class Plugin final : public IComponent, public IAudioProcessor, public IEditController {
  public:
@@ -296,9 +386,32 @@ class Plugin final : public IComponent, public IAudioProcessor, public IEditCont
       handler_->addRef();
     return kResultOk;
   }
-  IPlugView *PLUGIN_API createView(FIDString) override { return nullptr; }
+  IPlugView *PLUGIN_API createView(FIDString) override {
+    static const TestEditorCalls calls = {edit_gain, ask_size, nullptr};
+    if (kind_ != KIND_PARAMS)
+      return nullptr;
+    view_ = new View(this, &calls);
+    return view_;
+  }
 
  private:
+  // The editor moved the gain, on the main thread: an edit like any other.
+  static void edit_gain(void *plugin, float gain) {
+    auto *p = static_cast<Plugin *>(plugin);
+    p->values_[PARAM_GAIN] = gain;
+    if (!p->handler_)
+      return;
+    p->handler_->beginEdit(PARAM_GAIN);
+    p->handler_->performEdit(PARAM_GAIN, gain);
+    p->handler_->endEdit(PARAM_GAIN);
+  }
+  static bool ask_size(void *plugin, int width, int height) {
+    auto *p = static_cast<Plugin *>(plugin);
+    return p->view_ && p->view_->ask_size(width, height);
+  }
+
+  View *view_ = nullptr;  // the view last made, which only an open editor asks through
+
   const int kind_;
   uint32 refs_ = 1;
   int32 width_ = 2;

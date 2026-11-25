@@ -116,6 +116,10 @@ typedef struct {
   // the block as it came. For every other backend the host replaces them.
   // The output is checked like any other's either way.
   bool guards_input;
+  // The size hints on the editor's window are not the editor's. Wine writes
+  // its own on every window it owns, and for a window with no border they
+  // allow one size only. The frame's bounds then come from the backend alone.
+  bool foreign_window_hints;
 } Backend;
 
 #ifndef __cplusplus
@@ -225,6 +229,9 @@ struct Host {
   Atom close_message;
   bool editor_open;
   bool editor_resizable;
+  // What an editor is told to draw at, 1 for 96 dpi. 0 reads as 1: the host
+  // has one scale for every editor until it learns the desktop's.
+  double editor_scale;
   unsigned editor_min_width, editor_min_height;
   unsigned editor_max_width, editor_max_height;
   // A plugin bridged from Windows learns where its window is when the window
@@ -271,6 +278,8 @@ void host_control_moved(Host *h, Control *c, float value);
 // The editor moved a control on the audio thread: apply it; the tick tells.
 void host_control_moved_rt(Host *h, Control *c, float value);
 void host_resize_editor(Host *h, unsigned width, unsigned height);
+// The scale an editor is opened at, for the plugin to be told.
+double host_editor_scale(const Host *h);
 void host_set_editor_resizable(Host *h, bool resizable);
 void host_show_editor(Host *h, bool show);
 // The display went away under a backend's own callback: drop the editor.

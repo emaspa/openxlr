@@ -787,9 +787,7 @@ syncs and rescans. It never imposes a deadline on an interactive uninstaller.
 
 Native editor compatibility is separate from DSP support. Catalogue entries
 carry `nativeUiBlocked`; live insert status also carries `nativeUiBlocked`
-and `nativeUiBlockReason`. An insert running on the
-[Windows plugin host](#windows-host), which has no editor yet, reports them
-too, whatever the rules say. Blocking leaves `supported`, native-host support,
+and `nativeUiBlockReason`. Blocking leaves `supported`, native-host support,
 processing, parameters and bypass state unchanged. Clients should open their
 generated controls when blocked and refresh availability on
 `nativeEditorRulesChanged`. Existing editor windows are not closed.
@@ -884,13 +882,12 @@ host, this one reports the model, firmware revision and serial number of
 the NVMe drive that holds the Wine prefix, the way Windows does, and leaves
 Wine's answer alone when the prefix is on another kind of drive.
 
-The Windows plugin host has no plugin editor yet. An insert running on it
-reports `nativeUiBlocked: true` with the reason in `nativeUiBlockReason`,
-and the daemon refuses `showInsertUi` with the same sentence. Clients that follow
-`nativeUiBlocked` open their generated controls. No compatibility rule makes
-this block, so the UI offers its editor rules only when the catalogue entry
-carries `nativeUiBlocked` or the insert is blocked while `windowsHostRunning`
-is false. A rule's reason comes first when both apply.
+`showInsertUi` opens the plugin's own editor for an insert on the Windows
+plugin host as it does for any other, in the window every plugin editor
+opens in. A parameter moved in the editor arrives as it does from any editor. The host an
+insert runs on never sets `nativeUiBlocked`. A block on an insert there is a
+compatibility rule's, with the rule's reason, as on yabridge. Wine draws the
+editor on X11, so it needs the X display every plugin editor needs.
 
 The helper gets the same eight seconds to start as any other. Wine can take
 longer while it creates or updates its prefix. The chain's inserts then

@@ -16,10 +16,12 @@
 #include <windows.h>
 #include <winioctl.h>
 
+#include "winhost-plugin-editor.h"
+
 #define ID "org.openxlr.test.winhost."
 
 enum {
-  KIND_GAIN,       // nothing else; the one plugin that says it has an editor
+  KIND_GAIN,       // nothing else; it says it has an editor and cannot make one
   KIND_MONO,       // one channel wide
   KIND_LATENCY,    // reports 480 frames
   KIND_RESTART,    // asks for a restart on block 8; reports 100 frames, then 300
@@ -29,7 +31,7 @@ enum {
   KIND_SLOW,       // block 16 takes 60 ms
   KIND_STALL,      // block 16 never returns
   KIND_CRASH,      // block 16 writes through a null pointer
-  KIND_PARAMS,     // five parameters; see PARAM_GAIN and the rest
+  KIND_PARAMS,     // five parameters and an editor; see PARAM_GAIN and the rest
   KIND_MANY,       // more parameters than a host carries; see MANY_PARAMS
   KIND_TIMER,      // asks for a timer when it is made, quarters after three calls
   KIND_DISK,       // asks for the disk's identity; see probe_disk and ask_per_block
@@ -40,7 +42,8 @@ enum {
 // plugin answers every gain it is sent with the same value. Setting `move`
 // to anything but 0 makes the plugin move its own gain to that value and
 // say so, as an editor would. The level is a meter, twice the gain. The last two must never reach the host's control table: one is
-// hidden, and the plugin's own bypass is left to the chain's.
+// hidden, and the plugin's own bypass is left to the chain's. This plugin
+// has the editor of winhost-plugin-editor.h, which moves the gain too.
 enum { PARAM_GAIN = 1, PARAM_MOVE, PARAM_LEVEL, PARAM_HIDDEN, PARAM_BYPASS, PARAMS = 5 };
 
 // KIND_MANY. Parameters 1 to MANY_PARAMS, each 0 or 1. The audio is
@@ -97,6 +100,10 @@ typedef struct {
   // plugin was activated, and the latest answer, which a block writes.
   HANDLE drive;
   ProbeRecord activated, block;
+  // The editor, and a gain it has moved that the host has not been told.
+  TestEditor editor;
+  _Atomic float edit;
+  _Atomic bool edited;
 } Instance;
 
 static Instance *of(const clap_plugin_t *plugin) { return plugin->plugin_data; }
@@ -205,6 +212,22 @@ static const clap_plugin_timer_support_t timer_support = {plugin_on_timer};
 // The parameter values the host sends, in a block or in a flush.
 static void take_events(Instance *p, const clap_input_events_t *in,
                         const clap_output_events_t *out) {
+  // What the editor did since the last look comes first: the gain changes
+  // and the host is told, as for a move.
+  if (out && atomic_exchange(&p->edited, false)) {
+    clap_event_param_value_t said = {
+        .header = {sizeof(said), 0, CLAP_CORE_EVENT_SPACE_ID,
+                   CLAP_EVENT_PARAM_VALUE, 0},
+        .param_id = PARAM_GAIN,
+        .note_id = -1,
+        .port_index = -1,
+        .channel = -1,
+        .key = -1,
+        .value = atomic_load(&p->edit),
+    };
+    atomic_store(&p->gain, (float)said.value);
+    out->try_push(out, &said.header);
+  }
   uint32_t count = in ? in->size(in) : 0;
   for (uint32_t i = 0; i < count; ++i) {
     const clap_event_header_t *header = in->get(in, i);
@@ -434,19 +457,124 @@ static const clap_plugin_params_t params = {
     params_count, params_get_info, params_get_value, params_value_to_text,
     params_text_to_value, params_flush};
 
-// The editor is in a window of Windows' own and in no other. Nothing makes
-// one yet, so this is all of it.
+// The editor is in a window of Windows' own and in no other. KIND_PARAMS
+// has one. KIND_GAIN says it has one too and then fails to make it.
 static bool gui_is_api_supported(const clap_plugin_t *plugin, const char *api,
                                  bool is_floating) {
   return !is_floating && !strcmp(api, CLAP_WINDOW_API_WIN32);
 }
 
-static const clap_plugin_gui_t gui = {.is_api_supported = gui_is_api_supported};
+// The editor moved the gain, on the main thread. The host hears of it in
+// the events of the next block, or of the flush this asks for.
+static void editor_set_gain(void *plugin, float gain) {
+  Instance *p = plugin;
+  const clap_host_params_t *host_params =
+      p->host->get_extension(p->host, CLAP_EXT_PARAMS);
+  atomic_store(&p->edit, gain);
+  atomic_store(&p->edited, true);
+  if (host_params)
+    host_params->request_flush(p->host);
+}
+
+static bool editor_ask_size(void *plugin, int width, int height) {
+  Instance *p = plugin;
+  const clap_host_gui_t *host_gui = p->host->get_extension(p->host, CLAP_EXT_GUI);
+  return host_gui &&
+         host_gui->request_resize(p->host, (uint32_t)width, (uint32_t)height);
+}
+
+static void editor_closed(void *plugin) {
+  Instance *p = plugin;
+  const clap_host_gui_t *host_gui = p->host->get_extension(p->host, CLAP_EXT_GUI);
+  if (host_gui)
+    host_gui->closed(p->host, false);
+}
+
+static const TestEditorCalls editor_calls = {editor_set_gain, editor_ask_size,
+                                             editor_closed};
+
+static bool gui_get_preferred_api(const clap_plugin_t *plugin, const char **api,
+                                  bool *is_floating) {
+  *api = CLAP_WINDOW_API_WIN32;
+  *is_floating = false;
+  return true;
+}
+
+static bool gui_create(const clap_plugin_t *plugin, const char *api,
+                       bool is_floating) {
+  Instance *p = of(plugin);
+  if (p->kind != KIND_PARAMS || !gui_is_api_supported(plugin, api, is_floating))
+    return false;
+  p->editor = (TestEditor){.scale = 1, .calls = &editor_calls, .plugin = p};
+  return true;
+}
+
+static void gui_destroy(const clap_plugin_t *plugin) {
+  test_editor_destroy(&of(plugin)->editor);
+}
+
+static bool gui_set_scale(const clap_plugin_t *plugin, double scale) {
+  of(plugin)->editor.scale = scale;
+  return true;
+}
+
+static bool gui_get_size(const clap_plugin_t *plugin, uint32_t *width,
+                         uint32_t *height) {
+  int wanted_width, wanted_height;
+  test_editor_wanted(&of(plugin)->editor, &wanted_width, &wanted_height);
+  *width = (uint32_t)wanted_width;
+  *height = (uint32_t)wanted_height;
+  return true;
+}
+
+static bool gui_can_resize(const clap_plugin_t *plugin) {
+  return !test_editor_fixed();
+}
+
+static bool gui_get_resize_hints(const clap_plugin_t *plugin,
+                                 clap_gui_resize_hints_t *hints) {
+  return false;
+}
+
+static bool gui_adjust_size(const clap_plugin_t *plugin, uint32_t *width,
+                            uint32_t *height) {
+  int fitted_width = (int)*width, fitted_height = (int)*height;
+  test_editor_fit(&fitted_width, &fitted_height);
+  *width = (uint32_t)fitted_width;
+  *height = (uint32_t)fitted_height;
+  return true;
+}
+
+static bool gui_set_size(const clap_plugin_t *plugin, uint32_t width,
+                         uint32_t height) {
+  test_editor_set_size(&of(plugin)->editor, (int)width, (int)height);
+  return true;
+}
+
+static bool gui_set_parent(const clap_plugin_t *plugin,
+                           const clap_window_t *window) {
+  return test_editor_create(&of(plugin)->editor, (HWND)window->win32);
+}
+
+static bool gui_set_transient(const clap_plugin_t *plugin,
+                              const clap_window_t *window) {
+  return false;
+}
+
+static void gui_suggest_title(const clap_plugin_t *plugin, const char *title) {}
+static bool gui_show(const clap_plugin_t *plugin) { return true; }
+static bool gui_hide(const clap_plugin_t *plugin) { return true; }
+
+static const clap_plugin_gui_t gui = {
+    gui_is_api_supported, gui_get_preferred_api, gui_create, gui_destroy,
+    gui_set_scale, gui_get_size, gui_can_resize, gui_get_resize_hints,
+    gui_adjust_size, gui_set_size, gui_set_parent, gui_set_transient,
+    gui_suggest_title, gui_show, gui_hide};
 
 static const void *plugin_get_extension(const clap_plugin_t *plugin,
                                         const char *id) {
   int kind = of(plugin)->kind;
-  if (!strcmp(id, CLAP_EXT_GUI) && kind == KIND_GAIN)
+  if (!strcmp(id, CLAP_EXT_GUI) && (kind == KIND_GAIN || kind == KIND_PARAMS))
     return &gui;
   if (!strcmp(id, CLAP_EXT_PARAMS) && (kind == KIND_PARAMS || kind == KIND_MANY))
     return &params;

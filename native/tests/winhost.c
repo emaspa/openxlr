@@ -660,21 +660,41 @@ static void check_stalled(void) {
          after / 1e3, now_ms() - start);
 }
 
+enum { TIMED_CYCLES = 4000 };
+
 typedef struct {
   int priority;
   bool allowed;
+  // Asked for: how long each of TIMED_CYCLES more cycles took, sorted.
+  bool timed;
+  double took[TIMED_CYCLES];
 } RealTime;
 
 static void *real_time_cycles(void *data) {
   RealTime *rt = data;
   struct sched_param param = {.sched_priority = rt->priority};
   rt->allowed = sched_setscheduler(0, SCHED_FIFO, &param) == 0;
-  if (rt->allowed)
-    for (unsigned i = 0; i < 20; ++i) {
-      cycle(256);
-      assert(scaled(256, 0.5f));
-    }
+  if (!rt->allowed) return NULL;
+  for (unsigned i = 0; i < 20; ++i) {
+    cycle(256);
+    assert(scaled(256, 0.5f));
+  }
+  if (!rt->timed) return NULL;
+  for (unsigned i = 0; i < TIMED_CYCLES; ++i) {
+    rt->took[i] = cycle(256);
+    assert(scaled(256, 0.5f));
+  }
+  qsort(rt->took, TIMED_CYCLES, sizeof(rt->took[0]), compare_doubles);
   return NULL;
+}
+
+// The round trip of one block with both audio threads at real-time priority,
+// which is how the product runs it.
+static void note_round_trip(const RealTime *rt, const char *what) {
+  printf("note: %s: round trip of 256 frames at real-time priority %d over %d cycles: "
+         "median %.1f us, 99th percentile %.1f us, longest %.1f us\n",
+         what, rt->priority, TIMED_CYCLES, rt->took[TIMED_CYCLES / 2] * 1e3,
+         rt->took[TIMED_CYCLES * 99 / 100] * 1e3, rt->took[TIMED_CYCLES - 1] * 1e3);
 }
 
 static void check_scheduling(void) {
@@ -688,7 +708,8 @@ static void check_scheduling(void) {
 
   assert(begin("gain", 2));
   w = h.impl;
-  RealTime rt = {.priority = 5};
+  static RealTime rt;
+  rt = (RealTime){.priority = 5};
   pthread_t thread;
   assert(pthread_create(&thread, NULL, real_time_cycles, &rt) == 0);
   pthread_join(thread, NULL);
@@ -706,6 +727,12 @@ static void check_scheduling(void) {
     cycle(256);
     assert(scaled(256, 0.5f));
   }
+  // Both ends are at that priority now: what a block costs as the product
+  // runs it.
+  rt.timed = true;
+  assert(pthread_create(&thread, NULL, real_time_cycles, &rt) == 0);
+  pthread_join(thread, NULL);
+  note_round_trip(&rt, "CLAP, no editor");
   end();
   puts("PASS: the Windows audio thread is given the scheduling of the thread that waits for it");
 }
@@ -1039,8 +1066,8 @@ static bool described(const Described *d, const char *expected) {
 
 // What the native CLAP scanner writes for a module with these plugins
 // (clap_scan), byte for byte. The plugin with a timer needs a host service a
-// scan does not offer and refuses to initialise, so it is left out. Only the
-// first plugin has an editor, and it has one in a window of Windows' own
+// scan does not offer and refuses to initialise, so it is left out. Only
+// `gain` and `params` say they have an editor, in a window of Windows' own
 // and in no other. Of the five parameters of `params`, the hidden one and
 // the plugin's own bypass are left out.
 static char *clap_description(const char *file) {
@@ -1064,7 +1091,8 @@ static char *clap_description(const char *file) {
                "\"features\":[\"audio-effect\"],\"audioIns\":%d,\"audioOuts\":%d,"
                "\"gui\":%s,\"params\":[",
             i ? "," : "", plugins[i].id, plugins[i].name, plugins[i].width,
-            plugins[i].width, i == 0 ? "true" : "false");
+            plugins[i].width,
+            i == 0 || !strcmp(plugins[i].id, "params") ? "true" : "false");
     if (!strcmp(plugins[i].id, "params"))
       fputs("{\"id\":1,\"name\":\"Gain\",\"module\":\"\",\"min\":0,\"max\":1,\"default\":0.5,"
             "\"readonly\":false,\"stepped\":false,\"enum\":false},"
