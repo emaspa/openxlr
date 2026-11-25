@@ -7,6 +7,7 @@
 #pragma once
 #ifdef __cplusplus
 #include <cstdint>
+#include <cstdio>
 #ifdef _WIN32
 #include "winhost/shim.h"  // as for a C backend, below
 #endif
@@ -30,6 +31,7 @@ extern "C" {
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #endif
 
 enum {
@@ -331,16 +333,20 @@ void *control_backend(const Control *c);
 extern const Backend lv2_backend;
 extern const Backend clap_backend;
 extern const Backend vst3_backend;
-// `scan-clap FILE` and `scan-vst3 PATH`: describe a bundle's plugins as JSON.
-int clap_scan(const char *file);
-int vst3_scan(const char *path);
+// `scan-clap FILE` and `scan-vst3 PATH`: describe a bundle's plugins as JSON
+// on `out`. The description names the bundle by `name`. For a native plugin
+// that is the path itself and `out` is standard output. The Windows plugin
+// host (winhost/) opens a module by its Windows path, names it by the Linux
+// path the helper was given, and writes to a stream no plugin can reach.
+int clap_scan(const char *file, const char *name, FILE *out);
+int vst3_scan(const char *path, const char *name, FILE *out);
 // `scan-lv2 [--skip BUNDLE]... [LV2_PATH]`: describe every installed LV2
 // plugin as JSON; argc and argv are the arguments after `scan-lv2`.
 int lv2_scan(int argc, char **argv);
-// A JSON string on stdout for the scanners, or null for NULL. Bytes that
+// A JSON string on `out` for the scanners, or null for NULL. Bytes that
 // are not UTF-8 become U+FFFD and the text stops at 4096 bytes, so the
-// description always parses (lv2-scan.c).
-void json_text(const char *text);
+// description always parses (json.c).
+void json_text(FILE *out, const char *text);
 
 #ifdef __cplusplus
 }

@@ -3,6 +3,8 @@
 // tests/winhost.c to load through the Windows plugin host. Each plugin in
 // it halves its input and has one way of behaving beside that, chosen by
 // its id, so a test picks the behaviour it wants by the plugin it loads.
+// A scan describes every plugin in the module, so what goes wrong during
+// one is chosen by OPENXLR_TEST_WINHOST_SCAN (see scan_trouble).
 #include <clap/clap.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -14,7 +16,7 @@
 #define ID "org.openxlr.test.winhost."
 
 enum {
-  KIND_GAIN,       // nothing else
+  KIND_GAIN,       // nothing else; the one plugin that says it has an editor
   KIND_MONO,       // one channel wide
   KIND_LATENCY,    // reports 480 frames
   KIND_RESTART,    // asks for a restart on block 8; reports 100 frames, then 300
@@ -217,7 +219,32 @@ static clap_process_status plugin_process(const clap_plugin_t *plugin,
   return CLAP_PROCESS_CONTINUE;
 }
 
+// What a scan of this module runs into, when the test asks for it: a fault,
+// a call that never returns, or text on standard output, written through
+// the C library and through Windows' own handle. Neither text ends its line.
+// With no control character in it, text that landed inside one of the
+// description's strings would leave it readable, so the test compares bytes.
+static void scan_trouble(void) {
+  const char *what = getenv("OPENXLR_TEST_WINHOST_SCAN");
+  if (!what)
+    return;
+  if (!strcmp(what, "crash"))
+    *(volatile int *)0 = 1;
+  if (!strcmp(what, "hang"))
+    Sleep(INFINITE);
+  if (!strcmp(what, "print")) {
+    static const char raw[] = "[printed through the Windows handle]";
+    DWORD written = 0;
+    fputs("[printed through the C library]", stdout);
+    fflush(stdout);
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), raw, sizeof(raw) - 1, &written,
+              NULL);
+  }
+}
+
 static uint32_t ports_count(const clap_plugin_t *plugin, bool is_input) {
+  if (of(plugin)->kind == KIND_GAIN && is_input)
+    scan_trouble();
   return is_input && of(plugin)->kind == KIND_SIDECHAIN ? 2 : 1;
 }
 
@@ -315,9 +342,20 @@ static const clap_plugin_params_t params = {
     params_count, params_get_info, params_get_value, params_value_to_text,
     params_text_to_value, params_flush};
 
+// The editor is in a window of Windows' own and in no other. Nothing makes
+// one yet, so this is all of it.
+static bool gui_is_api_supported(const clap_plugin_t *plugin, const char *api,
+                                 bool is_floating) {
+  return !is_floating && !strcmp(api, CLAP_WINDOW_API_WIN32);
+}
+
+static const clap_plugin_gui_t gui = {.is_api_supported = gui_is_api_supported};
+
 static const void *plugin_get_extension(const clap_plugin_t *plugin,
                                         const char *id) {
   int kind = of(plugin)->kind;
+  if (!strcmp(id, CLAP_EXT_GUI) && kind == KIND_GAIN)
+    return &gui;
   if (!strcmp(id, CLAP_EXT_PARAMS) && (kind == KIND_PARAMS || kind == KIND_MANY))
     return &params;
   if (!strcmp(id, CLAP_EXT_TIMER_SUPPORT) && kind == KIND_TIMER)

@@ -9,10 +9,9 @@
 // vendored under vst3/ (MIT); only their inline parts are used, so nothing
 // of the SDK is compiled here.
 //
-// The Windows plugin host (winhost/) builds this file for Windows and runs a
-// Windows plugin with it. Three places differ there: the system headers
-// below, the module's layout and entry points further down, and the scanner,
-// which that host leaves out for now.
+// The Windows plugin host (winhost/) builds this file for Windows and runs
+// and describes a Windows plugin with it. Two places differ there: the system
+// headers below, and the module's layout and entry points further down.
 #include "host.h"
 
 #include <algorithm>
@@ -1543,18 +1542,18 @@ extern "C" const Backend vst3_backend = {
 
 // --- the scanner ------------------------------------------------------------
 
-#ifndef _WIN32  // the Windows plugin host does not scan yet
 // Describe every audio plugin in one bundle as JSON, for the daemon's
 // catalogue. Each is created once, wired to its controller, and asked about
-// its buses, parameters and editor, then let go.
-extern "C" int vst3_scan(const char *path) {
+// its buses, parameters and editor, then let go. The description goes to
+// `out` and names the bundle by `name`.
+extern "C" int vst3_scan(const char *path, const char *name, FILE *out) {
   fputs("trace: scan VST3: module load\n", stderr);
   Vst3 v;
   if (!open_module(&v, path))
     return 1;
-  printf("{\"file\":");
-  json_text(path);
-  printf(",\"plugins\":[");
+  fprintf(out, "{\"file\":");
+  json_text(out, name);
+  fprintf(out, ",\"plugins\":[");
   fputs("trace: scan VST3: factory classes\n", stderr);
   int32 count = v.factory->countClasses();
   IPluginFactory2 *factory2 = nullptr;
@@ -1579,15 +1578,15 @@ extern "C" int vst3_scan(const char *path) {
       release_plugin(&v);
       continue;
     }
-    printf("%s{\"id\":", first ? "" : ",");
+    fprintf(out, "%s{\"id\":", first ? "" : ",");
     first = false;
-    json_text(hex_of(info.cid).c_str());
-    printf(",\"name\":");
-    json_text(text_of(info.name).c_str());
-    printf(",\"vendor\":");
-    json_text(vendor.c_str());
+    json_text(out, hex_of(info.cid).c_str());
+    fprintf(out, ",\"name\":");
+    json_text(out, text_of(info.name).c_str());
+    fprintf(out, ",\"vendor\":");
+    json_text(out, vendor.c_str());
     // Sub-categories read "Fx|Reverb"; the daemon groups by them.
-    printf(",\"features\":[");
+    fprintf(out, ",\"features\":[");
     size_t start = 0;
     bool first_feature = true;
     while (start <= subcategories.size()) {
@@ -1596,9 +1595,9 @@ extern "C" int vst3_scan(const char *path) {
         end = subcategories.size();
       if (end > start) {
         if (!first_feature)
-          putchar(',');
+          fputc(',', out);
         first_feature = false;
-        json_text(subcategories.substr(start, end - start).c_str());
+        json_text(out, subcategories.substr(start, end - start).c_str());
       }
       start = end + 1;
     }
@@ -1610,13 +1609,13 @@ extern "C" int vst3_scan(const char *path) {
     fprintf(stderr, "trace: scan VST3 class %d: buses and parameters\n", i);
     int default_in = main_bus_channels(&v, kInput);
     int default_out = main_bus_channels(&v, kOutput);
-    printf("],\"audioIns\":%d,\"audioOuts\":%d", default_in, default_out);
+    fprintf(out, "],\"audioIns\":%d,\"audioOuts\":%d", default_in, default_out);
     // Whether a VST3 plugin has an editor can only be learnt by creating
     // one, which for a module of two hundred plugins is most of a minute.
     // Nearly every VST3 plugin ships one, so the catalogue assumes it does;
     // the host finds out for certain when the editor is asked for.
-    printf(",\"gui\":true");
-    printf(",\"params\":[");
+    fprintf(out, ",\"gui\":true");
+    fprintf(out, ",\"params\":[");
     int32 parameters = v.controller->getParameterCount();
     bool first_param = true;
     for (int32 p = 0; p < parameters; ++p) {
@@ -1635,18 +1634,19 @@ extern "C" int vst3_scan(const char *path) {
       // range, so the parameter is left out, as the LV2 scanner does.
       if (!std::isfinite(minimum) || !std::isfinite(maximum) || !std::isfinite(fallback))
         continue;
-      printf("%s{\"id\":%u,\"name\":", first_param ? "" : ",",
-             (unsigned)pinfo.id);
+      fprintf(out, "%s{\"id\":%u,\"name\":", first_param ? "" : ",",
+              (unsigned)pinfo.id);
       first_param = false;
-      json_text(utf8(pinfo.title).c_str());
-      printf(",\"module\":");
-      json_text(utf8(pinfo.units).c_str());
-      printf(",\"min\":%.9g,\"max\":%.9g,\"default\":%.9g,\"readonly\":%s,"
-             "\"stepped\":%s,\"enum\":%s}",
-             minimum, maximum, fallback,
-             (pinfo.flags & ParameterInfo::kIsReadOnly) ? "true" : "false",
-             pinfo.stepCount > 0 ? "true" : "false",
-             (pinfo.flags & ParameterInfo::kIsList) ? "true" : "false");
+      json_text(out, utf8(pinfo.title).c_str());
+      fprintf(out, ",\"module\":");
+      json_text(out, utf8(pinfo.units).c_str());
+      fprintf(out,
+              ",\"min\":%.9g,\"max\":%.9g,\"default\":%.9g,\"readonly\":%s,"
+              "\"stepped\":%s,\"enum\":%s}",
+              minimum, maximum, fallback,
+              (pinfo.flags & ParameterInfo::kIsReadOnly) ? "true" : "false",
+              pinfo.stepCount > 0 ? "true" : "false",
+              (pinfo.flags & ParameterInfo::kIsList) ? "true" : "false");
     }
     // The chain widths this plugin can be inserted at, out of the ones the
     // host carries. Each answer is the one a load would get: the default
@@ -1658,7 +1658,7 @@ extern "C" int vst3_scan(const char *path) {
     // width is listed with none and offered nowhere, rather than failing
     // at load.
     static_assert(MAX_CHANNELS == 2, "accepts_width knows the arrangement of each width the host carries");
-    printf("],\"widths\":[");
+    fprintf(out, "],\"widths\":[");
     fprintf(stderr, "trace: scan VST3 class %d: width probes\n", i);
     bool first_width = true, asked = false;
     for (unsigned width = 1; width <= MAX_CHANNELS; ++width) {
@@ -1676,14 +1676,14 @@ extern "C" int vst3_scan(const char *path) {
       }
       if (!accepted)
         continue;
-      printf("%s%u", first_width ? "" : ",", width);
+      fprintf(out, "%s%u", first_width ? "" : ",", width);
       first_width = false;
     }
-    printf("]}");
+    fprintf(out, "]}");
     fprintf(stderr, "trace: scan VST3 class %d: release\n", i);
     release_plugin(&v);
   }
-  puts("]}");
+  fputs("]}\n", out);
   fputs("trace: scan VST3: module release\n", stderr);
   if (factory2)
     factory2->release();
@@ -1694,4 +1694,3 @@ extern "C" int vst3_scan(const char *path) {
   fputs("trace: scan VST3: complete\n", stderr);
   return 0;
 }
-#endif

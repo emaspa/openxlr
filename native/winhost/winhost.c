@@ -21,9 +21,16 @@
 // Usage: openxlr-winhost.exe DIRECTORY
 // DIRECTORY is a Unix path. It holds the shared audio file and the two
 // control FIFOs under the names wire.h gives them.
+//
+// Usage: openxlr-winhost.exe scan
+// Describes one module and leaves, with none of the above: the module is
+// named on standard input and its description goes to standard output (see
+// "scanning" below).
 #include "winhost.h"
 #include "wire.h"
 
+#include <fcntl.h>
+#include <io.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -96,6 +103,17 @@ static WCHAR *windows_path(const char *unix_path) {
     if (*p == L'/')
       *p = L'\\';
   return path;
+}
+
+// The same in UTF-8: the path a backend opens and a plugin is told, as CLAP
+// asks and as this side's dlopen takes it.
+static bool windows_utf8(const char *unix_path, char *out, int size) {
+  WCHAR *path = windows_path(unix_path);
+  bool named = path && WideCharToMultiByte(CP_UTF8, 0, path, -1, out, size,
+                                           NULL, NULL);
+  if (path)
+    HeapFree(GetProcessHeap(), 0, path);
+  return named;
 }
 
 static HANDLE open_in(const char *directory, const char *name, DWORD access) {
@@ -239,15 +257,8 @@ static bool load(WireRequest *r, WireReply *reply) {
              (unsigned)r->channels, (unsigned)r->rate);
     return false;
   }
-  // The path the backend opens and the plugin is told is its Windows one,
-  // in UTF-8, as CLAP asks and as this side's dlopen takes it.
   static char module[WIRE_PATH * 3];
-  WCHAR *path = windows_path(r->path);
-  bool named = path && WideCharToMultiByte(CP_UTF8, 0, path, -1, module,
-                                           sizeof(module), NULL, NULL);
-  if (path)
-    HeapFree(GetProcessHeap(), 0, path);
-  if (!named) {
+  if (!windows_utf8(r->path, module, sizeof(module))) {
     snprintf(text, text_size, "the module's path cannot be named on Windows");
     return false;
   }
@@ -527,23 +538,103 @@ static bool start(const char *directory) {
   return true;
 }
 
+// --- scanning ---------------------------------------------------------------
+
+// The Linux side holds the other end of standard input open for as long as
+// it waits for a scan, and writes nothing after the request. When this read
+// ends it has given up or is gone, and the scan is over wherever the plugin
+// has got to.
+static DWORD WINAPI watch_requester(void *unused) {
+  char byte;
+  DWORD count = 0;
+  while (ReadFile(GetStdHandle(STD_INPUT_HANDLE), &byte, 1, &count, NULL) &&
+         count == 1) {
+  }
+  TerminateProcess(GetCurrentProcess(), 1);
+  return 0;
+}
+
+// Describe the module one WireScan names and leave. The scanner is the one
+// the Linux helper has for a native plugin of that format (clap_scan,
+// vst3_scan), built here for Windows, so a description reads the same from
+// either. Nothing of the host above is started: a scan has no shared file,
+// no FIFO and no audio thread.
+static int scan(void) {
+  static WireScan request;
+  static char module[WIRE_PATH * 3];
+  if (!read_all(GetStdHandle(STD_INPUT_HANDLE), &request, sizeof(request)) ||
+      request.magic != WIRE_MAGIC || request.version != WIRE_VERSION) {
+    fputs("openxlr-winhost: no scan request of this build on standard input\n",
+          stderr);
+    return 2;
+  }
+  request.module[sizeof(request.module) - 1] = 0;
+  request.name[sizeof(request.name) - 1] = 0;
+  if (request.format != WIRE_FORMAT_CLAP && request.format != WIRE_FORMAT_VST3) {
+    fprintf(stderr, "this Windows plugin host does not carry plugin format %u\n",
+            (unsigned)request.format);
+    return 2;
+  }
+  if (!windows_utf8(request.module, module, sizeof(module))) {
+    fputs("the module's path cannot be named on Windows\n", stderr);
+    return 1;
+  }
+  // The description goes out where standard output went, through a stream
+  // nothing else has. Standard output itself becomes standard error, for the
+  // C library and for Windows, before any plugin code is loaded. What a
+  // plugin prints is then passed on as its log, in the order it was printed,
+  // and cannot land in the description.
+  int described = _dup(_fileno(stdout));
+  FILE *out = described >= 0 && _setmode(described, _O_BINARY) != -1
+                  ? _fdopen(described, "wb")
+                  : NULL;
+  if (!out || _dup2(_fileno(stderr), _fileno(stdout)) != 0) {
+    fputs("openxlr-winhost: cannot set up the description's stream\n", stderr);
+    return 1;
+  }
+  SetStdHandle(STD_OUTPUT_HANDLE, GetStdHandle(STD_ERROR_HANDLE));
+  setvbuf(stdout, NULL, _IONBF, 0);
+  HANDLE watch = CreateThread(NULL, 0, watch_requester, NULL, 0, NULL);
+  if (!watch)
+    return 1;
+  CloseHandle(watch);
+  int result = request.format == WIRE_FORMAT_CLAP
+                   ? clap_scan(module, request.name, out)
+                   : vst3_scan(module, request.name, out);
+  if ((fflush(out) != 0 || ferror(out)) && result == 0)
+    result = 1;
+  fflush(stderr);
+  // The description is out, or never will be. Leave without unloading
+  // anything: what a plugin's module does on its way out can only spoil a
+  // scan that has its answer.
+  TerminateProcess(GetCurrentProcess(), (UINT)result);
+  return result;
+}
+
 int main(void) {
   // No dialog for a missing library or a fault: nobody is there to see it.
   SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX |
                SEM_NOOPENFILEERRORBOX);
   SetUnhandledExceptionFilter(crashed);
+  // What this program and its backends write to standard error is read a
+  // line at a time on the Linux side, where a line ends with a line feed.
+  _setmode(_fileno(stderr), _O_BINARY);
   int argc = 0;
   WCHAR **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
   static char directory[WIRE_PATH];
   if (!argv || argc != 2 ||
       !WideCharToMultiByte(CP_UTF8, 0, argv[1], -1, directory,
                            sizeof(directory), NULL, NULL)) {
-    fputs("usage: openxlr-winhost.exe DIRECTORY\n", stderr);
+    fputs("usage: openxlr-winhost.exe DIRECTORY\n"
+          "       openxlr-winhost.exe scan\n",
+          stderr);
     return 2;
   }
   // Windows plugins expect their host to have done this on the thread that
   // creates them.
   OleInitialize(NULL);
+  if (!strcmp(directory, "scan"))
+    return scan();
   request_ready = CreateEventW(NULL, FALSE, FALSE, NULL);
   request_taken = CreateEventW(NULL, FALSE, FALSE, NULL);
   audio_named = CreateEventW(NULL, TRUE, FALSE, NULL);

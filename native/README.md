@@ -1183,6 +1183,8 @@ exactly one counted event each and recover.
 ```text
 openxlr-lv2-host [--own-block] wine clap FILE ID NODE CHANNELS RATE [SYMBOL=VALUE ...]
 openxlr-lv2-host [--own-block] wine vst3 BUNDLE CLASS-ID NODE CHANNELS RATE [SYMBOL=VALUE ...]
+openxlr-lv2-host wine scan-clap FILE
+openxlr-lv2-host wine scan-vst3 BUNDLE
 ```
 
 `make -C native WINHOST=1` builds a second way to run a Windows plugin, one
@@ -1198,7 +1200,9 @@ after the format mean what they mean for a native plugin of that format:
   file. `CLASS-ID` is the class id as 32 hex digits, in the form a Linux
   host has for the plugin, described below.
 
-`SYMBOL=VALUE` sets a parameter before the first block.
+`SYMBOL=VALUE` sets a parameter before the first block. The two `scan`
+forms describe a module for the catalogue and run no audio.
+[Scanning a Windows plugin](#scanning-a-windows-plugin) has the rest.
 
 The default build leaves both out and is unchanged. The flag needs
 `x86_64-w64-mingw32-gcc` and `x86_64-w64-mingw32-g++`, or the compilers
@@ -1208,8 +1212,8 @@ one file. Building it does not need Wine; running it does. Run
 of flags.
 
 This is the start of a host that will replace the yabridge companion. It
-carries CLAP and VST3 audio, parameters and latency. It has no editor and no
-scanner yet. The daemon does not start it and no package builds it, so
+carries CLAP and VST3 audio, parameters and latency, and it scans. It has no
+editor yet. The daemon does not start it and no package builds it, so
 nothing here reaches a user.
 
 The helper keeps the PipeWire node and the Windows program holds the plugin.
@@ -1218,8 +1222,9 @@ these sources:
 
 - `clap.c` and `vst3.cpp`, the same files the helper builds for native
   plugins, compiled for Windows. The port and bus layouts, the parameters, a
-  restart or a reload the plugin asks for, timers and the thread checks are
-  one implementation for each format on both systems.
+  restart or a reload the plugin asks for, timers, the thread checks and the
+  scanner are one implementation for each format on both systems.
+- `json.c`, which writes the text in a scanner's JSON, for the same reason.
 - `winhost/shim.c`, which gives those backends the services `host.h`
   declares: the control table, the reports from the audio thread, the main
   loop's timers and events, and the module loader. `winhost/shim.h` stands
@@ -1228,9 +1233,9 @@ these sources:
   the load names.
 
 The two backends differ on Windows in few places. `clap.c` skips the
-`dlfcn.h` include and leaves out its scanner. `vst3.cpp` skips the system
-headers the shim stands in for, leaves out its scanner, and has one block
-for what a Windows module is.
+`dlfcn.h` include and has one block for the window an editor sits in, which
+is Windows' own kind there. `vst3.cpp` skips the system headers the shim
+stands in for and has one block for what a Windows module is.
 
 A Windows VST3 module differs from a Linux one in three ways, and that block
 holds them:
@@ -1368,6 +1373,63 @@ What happens when the Windows side goes wrong:
 - The helper itself is killed. The kernel sends the Windows program a
   SIGKILL, and it would also leave by itself on reading its closed pipes.
 
+### Scanning a Windows plugin
+
+`wine scan-clap FILE` and `wine scan-vst3 BUNDLE` describe a Windows module
+the way `scan-clap` and `scan-vst3` describe a native one. `FILE` and
+`BUNDLE` are Linux paths, as for a load. The scanner is `clap_scan` or
+`vst3_scan`, the function that scans a native plugin, compiled for Windows.
+The JSON on standard output has the same fields in the same order, and the
+`trace:` phase lines on standard error are the same lines. For a Windows
+plugin, three of the fields read as follows:
+
+- `file` is the path the helper was given, as it was given. No Windows path
+  is written into a description.
+- A VST3 class id is in the Linux form described above.
+- `gui` is about a window of Windows' own. A CLAP plugin is asked whether it
+  has an editor for `win32`, where a native one is asked about `x11`. The
+  VST3 scanner asks no plugin and answers `true` for every class, on both
+  systems. This host opens no editor yet, so `gui` says what the plugin has
+  and not what can be shown.
+
+A scan starts the Windows program with the one argument `scan`. None of the
+audio path is set up: no shared file, no FIFO and no audio thread. The
+helper writes one fixed-size request to the program's standard input, with
+the module to open and the path to name it by. Both cross as bytes, because
+Wine converts a command line through the locale's character set. The program
+runs the scanner and exits with its result, and the helper passes on what it
+writes as it arrives.
+
+A scan runs plugin code. This is what the two sides do about a plugin that
+misbehaves in one:
+
+- The description goes out on a stream only the scanner has. Before any
+  plugin code is loaded the Windows program points its standard output at its
+  standard error, for the C library and for Windows. Text a plugin prints
+  during its scan arrives as a line of its log and cannot land in the JSON.
+  This does not cover a Linux library inside the Wine process that writes to
+  file descriptor 1.
+- A plugin that crashes ends the Windows program with the line naming the
+  exception. The helper adds how the program ended and exits with 1. The
+  last phase line says where the plugin was.
+- The helper gives up on a plugin that never answers after three minutes.
+  Two are what Wine may need to start, as before a load, and one is what the
+  daemon gives the scan of a native bundle. The daemon ends a native scan
+  after that one minute, so its deadline would come first.
+- The helper holds the request's pipe open while it waits, and the Windows
+  program ends itself when that pipe closes. The helper gives up by closing
+  it. A helper that is killed, as the daemon kills one at its deadline,
+  closes it by dying, and the kernel also sends the Windows program a
+  SIGKILL. The helper kills a Windows program that is still there two
+  seconds after it gave up.
+- Once the description is written the Windows program leaves without
+  unloading the module, so what a plugin does on its way out cannot fail a
+  scan that has its answer.
+
+The helper exits with 0 only when the Windows program did. It refuses a
+file that is no Windows module, a missing file and a bundle with no 64-bit
+module with the reason, exit code 1 and nothing on standard output.
+
 `OPENXLR_WINE` names the Wine to start, `wine` on `PATH` otherwise.
 `OPENXLR_WINHOST` names the Windows program when it is not beside the helper.
 The Wine prefix and the DLL overrides come from the helper's environment,
@@ -1432,6 +1494,30 @@ With the VST3 module it checks:
   an editor would, reaches the helper, and a value the helper set before it
   had seen that move is dropped;
 - refused blocks are silence and half a second of them fails the instance.
+
+It then runs the helper's `wine scan-clap` and `wine scan-vst3` in a process
+of their own, as the daemon would start them, and checks:
+
+- each description against the text the native scanner writes for the same
+  plugins, byte for byte. That covers names, vendor, features, the main
+  ports' widths, the widths a VST3 class takes, class ids in the Linux form,
+  parameters with their ranges, and the path as it was given. A hidden
+  parameter, the plugin's own bypass and a plugin that refuses to initialise
+  are left out, as a native scan leaves them out. The CLAP module is scanned
+  through a link whose name is not ASCII;
+- the editor field. One CLAP plugin has an editor for a Windows window and
+  for no other, and it alone is listed with one;
+- the phase lines, which have to be the native ones line for line;
+- a file that is no module, a missing file and a bundle with no module are
+  refused with the reason and exit code 1;
+- a plugin that crashes while it is described, in both formats: the
+  exception, the phase it was in and exit code 1;
+- a plugin that prints on standard output with no line end, through the C
+  library and through Windows: the description is still exact and the text
+  is in the log;
+- a plugin that never answers: the helper gives up at its limit, which the
+  test builds as six seconds, and a helper killed during a scan takes the
+  Windows program with it. No Windows program is left after any of these.
 
 `make -C native test-vst3` checks that the Linux build still reads and
 writes a native class id in the order of its bytes.

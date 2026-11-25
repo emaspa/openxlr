@@ -30,6 +30,12 @@
 //   is behind: the plugin has moved that control since, and its newer value
 //   is already on its way.
 //
+// A scan uses none of this. The Windows host started with the one argument
+// `scan` reads one WireScan from its standard input, writes the module's
+// description to its standard output and leaves. The Linux side holds that
+// input pipe open while it waits, and the Windows host ends itself when the
+// pipe closes, so giving up on a scan is closing it.
+//
 // Every structure has a fixed size and both builds are x86-64, so the two
 // compilers lay them out alike; the assertions below hold them to it.
 // Neither side trusts a count or an index it reads from the other: each one
@@ -163,6 +169,21 @@ typedef struct {
   char text[WIRE_TEXT];
 } WireReply;
 
+// What a scan is asked to describe. Both paths are the bytes of a Unix path
+// and cross in this structure, never on the command line, which Wine would
+// convert through the locale's character set.
+typedef struct {
+  uint32_t magic, version;
+  uint32_t format;  // WIRE_FORMAT_CLAP or WIRE_FORMAT_VST3
+  uint32_t reserved;
+  // The module to open. For VST3 it is the module inside the bundle, which
+  // the Linux side has found.
+  char module[WIRE_PATH];
+  // The path the description names the plugin by: the one the helper was
+  // given, as it was given.
+  char name[WIRE_PATH];
+} WireScan;
+
 _Static_assert(sizeof(WireControl) == WIRE_SYMBOL + 16, "a control's layout");
 _Static_assert(sizeof(WireSet) == 16, "a set's layout");
 _Static_assert(sizeof(_Atomic uint64_t) == 8 && sizeof(_Atomic uint32_t) == 4,
@@ -176,3 +197,4 @@ _Static_assert(sizeof(WireRequest) ==
                    32 + WIRE_THREAD_NAME + WIRE_ID + WIRE_PATH,
                "a request's layout");
 _Static_assert(sizeof(WireReply) == 32 + WIRE_TEXT, "a reply's layout");
+_Static_assert(sizeof(WireScan) == 16 + 2 * WIRE_PATH, "a scan's layout");

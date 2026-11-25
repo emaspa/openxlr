@@ -24,6 +24,10 @@
 // The Windows backend (wine.c) is linked only into a build with WINHOST=1.
 // Without it its address is null, which no backend in use ever is.
 extern const Backend wine_backend __attribute__((weak));
+// `wine scan-clap FILE` and `wine scan-vst3 BUNDLE`: describe a Windows
+// plugin as `scan-clap` and `scan-vst3` describe a native one. `format` is
+// "clap" or "vst3".
+extern int wine_scan(const char *format, const char *path) __attribute__((weak));
 
 static bool is_wine_backend(const Backend *backend) {
   return backend && backend == &wine_backend;
@@ -1465,9 +1469,12 @@ static bool configure_editor_environment(void) {
 
 int main(int argc, char **argv) {
   if (argc == 3 && !strcmp(argv[1], "scan-clap"))
-    return clap_scan(argv[2]);
+    return clap_scan(argv[2], argv[2], stdout);
   if (argc == 3 && !strcmp(argv[1], "scan-vst3"))
-    return vst3_scan(argv[2]);
+    return vst3_scan(argv[2], argv[2], stdout);
+  if (argc == 4 && !strcmp(argv[1], "wine") && wine_scan &&
+      (!strcmp(argv[2], "scan-clap") || !strcmp(argv[2], "scan-vst3")))
+    return wine_scan(argv[2] + strlen("scan-"), argv[3]);
   if (argc >= 2 && !strcmp(argv[1], "scan-lv2"))
     return lv2_scan(argc - 2, argv + 2);
   if (argc == 2 && !strcmp(argv[1], "engines") && denoise_print_engines)
@@ -1512,7 +1519,9 @@ int main(int argc, char **argv) {
       fputs("       openxlr-lv2-host [--own-block] wine clap FILE ID NODE "
             "CHANNELS RATE [SYMBOL=VALUE ...]\n"
             "       openxlr-lv2-host [--own-block] wine vst3 BUNDLE CLASS-ID NODE "
-            "CHANNELS RATE [SYMBOL=VALUE ...]\n",
+            "CHANNELS RATE [SYMBOL=VALUE ...]\n"
+            "       openxlr-lv2-host wine scan-clap FILE\n"
+            "       openxlr-lv2-host wine scan-vst3 BUNDLE\n",
             stderr);
     return 2;
   }
