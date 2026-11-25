@@ -13,7 +13,12 @@
 // wait. Either way the cycle plays silence and the main thread reports it,
 // as it would for a native plugin that refuses its blocks.
 //
-// This step carries CLAP audio and latency. Parameters, editors and VST3
+// The plugin's controls are registered here under the names the Windows
+// side lists, so the daemon sets and reads them as a native plugin's. Their
+// values cross in the shared file: what this side sets goes with the next
+// block, and what the plugin moves is read on the tick.
+//
+// This step carries CLAP audio, parameters and latency. Editors and VST3
 // come with later ones.
 #define _GNU_SOURCE  // pipe2, realpath, SCHED_RESET_ON_FORK
 #include "host.h"
@@ -23,6 +28,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <math.h>
 #include <poll.h>
 #include <sched.h>
 #include <stdio.h>
@@ -39,6 +45,8 @@ _Static_assert((int)WIRE_MAX_FRAMES == (int)MAX_FRAMES,
                "wire.h carries the host's largest block");
 _Static_assert((int)WIRE_MAX_CHANNELS == (int)MAX_CHANNELS,
                "wire.h carries the host's channels");
+_Static_assert((int)WIRE_MAX_CONTROLS == (int)MAX_CONTROLS,
+               "wire.h carries the host's control table");
 
 // How long the main thread waits for an answer on the control channel. Wine
 // may be creating or updating its prefix before the first one, and a plugin
@@ -63,6 +71,19 @@ enum {
 
 extern char **environ;
 
+// One of the plugin's controls on this side.
+typedef struct {
+  Control *control;
+  char symbol[WIRE_SYMBOL];  // the name the host's table points at
+  // The value the main thread last took from the plugin, with its count
+  // (wire_value). Written by the main thread, read by the audio thread.
+  _Atomic uint64_t taken;
+  // Audio thread: the count of `taken` it has caught up with, and the value
+  // the Windows side holds as far as this side knows.
+  uint32_t caught_up;
+  float sent;
+} WineControl;
+
 typedef struct {
   Host *h;
   pid_t child;      // what was started: wine, which becomes the Windows host
@@ -76,6 +97,9 @@ typedef struct {
   int request, reply;  // the control FIFOs
   int log;             // the Windows host's standard error
   WireShared *shared;
+  WineControl *controls;
+  uint32_t control_count;
+  uint32_t published;  // main thread: the shared count as last looked at
   struct spa_source *log_source;
   char log_line[1024];
   size_t log_size;
@@ -488,6 +512,115 @@ static pid_t wine_find_thread(Wine *w) {
   return found;
 }
 
+// --- controls ---------------------------------------------------------------
+
+// A control's name is printed in lines the daemon reads and matched against
+// the ones it sends, so it has to be one plain word.
+static bool wine_symbol_ok(const char *symbol) {
+  if (!symbol[0])
+    return false;
+  for (const unsigned char *c = (const unsigned char *)symbol; *c; ++c)
+    if (*c <= 0x20 || *c >= 0x7f)
+      return false;
+  return true;
+}
+
+// Register what the Windows side listed at load, `count` controls by its
+// reply. Every entry is copied out of the shared file before it is looked
+// at, and a list this side cannot carry is refused whole.
+static bool wine_take_controls(Host *h, Wine *w, uint32_t count) {
+  if (count > WIRE_MAX_CONTROLS) {
+    fprintf(stderr,
+            "the Windows plugin host lists %u controls; at most %d can be "
+            "carried\n",
+            count, WIRE_MAX_CONTROLS);
+    return false;
+  }
+  if (!count)
+    return true;
+  w->controls = calloc(count, sizeof(WineControl));
+  if (!w->controls)
+    return false;
+  for (uint32_t i = 0; i < count; ++i) {
+    WireControl listed = w->shared->controls[i];
+    listed.symbol[WIRE_SYMBOL - 1] = 0;
+    if (!wine_symbol_ok(listed.symbol)) {
+      fprintf(stderr,
+              "the Windows plugin host gave control %u a name that cannot be "
+              "used\n",
+              i);
+      return false;
+    }
+    WineControl *c = &w->controls[i];
+    memcpy(c->symbol, listed.symbol, sizeof(c->symbol));
+    c->control = host_add_control(h, c->symbol, listed.minimum, listed.maximum,
+                                  listed.initial,
+                                  (listed.flags & WIRE_CONTROL_OUTPUT) != 0, c);
+    if (!c->control) {
+      fputs("the plugin has more controls than this host carries\n", stderr);
+      return false;
+    }
+    c->sent = atomic_load(&c->control->desired);
+    atomic_init(&c->taken, wire_value(0, c->sent));
+    w->control_count = i + 1;
+  }
+  return true;
+}
+
+// Main thread, each tick: the values the plugin moved and the meters that
+// changed since the last look. A moved control is applied and told to the
+// daemon as a native plugin's is. The control's own value is written before
+// `taken`, which is the order wine_write_sets relies on.
+static void wine_take_values(Host *h, Wine *w) {
+  uint32_t published = atomic_load(&w->shared->published);
+  if (published == w->published)
+    return;
+  w->published = published;
+  for (uint32_t i = 0; i < w->control_count; ++i) {
+    WineControl *c = &w->controls[i];
+    uint64_t word = atomic_load(&w->shared->values[i]);
+    uint32_t count = wire_value_count(word);
+    if (count == wire_value_count(atomic_load(&c->taken)))
+      continue;
+    float value = wire_value_float(word);
+    if (c->control->output) {
+      if (isfinite(value))
+        atomic_store(&c->control->observed, value);
+    } else
+      host_control_moved(h, c->control, value);
+    atomic_store(&c->taken,
+                 wire_value(count, atomic_load(&c->control->desired)));
+  }
+}
+
+// Audio thread, before a block goes out: the values this side has set since
+// the Windows side last heard. A value the main thread took from the plugin
+// is not one of them. `taken` is read before the control's own value: read
+// the other way round, a value just taken could be sent back as if it had
+// been set here, with a count that makes the Windows side accept it. Read
+// this way the worst is a value sent with the count before it, which the
+// Windows side drops. More than one cycle's worth wait for the next.
+static void wine_write_sets(Wine *w) {
+  uint32_t count = 0;
+  for (uint32_t i = 0; i < w->control_count && count < WIRE_MAX_SETS; ++i) {
+    WineControl *c = &w->controls[i];
+    if (c->control->output)
+      continue;
+    uint64_t taken = atomic_load(&c->taken);
+    if (wire_value_count(taken) != c->caught_up) {
+      c->caught_up = wire_value_count(taken);
+      c->sent = wire_value_float(taken);
+    }
+    float value = atomic_load(&c->control->desired);
+    if (value == c->sent)
+      continue;
+    w->shared->sets[count++] =
+        (WireSet){.index = i, .based_on = c->caught_up, .value = value};
+    c->sent = value;
+  }
+  w->shared->set_count = count;
+}
+
 // --- load and unload --------------------------------------------------------
 
 // End the Windows host and wait for it. Asked to quit it takes the plugin
@@ -589,7 +722,8 @@ static bool wine_load(Host *h, char **arguments) {
     w->audio_tid = wine_find_thread(w);
   }
   WireRequest load = {.type = WIRE_LOAD, .format = WIRE_FORMAT_CLAP,
-                      .channels = h->channels};
+                      .channels = h->channels, .rate = h->rate,
+                      .own_block = h->own_block};
   snprintf(load.path, sizeof(load.path), "%s", module);
   snprintf(load.id, sizeof(load.id), "%s", arguments[2]);
   if (!wine_exchange(w, &load, &reply, WINE_LOAD_MS)) {
@@ -603,6 +737,8 @@ static bool wine_load(Host *h, char **arguments) {
     return false;
   }
   host_set_plugin_name(h, reply.text);
+  if (!wine_take_controls(h, w, reply.controls))
+    return false;
   w->log_source = pw_loop_add_io(host_loop(h), w->log, SPA_IO_IN | SPA_IO_HUP,
                                  false, wine_log_ready, w);
   return true;
@@ -621,6 +757,7 @@ static void wine_unload(Host *h) {
       close(*fds[i]);
   if (w->shared)
     munmap(w->shared, sizeof(WireShared));
+  free(w->controls);
   free(w);
   h->impl = NULL;
 }
@@ -629,10 +766,7 @@ static void wine_unload(Host *h) {
 
 static bool wine_activate(Host *h) {
   Wine *w = h->impl;
-  uint32_t most = host_max_block(h);
-  WireRequest request = {.type = WIRE_ACTIVATE, .rate = h->rate,
-                         .min_frames = h->own_block ? most : 1,
-                         .max_frames = most};
+  WireRequest request = {.type = WIRE_ACTIVATE};
   WireReply reply;
   if (!wine_exchange(w, &request, &reply, WINE_CONTROL_MS)) {
     char ending[96];
@@ -657,10 +791,10 @@ static bool wine_await_done(Wine *w, int timeout_ms) {
 }
 
 // The node has disconnected and the own block's worker has ended, so no
-// block can start any more and this thread may use the audio wake. The
-// Windows audio thread is first asked to stop processing, which is where
-// CLAP wants that call made, then the plugin is deactivated. A Windows host
-// that answers neither is left for unload to end.
+// block can start any more and this thread may read the audio wake. A block
+// that is still out is waited for, so the Windows audio thread is idle when
+// the plugin is deactivated. A Windows host that does not answer is left
+// for unload to end.
 static void wine_deactivate(Host *h) {
   Wine *w = h->impl;
   if (!w->activated)
@@ -671,9 +805,7 @@ static void wine_deactivate(Host *h) {
     atomic_store(&w->dead, true);
   if (atomic_load(&w->dead))
     return;
-  char wake = WIRE_WAKE_STOP;
-  if ((w->pending && !wine_await_done(w, 1000)) ||
-      write(w->wake_out, &wake, 1) != 1 || !wine_await_done(w, 1000)) {
+  if (w->pending && !wine_await_done(w, 1000)) {
     atomic_store(&w->dead, true);
     return;
   }
@@ -698,14 +830,15 @@ static void wine_lost(Host *h, Wine *w, uint32_t frames, float *const *out) {
   host_processing_result(h, false, frames);
 }
 
-// One block: copy the input into the shared file, wake the Windows audio
-// thread with one byte, wait for the byte that answers, copy the output
-// back. The wait is bounded at twice the block's own length and at least
-// WINE_BLOCK_MS, so a block that comes late by less than that is heard
-// late, as a native plugin's would be, and one that takes longer plays as
-// silence. Its answer is then still owed: until it arrives every block
-// plays silence without asking for another, and the shared file is left
-// alone, since the Windows side may still be reading it.
+// One block: copy the input and the values set since the last one into the
+// shared file, wake the Windows audio thread with one byte, wait for the
+// byte that answers, copy the output back. The wait is bounded at twice
+// the block's own length and at least WINE_BLOCK_MS, so a block that comes
+// late by less than that is heard late, as a native plugin's would be, and
+// one that takes longer plays as silence. Its answer is then still owed:
+// until it arrives every block plays silence without asking for another,
+// and the shared file is left alone, since the Windows side may still be
+// reading it.
 static void wine_process(Host *h, uint32_t frames, float *const *in,
                          float *const *out) {
   Wine *w = h->impl;
@@ -742,6 +875,7 @@ static void wine_process(Host *h, uint32_t frames, float *const *in,
     memcpy(w->shared->in[c], in[c], frames * sizeof(float));
   w->shared->frames = frames;
   w->shared->status = 0;
+  wine_write_sets(w);
   byte = WIRE_WAKE_PROCESS;
   if (write(w->wake_out, &byte, 1) != 1) {
     // A full pipe would mean thousands of unread wakes, which the protocol
@@ -817,6 +951,7 @@ static void wine_main_thread(Host *h) {
     return;
   if (!w->scheduled && atomic_load(&w->waiter_known))
     wine_schedule(w);
+  wine_take_values(h, w);
   // A Windows host that died while no audio was running has no pipe to
   // close on anybody, so it is looked at here as well.
   if (atomic_load(&w->dead) || wine_gone(w)) {

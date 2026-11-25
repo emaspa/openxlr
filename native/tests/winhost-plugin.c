@@ -5,6 +5,7 @@
 // its id, so a test picks the behaviour it wants by the plugin it loads.
 #include <clap/clap.h>
 #include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,8 +24,25 @@ enum {
   KIND_SLOW,       // block 16 takes 60 ms
   KIND_STALL,      // block 16 never returns
   KIND_CRASH,      // block 16 writes through a null pointer
+  KIND_PARAMS,     // five parameters; see PARAM_GAIN and the rest
+  KIND_MANY,       // more parameters than a host carries; see MANY_PARAMS
+  KIND_TIMER,      // asks for a timer when it is made, quarters after three calls
   KINDS
 };
+
+// KIND_PARAMS. The gain is the factor the audio is multiplied by, and the
+// plugin answers every gain it is sent with the same value. Setting `move`
+// to anything but 0 makes the plugin move its own gain to that value and
+// say so, as an editor would. The level is a meter, twice the gain. The last two must never reach the host's control table: one is
+// hidden, and the plugin's own bypass is left to the chain's.
+enum { PARAM_GAIN = 1, PARAM_MOVE, PARAM_LEVEL, PARAM_HIDDEN, PARAM_BYPASS, PARAMS = 5 };
+
+// KIND_MANY. Parameters 1 to MANY_PARAMS, each 0 or 1. The audio is
+// quartered while exactly MANY_QUARTER of them are 1 and halved otherwise.
+enum { MANY_PARAMS = 5000, MANY_QUARTER = 1000 };
+
+// KIND_TIMER.
+enum { TIMER_MS = 20, TIMER_CALLS = 3 };
 
 // Which block the timed behaviours act on.
 enum { RESTART_BLOCK = 8, CALLBACK_BLOCK = 4, TROUBLE_BLOCK = 16 };
@@ -47,6 +65,9 @@ static const clap_plugin_descriptor_t descriptors[KINDS] = {
     [KIND_SLOW] = DESCRIPTOR("slow", "Test Slow"),
     [KIND_STALL] = DESCRIPTOR("stall", "Test Stall"),
     [KIND_CRASH] = DESCRIPTOR("crash", "Test Crash"),
+    [KIND_PARAMS] = DESCRIPTOR("params", "Test Params"),
+    [KIND_MANY] = DESCRIPTOR("many", "Test Many"),
+    [KIND_TIMER] = DESCRIPTOR("timer", "Test Timer"),
 };
 
 typedef struct {
@@ -56,12 +77,87 @@ typedef struct {
   unsigned blocks;       // audio thread
   unsigned activations;  // main thread
   _Atomic int called_back;
+  // KIND_PARAMS: written by whichever thread is handed the events, read by
+  // the main thread when the host asks for a value.
+  _Atomic float gain, move;
+  // KIND_MANY: which parameters are 1, and how many.
+  unsigned char *many;
+  unsigned many_set;
+  // KIND_TIMER
+  clap_id timer;
+  _Atomic int timer_calls;
 } Instance;
 
 static Instance *of(const clap_plugin_t *plugin) { return plugin->plugin_data; }
 
-static bool plugin_init(const clap_plugin_t *plugin) { return true; }
-static void plugin_destroy(const clap_plugin_t *plugin) { free(of(plugin)); }
+static bool plugin_init(const clap_plugin_t *plugin) {
+  Instance *p = of(plugin);
+  if (p->kind == KIND_TIMER) {
+    const clap_host_timer_support_t *timers =
+        p->host->get_extension(p->host, CLAP_EXT_TIMER_SUPPORT);
+    return timers && timers->register_timer(p->host, TIMER_MS, &p->timer);
+  }
+  return true;
+}
+
+static void plugin_destroy(const clap_plugin_t *plugin) {
+  free(of(plugin)->many);
+  free(of(plugin));
+}
+
+static void plugin_on_timer(const clap_plugin_t *plugin, clap_id timer) {
+  Instance *p = of(plugin);
+  if (timer != p->timer)
+    return;
+  if (atomic_fetch_add(&p->timer_calls, 1) + 1 == TIMER_CALLS) {
+    const clap_host_timer_support_t *timers =
+        p->host->get_extension(p->host, CLAP_EXT_TIMER_SUPPORT);
+    timers->unregister_timer(p->host, timer);
+  }
+}
+
+static const clap_plugin_timer_support_t timer_support = {plugin_on_timer};
+
+// The parameter values the host sends, in a block or in a flush.
+static void take_events(Instance *p, const clap_input_events_t *in,
+                        const clap_output_events_t *out) {
+  uint32_t count = in ? in->size(in) : 0;
+  for (uint32_t i = 0; i < count; ++i) {
+    const clap_event_header_t *header = in->get(in, i);
+    if (!header || header->space_id != CLAP_CORE_EVENT_SPACE_ID ||
+        header->type != CLAP_EVENT_PARAM_VALUE)
+      continue;
+    const clap_event_param_value_t *e = (const clap_event_param_value_t *)header;
+    if (p->kind == KIND_MANY) {
+      if (e->param_id < 1 || e->param_id > MANY_PARAMS)
+        continue;
+      unsigned char *held = &p->many[e->param_id - 1], now = e->value >= 0.5;
+      p->many_set += now - *held;
+      *held = now;
+    } else if (p->kind == KIND_PARAMS &&
+               (e->param_id == PARAM_GAIN || e->param_id == PARAM_MOVE)) {
+      // A gain the host sends is answered with the same value, which a
+      // plugin has no need to do and a host has to put up with. A move
+      // that is not 0 changes the gain and says so.
+      if (e->param_id == PARAM_MOVE)
+        atomic_store(&p->move, (float)e->value);
+      if ((e->param_id == PARAM_MOVE && e->value == 0) || !out)
+        continue;
+      atomic_store(&p->gain, (float)e->value);
+      clap_event_param_value_t said = {
+          .header = {sizeof(said), 0, CLAP_CORE_EVENT_SPACE_ID,
+                     CLAP_EVENT_PARAM_VALUE, 0},
+          .param_id = PARAM_GAIN,
+          .note_id = -1,
+          .port_index = -1,
+          .channel = -1,
+          .key = -1,
+          .value = e->value,
+      };
+      out->try_push(out, &said.header);
+    }
+  }
+}
 
 static bool plugin_activate(const clap_plugin_t *plugin, double rate,
                             uint32_t min, uint32_t max) {
@@ -98,9 +194,18 @@ static clap_process_status plugin_process(const clap_plugin_t *plugin,
     if (p->kind == KIND_CRASH)
       *(volatile int *)0 = 1;
   }
+  take_events(p, process->in_events, process->out_events);
   const clap_audio_buffer_t *in = &process->audio_inputs[0];
   const clap_audio_buffer_t *out = &process->audio_outputs[0];
-  float gain = p->kind == KIND_CALLBACK && atomic_load(&p->called_back) ? 0.25f : 0.5f;
+  float gain = 0.5f;
+  if (p->kind == KIND_CALLBACK && atomic_load(&p->called_back))
+    gain = 0.25f;
+  if (p->kind == KIND_TIMER && atomic_load(&p->timer_calls) >= TIMER_CALLS)
+    gain = 0.25f;
+  if (p->kind == KIND_MANY && p->many_set == MANY_QUARTER)
+    gain = 0.25f;
+  if (p->kind == KIND_PARAMS)
+    gain = atomic_load(&p->gain);
   for (uint32_t c = 0; c < out->channel_count; ++c)
     for (uint32_t n = 0; n < process->frames_count; ++n) {
       float sample = in->data32[c][n] * gain;
@@ -141,9 +246,82 @@ static uint32_t latency_get(const clap_plugin_t *plugin) {
 
 static const clap_plugin_latency_t latency = {latency_get};
 
+static uint32_t params_count(const clap_plugin_t *plugin) {
+  return of(plugin)->kind == KIND_MANY ? MANY_PARAMS : PARAMS;
+}
+
+static bool params_get_info(const clap_plugin_t *plugin, uint32_t index,
+                            clap_param_info_t *info) {
+  if (index >= params_count(plugin))
+    return false;
+  memset(info, 0, sizeof(*info));
+  info->id = index + 1;
+  info->max_value = 1;
+  if (of(plugin)->kind == KIND_MANY) {
+    snprintf(info->name, sizeof(info->name), "Switch %u", (unsigned)index + 1);
+    info->flags = CLAP_PARAM_IS_STEPPED;
+    return true;
+  }
+  static const char *const names[PARAMS] = {"Gain", "Move", "Level", "Hidden",
+                                            "Bypass"};
+  strcpy(info->name, names[index]);
+  switch (info->id) {
+    case PARAM_GAIN: info->default_value = 0.5; break;
+    case PARAM_LEVEL:
+      info->max_value = 2;
+      info->default_value = 1;
+      info->flags = CLAP_PARAM_IS_READONLY;
+      break;
+    case PARAM_HIDDEN: info->flags = CLAP_PARAM_IS_HIDDEN; break;
+    case PARAM_BYPASS: info->flags = CLAP_PARAM_IS_BYPASS | CLAP_PARAM_IS_STEPPED; break;
+  }
+  return true;
+}
+
+static bool params_get_value(const clap_plugin_t *plugin, clap_id id,
+                             double *value) {
+  Instance *p = of(plugin);
+  if (id < 1 || id > params_count(plugin))
+    return false;
+  if (p->kind == KIND_MANY)
+    *value = p->many[id - 1];
+  else
+    *value = id == PARAM_GAIN    ? atomic_load(&p->gain)
+             : id == PARAM_MOVE  ? atomic_load(&p->move)
+             : id == PARAM_LEVEL ? atomic_load(&p->gain) * 2
+                                 : 0;
+  return true;
+}
+
+static bool params_value_to_text(const clap_plugin_t *plugin, clap_id id,
+                                 double value, char *text, uint32_t size) {
+  snprintf(text, size, "%g", value);
+  return true;
+}
+
+static bool params_text_to_value(const clap_plugin_t *plugin, clap_id id,
+                                 const char *text, double *value) {
+  *value = atof(text);
+  return true;
+}
+
+static void params_flush(const clap_plugin_t *plugin,
+                         const clap_input_events_t *in,
+                         const clap_output_events_t *out) {
+  take_events(of(plugin), in, out);
+}
+
+static const clap_plugin_params_t params = {
+    params_count, params_get_info, params_get_value, params_value_to_text,
+    params_text_to_value, params_flush};
+
 static const void *plugin_get_extension(const clap_plugin_t *plugin,
                                         const char *id) {
   int kind = of(plugin)->kind;
+  if (!strcmp(id, CLAP_EXT_PARAMS) && (kind == KIND_PARAMS || kind == KIND_MANY))
+    return &params;
+  if (!strcmp(id, CLAP_EXT_TIMER_SUPPORT) && kind == KIND_TIMER)
+    return &timer_support;
   if (!strcmp(id, CLAP_EXT_AUDIO_PORTS))
     return &audio_ports;
   if (!strcmp(id, CLAP_EXT_LATENCY) && (kind == KIND_LATENCY || kind == KIND_RESTART))
@@ -171,6 +349,11 @@ static const clap_plugin_t *factory_create(const clap_plugin_factory_t *factory,
       return NULL;
     p->host = host;
     p->kind = kind;
+    atomic_init(&p->gain, 0.5f);
+    if (kind == KIND_MANY && !(p->many = calloc(MANY_PARAMS, 1))) {
+      free(p);
+      return NULL;
+    }
     p->plugin = (clap_plugin_t){
         .desc = &descriptors[kind],
         .plugin_data = p,

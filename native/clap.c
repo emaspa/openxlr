@@ -6,7 +6,9 @@
 #include "host.h"
 
 #include <clap/clap.h>
+#ifndef _WIN32  // the Windows plugin host brings its own (winhost/shim.h)
 #include <dlfcn.h>
+#endif
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -977,6 +979,7 @@ const Backend clap_backend = {
 
 // --- the scanner ------------------------------------------------------------
 
+#ifndef _WIN32  // the Windows plugin host does not scan yet
 static bool scan_main_thread(const clap_host_t *host) { return true; }
 static bool scan_audio_thread(const clap_host_t *host) { return false; }
 static const clap_host_thread_check_t scan_thread_check = {scan_main_thread,
@@ -1120,3 +1123,4 @@ int clap_scan(const char *file) {
   fputs("trace: scan CLAP: complete\n", stderr);
   return 0;
 }
+#endif
