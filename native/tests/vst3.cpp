@@ -476,6 +476,21 @@ static void strings() {
   puts("PASS: VST3 class names and parameter strings stop at the end of their arrays");
 }
 
+// A native plugin's class id is its 16 bytes in the order of the digits. The
+// Windows plugin host builds the same two functions for Windows, where they
+// read a plugin's COM order; tests/winhost.c holds them to that.
+static void class_ids() {
+  const char *text = "00112233445566778899AABBCCDDEEFF";
+  TUID id;
+  assert(tuid_of(text, id));
+  for (int i = 0; i < 16; ++i)
+    assert((unsigned char)id[i] == i * 0x11);
+  assert(hex_of(id) == text);
+  assert(!tuid_of("0011223344556677", id) && !tuid_of(nullptr, id));
+  assert(!tuid_of("00112233445566778899AABBCCDDEEzz", id));
+  puts("PASS: a native VST3 class id is read and written in the order of its bytes");
+}
+
 // What a plugin may ask of the host after activation. A changed component
 // or bus layout asks for a reload, done in place (see reload_in_place); a
 // new latency figure does not need one.
@@ -986,6 +1001,7 @@ int main(int argc, char **argv) {
   if (argc == 1 || !strcmp(argv[1], "stream")) stream();
   if (argc == 1 || !strcmp(argv[1], "attributes")) attributes();
   if (argc == 1 || !strcmp(argv[1], "strings")) strings();
+  if (argc == 1 || !strcmp(argv[1], "class-ids")) class_ids();
   if (argc == 1 || !strcmp(argv[1], "restart")) restart();
   if (argc == 1 || !strcmp(argv[1], "reload")) reload_in_place();
   if (argc == 1 || !strcmp(argv[1], "latency")) latency();

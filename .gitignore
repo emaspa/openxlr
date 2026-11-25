@@ -34,6 +34,7 @@ native/openxlr-winhost.exe
 native/winhost/*.obj
 native/tests/winhost
 native/tests/winhost-plugin.clap
+native/tests/winhost-plugin.vst3
 native/build-config.h
 native/rnnoise/src/*.o
 native/rnnoise/src/x86/*.o

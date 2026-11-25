@@ -8,6 +8,11 @@
 // behind FUnknown, found by a 16-byte id. The interface headers are
 // vendored under vst3/ (MIT); only their inline parts are used, so nothing
 // of the SDK is compiled here.
+//
+// The Windows plugin host (winhost/) builds this file for Windows and runs a
+// Windows plugin with it. Three places differ there: the system headers
+// below, the module's layout and entry points further down, and the scanner,
+// which that host leaves out for now.
 #include "host.h"
 
 #include <algorithm>
@@ -16,12 +21,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
-#include <dlfcn.h>
 #include <limits>
 #include <map>
 #include <string>
-#include <sys/stat.h>
 #include <vector>
 
 #include <pluginterfaces/base/ibstream.h>
@@ -37,10 +39,15 @@
 #include <pluginterfaces/vst/ivstpluginterfacesupport.h>
 #include <pluginterfaces/vst/vstspeaker.h>
 
+#ifndef _WIN32  // the Windows plugin host brings its own (winhost/shim.h)
+#include <dirent.h>
+#include <dlfcn.h>
+#include <sys/stat.h>
 extern "C" {
 #include <pipewire/pipewire.h>
 #include <spa/utils/defs.h>
 }
+#endif
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -101,12 +108,22 @@ std::string utf8(const char16 (&s)[N]) { return utf8(s, N); }
 template <size_t N>
 std::string text_of(const char8 (&s)[N]) { return std::string(s, strnlen(s, N)); }
 
+// A class id as text is 32 hex digits, and the same 32 for one plugin on
+// every system: what the catalogue and a saved insert hold. A Linux plugin
+// keeps its 16 bytes in the order of the digits. A Windows plugin keeps the
+// first eight as COM does, three fields with the low byte first, so there
+// the digits are read and written in that order. The SDK's own macro lays an
+// id out for the system this is built for; given the numbers 0 to 15 it says
+// which pair of digits each byte is.
+const TUID digits_of_byte =
+    INLINE_UID(0x00010203, 0x04050607, 0x08090A0B, 0x0C0D0E0F);
+
 std::string hex_of(const TUID id) {
   static const char digits[] = "0123456789ABCDEF";
-  std::string out;
+  std::string out(32, '0');
   for (int i = 0; i < 16; ++i) {
-    out += digits[((unsigned char)id[i]) >> 4];
-    out += digits[((unsigned char)id[i]) & 15];
+    out[2 * digits_of_byte[i]] = digits[((unsigned char)id[i]) >> 4];
+    out[2 * digits_of_byte[i] + 1] = digits[((unsigned char)id[i]) & 15];
   }
   return out;
 }
@@ -116,7 +133,7 @@ bool tuid_of(const char *hex, TUID out) {
     return false;
   for (int i = 0; i < 16; ++i) {
     unsigned byte;
-    if (sscanf(hex + 2 * i, "%2x", &byte) != 1)
+    if (sscanf(hex + 2 * digits_of_byte[i], "%2x", &byte) != 1)
       return false;
     out[i] = (char)byte;
   }
@@ -805,6 +822,27 @@ tresult PLUGIN_API PlugFrame::unregisterTimer(Linux::ITimerHandler *handler) {
 
 // --- the module ---------------------------------------------------------------
 
+#ifdef _WIN32
+// What a Windows module is, for the Windows plugin host's build. Its editor
+// sits in a window of Windows' kind.
+const FIDString editor_platform = kPlatformTypeHWND;
+
+// That host is handed the module itself: the Linux side has found it in its
+// bundle (wine.c), where the file system is its own.
+std::string library_in(const std::string &path) { return path; }
+
+// The module is the Windows plugin, with no bridge's bundle around it.
+bool bridge_module_present(const char *) { return true; }
+
+// A Windows module is entered and left without an argument.
+bool enter_module(Vst3 *v) {
+  auto entry = (bool (*)())dlsym(v->library, "InitDll");
+  v->module_exit = (bool (*)())dlsym(v->library, "ExitDll");
+  return !entry || entry();
+}
+#else
+const FIDString editor_platform = kPlatformTypeX11EmbedWindowID;
+
 // A bundle is a directory with the shared object under Contents/<arch>; an
 // older plugin may be the shared object itself.
 std::string library_in(const std::string &path) {
@@ -829,14 +867,9 @@ std::string library_in(const std::string &path) {
   return found;
 }
 
-bool open_module(Vst3 *v, const char *path) {
-  std::string library = library_in(path);
-  if (library.empty()) {
-    fprintf(stderr, "no plugin library in %s\n", path);
-    return false;
-  }
-  // yabridge may show a desktop dialog from its library constructor. Refuse
-  // dangling Windows module links before dlopen, for scans and live inserts.
+// yabridge may show a desktop dialog from its library constructor. Refuse
+// dangling Windows module links before dlopen, for scans and live inserts.
+bool bridge_module_present(const char *path) {
   std::string bundle = path;
   while (!bundle.empty() && bundle.back() == '/') bundle.pop_back();
   std::string name = bundle.substr(bundle.find_last_of('/') + 1);
@@ -852,14 +885,30 @@ bool open_module(Vst3 *v, const char *path) {
     }
     break;
   }
+  return true;
+}
+
+bool enter_module(Vst3 *v) {
+  auto entry = (bool (*)(void *))dlsym(v->library, "ModuleEntry");
+  v->module_exit = (bool (*)())dlsym(v->library, "ModuleExit");
+  return !entry || entry(v->library);
+}
+#endif
+
+bool open_module(Vst3 *v, const char *path) {
+  std::string library = library_in(path);
+  if (library.empty()) {
+    fprintf(stderr, "no plugin library in %s\n", path);
+    return false;
+  }
+  if (!bridge_module_present(path))
+    return false;
   v->library = dlopen(library.c_str(), RTLD_NOW | RTLD_LOCAL);
   if (!v->library) {
     fprintf(stderr, "cannot load %s: %s\n", library.c_str(), dlerror());
     return false;
   }
-  auto entry = (bool (*)(void *))dlsym(v->library, "ModuleEntry");
-  v->module_exit = (bool (*)())dlsym(v->library, "ModuleExit");
-  if (entry && !entry(v->library)) {
+  if (!enter_module(v)) {
     fputs("the module refused to initialise\n", stderr);
     return false;
   }
@@ -1400,8 +1449,7 @@ bool vst3_editor_open(Host *h) {
     host_set_has_editor(h, false);  // now known for certain
     return false;
   }
-  if (v->view->isPlatformTypeSupported(kPlatformTypeX11EmbedWindowID) !=
-      kResultTrue) {
+  if (v->view->isPlatformTypeSupported(editor_platform) != kResultTrue) {
     v->view->release();
     v->view = nullptr;
     host_set_has_editor(h, false);
@@ -1412,8 +1460,8 @@ bool vst3_editor_open(Host *h) {
   if (v->view->getSize(&rect) == kResultOk && rect.getWidth() > 0 &&
       rect.getHeight() > 0)
     host_resize_editor(h, (unsigned)rect.getWidth(), (unsigned)rect.getHeight());
-  if (v->view->attached((void *)(uintptr_t)host_window(h),
-                        kPlatformTypeX11EmbedWindowID) != kResultOk) {
+  if (v->view->attached((void *)(uintptr_t)host_window(h), editor_platform) !=
+      kResultOk) {
     release_view(v);
     return false;
   }
@@ -1495,6 +1543,7 @@ extern "C" const Backend vst3_backend = {
 
 // --- the scanner ------------------------------------------------------------
 
+#ifndef _WIN32  // the Windows plugin host does not scan yet
 // Describe every audio plugin in one bundle as JSON, for the daemon's
 // catalogue. Each is created once, wired to its controller, and asked about
 // its buses, parameters and editor, then let go.
@@ -1645,3 +1694,4 @@ extern "C" int vst3_scan(const char *path) {
   fputs("trace: scan VST3: complete\n", stderr);
   return 0;
 }
+#endif

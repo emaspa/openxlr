@@ -93,21 +93,24 @@ DEP_TARGETS = $(OBJECTS) $(TEST_OBJECTS) tests/bridge tests/scan-plugin.so \
 
 # The Windows backend (wine.c), which runs a Windows plugin under Wine in a
 # process of its own, and that process's program, openxlr-winhost.exe, built
-# with mingw and linked statically. The program is the plugin backend's own
-# source built for Windows (clap.c), the host services that backend expects
-# (winhost/shim.c) and the half that talks to the Linux side
+# with mingw and linked statically. The program is the plugin backends' own
+# sources built for Windows (clap.c and vst3.cpp), the host services those
+# backends expect (winhost/shim.c) and the half that talks to the Linux side
 # (winhost/winhost.c). WINHOST=1 builds both; the default builds neither and
 # needs no mingw. Wine is needed only to run a Windows plugin, never to
 # build.
 WINHOST ?= 0
 MINGW_CC ?= x86_64-w64-mingw32-gcc
+MINGW_CXX ?= x86_64-w64-mingw32-g++
 MINGW_CFLAGS = -std=c11 $(WARN) -isystem clap/include
-WINHOST_OBJECTS = winhost/winhost.obj winhost/shim.obj winhost/clap.obj
-WINHOST_TARGETS = openxlr-winhost.exe tests/winhost-plugin.clap
+MINGW_CXXFLAGS = -std=c++17 $(WARN) -fno-exceptions -fno-rtti -isystem vst3
+WINHOST_OBJECTS = winhost/winhost.obj winhost/shim.obj winhost/clap.obj winhost/vst3.obj
+WINHOST_PLUGINS = tests/winhost-plugin.clap tests/winhost-plugin.vst3
+WINHOST_TARGETS = openxlr-winhost.exe $(WINHOST_PLUGINS)
 ifeq ($(WINHOST),1)
 OBJECTS += wine.o
 TEST_OBJECTS += tests/winhost.o
-DEP_TARGETS += $(WINHOST_OBJECTS) tests/winhost-plugin.clap
+DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS)
 .PHONY: all
 all: openxlr-lv2-host openxlr-winhost.exe
 endif
@@ -251,15 +254,27 @@ winhost/clap.obj: clap.c
 	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
 
+# The scanner is left out of this build for now, and two helpers that only
+# it calls are then unused.
+winhost/vst3.obj: vst3.cpp
+	$(MINGW_CXX) $(MINGW_CXXFLAGS) -Wno-unused-function $(DEPFLAGS) -c $< -o $@
+	@mv $@.d.tmp $@.d
+
 winhost/%.obj: winhost/%.c
 	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@mv $@.d.tmp $@.d
 
+# The C++ driver links it, for vst3.cpp. Static, so the C++ runtime is
+# inside and the program stays one file.
 openxlr-winhost.exe: $(WINHOST_OBJECTS)
-	$(MINGW_CC) -static $^ -o $@ -lole32 -lshell32
+	$(MINGW_CXX) -static $^ -o $@ -lole32 -lshell32
 
 tests/winhost-plugin.clap: tests/winhost-plugin.c
 	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@
+	@mv $@.d.tmp $@.d
+
+tests/winhost-plugin.vst3: tests/winhost-plugin-vst3.cpp
+	$(MINGW_CXX) $(MINGW_CXXFLAGS) $(DEPFLAGS) -shared -static $< -o $@
 	@mv $@.d.tmp $@.d
 
 # This one compiles host.c and wine.c into itself, to drive the audio
@@ -277,9 +292,12 @@ test-winhost:
 else ifeq ($(shell command -v $(MINGW_CC) 2>/dev/null),)
 test-winhost:
 	@echo "SKIP: test-winhost needs $(MINGW_CC) to build the Windows plugin host"
+else ifeq ($(shell command -v $(MINGW_CXX) 2>/dev/null),)
+test-winhost:
+	@echo "SKIP: test-winhost needs $(MINGW_CXX) to build the Windows plugin host"
 else
 test-winhost: tests/winhost $(WINHOST_TARGETS)
-	./tests/winhost ./openxlr-winhost.exe tests/winhost-plugin.clap
+	./tests/winhost ./openxlr-winhost.exe $(WINHOST_PLUGINS)
 endif
 
 clean-native: clean-winhost
