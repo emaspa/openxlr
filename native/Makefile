@@ -88,7 +88,7 @@ OBJECTS = host.o measure.o lv2.o lv2-scan.o json.o clap.o vst3.o sound-check.o e
 TEST_OBJECTS = $(addprefix tests/,editor.o audio.o own-block.o measure.o clap.o lv2.o vst3.o host.o \
                lifecycle.o sound-check.o eq.o duck.o denoise.o denoise-handoff.o denoise-recovery.o \
                voice.o dynamics.o player.o)
-DEP_TARGETS = $(OBJECTS) $(TEST_OBJECTS) tests/bridge tests/scan-plugin.so \
+DEP_TARGETS = $(OBJECTS) $(TEST_OBJECTS) tests/bridge tests/disk-identity tests/scan-plugin.so \
               tests/latency.lv2/latency.so tests/gain.lv2/gain.so
 
 # The Windows backend (wine.c), which runs a Windows plugin under Wine in a
@@ -105,11 +105,11 @@ MINGW_CXX ?= x86_64-w64-mingw32-g++
 MINGW_CFLAGS = -std=c11 $(WARN) -isystem clap/include
 MINGW_CXXFLAGS = -std=c++17 $(WARN) -fno-exceptions -fno-rtti -isystem vst3
 WINHOST_OBJECTS = winhost/winhost.obj winhost/shim.obj winhost/clap.obj winhost/vst3.obj \
-                  winhost/json.obj
+                  winhost/json.obj winhost/disk-hook.obj
 WINHOST_PLUGINS = tests/winhost-plugin.clap tests/winhost-plugin.vst3
 WINHOST_TARGETS = openxlr-winhost.exe $(WINHOST_PLUGINS)
 ifeq ($(WINHOST),1)
-OBJECTS += wine.o
+OBJECTS += wine.o disk-identity.o
 TEST_OBJECTS += tests/winhost.o
 DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS)
 .PHONY: all
@@ -233,7 +233,7 @@ test-scan: openxlr-lv2-host tests/scan-plugin.so
 test-editor: tests/editor
 	./tests/editor
 
-test-audio: tests/audio tests/own-block tests/measure
+test-audio: tests/audio tests/own-block tests/measure test-disk-identity
 	./tests/audio
 	./tests/own-block
 	./tests/measure
@@ -278,7 +278,7 @@ tests/winhost-plugin.vst3: tests/winhost-plugin-vst3.cpp
 
 # This one compiles host.c and wine.c into itself, to drive the audio
 # callback through the Windows backend without a graph.
-tests/winhost: tests/winhost.o lv2.o lv2-scan.o json.o clap.o vst3.o
+tests/winhost: tests/winhost.o lv2.o lv2-scan.o json.o clap.o vst3.o disk-identity.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 # The Windows backend against the Windows test plugin, under Wine and with
@@ -301,9 +301,9 @@ endif
 
 clean-native: clean-winhost
 clean-winhost:
-	rm -f wine.o tests/winhost tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
-	rm -f $(addsuffix .d,wine.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
-	      $(addsuffix .d.tmp,wine.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
+	rm -f wine.o disk-identity.o tests/winhost tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
+	rm -f $(addsuffix .d,wine.o disk-identity.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
+	      $(addsuffix .d.tmp,wine.o disk-identity.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
 
 .PHONY: clean clean-native clean-deepfilter
 clean: clean-native clean-deepfilter
@@ -444,6 +444,24 @@ test-bridge: tests/bridge
 clean-native: clean-bridge
 clean-bridge:
 	rm -f tests/bridge
+
+# The disk identity the Windows plugin host gives a plugin, worked out on
+# made-up disks: NVMe with an NGUID, with an EUI-64 only, with a serial only,
+# behind LUKS, and not NVMe at all. It reads no real disk and needs no Wine,
+# so test-audio, which CI runs, runs it too. test-winhost checks what a
+# plugin is given under Wine.
+tests/disk-identity: tests/disk-identity.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) $< -o $@ $(LDFLAGS)
+	@mv $@.d.tmp $@.d
+
+.PHONY: test-disk-identity clean-disk-identity
+test: test-disk-identity
+test-disk-identity: tests/disk-identity
+	./tests/disk-identity
+
+clean-native: clean-disk-identity
+clean-disk-identity:
+	rm -f tests/disk-identity disk-identity.o
 
 # Objects from a previous checkout or a removed dependency file need one
 # compile to recover their prerequisites. Keep this below the default goal.

@@ -362,7 +362,7 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, ownBlock?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. The daemon does not read a `windowsHost` in the chain. An insert keeps the [host of its Windows plugin](#windows-host), and one being added starts on yabridge. Only this chain is rebuilt; every other chain keeps its running plugins |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert; rebuilds this chain only |
 | `setInsertOwnBlock` | `channel`, `insertId`, `value` | `true` runs one insert's plugin [on its own block](#own-block), `false` back in PipeWire's cycle; saved with the insert as `ownBlock`. Rebuilds this chain only, which starts that insert's host again in the new mode. Refused when the insert is not in the chain, when `value` is not a boolean, and, for `true`, when the native plugin host is not installed |
-| `setInsertWindowsHost` | `channel`, `insertId`, `value` | `"openxlr"` runs one insert's Windows plugin on the [Windows plugin host](#windows-host) built into OpenXLR, `"yabridge"` back through yabridge, which is the default; saved with the insert as `windowsHost`. Needs a build with that host, which no package provides yet. Rebuilds this chain only, which starts that insert's helper again on the other host with the same control values. Refused when the insert is not in the chain, when `value` is neither of the two, and, for `"openxlr"`, when the build has no Windows plugin host, the plugin is not a Windows plugin bridged through yabridge, its Windows module is missing or not 64-bit, or its licence needs the yabridge companion's host. `"yabridge"` is never refused |
+| `setInsertWindowsHost` | `channel`, `insertId`, `value` | `"openxlr"` runs one insert's Windows plugin on the [Windows plugin host](#windows-host) built into OpenXLR, `"yabridge"` back through yabridge, which is the default; saved with the insert as `windowsHost`. Needs a build with that host, which no package provides yet. Rebuilds this chain only, which starts that insert's helper again on the other host with the same control values. Refused when the insert is not in the chain, when `value` is neither of the two, and, for `"openxlr"`, when the build has no Windows plugin host, the plugin is not a Windows plugin bridged through yabridge, or its Windows module is missing or not 64-bit. `"yabridge"` is never refused |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points. Refused when the insert is not in the chain or the catalogue does not declare the symbol for its plugin |
 | `renameInsert` | `channel`, `insertId`, `name` | change one insert's label; `name` is 1 to 256 characters with no control characters. The running plugin, its parameters and the audio path stay as they are. Refused when the insert is not in the chain |
 | `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
@@ -853,12 +853,7 @@ when:
   `Contents/x86_64-win/NAME.vst3` is a link, or a CLAP file with a
   `NAME.clap-win` beside it;
 - the Windows module behind the wrapper is missing, or is not a 64-bit
-  Windows module;
-- the plugin is Elgato Voice Focus, recognised by "voice focus" in the name
-  its module reports or in the file name of its wrapper or its module. Its
-  licence is tied to the disk identity the yabridge companion's host
-  reports. This host does not report it, so the plugin would see a
-  different machine.
+  Windows module.
 
 `"yabridge"` is never refused, so an insert can always go back.
 
@@ -882,6 +877,12 @@ own `WINEPREFIX` when it has one, else the nearest directory above the
 Windows module that holds `dosdevices`, else Wine's default. A `WINELOADER` in the
 daemon's environment names the Wine to start, as it does for yabridge.
 Wine's USB driver stays out of the prefix on both hosts.
+
+Plugins that tie their licence to the system disk, Elgato Voice Focus among
+them, see the same machine on both hosts. Like the yabridge companion's
+host, this one reports the model, firmware revision and serial number of
+the NVMe drive that holds the Wine prefix, the way Windows does, and leaves
+Wine's answer alone when the prefix is on another kind of drive.
 
 The Windows plugin host has no plugin editor yet. An insert running on it
 reports `nativeUiBlocked: true` with the reason in `nativeUiBlockReason`,

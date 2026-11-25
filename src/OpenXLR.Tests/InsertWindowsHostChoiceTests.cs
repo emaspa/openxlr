@@ -190,7 +190,7 @@ public sealed class InsertWindowsHostChoiceTests
         // yabridge, so the switch is back off when the refusal is shown.
         owner.Apply(Chain());
         Assert.False(insert.OnWindowsHost);
-        const string reason = "'Deep Verb' ties its licence to the disk identity that only the yabridge companion reports to a plugin";
+        const string reason = "'Deep Verb' is not a 64-bit Windows module, the only kind the Windows plugin host runs";
         refusal = "setInsertWindowsHost: " + reason;
         await owner.SendWindowsHostAsync(insert, true);
         Assert.Equal(Localizer.Format("WindowsHostRefused", reason), insert.WindowsHostNote);

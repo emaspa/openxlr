@@ -1212,8 +1212,9 @@ one file. Building it does not need Wine; running it does. Run
 of flags.
 
 This is the start of a host that will replace the yabridge companion. It
-carries CLAP and VST3 audio, parameters and latency, and it scans. It has no
-editor yet. No package builds it, so nothing here reaches a user. In a build
+carries CLAP and VST3 audio, parameters and latency, it scans, and it
+reports the system disk's identity to a plugin as the companion's host does.
+It has no editor yet. No package builds it, so nothing here reaches a user. In a build
 that has it, the daemon starts it for an insert that asks for it and for no
 other, and never for a scan. [The daemon's side](#the-daemons-side) has
 the rest.
@@ -1398,8 +1399,9 @@ plugin, three of the fields read as follows:
   systems. This host opens no editor yet, so `gui` says what the plugin has
   and not what can be shown.
 
-A scan starts the Windows program with the one argument `scan`. None of the
-audio path is set up: no shared file, no FIFO and no audio thread. The
+A scan starts the Windows program with the argument `scan`, followed by the
+directory that holds [the disk identity](#the-disk-identity) when there is
+one to give. None of the audio path is set up: no shared file, no FIFO and no audio thread. The
 helper writes one fixed-size request to the program's standard input, with
 the module to open and the path to name it by. Both cross as bytes, because
 Wine converts a command line through the locale's character set. The program
@@ -1461,6 +1463,63 @@ the others, else `LC_CTYPE`. A daemon scan runs under `LC_ALL=C`, so its
 Windows program runs under `LC_ALL=C.UTF-8`. The helper's own locale is not
 touched, and a system with no UTF-8 locale at all is left as it is.
 
+### The disk identity
+
+Some plugins, Elgato Voice Focus among them, tie their licence to a machine
+ID built from the system disk. Under Wine, `\\.\PhysicalDrive0` answers the
+storage property query with a descriptor that has no model, firmware
+revision or serial number, and such a plugin cannot activate. The yabridge
+companion's host answers that one query with the real identity of the NVMe
+drive that holds the Wine prefix, as
+[its own page](../packaging/yabridge/README.md) describes. This host gives
+the same answer by the same rules, byte for byte. A plugin then sees one
+machine on either host, where a different answer would count as another
+device against its licence.
+
+The helper works the descriptor out before it starts Wine, in
+`disk-identity.c`, with the companion's rules unchanged:
+
+- The prefix is the one `WINEPREFIX` names, else `~/.wine`, as for Wine.
+- The disk is the one behind the mount that holds the prefix's `drive_c` in
+  `/proc/self/mountinfo`, under its partition and under a LUKS or LVM
+  mapping. The helper reports an NVMe drive and no other kind.
+- The serial is the namespace's NGUID, or its EUI-64 when the NGUID is zero
+  or missing, as groups of four hex digits joined by underscores with a
+  period at the end, which is how Windows' NVMe driver writes it. A disk with
+  neither has its controller's serial.
+- The descriptor is the 396 bytes that driver returns: no vendor, the model
+  at byte 57, the firmware revision at 122 and the serial at 139, bus type
+  NVMe.
+
+The helper writes the 396 bytes to a file named `disk-identity` in the
+private directory it hands the Windows program, and the file goes with the
+directory. A scan has a directory of its own for it, named after `scan` on
+the Windows program's command line. It goes once the Windows program has
+closed the file, or when the scan ends. When there is nothing to give,
+because the prefix is not on a block device, the disk is not an NVMe drive
+or its identity cannot be read, there is no file and one `trace:` line says
+why. A prefix with no `drive_c` yet gets no line, as under the companion.
+When there is one, the line names the disk, its model and revision, and
+the shape of its serial with every letter and digit masked.
+
+The Windows program reads the file before any plugin module is loaded
+(`winhost/disk-hook.c`). Like the companion's host, it asks the loader to
+tell it of every module that loads from outside `C:\windows`, and points
+that module's imports of `DeviceIoControl`, `CreateFileA`, `CreateFileW` and
+`CloseHandle` at its own. It notes the handles a plugin opens on
+`\\.\PhysicalDrive0` or `\\?\PhysicalDrive0`. On those handles only, it
+answers the standard query for the device property, and only where Wine's
+answer is its empty descriptor. Every other question goes to Wine unchanged,
+another property or device and a handle once closed among them.
+
+A plugin may ask once per audio block, as Voice Focus does, so the question
+reaches the audio thread. Once Wine's empty answer has been replaced, a
+repeat on a noted handle is answered from the copy without asking Wine, as
+the companion does. The noted handles are a fixed table of 256 slots read
+without a lock, so a repeat costs no allocation, no lock and no system
+call. A plugin with more than 256 open at once has the rest answered by
+Wine, and one line says so.
+
 ### The daemon's side
 
 The daemon knows a build has this host by the Windows program. It looks
@@ -1511,17 +1570,10 @@ did not answer in time and the audio goes on without them. Turning the
 insert off and on tries again. The backend's two minutes are what a scan or
 a run by hand gets.
 
-Two things a plugin has under the yabridge companion are missing here:
-
-- The system disk's identity. The companion's host reports it to every
-  plugin it runs, as [its own page](../packaging/yabridge/README.md)
-  describes, so nothing in a module says which plugins depend on it. One
-  is known to, Elgato Voice Focus, and the daemon refuses to move it. It
-  recognises the plugin by "voice focus" in the name its module reports or
-  in the file name of its wrapper or its module, whatever the case and
-  whatever stands between the two words.
-- Editors. An insert on this host reports its editor as blocked, with the
-  reason, and the daemon refuses to open one.
+Editors are the one thing a plugin has under the yabridge companion that
+this host lacks. An insert on this host reports its editor as blocked, with
+the reason, and the daemon refuses to open one. The system disk's identity
+is there too, as [the disk identity](#the-disk-identity) describes.
 
 A saved choice the build cannot honour when the chain is built, because the
 host is gone after a downgrade or the module is, never fails the chain. The
@@ -1585,6 +1637,37 @@ With the VST3 module it checks:
   an editor would, reaches the helper, and a value the helper set before it
   had seen that move is dropped;
 - refused blocks are silence and half a second of them fails the instance.
+
+The CLAP module's `disk` plugin asks for `\\.\PhysicalDrive0`'s descriptor
+from its own module when it is made, the questions `tests/disk-probe.h`
+lists, and again in every block. With it the test checks:
+
+- without an identity to give, the plugin hears Wine's empty descriptor;
+- with a made-up NVMe disk under `disk_identity_test_root`, the plugin is
+  told the helper's 396 bytes on the first question, on a repeat, into a
+  buffer one header long, and on a handle opened again through
+  `CreateFileW` as `\\?\PHYSICALDRIVE0`. Another property, the question
+  whether the property exists, the `C:` volume, the handle once closed and
+  a plain file opened after it come back as Wine gave them without the hook;
+- on this machine's own disk, when the prefix is on an NVMe drive, the
+  plugin is told the bytes the helper built;
+- a block that asks once is no slower than one that does not, at real-time
+  priority 10 where the user's limit allows, and strace on the Windows
+  audio thread sees nothing beside the wake's read and the answer's write.
+  The test prints the same figures with Wine answering, for comparison;
+- a scan gives the plugin the same answer, and Wine's when there is none.
+
+`make -C native test-disk-identity` runs the helper's side alone on
+made-up disks, and `test-audio` runs it too, so CI does. It checks an NVMe
+disk with an NGUID, with an EUI-64 only, with a serial only and with no
+firmware revision, one behind a LUKS mapping, the later of two mounts and a
+mount point with a space in its name, against the layout written out byte
+by byte. It also checks the cases that give nothing: a disk that is not
+NVMe, a prefix on tmpfs, a model or revision too long for the layout, a
+device that is not there, a mount table that cannot be read and a prefix
+with no `drive_c`. `tests/disk-identity --write FILE` writes the
+descriptor for this machine's own prefix, to compare with what the
+companion builds.
 
 It then runs the helper's `wine scan-clap` and `wine scan-vst3` in a process
 of their own, as the daemon would start them, and checks:

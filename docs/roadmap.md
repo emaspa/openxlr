@@ -331,7 +331,8 @@ runs the plugin under Wine and talks to the native plugin host directly.
 What exists is in the tree behind the build flag `WINHOST=1`. It carries
 CLAP and VST3 audio, parameters and latency, and it describes a Windows
 plugin for the catalogue, with the same CLAP and VST3 host code that runs
-and scans a native plugin. It has its own test, described in
+and scans a native plugin. It reports the system disk's identity to a
+plugin as the companion's host does. It has its own test, described in
 [native/README.md](../native/README.md#windows-plugin-host). A VST3 plugin
 keeps the class id and the parameter ids it has through yabridge, so a saved
 insert will still name it and keep its values. No package builds it. In a

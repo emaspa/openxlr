@@ -63,9 +63,8 @@ internal static class WindowsPluginHost
     /// <summary>
     /// The route for a plugin of the catalogue, or null with the reason this
     /// host cannot run it, as the end of a sentence: the build has no host,
-    /// the plugin is not a Windows plugin bridged through yabridge, its
-    /// module is gone or not 64-bit, or its licence needs what only the
-    /// yabridge companion gives it.
+    /// the plugin is not a Windows plugin bridged through yabridge, or its
+    /// module is gone or not 64-bit.
     /// </summary>
     /// <param name="installed">The host's presence, for a test; the build's own when null.</param>
     internal static Route? Resolve(PluginInfo? plugin, out string? reason, bool? installed = null)
@@ -94,13 +93,6 @@ internal static class WindowsPluginHost
             if (!File.Exists(module))
             {
                 reason = $"the Windows plugin behind '{plugin.Name}' is missing: {module}";
-                return null;
-            }
-            // Before the module is opened: this one is decided by name alone.
-            if (NeedsDiskIdentity(plugin.Name, Path.GetFileName(Path.TrimEndingDirectorySeparator(bundle)), Path.GetFileName(module)))
-            {
-                reason = $"'{plugin.Name}' ties its licence to the disk identity that only the yabridge companion reports to a plugin, "
-                    + "so on the Windows plugin host it would see a different machine";
                 return null;
             }
             if (!IsWindows64(module))
@@ -173,20 +165,6 @@ internal static class WindowsPluginHost
             if (Directory.Exists(Path.Combine(directory, "dosdevices"))) return directory;
         return null;
     }
-
-    /// <summary>
-    /// Whether a plugin is one whose licence depends on the disk identity the
-    /// yabridge companion's host reports and this host does not. The
-    /// companion applies that to every plugin it runs, so nothing in a module
-    /// says which ones depend on it, and the rule here is by name: any of the
-    /// names holds "voice focus", whatever its case and whatever stands
-    /// between or around the two words. That is Elgato Voice Focus by the
-    /// name its module reports and by the file names it installs under.
-    /// </summary>
-    internal static bool NeedsDiskIdentity(params string?[] names)
-        => names.Any(name => name is not null
-            && new string([.. name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant)])
-                .Contains("voicefocus", StringComparison.Ordinal));
 
     /// <summary>Whether a file is a Windows module for x86-64: a PE image whose machine field says so.</summary>
     internal static bool IsWindows64(string path)

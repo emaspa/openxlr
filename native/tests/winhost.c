@@ -18,9 +18,15 @@
 // described, and a file that is no module, each have to end the helper
 // with the reason and leave no process behind.
 //
-// Last, both modules are loaded and described from a directory whose name is
-// not ASCII while this process is in the C locale, which is how the daemon
-// runs a scan.
+// Both modules are loaded and described from a directory whose name is not
+// ASCII while this process is in the C locale, which is how the daemon runs
+// a scan.
+//
+// Last, the disk identity: what a plugin that asks for \\.\PhysicalDrive0's
+// descriptor from its own module is told, in a load and in a scan, against
+// the bytes the Linux side built, for a made-up NVMe disk and for this
+// machine's own; what the hook must leave to Wine; and that asking once per
+// block costs the audio thread no time and no system call.
 // Usage: winhost WINHOST-EXE CLAP-PLUGIN VST3-PLUGIN
 #define _GNU_SOURCE
 #include "../host.h"
@@ -38,6 +44,8 @@ static void *test_dsp_buffer(void *port, uint32_t frames);
 #define WINE_STALL_MS 1500
 #define WINE_SCAN_MS 6000
 #include "../wine.c"
+#include "disk-fixture.h"
+#include "disk-probe.h"
 #include <assert.h>
 
 #define PLUGIN "org.openxlr.test.winhost."
@@ -1044,7 +1052,8 @@ static char *clap_description(const char *file) {
                  {"callback", "Test Callback", 2},   {"sidechain", "Test Sidechain", 2},
                  {"refuse", "Test Refuse", 2},       {"slow", "Test Slow", 2},
                  {"stall", "Test Stall", 2},         {"crash", "Test Crash", 2},
-                 {"params", "Test Params", 2},       {"many", "Test Many", 2}};
+                 {"params", "Test Params", 2},       {"many", "Test Many", 2},
+                 {"disk", "Test Disk", 2}};
   char *text = NULL;
   size_t size = 0;
   FILE *f = open_memstream(&text, &size);
@@ -1084,7 +1093,7 @@ static char *clap_phases(void) {
   FILE *f = open_memstream(&text, &size);
   assert(f);
   fputs("trace: scan CLAP: module load\ntrace: scan CLAP: factory plugins\n", f);
-  for (unsigned i = 0; i < 13; ++i) {
+  for (unsigned i = 0; i < 14; ++i) {
     fprintf(f, "trace: scan CLAP plugin %u: descriptor and create\n"
                "trace: scan CLAP plugin %u: initialize\n", i, i);
     if (i != 12) fprintf(f, "trace: scan CLAP plugin %u: ports, GUI support and parameters\n", i);
@@ -1394,6 +1403,289 @@ static void check_locale_scans(void) {
        "not ASCII are loaded with their audio exact and described under that path");
 }
 
+// --- the disk identity ------------------------------------------------------
+
+static void join(char *out, size_t size, const char *directory, const char *name);
+
+// Made-up disks under the runtime directory (tests/disk-fixture.h), the
+// directory that holds the test's prefix, and the file the `disk` plugin
+// writes what it was told to.
+static char disk_tree[PATH_MAX], disk_holder[PATH_MAX], disk_probe[PATH_MAX];
+
+#define DISK_MODEL "OpenXLR Test NVMe"
+#define DISK_REVISION "1.2.3"
+#define DISK_SERIAL "0123_4567_89AB_CDEF_FEDC_BA98_7654_3210."
+
+// The prefix on the made-up NVMe disk, which has an NGUID, or on the SATA
+// disk, where there is no identity to give.
+static void disk_mounted_on(bool nvme) {
+  fixture_mounts(disk_tree, disk_holder, nvme ? "/dev/nvme0n1p2" : "/dev/sda1", NULL, NULL);
+  disk_identity_test_root = disk_tree;
+}
+
+static bool take_probe(ProbeRecord records[PROBE_RECORDS]) {
+  FILE *file = fopen(disk_probe, "rb");
+  size_t count = file ? fread(records, sizeof(ProbeRecord), PROBE_RECORDS, file) : 0;
+  if (file) fclose(file);
+  unlink(disk_probe);
+  return count == PROBE_RECORDS;
+}
+
+// Load the `disk` plugin, which asks its questions as it is made, run blocks
+// that each ask again and must each be told the same, and take what it was
+// told.
+static bool probe_by_load(ProbeRecord records[PROBE_RECORDS]) {
+  setenv("OPENXLR_TEST_WINHOST_DISK", disk_probe, 1);
+  bool begun = begin("disk", 2), steady = begun;
+  unsetenv("OPENXLR_TEST_WINHOST_DISK");
+  for (unsigned i = 0; begun && i < 64; ++i) {
+    cycle(256);
+    steady = steady && scaled(256, 0.5f);
+  }
+  end();
+  return take_probe(records) && steady;
+}
+
+static bool told(const ProbeRecord *r, const unsigned char *descriptor, uint32_t size) {
+  return r->ok && r->returned == size && !memcmp(r->bytes, descriptor, size);
+}
+
+// The descriptor on every question it answers: the first, the same again, one
+// into a buffer only a header long, and one on a handle opened again through
+// CreateFileW under another spelling of the name.
+static bool told_everywhere(const ProbeRecord *got, const unsigned char *descriptor) {
+  return told(&got[PROBE_FIRST], descriptor, DISK_IDENTITY_SIZE) &&
+         told(&got[PROBE_REPEAT], descriptor, DISK_IDENTITY_SIZE) &&
+         told(&got[PROBE_HEADER], descriptor, 8) &&
+         told(&got[PROBE_REOPENED], descriptor, DISK_IDENTITY_SIZE);
+}
+
+// Wine's own answer for PhysicalDrive0, which is what the hook replaces: a
+// bare 40-byte descriptor that names no vendor, product or serial.
+static bool wine_placeholder(const ProbeRecord *r) {
+  static const unsigned char none[16] = {0};
+  return r->ok && r->returned == 40 && r->bytes[4] == 40 && !r->bytes[5] &&
+         !memcmp(r->bytes + 12, none, 16);
+}
+
+// What the hook leaves to Wine has to come back as Wine gave it without the
+// hook: another property, the question whether one exists, another device, a
+// handle once it is closed, and a plain file opened after that.
+static bool left_alone(const ProbeRecord *got, const ProbeRecord *wine) {
+  static const int untouched[] = {PROBE_ADAPTER, PROBE_EXISTS, PROBE_VOLUME, PROBE_CLOSED,
+                                  PROBE_REUSED};
+  for (size_t i = 0; i < sizeof(untouched) / sizeof(untouched[0]); ++i) {
+    const ProbeRecord *a = &got[untouched[i]], *b = &wine[untouched[i]];
+    if (a->ok != b->ok || a->returned != b->returned || a->error != b->error ||
+        a->returned > PROBE_BUFFER || memcmp(a->bytes, b->bytes, a->returned)) {
+      printf("FAIL: question %d of the disk probe was not left to Wine\n", untouched[i]);
+      return false;
+    }
+  }
+  return true;
+}
+
+typedef struct {
+  unsigned count;
+  double *times;
+  bool real_time;
+} Timed;
+
+static void *timed_cycles(void *data) {
+  Timed *t = data;
+  struct sched_param param = {.sched_priority = 10};
+  t->real_time = sched_setscheduler(0, SCHED_FIFO, &param) == 0;
+  for (unsigned i = 0; i < t->count; ++i) {
+    t->times[i] = cycle(256);
+    assert(scaled(256, 0.5f));
+  }
+  return NULL;
+}
+
+// The round trip of a 256-frame block through a plugin, by its median and its
+// 99th percentile, from a thread at real-time priority 10 when this user may
+// have one. The Windows audio thread is given the same, as in the product.
+static double round_trip(const char *kind, unsigned count, double *p99, bool *real_time) {
+  static double times[4000];
+  assert(count <= sizeof(times) / sizeof(times[0]));
+  assert(begin(kind, 2));
+  pthread_t thread;
+  Timed warm = {32, times, false};
+  assert(pthread_create(&thread, NULL, timed_cycles, &warm) == 0);
+  pthread_join(thread, NULL);
+  wine_backend.main_thread(&h);
+  Timed timed = {count, times, false};
+  assert(pthread_create(&thread, NULL, timed_cycles, &timed) == 0);
+  pthread_join(thread, NULL);
+  end();
+  qsort(times, count, sizeof(double), compare_doubles);
+  *p99 = times[count * 99 / 100];
+  *real_time = timed.real_time;
+  return times[count / 2];
+}
+
+// The system calls the Windows audio thread makes over `count` blocks of the
+// plugin `kind`, as strace sees them on that thread alone, beside the read
+// that wakes it and the write that answers. -1 when strace is missing or may
+// not watch the thread.
+static int other_system_calls(const char *kind, unsigned count) {
+  char strace[PATH_MAX], log[PATH_MAX + 16], status_path[64], line[512];
+  if (!wine_find_program("strace", strace, sizeof(strace)))
+    return -1;
+  assert(begin(kind, 2));
+  Wine *w = h.impl;
+  for (unsigned i = 0; i < 8; ++i)
+    cycle(256);
+  if (!w->audio_tid) {
+    end();
+    return -1;
+  }
+  snprintf(log, sizeof(log), "%s.strace", disk_probe);
+  char tid[16];
+  snprintf(tid, sizeof(tid), "%d", (int)w->audio_tid);
+  fflush(NULL);
+  pid_t tracer = fork();
+  assert(tracer >= 0);
+  if (tracer == 0) {
+    execl(strace, "strace", "-qq", "-o", log, "-p", tid, (char *)NULL);
+    _exit(127);
+  }
+  // Until strace has the thread, or gives up.
+  snprintf(status_path, sizeof(status_path), "/proc/%s/status", tid);
+  bool watched = false;
+  for (unsigned attempt = 0; attempt < 500 && !watched; ++attempt) {
+    FILE *status = fopen(status_path, "r");
+    while (status && fgets(line, sizeof(line), status))
+      if (!strncmp(line, "TracerPid:", 10))
+        watched = atoi(line + 10) == (int)tracer;
+    if (status) fclose(status);
+    if (!watched) sleep_ms(10);
+    int ended = 0;
+    if (!watched && waitpid(tracer, &ended, WNOHANG) == tracer) {
+      tracer = 0;
+      break;
+    }
+  }
+  for (unsigned i = 0; watched && i < count; ++i) {
+    cycle(256);
+    assert(scaled(256, 0.5f));
+  }
+  if (tracer > 0) {
+    kill(tracer, SIGINT);
+    while (waitpid(tracer, NULL, 0) < 0 && errno == EINTR) {}
+  }
+  end();
+  // The wake is a one-byte read and the answer a one-byte write, on the
+  // descriptors Wine gave standard input and output. A read strace caught
+  // half way when it attached ends as a resumed one, and the read it leaves
+  // the thread waiting in as a detached one.
+  int others = watched ? 0 : -1;
+  FILE *calls = fopen(log, "r");
+  while (watched && calls && fgets(line, sizeof(line), calls))
+    if (!(!strncmp(line, "read(", 5) && strstr(line, ", \"P\", 1)")) &&
+        !(!strncmp(line, "write(", 6) && strstr(line, ", \"D\", 1)")) &&
+        !(!strncmp(line, "read(", 5) && strstr(line, "<detached ...>")) &&
+        strncmp(line, "<... read resumed>", 18)) {
+      if (others < 4) printf("note: the Windows audio thread called %s", line);
+      ++others;
+    }
+  if (calls) fclose(calls);
+  unlink(log);
+  return others;
+}
+
+static void check_disk_identity(const char *runtime) {
+  static ProbeRecord wine[PROBE_RECORDS], got[PROBE_RECORDS];
+  unsigned char fixture[DISK_IDENTITY_SIZE], own[DISK_IDENTITY_SIZE];
+  fixture_expected(fixture, DISK_MODEL, DISK_REVISION, DISK_SERIAL);
+  // Wine has made the prefix by now, so it has a real path for the mount
+  // table to name.
+  assert(realpath(getenv("WINEPREFIX"), disk_holder));
+  join(disk_tree, sizeof(disk_tree), runtime, "disks");
+  join(disk_probe, sizeof(disk_probe), runtime, "disk-probe");
+  fixture_nvme(disk_tree, 0, "01234567-89ab-cdef-fedc-ba9876543210\n", "00 11 22 33 44 55 66 77\n",
+               DISK_MODEL "\n", DISK_REVISION "\n", "NOT-THE-NAME\n");
+  fixture_sata(disk_tree);
+
+  // No identity to give: the plugin hears Wine, which is what the rest is
+  // measured against.
+  disk_mounted_on(false);
+  assert(probe_by_load(wine));
+  assert(wine_placeholder(&wine[PROBE_FIRST]) && wine_placeholder(&wine[PROBE_REOPENED]));
+  puts("PASS: without an identity to give, the plugin hears Wine's empty descriptor");
+
+  disk_mounted_on(true);
+  assert(probe_by_load(got));
+  assert(told_everywhere(got, fixture) && left_alone(got, wine));
+  printf("PASS: a plugin that asks for PhysicalDrive0's descriptor is told the Linux side's "
+         "396 bytes, and every other question is left to Wine%s\n",
+         got[PROBE_REUSED].same ? " (the closed handle's value came back for a plain file)" : "");
+
+  // This machine's own disk, when its prefix is on an NVMe drive. Only the
+  // comparison is printed, never the bytes.
+  disk_identity_test_root = NULL;
+  if (disk_identity_build(own)) {
+    assert(probe_by_load(got));
+    assert(told_everywhere(got, own) && left_alone(got, wine));
+    puts("PASS: on this machine's own NVMe disk the plugin is told the bytes the Linux side built");
+  } else
+    puts("SKIP: this machine's prefix is not on an NVMe disk the rules can read, so only the "
+         "made-up one was checked");
+
+  // Once per block, on the audio thread: no slower than a plugin that does
+  // not ask, and no system call beyond the block's own two.
+  disk_mounted_on(true);
+  double gain_p99, disk_p99, wine_p99;
+  bool real_time;
+  double gain = round_trip("gain", 4000, &gain_p99, &real_time);
+  double disk = round_trip("disk", 4000, &disk_p99, &real_time);
+  disk_mounted_on(false);
+  double asked = round_trip("disk", 4000, &wine_p99, &real_time);
+  printf("note: a 256-frame round trip, median and 99th percentile%s: %.3f and %.3f ms "
+         "without a query, %.3f and %.3f ms with one answered by the hook, %.3f and %.3f ms "
+         "with one answered by Wine\n",
+         real_time ? " at real-time priority 10" : " at ordinary priority", gain, gain_p99,
+         disk, disk_p99, asked, wine_p99);
+  assert(disk < gain + 0.02);
+  printf("PASS: a query in every block costs the round trip %+.1f us at the median\n",
+         (disk - gain) * 1e3);
+  disk_mounted_on(true);
+  int hooked = other_system_calls("disk", 200), plain = other_system_calls("gain", 200);
+  disk_mounted_on(false);
+  int unhooked = other_system_calls("disk", 200);
+  if (hooked < 0 || plain < 0)
+    puts("SKIP: strace is missing or may not watch the Windows audio thread, so its system "
+         "calls were not counted");
+  else {
+    printf("note: over 200 blocks the Windows audio thread made %d system calls beside its "
+           "read and write with the hook answering, %d with no query, %d with Wine answering\n",
+           hooked, plain, unhooked);
+    assert(hooked == 0 && plain == 0);
+    puts("PASS: the hook's repeat answers make no system call on the audio thread");
+  }
+  disk_identity_test_root = NULL;
+}
+
+// A scan loads the plugin as a run does, and gets the identity the same way.
+static void check_disk_identity_scan(void) {
+  static ProbeRecord got[PROBE_RECORDS];
+  unsigned char fixture[DISK_IDENTITY_SIZE];
+  fixture_expected(fixture, DISK_MODEL, DISK_REVISION, DISK_SERIAL);
+  for (int nvme = 1; nvme >= 0; --nvme) {
+    disk_mounted_on(nvme);
+    setenv("OPENXLR_TEST_WINHOST_DISK", disk_probe, 1);
+    Described d = run_scan("scan-clap", plugin_path, NULL);
+    unsetenv("OPENXLR_TEST_WINHOST_DISK");
+    assert(exited_with(&d, 0) && take_probe(got));
+    assert(nvme ? told_everywhere(got, fixture) : wine_placeholder(&got[PROBE_FIRST]));
+    forget(&d);
+  }
+  disk_identity_test_root = NULL;
+  assert(scanning_hosts() == 0);
+  puts("PASS: a plugin is told the disk identity during a scan too, and Wine's answer when "
+       "there is none");
+}
+
 static void make_directories(char *path) {
   for (char *slash = strchr(path + 1, '/'); slash; slash = strchr(slash + 1, '/')) {
     *slash = 0;
@@ -1501,6 +1793,7 @@ int main(int argc, char **argv) {
   check_refused(begin_vst3, VST3_REFUSE);
   puts("PASS: blocks a VST3 plugin refuses are silence, and half a second of them fails the instance");
   check_vst3_refusals();
+  check_disk_identity(runtime);
   check_locale_choice();
   check_locale_loads();
   pw_deinit();
@@ -1512,7 +1805,12 @@ int main(int argc, char **argv) {
   check_scan_print();
   check_scan_hang();
   check_locale_scans();
+  check_disk_identity_scan();
   // What the test itself put in the runtime directory.
+  char command[PATH_MAX + 32];
+  assert(strstr(disk_tree, "/openxlr-test-winhost."));
+  snprintf(command, sizeof(command), "rm -rf -- '%s'", disk_tree);
+  assert(system(command) == 0);
   unlink(umlaut_clap);
   unlink(umlaut_vst3);
   rmdir(umlaut_directory);
