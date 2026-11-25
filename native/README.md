@@ -1722,6 +1722,33 @@ that prefix, which takes most of a minute. The target is not part of
 `make test`. CI runs it in a job of its own, with Ubuntu's mingw and Wine,
 whenever a source file under `native/` changes.
 
+`make -C native WINHOST=1 test-winhost-graph` runs the helper with the
+`wine` backend as a real node in a PipeWire graph
+(`tests/winhost-graph.py`). It starts a PipeWire server of its own, with its
+own runtime directory, configuration and socket name and no session
+manager. Before it starts anything else it checks that the server the
+environment reaches is that one, by a token in the server's configuration,
+and stops if not. `tests/winhost-graph` holds two nodes, one that plays a
+stereo signal in which every frame names its own position and one that
+records. The check links the helper's node between them by hand and checks,
+for the CLAP and the VST3 test plugin, on the graph's block and on the
+plugin's own:
+
+- every recorded frame is the signal at the plugin's gain, or silence;
+- the latency the helper reports is the plugin's figure plus the delay the
+  node adds, which is none on the graph's block and 1536 frames on the
+  plugin's own at a quantum of 256;
+- a parameter set on the helper's standard input is heard and its meter
+  follows;
+- a killed Windows program makes the helper say so and exit, and its node
+  leaves the graph. A helper asked to quit exits cleanly and takes its node.
+
+Silence while the plugin's audio runs is a block that came late, which a
+loaded machine may cause. It is counted and printed, not failed. No thread
+of the check runs above real-time priority 20. The check needs PipeWire's
+server, `pw-link` and `pw-dump` as well as Wine, uses the same Wine prefix as
+`test-winhost` and no display, and runs in the same CI job.
+
 ## Scope
 
 For the plugin: URID map and unmap, the worker extension, options, and the

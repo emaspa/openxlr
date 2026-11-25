@@ -34,6 +34,7 @@ native/tests/disk-identity
 native/openxlr-winhost.exe
 native/winhost/*.obj
 native/tests/winhost
+native/tests/winhost-graph
 native/tests/winhost-plugin.clap
 native/tests/winhost-plugin.vst3
 native/build-config.h

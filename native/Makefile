@@ -111,7 +111,7 @@ WINHOST_TARGETS = openxlr-winhost.exe $(WINHOST_PLUGINS)
 ifeq ($(WINHOST),1)
 OBJECTS += wine.o disk-identity.o
 TEST_OBJECTS += tests/winhost.o
-DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS)
+DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS) tests/winhost-graph
 .PHONY: all
 all: openxlr-lv2-host openxlr-winhost.exe
 endif
@@ -281,29 +281,42 @@ tests/winhost-plugin.vst3: tests/winhost-plugin-vst3.cpp
 tests/winhost: tests/winhost.o lv2.o lv2-scan.o json.o clap.o vst3.o disk-identity.o
 	$(CXX) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
+# The two ends of the graph check: a node that plays and one that records.
+tests/winhost-graph: tests/winhost-graph.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
+	@mv $@.d.tmp $@.d
+
 # The Windows backend against the Windows test plugin, under Wine and with
 # no audio server. Not part of `test`: it needs a build with WINHOST=1,
 # mingw and Wine, and says which one is missing instead of failing.
-.PHONY: test-winhost clean-winhost
+#
+# test-winhost-graph runs the helper with that backend as a node of a private
+# PipeWire server, between the two nodes of tests/winhost-graph, and needs
+# Wine and PipeWire's server and tools as well (tests/winhost-graph.py).
+.PHONY: test-winhost test-winhost-graph clean-winhost
 ifneq ($(WINHOST),1)
-test-winhost:
-	@echo "SKIP: test-winhost needs a build with WINHOST=1"
+test-winhost test-winhost-graph:
+	@echo "SKIP: $@ needs a build with WINHOST=1"
 else ifeq ($(shell command -v $(MINGW_CC) 2>/dev/null),)
-test-winhost:
-	@echo "SKIP: test-winhost needs $(MINGW_CC) to build the Windows plugin host"
+test-winhost test-winhost-graph:
+	@echo "SKIP: $@ needs $(MINGW_CC) to build the Windows plugin host"
 else ifeq ($(shell command -v $(MINGW_CXX) 2>/dev/null),)
-test-winhost:
-	@echo "SKIP: test-winhost needs $(MINGW_CXX) to build the Windows plugin host"
+test-winhost test-winhost-graph:
+	@echo "SKIP: $@ needs $(MINGW_CXX) to build the Windows plugin host"
 else
 test-winhost: tests/winhost $(WINHOST_TARGETS)
 	./tests/winhost ./openxlr-winhost.exe $(WINHOST_PLUGINS)
+
+test-winhost-graph: openxlr-lv2-host tests/winhost-graph $(WINHOST_TARGETS)
+	python3 tests/winhost-graph.py ./openxlr-lv2-host ./openxlr-winhost.exe $(WINHOST_PLUGINS) \
+	        ./tests/winhost-graph
 endif
 
 clean-native: clean-winhost
 clean-winhost:
-	rm -f wine.o disk-identity.o tests/winhost tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
-	rm -f $(addsuffix .d,wine.o disk-identity.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
-	      $(addsuffix .d.tmp,wine.o disk-identity.o tests/winhost.o $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
+	rm -f wine.o disk-identity.o tests/winhost tests/winhost.o tests/winhost-graph $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
+	rm -f $(addsuffix .d,wine.o disk-identity.o tests/winhost.o tests/winhost-graph $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
+	      $(addsuffix .d.tmp,wine.o disk-identity.o tests/winhost.o tests/winhost-graph $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
 
 .PHONY: clean clean-native clean-deepfilter
 clean: clean-native clean-deepfilter
