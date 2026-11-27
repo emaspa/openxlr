@@ -23,6 +23,14 @@ public sealed record DaemonSettings
 
     public List<PluginFolder>? PluginFolders { get; init; }
 
+    /// <summary>
+    /// Present once the daemon has copied the yabridge companion's folders
+    /// into <see cref="PluginFolders"/>, which it does by itself once, at the
+    /// first start of a build with both the Windows plugin host and the
+    /// companion. Absent until then.
+    /// </summary>
+    public BridgeFolderCopy? YabridgeFolderCopy { get; init; }
+
     /// <summary>Keys this version does not know, written back unchanged by a save.</summary>
     [System.Text.Json.Serialization.JsonExtensionData]
     public Dictionary<string, JsonElement>? UnknownKeys { get; init; }
@@ -73,3 +81,9 @@ public sealed record DaemonSettings
 
 /// <summary>An added plugin search folder: the format (lv2, clap or vst3, or windows for both Windows formats) and an absolute directory.</summary>
 public sealed record PluginFolder(string Kind, string Path);
+
+/// <summary>What the one-time copy of the yabridge companion's folders did: the folders it added under <c>windows</c>, and those it could not add, each with the reason.</summary>
+public sealed record BridgeFolderCopy(List<string>? Added, List<FolderNotCopied>? NotAdded);
+
+/// <summary>A yabridge folder the copy did not add, or the registry itself when it could not be read, and why.</summary>
+public sealed record FolderNotCopied(string Path, string Reason);

@@ -160,7 +160,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
 | `browserSession` | in answer to `getBrowserSession` over WebSocket | `session`, a server-generated 32-character hexadecimal id owned by that connection; see [browser tabs](#browser-tabs) |
 | `browserTabActivation` | to the browser companion connection that registered the tab, after an accepted `activateBrowserTab` | `tabId` and `site`, the tab's canonical origin; no other client receives it. See [browser tabs](#browser-tabs) |
-| `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports. A scan entry that failed carries `logId`, the name of the file holding that attempt's bounded scanner output, or `logNote` saying why there is none; both are absent from an entry that did not fail and from one an older daemon recorded. `scanLogs` gives the `directory` those files are in and the bounds they are kept under (`stderrCapBytes`, `traceStderrCapBytes`, `traceCaptureBytes`, `stdoutCapBytes`, `maxFiles`, `maxTotalBytes`). Reading the reply or the directory scans nothing and starts no process |
+| `pluginDiagnostics` | in answer to `getPluginDiagnostics` | `discovery`: daemon host/controller paths, Wine prefix, architecture, effective search paths, bounded `yabridgectl status` output and latest completed CLAP/VST3 scan reports, the inserts only a yabridge wrapper gives a plugin (`bridgeOnlyInserts`), those with a Windows plugin while Wine is missing (`windowsInsertsNeedingWine`) and the record of the [one-time folder copy](#yabridge-folder-copy) (`yabridgeFolderCopy`). A scan entry that failed carries `logId`, the name of the file holding that attempt's bounded scanner output, or `logNote` saying why there is none; both are absent from an entry that did not fail and from one an older daemon recorded. `scanLogs` gives the `directory` those files are in and the bounds they are kept under (`stderrCapBytes`, `traceStderrCapBytes`, `traceCaptureBytes`, `stdoutCapBytes`, `maxFiles`, `maxTotalBytes`). Reading the reply or the directory scans nothing and starts no process |
 | `pluginInstall` | in answer to `installPlugin`, `addPluginSearchPath`, `removePluginSearchPath`, `addWindowsPluginFolder`, `removeWindowsPluginFolder`, `removeWindowsPluginInserts`, `setWindowsPluginEnabled`, `deleteWindowsPlugin`, `syncWindowsPlugins` and `rescanPlugins` | `ok`, `message` (a sentence or two for the user, ending with the bundles the scan that followed could not read, up to three by name and the rest as a count), `installed` (the bundles or folders put in place), `added` (plugins in the catalogue that were not before) and `total` |
 | `error` | when a command without a `requestId` is rejected or fails inside the daemon | `message`; for the mixer commands a `state` follows, so an optimistic edit can be reverted |
 | `commandResult` | in answer to a command that carried a `requestId` | `requestId`, `error` (null on success); preceded by the state the result refers to |
@@ -348,8 +348,8 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `getPluginDiagnostics` | none | read bridge status and existing native scan evidence without syncing, rescanning or changing inserts; answered with `pluginDiagnostics` |
 | `getPluginSetup` | none | where plugins are installed and what bridges Windows ones, answered with a `pluginSetup` message |
 | `setPluginWineTrace` | `value` | boolean only; set or clear deep Wine tracing for future plugin scans in the running daemon, answered with `pluginSetup` carrying the current `wineTrace`. No restart, persistence, rescan or cache deletion |
-| `installPlugin` | `path` | install what is at an absolute path the user picked: a `.clap` or single-file `.vst3` is copied into `~/.clap` or `~/.vst3`, a `.vst3` or `.lv2` directory into `~/.vst3` or `~/.lv2`, a plain directory installs every plugin inside it. A single Windows VST3/CLAP file or VST3 bundle is copied into its own folder under `windowsImportDirectory`, and only that folder is registered and synced; a plugin already installed inside a Wine prefix is linked from the managed folder instead, preserving its original location and prefix. An explicit Windows plugin folder is registered in place. Archives, installers and VST2 files are refused with a message that says what to do. The catalogues are read again before the `pluginInstall` answer |
-| `addWindowsPluginFolder` | `path` | register an existing folder holding Windows VST3 or CLAP plugins and sync it, without copying source files or installing any native plugins alongside them; answered with `pluginInstall` |
+| `installPlugin` | `path` | install what is at an absolute path the user picked: a `.clap` or single-file `.vst3` is copied into `~/.clap` or `~/.vst3`, a `.vst3` or `.lv2` directory into `~/.vst3` or `~/.lv2`, a plain directory installs every plugin inside it. A single Windows VST3/CLAP file or VST3 bundle is copied into its own folder under `windowsImportDirectory`, and only that folder is registered and synced; a plugin already installed inside a Wine prefix is linked from the managed folder instead, preserving its original location and prefix. An explicit Windows plugin folder is registered in place. In a build with the [Windows plugin host](#windows-host) and Wine but no yabridge, the copy alone is enough, since `windowsImportDirectory` is a [Windows plugin folder](#windows-plugin-folders), and an explicit folder is added as a `windows` plugin folder unless the host already searches it. Wine is needed either way. Archives, installers and VST2 files are refused with a message that says what to do. The catalogues are read again before the `pluginInstall` answer |
+| `addWindowsPluginFolder` | `path` | register an existing folder holding Windows VST3 or CLAP plugins and sync it, without copying source files or installing any native plugins alongside them. With no yabridge, in a build with the Windows plugin host and Wine, the folder is added as a `windows` plugin folder instead, unless the host already searches it; answered with `pluginInstall` |
 | `removeWindowsPluginFolder` | `path` | unregister a folder from `windowsDirectories`, sync retained folders and remove only its unused generated VST3/CLAP wrappers. Original files are kept. Refused while affected plugins remain in the mixer's insert chains. A missing source folder can still be removed from the list; answered with `pluginInstall` |
 | `getWindowsPluginFiles` | `path` | list Windows VST3/CLAP files and bundles reachable from one registered folder, including excluded files; answered with `windowsPluginFiles`. Reads metadata without syncing or deleting |
 | `removeWindowsPluginInserts` | `path` | remove every current insert supplied by the selected registered Windows plugin file, including bypassed occurrences across inputs and mixes. Other inserts, files, exclusions and saved profiles are kept. Rewire affected paths and save current settings before answering with `pluginInstall`; requires a running mixer |
@@ -899,7 +899,9 @@ Wine's USB driver stays out of the prefix on both hosts.
 daemon also reads Windows plugins straight from their folders, so a plugin
 needs no yabridge wrapper to reach the catalogue. The folders are
 `drive_c/Program Files/Common Files/VST3` and `.../CLAP` in the daemon's
-Wine prefix (its `WINEPREFIX`, else `~/.wine`), then the folders added with
+Wine prefix (its `WINEPREFIX`, else `~/.wine`), then the folder
+`installPlugin` copies a Windows plugin into (`windowsImportDirectory`,
+`$XDG_DATA_HOME/openxlr/windows-plugins`), then the folders added with
 `addPluginSearchPath` and `kind: "windows"`. Each one is searched for both
 formats, to any depth, on the terms of the other
 [plugin search paths](#plugin-search-paths). A `windows` folder may not be
@@ -950,6 +952,28 @@ them, see the same machine on both hosts. Like the yabridge companion's
 host, this one reports the model, firmware revision and serial number of
 the NVMe drive that holds the Wine prefix, the way Windows does, and leaves
 Wine's answer alone when the prefix is on another kind of drive.
+
+<a name="yabridge-folder-copy"></a>
+**The one-time copy of the companion's folders.** At its first start in a
+build with both the Windows plugin host and the `openxlr-yabridge`
+companion, before the first scan, the daemon reads the companion's folder
+registry (`plugin_dirs` in `bridge/yabridgectl/config.toml` under the
+configuration directory) and adds each folder there to `pluginFolders` as a
+`windows` entry. Nobody is asked. A folder the host already searches,
+itself or inside another, is passed over. The rest are added on the terms
+of `addPluginSearchPath`, the overlap rule and the limit of 32 included,
+and a folder that cannot be added is kept with the reason. The registry is
+not changed, and a system yabridge's own registry is not read.
+
+The daemon writes `daemon.json` once, through the same atomic write as
+the other settings, with the folders and the record
+`yabridgeFolderCopy: {added, notAdded}`. `added` lists the folders added
+and `notAdded` lists `{path, reason}`, at most 64 entries. A registry that
+cannot be read is in `notAdded` under its own path, and a missing one counts
+as one with no folders. Once the record is there the copy never runs
+again, even after the user removes a copied folder. If `daemon.json`
+cannot be read or written, nothing is copied, and the next start tries
+again. The daemon's log has one line for the copy.
 
 `showInsertUi` opens the plugin's own editor for an insert on the Windows
 plugin host as it does for any other, in the window every plugin editor
@@ -2170,9 +2194,13 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   `addPluginSearchPath` (`kind` is `lv2`, `clap`, `vst3` or `windows`; an
   older daemon skips a `windows` entry with a `searchPathWarning` and keeps
   it saved), written by the daemon and read at each scan and
-  each LV2 host start. Each writer keeps the keys it does not own.
+  each LV2 host start. `yabridgeFolderCopy` is present once the daemon has
+  copied the companion's folders into `pluginFolders`, which it does by
+  itself once (see [the one-time copy](#yabridge-folder-copy)). Each writer
+  keeps the keys it does not own.
 - `bridge/yabridgectl/config.toml`: the managed companion's folder registry,
-  separate from the system yabridgectl configuration. Private wrappers live
+  separate from the system yabridgectl configuration. The daemon reads it
+  once for [the one-time copy](#yabridge-folder-copy) and never writes it. Private wrappers live
   under `$XDG_DATA_HOME/openxlr/yabridge` (default `~/.local/share/openxlr/yabridge`).
 - `native-editors.json`: native editor compatibility overrides. Format
   `{"version":1,"overrides":[{"kind":"vst3","plugin":"<class-id>","name":"Plugin name","blocked":true}]}`.
@@ -2312,6 +2340,24 @@ own reports. A bundle whose plugins are all counted in `duplicates` there is
 in the catalogue through another entry, usually its yabridge wrapper. When
 that wrapper links to the bundle's own module, the bundle was not started
 and its `detail` names the wrapper.
+
+Three fields say what removing the companion would cost. `bridgeOnlyInserts`
+lists up to 64 inserts whose plugin is in the catalogue only through a
+yabridge wrapper, as `{chain, chainName, id, kind, plugin, name, wrapper,
+module, reason}`. `reason` is `outside-windows-folders` when the wrapper's
+64-bit module is in none of the Windows plugin folders, `not-64-bit` when
+the module is 32-bit, which only yabridge runs, and `module-missing` when
+the module is gone. `module` is null for a wrapper that links only a 32-bit
+module. An insert with a plugin found in a Windows plugin folder,
+or through a wrapper whose module is in one, is not listed, and neither is
+one whose plugin is not in the catalogue. `windowsInsertsNeedingWine`
+lists up to 64 `{chain, chainName, id, name}` inserts with a Windows plugin,
+through a wrapper or a Windows plugin folder, while the daemon finds no
+Wine: no `wine` where it looks for tools (its PATH, `~/.local/bin`,
+`/usr/local/bin`) and no file named by `OPENXLR_WINE` or `WINELOADER`. It
+is empty when Wine is there.
+`yabridgeFolderCopy` is the record of [the one-time copy](#yabridge-folder-copy)
+from `daemon.json`, or null before it ran.
 
 Both `pluginSetup` and `discovery` include `memoryLockHardLimitBytes`, the
 daemon's hard memory-lock limit. The existing `memoryLockLimitBytes` stays

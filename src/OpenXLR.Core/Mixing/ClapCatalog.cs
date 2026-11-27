@@ -323,7 +323,7 @@ internal static class HostScan
                             {
                                 evidence.Add(bundle, "windows-not-64-bit", detail: module is null && !WindowsPluginHost.Only32Bit(bundle)
                                     ? "The bundle holds no Windows module under Contents/x86_64-win."
-                                    : "The Windows plugin host runs only 64-bit Windows modules; yabridge can bridge a 32-bit one.");
+                                    : "The Windows plugin host runs only 64-bit Windows modules. Install the plugin's 64-bit build, or bridge this one with a system yabridge that has its 32-bit host; the openxlr-yabridge companion bridges only 64-bit plugins.");
                                 continue;
                             }
                             string real = WindowsPluginWrappers.Canonical(module);

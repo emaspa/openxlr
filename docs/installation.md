@@ -21,7 +21,14 @@ When the running daemon has
 [OpenXLR's Windows plugin host](manual.md#windows-plugin-host), doctor also
 asks it about Windows plugins, with or without a receipt. It adds notes for
 the folders the host looks in, each folder the daemon cannot see, and each
-Windows plugin its last scan left out, with the reason. These are
+Windows plugin its last scan left out, with the reason. Before those come
+the notes to read before removing the `openxlr-yabridge` companion: each
+insert whose plugin is listed only through a yabridge wrapper, with the
+wrapper and the reason, and each companion folder the daemon could not
+copy into the Windows plugin folders
+([Windows plugins without yabridge](manual.md#windows-plugin-folders)).
+With or without the host, a note names the inserts with a Windows plugin
+when the daemon finds no Wine. These are
 information, not findings, so they do not change the exit code. At most 32
 are printed; the last one counts the rest.
 

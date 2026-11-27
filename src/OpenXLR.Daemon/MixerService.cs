@@ -894,6 +894,26 @@ public sealed partial class MixerService : IHostedService, IDisposable
         return change ?? throw new ArgumentException("setDucking: value must be an object");
     }
 
+    /// <summary>
+    /// The one-time copy of the yabridge companion's folders into the Windows
+    /// plugin folders, before the first scan reads them. It reads a small
+    /// file and writes daemon.json at most once, so it runs on the startup path.
+    /// </summary>
+    private void CopyYabridgeFolders()
+    {
+        try
+        {
+            if (OpenXLR.Core.Mixing.YabridgeMigration.CopyFoldersOnce() is not { } copy) return;
+            int added = copy.Added?.Count ?? 0, refused = copy.NotAdded?.Count ?? 0;
+            _log.LogInformation("copied {Added} yabridge folders into the Windows plugin folders{Refused}", added,
+                refused == 0 ? "" : $"; {refused} could not be added, openxlr doctor names them");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogWarning("could not copy the yabridge folders into the Windows plugin folders; the next start tries again: {Error}", ex.Message);
+        }
+    }
+
     public Task StartAsync(CancellationToken ct)
     {
         if (!SubmixerEnabled)
@@ -902,6 +922,7 @@ public sealed partial class MixerService : IHostedService, IDisposable
             _log.LogInformation("submixer off (daemon.json, --mixer, or OPENXLR_BUILD_MIXER=1 turn it on); hardware control only");
             return Task.CompletedTask;
         }
+        CopyYabridgeFolders();
         // plugin inserts: scan the LV2, CLAP and VST3 bundles off the startup
         // path, and say in the log what the scan could not read.
         OpenXLR.Core.Mixing.PluginCatalog.Warm(() => PluginScanLog.Write(_log));

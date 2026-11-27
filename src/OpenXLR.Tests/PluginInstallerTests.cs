@@ -62,8 +62,8 @@ public sealed class PluginInstallerTests : IDisposable
 
     private string WindowsImports => Path.Combine(_root, "home", "windows-plugins");
 
-    private PluginInstaller Installer(string? yabridgectl = null, string? wine = null, bool host = true)
-        => new(_lv2, _clap, _vst3, yabridgectl, wine, host, windowsImportDirectory: WindowsImports);
+    private PluginInstaller Installer(string? yabridgectl = null, string? wine = null, bool host = true, bool windowsHost = false)
+        => new(_lv2, _clap, _vst3, yabridgectl, wine, host, windowsImportDirectory: WindowsImports, windowsHost: windowsHost);
 
     [Fact]
     public void WhatAPathIsComesFromItsNameAndItsFirstBytes()
@@ -412,6 +412,12 @@ public sealed class PluginInstallerTests : IDisposable
         InstallOutcome noWine = Installer(yabridgectl: "/bin/true").Install(bundle);
         Assert.False(noWine.Ok);
         Assert.Contains("Wine is not installed", noWine.Message);
+
+        // With OpenXLR's Windows plugin host yabridge is not needed, but Wine still is.
+        InstallOutcome hostNoWine = Installer(windowsHost: true).Install(bundle);
+        Assert.False(hostNoWine.Ok);
+        Assert.Equal("Comp-win.vst3 is a Windows plugin, and Wine is not installed. Install it, then add it again.", hostNoWine.Message);
+        Assert.False(Directory.Exists(WindowsImports));
     }
 
     /// <summary>A yabridgectl that records its calls and answers like the real one.</summary>
