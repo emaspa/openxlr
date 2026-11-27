@@ -41,13 +41,14 @@ to work.
 Inserts on XLR inputs and mixes support LV2, CLAP and VST3. The package
 includes the native helper for CLAP/VST3 and plugin editors. Install
 compatible plugins separately; lsp-plugins-lv2 supplies LV2 effects.
-Windows VST3/CLAP additionally need Wine and yabridge. The optional
-openxlr-yabridge companion has a separate build/artifact workflow and
-private wrappers; it is not automatically installed with openxlr.
+Windows VST3/CLAP additionally need Wine.
 OpenXLR's own Windows plugin host, /usr/lib/openxlr/daemon/openxlr-winhost.exe,
-is part of this package. It runs a plugin under Wine, which is only
-suggested, so install wine when nothing else brings it.
+is part of this package and runs them by default. It runs a plugin under
+Wine, which is only suggested, so install wine when nothing else brings it.
+The optional openxlr-yabridge companion has a separate build/artifact
+workflow and private wrappers; it is not automatically installed with
+openxlr.
 
-Manual and bridge setup:
+Manual, Windows plugins:
 https://github.com/emaspa/openxlr/blob/main/docs/manual.md#windows-plugins
 For matching release documentation, select the installed version's tag.

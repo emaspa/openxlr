@@ -101,7 +101,8 @@ untested device, open an issue with a diagnostics archive
   and each mix, with native editors, generated controls and bypass. The
   native host measures the delay each plugin adds on its audio, and a
   plugin too slow for a small block size can run on its own block.
-  Windows VST3 and CLAP plugins run through `openxlr-yabridge`. Its host
+  Windows VST3 and CLAP plugins run under Wine on OpenXLR's own Windows
+  plugin host, or through yabridge when you install it. The host
   reports the system disk's model and serial number the way Windows does,
   so plugins that tie their licence to a machine ID, such as
   [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767),
@@ -204,7 +205,7 @@ openxlr.nixosModules.default
 ```
 
 The [module options](packaging/nix/module.nix) cover LV2 plugins, software
-ClipGuard and the Windows bridge.
+ClipGuard and the optional yabridge companion.
 
 **After installing**, replug an Elgato device once so the udev rule
 applies, and log out and back in, or run
@@ -213,7 +214,7 @@ load. For the Stream Deck, install `com.emaspa.openxlr.sdPlugin.zip`
 from the release with OpenDeck's install-from-file. Inserts list the LV2,
 CLAP and VST3 plugins you have installed (`lsp-plugins-lv2` is a good
 start); the software ClipGuard needs `swh-plugins`; Windows plugins need
-`openxlr-yabridge` from the same place you got OpenXLR
+Wine from your distribution, which the packages only suggest
 ([manual](docs/manual.md#windows-plugins)).
 
 **Upgrading**: reboot, or run `systemctl --user restart openxlr-daemon`
@@ -253,7 +254,7 @@ AI-assisted development.
   GNOME Shell with the optional OpenXLR Focus extension
   ([gnome-focus.md](docs/gnome-focus.md)). Other Wayland compositors have
   no focus source yet.
-- Windows plugins depend on Wine and yabridge. An editor that misbehaves
+- Windows plugins depend on Wine. An editor that misbehaves
   there can be swapped for OpenXLR's generated controls.
 
 The [roadmap](docs/roadmap.md) has what comes next, starting with

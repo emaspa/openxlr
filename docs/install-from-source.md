@@ -436,9 +436,10 @@ A failed comparison leaves that file untouched. Inspect edited files before
 moving them. No service or WirePlumber directory needs to be removed.
 
 Stop the UI as well. Remove the OpenDeck plugin through its plugin manager. On Omarchy, `omarchy plugin remove openxlr.mixer`
-unlinks the bar plugin. These commands preserve unrelated service overrides. Saved settings, soundboard clips and private
-Windows wrappers remain in `~/.config/openxlr`,
-`~/.local/share/openxlr/soundboard` and
+unlinks the bar plugin. These commands preserve unrelated service overrides. Saved settings, soundboard clips, Windows
+plugins installed from a file and private yabridge wrappers remain in
+`~/.config/openxlr`, `~/.local/share/openxlr/soundboard`,
+`~/.local/share/openxlr/windows-plugins` and
 `~/.local/share/openxlr/yabridge`; back them up before removing them if you
 want a clean slate. Restart WirePlumber at a convenient time to unload the
 removed rules. If you installed the optional UCM profile, use its revert
@@ -460,7 +461,9 @@ shell export does not update an already running service.
 | `LADSPA_PATH` | LADSPA directories for the software limiter; only absolute entries count |
 | `OPENXLR_YABRIDGE` | `system` selects the existing bridge; an absolute path selects a complete companion; unset enables automatic discovery |
 | `WINEPREFIX` | Wine prefix used when locating Windows plugin folders; defaults to `~/.wine` |
-| `WINEDLLOVERRIDES` | passed to bridged plugins with `wineusb.sys=d` appended, which keeps Wine's USB driver off; a value that already names `wineusb.sys` is passed unchanged |
+| `OPENXLR_WINE` | the Wine that runs Windows plugins on OpenXLR's host; `WINELOADER` when this is unset, else `wine` on PATH |
+| `OPENXLR_WINHOST` | path of `openxlr-winhost.exe` when it is not beside the native helper |
+| `WINEDLLOVERRIDES` | passed to Windows plugins on either host with `wineusb.sys=d` appended, which keeps Wine's USB driver off; a value that already names `wineusb.sys` is passed unchanged |
 | `LSP_WS_LIB_GLXSURFACE` | native helper defaults to `0` for LSP software rendering; explicit `1` tests OpenGL |
 | `DISPLAY`, `XAUTHORITY` | X11/XWayland session and authentication for native editors; the daemon can obtain these from the systemd user manager |
 | `OPENXLR_HOST_TRACE=1` | VST3 bus and initial processing diagnostics in the daemon log |

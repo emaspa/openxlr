@@ -52,9 +52,9 @@ The extension sends messages only to the native messaging host
 installation on your computer. Those messages are:
 
 - the tab list: tab id, origin, title, whether the extension is playing
-  the tab's audio, that this extension can set a tab's volume, a short
-  error text if routing that tab failed, and where an activation OpenXLR
-  asked for stands;
+  the tab's audio, that this extension can set a tab's volume and raise it
+  above 100%, a short error text if routing that tab failed, and where an
+  activation OpenXLR asked for stands;
 - a channel choice: tab id, origin, the OpenXLR channel, and whether to
   remember it for that website;
 - the setting that lets the browser choose its outputs.

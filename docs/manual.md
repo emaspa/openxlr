@@ -1344,8 +1344,8 @@ channel. When the mixer stops supplying an app list, both the APPLICATIONS
 card and the Manage list clear their stale entries.
 
 Select the volume button beside a program's channel picker to adjust its
-playback volume from 0 to 100%. The button shows a speaker at full volume
-and the level below it, and hovering it says what the level does.
+playback volume from 0 to 100%. The button shows a speaker at 100% and
+the level at any other setting, and hovering it says what the level does.
 **Reset**, at the top right of the control, puts the program back to
 full volume. The same control in **Manage**
 works for remembered programs that are closed. OpenXLR uses the playback
@@ -1366,7 +1366,7 @@ later and keeps it across daemon restarts. When you move the program in
 the desktop's volume control, or the program moves its own stream, the
 saved level follows it. New streams get time to finish restoring their
 session volume before they can change the saved level. A program with
-nothing saved starts the slider at the level it plays at, and its button shows that level when it is below
+nothing saved starts the slider at the level it plays at, and its button shows that level when it is not
 100%. **Reset** or **Forget** clears the saved level and puts the program
 back to 100%. The saved level is machine state and profiles leave it in
 place.
@@ -1681,9 +1681,8 @@ as it is when a profile is loaded.
 <a name="own-block"></a>
 **A plugin that cannot keep up.** A plugin gets audio one block at a time
 and has to hand each block back before the next is due. At a small
-[block size](#block-size) some plugins cannot, most often Windows plugins
-running through yabridge, which pay a fixed cost for every block however
-short it is. The sound then stutters, and some interfaces drop out and come
+[block size](#block-size) some plugins cannot, most often Windows plugins,
+which pay a fixed cost for every block however short it is. The sound then stutters, and some interfaces drop out and come
 back over and over while the plugin runs. In the plugin's controls window,
 **Run on its own block (adds delay)** gives the plugin a thread of its own
 and 1024 samples at a time, while everything else keeps the block size it
@@ -2733,14 +2732,24 @@ or with a very large number of files, still loads, but OpenXLR scans it every
 time instead of caching it.
 
 <a name="windows-plugins"></a>
-**Windows VST3 and CLAP plugins.** They run through
-[yabridge](https://github.com/robbert-vdh/yabridge), which wraps them as
-Linux bundles.
+**Windows VST3 and CLAP plugins.** They run under Wine on
+[OpenXLR's Windows plugin host](#windows-plugin-host), which comes inside
+the OpenXLR package everywhere but the Flatpak. Install Wine from your
+distribution, then press "Install file" for a plugin you downloaded, or run
+its Windows installer with Wine and press "Rescan" in Options.
+[Windows plugins without yabridge](#windows-plugin-folders) lists the
+folders OpenXLR looks in.
 
-The **openxlr-yabridge** package supplies a tested bridge for 64-bit
-Windows VST3 and CLAP plugins, built from a pinned source with the Wine
-editor input fix. Install it from the same place you installed OpenXLR.
-Wine comes with it as a dependency.
+[yabridge](https://github.com/robbert-vdh/yabridge) is the other way to
+run them. It wraps each Windows plugin as a Linux bundle, and OpenXLR uses
+it only when you install it. A wrapped plugin runs on OpenXLR's host by
+default, and Options or the plugin's controls window can send it to
+yabridge.
+
+The optional **openxlr-yabridge** package supplies a tested bridge for
+64-bit Windows VST3 and CLAP plugins, built from a pinned source with the
+Wine editor input fix. Install it from the same place you installed
+OpenXLR. Wine comes with it as a dependency.
 
 ```sh
 # Arch Linux, CachyOS and Omarchy, from the AUR
@@ -2780,9 +2789,10 @@ Some plugins, [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-
 among them, tie their licence to a machine ID built from the system disk's
 model and serial number. Wine reports that disk with no model or serial,
 so these plugins send an empty machine ID and fail to activate.
-The companion's host reports the model, firmware revision and serial number
-of the NVMe drive that holds the Wine prefix, the way Windows does, so the
-plugin can activate with your own licence. When the prefix is on another
+OpenXLR's Windows plugin host and the companion's host report the model,
+firmware revision and serial number of the NVMe drive that holds the Wine
+prefix, the way Windows does, so the plugin can activate with your own
+licence. When the prefix is on another
 kind of drive, Wine's answer stays as it is.
 
 The companion keeps those wrappers in
@@ -3718,7 +3728,8 @@ the two. Holding a handle near the edge of a layout wider than the UI
 scrolls it sideways.
 
 A skin can also hide a section. While Arrange is on, a **Hidden
-sections** line under the header lists each one with a **Show** button;
+sections** line under the header lists each one with a button to show
+it, "Show INPUTS" for instance;
 showing it is kept for that skin. A section the UI itself sets aside,
 such as MONITOR without the software mixer, stays hidden whatever the
 skin says. A skin may start a section folded the first time you wear it;
@@ -4567,7 +4578,8 @@ keeps asking, or a long run of invalid samples, goes quiet there while the
 host carries on.
 
 A VST3 scan that says the original Windows plugin is missing usually means
-its yabridge wrapper still exists under `~/.vst3/yabridge`, but the source
+its yabridge wrapper still exists under `~/.vst3/yabridge`, or under
+`~/.local/share/openxlr/yabridge/vst3` with the companion, but the source
 file was moved or deleted. The wrapper is a bridge, not a copy of the
 Windows plugin. Restore the source to its original location, or install
 it again and register its current folder in Options. Then sync and rescan.
@@ -5374,8 +5386,9 @@ diagnostics** in Options and open an issue with the archive.
   [scan failures](#bundle-not-read)). CLAP and VST3 also require the native helper; Options
   reports whether it is installed. A source build without the native
   flag removes it. Check the format filter and press Rescan after an
-  external installation. A Windows bundle also needs Wine and a working
-  bridge; see [Windows plugins](#windows-plugins).
+  external installation. A Windows bundle also needs Wine. It runs on
+  OpenXLR's Windows plugin host, or through yabridge where that is
+  installed; see [Windows plugins](#windows-plugins).
 
 A yabridge entry can remain after its original Windows plugin was moved or
 removed. OpenXLR checks the wrapper's Windows module link before loading it,
@@ -6015,7 +6028,7 @@ settings. See
 | `~/.local/share/openxlr/yabridge/{vst3,clap,vst2}` | companion-generated wrappers; OpenXLR loads VST3 and CLAP only |
 | `~/.config/openxlr/ui.json` | UI preferences, the chosen skin, Material's mode and the language included ([section 3.10](#skins)) |
 | `~/.config/openxlr/effect-chain-presets.json` | the UI's saved effect presets ([effect-presets.md](effect-presets.md)) |
-| `~/.config/openxlr/eq-profiles.json` | the UI's saved EQ profiles ([EQ profiles](#eq-profiles)) |
+| `~/.config/openxlr/eq-profiles.json` | the saved EQ profiles, written by the daemon ([EQ profiles](#eq-profiles)) |
 | `~/.config/openxlr/deck-palette.json` | the skin colours the UI hands to the OpenDeck plugin |
 | `~/.config/autostart/openxlr.desktop` | the UI's autostart entry, written by Start the OpenXLR app ([section 3.9](#autostart)) |
 | `~/.cache/openxlr/plugin-scans/`, `~/.cache/openxlr/plugin-scan-logs/` | the plugin catalogue and the latest scan logs |
@@ -6108,8 +6121,9 @@ reinstall of Linux or a move to another computer, copy those folders.
   profiles, UI preferences and the chosen skin, EQ profiles, effect
   presets, desktop keys, the added plugin folders and the additional
   interfaces.
-- `~/.local/share/openxlr` holds the soundboard's clips and the skins you
-  installed.
+- `~/.local/share/openxlr` holds the soundboard's clips, the skins you
+  installed and, in `windows-plugins`, the Windows plugins "Install file"
+  copied.
 
 Leave out the files that belong to this machine's installation: the
 `installation*` files and folders that `openxlr doctor` reads, the lock and
@@ -6140,7 +6154,7 @@ systemctl --user start openxlr-daemon
 ```
 
 Profiles are kept per interface model, so they come back for the same
-model. Plugins are not in these folders: install them again on the new
+model. Other plugins are not in these folders: install them again on the new
 computer, in the same folders if you added plugin folders by hand. The
 Flatpak keeps the same two folders under
 `~/.var/app/io.github.emaspa.openxlr/config/openxlr` and

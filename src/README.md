@@ -35,7 +35,8 @@ into a second, contradictory product manual.
   cell.
 - Physical outputs use direct PipeWire port links so the hardware sink clocks
   the graph.
-- Hardware input channels follow the actively selected interface. There is no
+- Hardware input channels follow the actively selected interface, unless
+  `setInputBinding` gives XLR 1 or XLR 2 another capture source. There is no
   `setMicInput` command or `OPENXLR_MIC_INPUT` override.
 - Low cut and software ClipGuard use PipeWire filter-chain. LV2 inserts
   default to filter-chain and can opt into the native helper; CLAP and VST3
@@ -64,6 +65,7 @@ OPENXLR_BUILD_MIXER=1 ./src/OpenXLR.Daemon/bin/Release/net10.0/OpenXLR.Daemon
 
 The WebSocket command table and configuration paths are maintained only in the
 [API reference](../docs/api.md). The complete check list is in
-[CONTRIBUTING.md](../CONTRIBUTING.md); native editor and bridge details
-are in [native/README.md](../native/README.md) and the
-[companion guide](../packaging/yabridge/README.md).
+[CONTRIBUTING.md](../CONTRIBUTING.md); native editor and Windows plugin
+host details are in [native/README.md](../native/README.md), and the
+optional yabridge companion has its own
+[guide](../packaging/yabridge/README.md).

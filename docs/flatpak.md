@@ -173,8 +173,9 @@ sudo udevadm control --reload-rules
 
 The optional [Pro UCM profile](../packaging/ucm/README.md) remains a manual
 host step. Flatpak cannot raise the host PipeWire and pipewire-pulse open-file limits or
-grant unlimited memory locking. Large layouts and bridged Windows plugins
-remain better suited to distro packages. Removing the app leaves manually
+grant unlimited memory locking. Large layouts remain better suited to
+distro packages, and Windows plugins need one, since the Flatpak has
+neither OpenXLR's Windows plugin host nor Wine. Removing the app leaves manually
 installed host files in place. Remove only the exact files you installed,
 after checking they have not been modified.
 
@@ -198,7 +199,7 @@ installation starts with the monitor not routed, so pick an output first.
 
 LV2 uses Flathub LinuxAudio plugin extensions at
 `/app/extensions/Plugins/lv2`. The catalogue and both hosts share this path.
-Host plugin folders and yabridge are not exposed. Native editors need X11
+Host plugin folders, yabridge and OpenXLR's Windows plugin host are not available. Native editors need X11
 or XWayland. The native helper retains CLAP and VST3 support for compatible
 bundles imported into the app's private storage, provided their external
 dependencies are available in the sandbox.

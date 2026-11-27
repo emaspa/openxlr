@@ -325,8 +325,9 @@ is the running daemon's soft memory-lock limit in bytes (-1 for unlimited,
 null when unknown). `memoryLockHardLimitBytes` adds the hard limit with the
 same units and sentinel values. `memoryLockNote` distinguishes a soft limit
 with room to rise from a low hard limit that needs the user manager's
-ceiling checked. Advice is null without Windows plugin support or when the
-soft limit is at least 256 MiB or unlimited.
+ceiling checked. Advice is null unless yabridge, Wine and the native host
+are all present, and when the soft limit is unknown, at least 256 MiB or
+unlimited.
 `skippedFailedCount` and `skippedFailedBundles` quietly expose bundles
 skipped after a failed scan, including their reason and original failure
 time. The list is capped at 128; the count includes omitted bundles.

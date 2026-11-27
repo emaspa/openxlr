@@ -158,7 +158,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `starterSounds` | in answer to `restoreStarterSounds` | `ok` (true when it went through, also when no starter clip was missing), `message`, `clips` (the ids added, in library order) and `skipped` (each clip left out, as `name: reason`). See [Starter sounds](#starter-sounds) |
 | `soundboardImport` | in answer to `importSoundboard` | `ok` (true when at least one clip was imported), `message`, `clips` (the ids added, in library order), `renamed` (the archive's id to the new one, for each clip whose id was in use here), `skipped` (each clip left out, as `name: reason`, and on a refusal each clip that could not be taken) and `replaced` (true when the library was replaced). See [Soundboard](#soundboard) |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo input or mix with two or more. `windowsHostOnly` is true for a Windows CLAP or VST3 plugin found in a [Windows plugin folder](#windows-plugin-folders), whose `path` is the Windows bundle itself and which runs only on the Windows plugin host, and false for every other entry |
-| `pluginSetup` | in answer to `getPluginSetup`, `setPluginWineTrace` or `setWindowsHostDefault`, and to every client after a `setWindowsHostDefault` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which every package but the Flatpak has), `windowsHostDefault` (`"yabridge"` or `"openxlr"`, the host an insert of a Windows plugin runs on while it [follows the default](#windows-host-default)), `yabridgeInserts` (how many inserts run through yabridge: pinned to it, held on it by the release, following a default that is yabridge, or, in a build without the host, every insert of a plugin with a yabridge wrapper), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
+| `pluginSetup` | in answer to `getPluginSetup`, `setPluginWineTrace` or `setWindowsHostDefault`, and to every client after a `setWindowsHostDefault` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which every package but the Flatpak has), `windowsHostDefault` (`"yabridge"` or `"openxlr"`, the host an insert of a Windows plugin runs on while it [follows the default](#windows-host-default)), `yabridgeInserts` (how many inserts run through yabridge: pinned to it, held on it by the release, following a default that is yabridge, or, in a build without the host, every insert of a plugin with a yabridge wrapper), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when yabridge, Wine and the native host are present and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
 | `windowsPluginFiles` | in answer to `getWindowsPluginFiles` | `ok`, `message` and `plugins`; each plugin file carries `path`, `name`, `format`, `enabled`, `canDelete`, `winePrefix` and `inUse`. Excluded files remain listed |
 | `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
 | `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
@@ -422,7 +422,7 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `setInputBinding` | `channel`, `source?`, `captureMonoChannel?` | bind a hardware strip to one port of a PipeWire capture source by exact node name. `channel` is `xlr1` or `xlr2`; Aux In and Line In stay on the interface. With `source` null or absent the strip returns to the interface's capture pair and takes no port. With a source, `capturePair` must be 0 and `captureMonoChannel` is the zero-based port, 0 to 63, default 0. OpenXLR nodes, monitor taps, control characters and names over 256 characters are refused. A node of an attached supported interface (a `devices` entry with `drivenUnit`) is accepted, and the binding records that unit, see [a strip on another interface](#a-strip-on-another-interface). The source may be offline. Saved before the acknowledgement, rolled back on a failed save. The strip's monitor sends start muted after a change; no other strip changes. Channel ids, software processing and inserts stay as they are. See [input bindings](#input-bindings) |
 | `setEnforcedDefaults` | `sink`, `source` | system defaults to hold; `sink: "@monitor"` follows the first selected monitor output |
 | `setActiveDevice` | `device` | switch to another attached interface: one unit by its instance id from `detected`, or the first unit of a model by `vvvv:pppp`. The one command that moves the primary; it wins over `OPENXLR_DEVICE`. The daemon keeps the chosen unit's id in `~/.config/openxlr/active-device.json` and drives that unit again after a restart, waiting up to 10 seconds for it to enumerate before another unit stands in. A stand-in, the model `OPENXLR_DEVICE` names or else the first attached unit, hands the role back once the chosen unit is attached |
-| `setWaveInterfaceEnabled` | `device`, `value`, optional `keepChannels` | drive an attached unit, by its instance id from `waveInterfaces`, as an additional interface (`true`) or stop driving it (`false`); at most four. Refused for a unit that is not attached, and for a Wave XLR Pro whose capture node name another attached unit shares. Enabling creates no mixer channel; disabling deletes the unit's capture channels and their chains as `deleteChannel` does, unless `keepChannels` is true. Absent or false keeps deletion; any other type is refused. Channels are found by their saved `captureUnit`, even while unplugged, or by `captureHint` and `captureModelHint` for older entries without a unit. Shared model fragments alone never select another unit's channels. Kept channels retain their binding, sends and chains, and stay silent while the source is missing. Neither value changes the primary, and a unit enabled here is never driven as the primary in place of an absent one; only `setActiveDevice` makes it the primary. See [additional interface state](#additional-interface-state) |
+| `setWaveInterfaceEnabled` | `device`, `value`, optional `keepChannels` | drive an attached unit, by its instance id from `waveInterfaces`, as an additional interface (`true`) or stop driving it (`false`); at most four. Enabling is refused for a unit that is not attached, and for a Wave XLR Pro whose capture node name another attached unit shares. Disabling a remembered unit that is not attached is accepted. Enabling creates no mixer channel; disabling deletes the unit's capture channels and their chains as `deleteChannel` does, unless `keepChannels` is true. Absent or false keeps deletion; any other type is refused. Channels are found by their saved `captureUnit`, even while unplugged, or by `captureHint` and `captureModelHint` for older entries without a unit. Shared model fragments alone never select another unit's channels. Kept channels retain their binding, sends and chains, and stay silent while the source is missing. Neither value changes the primary, and a unit enabled here is never driven as the primary in place of an absent one; only `setActiveDevice` makes it the primary. See [additional interface state](#additional-interface-state) |
 | `setWaveControl` | `device`, `control`, `value` | the `set` command for one unit by instance id: an additional interface, or the primary when `device` is the primary's id. Same control names, capabilities, gain lock, phantom settling and undo steps as `set`, each step bound to that unit; an error for a unit that is not driven |
 | `saveProfile` / `loadProfile` / `deleteProfile` | `name` | named scenes, scoped to the connected interface, or to `generic` while none is connected (see below); loading restores saved gain even while locked and leaves the lock enabled |
 | `setRecallOnConnect` | `name` | the profile recalled whenever the active device connects fresh (daemon start, replug, switch to it); empty clears it. With none chosen, a device whose capabilities say `retainsSettings: false` gets the last settings the daemon saw on it instead. Refused while no interface is connected |
@@ -843,8 +843,8 @@ helper's side is described in
 
 <a name="windows-host"></a>
 A CLAP or VST3 insert definition optionally carries `windowsHost`, set with
-`setInsertWindowsHost`. It is for a Windows plugin, which is in the
-catalogue through the wrapper yabridge made for it, and the plugin can run
+`setInsertWindowsHost`. It is for a Windows plugin that is in the
+catalogue through the wrapper yabridge made for it. That plugin can run
 on either of two hosts: through yabridge, or on the Windows plugin host
 built into OpenXLR. On the second one the daemon reads the Windows module
 back from the wrapper and starts the native helper with it. The catalogue
@@ -983,8 +983,7 @@ there, its chain fails with the reason. The catalogue holds a plugin once
 per format. A plugin already found by the format's own search, through a
 yabridge wrapper above all, keeps that entry, and the folder's copy only
 counts as a duplicate in its scan entry: the wrapper's entry runs on either
-host, and yabridge is still the default, so an insert saved against it
-loads exactly as before.
+host, so an insert saved against it still finds its plugin.
 
 The daemon does not start a bundle whose module a yabridge wrapper in the
 catalogue links to. It compares modules by their real path, after every
@@ -2156,11 +2155,12 @@ is removed, this tab returns to browser default, and other explicit tab
 overrides remain. A successful remembered choice or mode change is saved
 before acknowledgement; a failed write keeps the previous choice.
 
-Only origin-to-channel defaults and the preservation flag survive daemon
-restarts in `mixer.json`. Titles, errors, capture status, tab ids and session
+Only origin-to-channel defaults, the tab volumes remembered for an origin
+and the preservation flag survive daemon restarts in `mixer.json`. Titles, errors, capture status, tab ids and session
 ids are runtime state. These settings are machine wiring, absent from
-profiles. Deleting an application channel removes its website defaults and
-returns affected tabs to browser default.
+profiles. Deleting an application channel moves its website defaults to the
+fallback application channel and returns tab-only choices for it to
+browser default.
 
 ## Configuration files
 
@@ -2307,7 +2307,8 @@ the added folders. Only absolute entries of `LV2_PATH`, `CLAP_PATH` and
 empty or relative entry is ignored and logged once, and a variable with no
 absolute entry counts as unset. `searchPathWarning` is null, or a sentence
 saying how many saved folders were skipped because they are invalid or no
-longer resolve. Skipped entries stay saved.
+longer resolve. Skipped entries stay saved. It also says when `daemon.json`
+cannot be read, and no added folder is searched then.
 
 `addPluginSearchPath` and `removePluginSearchPath` take `kind` and an
 absolute `path` of at most 4096 characters without a colon or control
@@ -2499,9 +2500,11 @@ LV2 search path, or on a crash, a stall or a nonzero exit the bundle the
 scan was reading. Its `detail` says when a build without the native helper
 read the bundles in the daemon. An empty list
 means no native scan has completed yet. Entries carry `path`, `outcome`,
-`cached`, `plugins`, `duplicates`, `exitCode` and `detail`. Outcomes include
+`cached`, `plugins`, `duplicates`, `exitCode` and `detail`. A failed attempt
+also carries `logId`, the name of its saved scanner output, or `logNote`,
+which says why there is none. Outcomes include
 `host-missing`, `directory`, `directory-missing`, `directory-error`,
-`start-error`, `scan-failed`, `source-missing`, `windows-module-missing`, `timeout`, `output-limit`, `output-incomplete`, `invalid-description`,
+`start-error`, `scan-failed`, `source-missing`, `windows-module-missing`, `windows-not-64-bit`, `timeout`, `output-limit`, `output-incomplete`, `invalid-description`,
 `no-plugins`, `ok`, `skipped-failed` and `scan-error`. A cached description is reused only
 while the native helper that wrote it is the one asking, so `cached` is
 false everywhere in the first scan after the helper changes. Reports retain
@@ -3062,8 +3065,8 @@ the Pro, the XLR Dock MK.2 and the Wave:3 MK.2, which have been measured to
 12 dB only. While a band of the channel's EQ is past it, condition 3 fails
 and the EQ runs in software with `ready` still true. It returns to the unit
 when every band fits again. An older daemon sends no `maxGain`; a client
-then takes 12. `ready` is true while the unit runs the EQ
-now. When it is false, `reason` says why in a word a client can explain and
+then takes 12. `ready` is true while the unit is able to run the EQ, and
+`backend` says whether it runs it now. When it is false, `reason` says why in a word a client can explain and
 `note` in a sentence: `firmwareOld` (older than `minimumFirmware`; Elgato's updater is
 in Wave Link on Windows or macOS), `firmwareUnknown` (the version could not
 be read), `unsupportedBlock` (the EQ fields hold values the EQ does not
@@ -3462,7 +3465,7 @@ the mix.
 
 ### Compressor and expander
 
-Every channel that carries the [microphone EQ](#microphone-eq) has a
+XLR 1, XLR 2 and every capture input on one mono port have a
 compressor and an expander. On XLR 1 and XLR 2 they run on the unit's own
 DSP when the unit can run them (see
 [where they run](#where-the-compressor-and-expander-run)). Everywhere else
@@ -4014,8 +4017,9 @@ USB pair."
 
 **Processed inputs and the cue.** The pairs no channel takes are claimed on
 demand, in this order. First each of the unit's inputs that software
-processes (noise removal, the voice changer, a software EQ, an insert, the
-soft low cut or ClipGuard, or Mic setup running on it), in the order XLR 1,
+processes (noise removal, the voice changer, a software EQ, a compressor
+or expander running in software, an insert, the soft low cut or ClipGuard,
+or Mic setup running on it), in the order XLR 1,
 XLR 2, Aux In, Line In: its channel's audio plays back to the unit on that
 pair, a return pair, and the unit's mixes take the input from there,
 processed, at its sends, instead of the raw input. Then the cue pair, which
