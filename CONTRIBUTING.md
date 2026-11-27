@@ -17,7 +17,7 @@ or in a GitHub issue.
   you did and what you expected. The daemon's journal is
   `journalctl --user -u openxlr-daemon`.
 - **A translation of the UI.** The UI ships in English, German,
-  Spanish, Italian, Tagalog, Cebuano and Serbian, every string read from
+  Spanish, French, Italian, Tagalog, Cebuano and Serbian, every string read from
   one catalogue; a new language is a copy of it with the values
   translated. [docs/localization.md](docs/localization.md) has the
   steps. Only translate a language you read and write well.

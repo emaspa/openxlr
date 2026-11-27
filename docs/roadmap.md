@@ -93,7 +93,7 @@ is measured over one that is described.
 - [x] Clients. The UI, with twenty-five built-in skins, skins that
   rearrange it, Broadcast and Wave among them with the mixer drawn as a
   matrix, system, light and dark modes, normal and Touch control sizes,
-  five text sizes, Mic setup, the Flow window and seven languages. The
+  five text sizes, Mic setup, the Flow window and eight languages. The
   terminal mixer `openxlr-tui`, drawing the same skins, with the EQ's
   band editor. The OpenDeck plugin, with keys and dials drawn like the
   hardware. Desktop keys through the portal, microphone mute and push to

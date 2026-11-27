@@ -1517,7 +1517,7 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   wider channel strips and mix tiles, chosen in Options and kept in
   `ui.json` beside the skin, over whichever skin is worn
 - A translatable UI: every string it shows comes from one catalogue,
-  and it ships in English, German, Spanish, Italian, Tagalog, Cebuano (Bisaya) and Serbian (Cyrillic). Languages come from
+  and it ships in English, German, Spanish, French, Italian, Tagalog, Cebuano (Bisaya) and Serbian (Cyrillic). Languages come from
   contributors ([localization.md](localization.md)); a language chosen in
   Options applies the next time the UI starts
 - One UI per user: a second launch brings the running UI to the

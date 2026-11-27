@@ -33,6 +33,7 @@ public static class Localizer
         new("en", "English"),
         new("de", "Deutsch"),
         new("es", "Español"),
+        new("fr", "Français"),
         new("it", "Italiano"),
         new("tl", "Tagalog"),
         new("ceb", "Bisaya (Cebuano)"),
