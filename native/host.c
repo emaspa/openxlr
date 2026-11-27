@@ -574,6 +574,40 @@ static void own_block_stop(Host *h) {
   b->thread = NULL;
 }
 
+// An output port's buffer for this cycle, or NULL for none.
+//
+// pw_filter hands out the buffer it put in a port's io area once that area
+// says it was taken. Until then it keeps the old one there and queues each
+// buffer written meanwhile behind it, oldest first, and never drops one, so
+// one cycle in which nothing took the port's buffer leaves that port a
+// cycle late for as long as it stays linked. That cycle comes when a link
+// is made: PipeWire gives the port its buffers and io area, and can run a
+// cycle before it starts taking from it. With one channel linked a moment
+// after the other, the two then played a cycle apart. So a port whose last
+// buffer is still in its io area gets none this cycle, and the next buffer
+// written is the next one played.
+static float *output_buffer(void *port, struct spa_io_buffers *_Atomic *io_area,
+                            uint32_t frames) {
+  struct spa_io_buffers *io =
+      atomic_load_explicit(io_area, memory_order_acquire);
+  if (io && io->status == SPA_STATUS_HAVE_DATA) return NULL;
+  return pw_filter_get_dsp_buffer(port, frames);
+}
+
+static void port_io_changed(void *data, void *port_data, uint32_t id,
+                            void *area, uint32_t size) {
+  Host *h = data;
+  if (id != SPA_IO_Buffers) return;
+  struct spa_io_buffers *io =
+      area && size >= sizeof(struct spa_io_buffers) ? area : NULL;
+  for (unsigned c = 0; c < h->channels; ++c)
+    if (port_data == h->out_ports[c])
+      atomic_store_explicit(&h->out_io[c], io, memory_order_release);
+  for (unsigned t = 0; t < h->tap_count; ++t)
+    if (port_data == h->tap_ports[t])
+      atomic_store_explicit(&h->tap_io[t], io, memory_order_release);
+}
+
 static void process_audio(void *data, struct spa_io_position *position) {
   Host *h = data;
   // On its own block the plugin is called from the worker, which is the
@@ -592,12 +626,12 @@ static void process_audio(void *data, struct spa_io_position *position) {
   if (!host_quantum_supported(h, frames, position->clock.rate.denom)) {
     atomic_store(&h->audio_error, true);
     for (unsigned i = 0; i < h->channels; ++i) {
-      float *buffer = pw_filter_get_dsp_buffer(h->out_ports[i], frames);
+      float *buffer = output_buffer(h->out_ports[i], &h->out_io[i], frames);
       if (buffer)
         memset(buffer, 0, sizeof(float) * frames);
     }
     for (unsigned t = 0; t < h->tap_count; ++t) {
-      float *buffer = pw_filter_get_dsp_buffer(h->tap_ports[t], frames);
+      float *buffer = output_buffer(h->tap_ports[t], &h->tap_io[t], frames);
       if (buffer)
         memset(buffer, 0, sizeof(float) * frames);
     }
@@ -610,7 +644,7 @@ static void process_audio(void *data, struct spa_io_position *position) {
     if (!buffer)
       buffer = host_fallback(h->silence, frames, true);
     in[i] = buffer;
-    out[i] = pw_filter_get_dsp_buffer(h->out_ports[i], frames);
+    out[i] = output_buffer(h->out_ports[i], &h->out_io[i], frames);
     if (out[i])
       h->outputs_unread = false;
     else
@@ -625,7 +659,7 @@ static void process_audio(void *data, struct spa_io_position *position) {
   for (unsigned t = 0; t < MAX_TAPS; ++t) {
     h->taps[t] = NULL;
     if (t >= h->tap_count) continue;
-    float *buffer = pw_filter_get_dsp_buffer(h->tap_ports[t], frames);
+    float *buffer = output_buffer(h->tap_ports[t], &h->tap_io[t], frames);
     h->taps[t] = buffer ? buffer : host_fallback(h->tap_scratch[t], frames, false);
   }
   // One invalid sample can poison a stateful processor until it is replaced,
@@ -688,7 +722,7 @@ static void state_changed(void *data, enum pw_filter_state old,
 
 static const struct pw_filter_events filter_events = {
     PW_VERSION_FILTER_EVENTS, .state_changed = state_changed,
-    .process = process_audio};
+    .io_changed = port_io_changed, .process = process_audio};
 
 static bool add_audio_ports(Host *h) {
   for (unsigned i = 0; i < h->channels; ++i) {

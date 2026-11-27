@@ -21,7 +21,8 @@ on the graph's own block and on the plugin's (`--own-block`):
 
 Silence while a plugin's audio runs is a block that came late, which a
 loaded machine may cause; it is counted and printed, never failed. Any frame
-that is neither silence nor the signal at one gain and one delay fails.
+that is neither silence nor the signal at one gain and one delay fails, and
+the failure says how late each channel was and how long it lasted.
 
 OPENXLR_TEST_GRAPH_ONLY=TEXT runs only the cases whose title holds TEXT.
 
@@ -35,6 +36,7 @@ import re
 import secrets
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
@@ -46,6 +48,11 @@ QUANTUM = 256
 # A second of audio at the expected gain and delay, without a break, is
 # what counts as heard.
 HEARD = RATE
+# As in tests/winhost-graph.c: positions a channel names before it wraps.
+SPAN = 0x100000
+# How long the recorder is still listened to after a frame that is not the
+# plugin's audio, to say how long that lasted.
+AFTER_GARBAGE = 2
 PLUGIN = "org.openxlr.test.winhost."
 VST3_CLASS = "00112233445566778899AABBCCDDEE"
 PLUGIN_LATENCY = 480  # what the latency classes of both test plugins report
@@ -355,7 +362,9 @@ class Stream:
     def __init__(self, events):
         self.events = events
         self.changes = []  # (position, kind, gain, delay)
+        self.frames = {}  # position: (left, right), for each change to garbage
         self.dropped = 0
+        self.position = 0
 
     def take(self, line):
         if line.startswith("state "):
@@ -365,8 +374,36 @@ class Stream:
                 self.changes.append((position, "audio", float(parts[3]), int(parts[5])))
             else:
                 self.changes.append((position, parts[2], None, None))
+                if parts[2] == "garbage":
+                    # Printed with the nine digits that bring a float back.
+                    self.frames[position] = tuple(
+                        struct.unpack("f", struct.pack("f", float(v)))[0] for v in parts[3:5])
+        elif line.startswith("alive "):
+            self.position = int(line.split()[1])
         elif line == "overflow":
             raise Failure("the recorder lost changes")
+
+    def garbage(self, at, gain, delay):
+        """Say what the frame at `at` was and how long the recorder heard
+        anything but `gain` (on `delay`, if given) from there: a skew between
+        the channels that lasts must not read as one that came and went."""
+        deadline = time.monotonic() + AFTER_GARBAGE
+        while (line := self.events.next(deadline)) not in (None, ""):
+            self.take(line)
+        what = ""
+        left, right = self.frames[at]
+        named = [round(v / gain * (1 << 22)) - 1 - (SPAN if c else 0)
+                 for c, v in enumerate((left, right))]
+        if all(0 <= n < SPAN and (n + 1 + (SPAN if c else 0)) / (1 << 22) * gain == v
+               for c, (n, v) in enumerate(zip(named, (left, right)))):
+            late = [(at - n) % SPAN for n in named]
+            what = f" (at gain {gain} the left channel is {late[0]} frames late, the right {late[1]})"
+        after = [p for p, kind, g, d in self.changes
+                 if p > at and kind == "audio" and g == gain and (delay is None or d == delay)]
+        if after:
+            return f"{what}, for {after[0] - at} frames"
+        last = max(self.position, self.changes[-1][0])
+        return f"{what}, and still at frame {last}, {last - at} frames later"
 
     def until_heard(self, gain, delay, seconds):
         """Read until HEARD frames in a row at `gain` (and `delay`, if given).
@@ -377,15 +414,12 @@ class Stream:
             line = self.events.next(deadline)
             check(line is not None, "the recorder ended")
             check(line != "", f"the plugin's audio at gain {gain} was never heard for a second")
-            if line.startswith("alive "):
-                self.position = int(line.split()[1])
-            else:
-                self.take(line)
+            self.take(line)
             if self.changes:
                 position, kind, g, d = self.changes[-1]
                 if kind == "garbage":
                     raise Failure(f"the recorder heard something that is not the plugin's audio "
-                                  f"at frame {position}")
+                                  f"at frame {position}{self.garbage(position, gain, delay)}")
                 if (kind == "audio" and g == gain and (delay is None or d == delay)
                         and self.position - position >= HEARD):
                     return self.changes[-1]

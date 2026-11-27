@@ -176,6 +176,10 @@ struct Host {
   struct pw_filter *filter;
   struct spa_source *timer;
   void *in_ports[MAX_CHANNELS], *out_ports[MAX_CHANNELS];
+  // Each output's io area, set from the main thread when PipeWire gives or
+  // takes it, read by the audio thread (see output_buffer in host.c).
+  struct spa_io_buffers *_Atomic out_io[MAX_CHANNELS];
+  struct spa_io_buffers *_Atomic tap_io[MAX_TAPS];
   void *key_ports[MAX_KEYS];
   // Each key input's buffer for this cycle, silence for one with none.
   const float *keys[MAX_KEYS];

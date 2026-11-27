@@ -65,6 +65,7 @@ static _Atomic bool overflowed, listening;
 
 static struct pw_main_loop *loop;
 static void *play_ports[2], *record_ports[2];
+static struct spa_io_buffers *_Atomic play_io[2];
 static State current = {.kind = -1};
 
 static bool same(State a, State b) {
@@ -87,10 +88,16 @@ static State reading(float left, float right, uint64_t at) {
                  .delay = (uint32_t)((at - (uint64_t)named) & (SPAN - 1))};
 }
 
+// As the helper does (output_buffer in host.c): a port whose last buffer is
+// still in its io area, untaken, is given none, or the buffer written now
+// would be queued behind it and that channel would play a cycle late from
+// then on.
 static void play(void *data, struct spa_io_position *position) {
   uint32_t frames = position->clock.duration;
   uint64_t at = position->clock.position;
   for (unsigned c = 0; c < 2; ++c) {
+    struct spa_io_buffers *io = atomic_load(&play_io[c]);
+    if (io && io->status == SPA_STATUS_HAVE_DATA) continue;
     float *out = pw_filter_get_dsp_buffer(play_ports[c], frames);
     if (!out) continue;
     for (uint32_t n = 0; n < frames; ++n) out[n] = signal_at(at + n, c);
@@ -157,7 +164,16 @@ static void input(void *data, int fd, uint32_t mask) {
 
 static void stop(void *data, int signal_number) { pw_main_loop_quit(loop); }
 
-static const struct pw_filter_events play_events = {PW_VERSION_FILTER_EVENTS, .process = play};
+static void play_io_changed(void *data, void *port_data, uint32_t id, void *area, uint32_t size) {
+  if (id != SPA_IO_Buffers) return;
+  for (unsigned c = 0; c < 2; ++c)
+    if (port_data == play_ports[c])
+      atomic_store(&play_io[c], area && size >= sizeof(struct spa_io_buffers) ? area : NULL);
+}
+
+static const struct pw_filter_events play_events = {PW_VERSION_FILTER_EVENTS,
+                                                    .io_changed = play_io_changed,
+                                                    .process = play};
 static const struct pw_filter_events record_events = {PW_VERSION_FILTER_EVENTS, .process = record};
 
 static struct pw_filter *make(const char *name, const struct pw_filter_events *events,
