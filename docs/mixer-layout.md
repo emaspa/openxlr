@@ -187,8 +187,8 @@ and the Stream Deck plugin always, unless the name is in the built-in set.
 The terminal mixer draws each built-in icon as one text character.
 
 `colour` is `#RRGGBB`; absent or null keeps the skin's colours. `hidden`
-leaves a channel's strip out of the UI's and the terminal mixer's full
-mixer; the channel keeps its sends, meter, applications and audio, and
+leaves a channel's strip out of the full mixer of the UI, the terminal
+mixer and the Omarchy bar's popout; the channel keeps its sends, meter, applications and audio, and
 stays in the layout editor, the application pickers and the Stream Deck
 targets.
 
@@ -201,7 +201,8 @@ pickers. A mix matrix drops its column head and the cell under it in
 every row, so the other columns stay lined up. The compact view draws
 every mix, so it leaves a hidden mix out too. The mini view draws the one
 mix chosen for it, hidden or not. The terminal mixer leaves
-a hidden mix out of its Mixer section and keeps it in Matrix. A hidden mix
+a hidden mix out of its Mixer section and keeps it in Matrix. The Omarchy
+bar's popout leaves out its master and skips it with the send arrows. A hidden mix
 stays in the layout editor, in every output's feed picker and in the
 Stream Deck targets. With every mix hidden the full mixer draws the
 channels with no sends and the matrix has row heads and no columns. The

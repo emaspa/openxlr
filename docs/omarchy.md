@@ -45,6 +45,14 @@ The popout and the bar show only the channels the active device can feed,
 which the daemon says per channel, so XLR 2 and Aux In are absent on every
 model but the Wave XLR Pro.
 
+The popout is the full mixer, so it follows the layout editor's hide
+flags. A hidden channel has no strip there, and a hidden mix has no master
+and is skipped by the send arrows. When the first output hears a hidden mix,
+the channel strips start on the next mix it hears, or on the first shown
+mix. With every mix hidden both banks are empty.
+The bar, its tooltip and the output line still name hidden channels and
+mixes, as the UI's feed pickers and Stream Deck keys do.
+
 Click to open the mixer. The arrows choose which mix the channel sends
 control. Channels remain in layout order, with a separate bank of mix
 masters. Each bank fits only whole strips and has previous and next page

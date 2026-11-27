@@ -24,14 +24,14 @@ Item {
     readonly property string family: bar ? bar.fontFamily : Style.font.family
     readonly property var mixer: daemon.snapshot ? daemon.snapshot.mixer : ({})
     readonly property var channels: Mixer.shownChannels(mixer.channels)
-    readonly property var mixes: mixer.mixes || []
+    // The popout leaves hidden strips and mixes out; the tooltip does not.
+    readonly property var strips: Mixer.mixerEntries(channels)
+    readonly property var mixes: Mixer.mixerEntries(mixer.mixes)
     readonly property var inputs: channels.filter(function (channel) {
         return Mixer.mono(channel);
     })
     readonly property var feeds: Mixer.monitorFeeds(mixer)
-    readonly property string mixId: mixes.some(function (mix) {
-        return mix.id === root.selectedMix;
-    }) ? selectedMix : feeds.length && feeds[0].ids.length ? feeds[0].ids[0] : mixes.length ? mixes[0].id : ""
+    readonly property string mixId: Mixer.sendMix(mixes, selectedMix, feeds)
     readonly property string mixName: {
         var mix = mixes.filter(function (entry) {
             return entry.id === root.mixId;
@@ -267,7 +267,8 @@ Item {
                         id: channelBank
                         width: Math.floor((banks.stacked ? banks.width : (banks.width - banks.spacing) * 0.62) / stripWidth) * stripWidth
                         title: "Channels / send mute"
-                        entries: root.channels
+                        // With every mix hidden there is nothing to send to.
+                        entries: root.mixId ? root.strips : []
                         meterPalette: theme.palette
                         mix: root.mixId
                         link: daemon
