@@ -113,11 +113,15 @@ MINGW_CXXFLAGS = -std=c++17 $(WARN) -fno-exceptions -fno-rtti -isystem vst3
 WINHOST_OBJECTS = winhost/winhost.obj winhost/shim.obj winhost/editor.obj winhost/clap.obj \
                   winhost/vst3.obj winhost/json.obj winhost/disk-hook.obj
 WINHOST_PLUGINS = tests/winhost-plugin.clap tests/winhost-plugin.vst3
-WINHOST_TARGETS = openxlr-winhost.exe $(WINHOST_PLUGINS)
+# The CLAP test plugin again, against each C library a Windows plugin may
+# bring; test-winhost finds them beside tests/winhost-plugin.clap.
+WINHOST_CRT_PLUGINS = tests/winhost-plugin-msvcrt.clap tests/winhost-plugin-ucrt.clap
+WINHOST_TARGETS = openxlr-winhost.exe $(WINHOST_PLUGINS) $(WINHOST_CRT_PLUGINS)
 ifeq ($(WINHOST),1)
 OBJECTS += wine.o disk-identity.o
 TEST_OBJECTS += tests/winhost.o tests/winhost-editor.o
-DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS) tests/winhost-graph tests/winhost-rtkit
+DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS) $(WINHOST_CRT_PLUGINS) tests/winhost-graph \
+               tests/winhost-rtkit
 .PHONY: all
 all: openxlr-lv2-host openxlr-winhost.exe
 endif
@@ -278,6 +282,33 @@ tests/winhost-plugin.clap: tests/winhost-plugin.c
 	$(MINGW_CC) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@ -lgdi32
 	@mv $@.d.tmp $@.d
 
+# GCC 14 and later choose the C library with -mcrtdll. Before it the
+# library is the toolchain's default, msvcrt on the distributions that have
+# such a GCC (Ubuntu 24.04), and the Universal C Runtime takes a link spec
+# with -lucrt in place of -lmsvcrt. test-winhost checks what each module
+# imports, so a toolchain that differs fails there instead of passing
+# with one library twice.
+ifeq ($(shell $(MINGW_CC) -mcrtdll=ucrt -E -x c /dev/null >/dev/null 2>&1 && echo yes),yes)
+CRT_MSVCRT = -mcrtdll=msvcrt-os
+CRT_UCRT = -mcrtdll=ucrt
+CRT_UCRT_SPECS =
+else
+CRT_MSVCRT =
+CRT_UCRT = -D_UCRT -specs=tests/winhost-ucrt.specs
+CRT_UCRT_SPECS = tests/winhost-ucrt.specs
+endif
+
+tests/winhost-ucrt.specs:
+	$(MINGW_CC) -dumpspecs | sed -n '/^\*libgcc:/,/^$$/p' | sed 's/-lmsvcrt\b/-lucrt/g' > $@
+
+tests/winhost-plugin-msvcrt.clap: tests/winhost-plugin.c
+	$(MINGW_CC) $(CRT_MSVCRT) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@ -lgdi32
+	@mv $@.d.tmp $@.d
+
+tests/winhost-plugin-ucrt.clap: tests/winhost-plugin.c $(CRT_UCRT_SPECS)
+	$(MINGW_CC) $(CRT_UCRT) $(MINGW_CFLAGS) $(DEPFLAGS) -shared -static $< -o $@ -lgdi32
+	@mv $@.d.tmp $@.d
+
 tests/winhost-plugin.vst3: tests/winhost-plugin-vst3.cpp
 	$(MINGW_CXX) $(MINGW_CXXFLAGS) $(DEPFLAGS) -shared -static $< -o $@ -lgdi32
 	@mv $@.d.tmp $@.d
@@ -347,7 +378,8 @@ WINHOST_TESTS = tests/winhost tests/winhost.o tests/winhost-editor tests/winhost
                 tests/winhost-rtkit
 clean-native: clean-winhost
 clean-winhost:
-	rm -f wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
+	rm -f wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS) \
+	      tests/winhost-ucrt.specs
 	rm -f $(addsuffix .d,wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS)) \
 	      $(addsuffix .d.tmp,wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS))
 

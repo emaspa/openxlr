@@ -4,7 +4,9 @@
 // it halves its input and has one way of behaving beside that, chosen by
 // its id, so a test picks the behaviour it wants by the plugin it loads.
 // A scan describes every plugin in the module, so what goes wrong during
-// one is chosen by OPENXLR_TEST_WINHOST_SCAN (see scan_trouble).
+// one is chosen by OPENXLR_TEST_WINHOST_SCAN (see scan_trouble). With
+// OPENXLR_TEST_WINHOST_PRINT set, every plugin prints on standard output
+// while it is made, activated and run (see print_line).
 #include "disk-probe.h"
 
 #include <clap/clap.h>
@@ -104,6 +106,8 @@ typedef struct {
   TestEditor editor;
   _Atomic float edit;
   _Atomic bool edited;
+  // OPENXLR_TEST_WINHOST_PRINT, read once when the plugin is made.
+  bool prints;
 } Instance;
 
 static Instance *of(const clap_plugin_t *plugin) { return plugin->plugin_data; }
@@ -179,8 +183,26 @@ static bool ask_per_block(Instance *p) {
          !memcmp(p->block.bytes, p->activated.bytes, p->block.returned);
 }
 
+// A line on standard output through the C library this module was built
+// with and one through Windows, as a plugin that prints does. Each names
+// where it was printed from.
+static void print_line(Instance *p, const char *where) {
+  if (!p->prints)
+    return;
+  char line[96];
+  int length = snprintf(line, sizeof(line), "[printed through the C library %s]\n", where);
+  fputs(line, stdout);
+  fflush(stdout);
+  length = snprintf(line, sizeof(line), "[printed through the Windows handle %s]\n", where);
+  DWORD written = 0;
+  if (length > 0)
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), line, (DWORD)length, &written, NULL);
+}
+
 static bool plugin_init(const clap_plugin_t *plugin) {
   Instance *p = of(plugin);
+  p->prints = getenv("OPENXLR_TEST_WINHOST_PRINT") != NULL;
+  print_line(p, "when made");
   if (p->kind == KIND_DISK)
     probe_disk();
   if (p->kind == KIND_TIMER) {
@@ -270,6 +292,7 @@ static bool plugin_activate(const clap_plugin_t *plugin, double rate,
                             uint32_t min, uint32_t max) {
   Instance *p = of(plugin);
   p->activations++;
+  print_line(p, "when activated");
   if (p->kind == KIND_DISK) {
     p->drive = open_drive("\\\\.\\PhysicalDrive0");
     ask(p->drive, StorageDeviceProperty, PropertyStandardQuery, PROBE_BUFFER, &p->activated);
@@ -303,6 +326,8 @@ static clap_process_status plugin_process(const clap_plugin_t *plugin,
     p->host->request_restart(p->host);
   if (p->kind == KIND_CALLBACK && block == CALLBACK_BLOCK)
     p->host->request_callback(p->host);
+  if (block <= 3 || block == TROUBLE_BLOCK)
+    print_line(p, "in a block");
   if (block == TROUBLE_BLOCK) {
     if (p->kind == KIND_SLOW)
       Sleep(60);

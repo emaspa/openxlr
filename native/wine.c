@@ -355,10 +355,13 @@ static size_t wine_utf8_locale(char *entry, size_t size) {
 }
 
 // Start Wine with the Windows host and its arguments: the directory of the
-// channel, or `scan` and, when there is one, the directory that holds the
-// disk identity (`also`). It inherits this process's environment, which the
-// daemon has already given the Wine prefix and the overrides it wants, with
-// two changes. WAYLAND_DISPLAY is left out: an editor has to be an X11
+// channel, or `scan` and the scan's directory (`also`). Its standard input
+// is the pipe this side writes to, and its standard output and standard
+// error are both the log: a plugin's C library takes standard output from
+// Windows when it starts, often before the Windows host runs, so nothing but
+// the log may be there (wire.h). It inherits this process's environment,
+// which the daemon has already given the Wine prefix and the overrides it
+// wants, with two changes. WAYLAND_DISPLAY is left out: an editor has to be an X11
 // window, which is what the frame it will sit in is. And the locale reads
 // UTF-8 (wine_utf8_locale).
 static bool wine_spawn(Wine *w, const char *argument, const char *also) {
@@ -389,13 +392,11 @@ static bool wine_spawn(Wine *w, const char *argument, const char *also) {
     environment[kept++] = locale;
   char *arguments[] = {wine, winhost, (char *)argument, (char *)also, NULL};
 
-  int to[2] = {-1, -1}, from[2] = {-1, -1}, log[2] = {-1, -1};
-  if (pipe2(to, O_CLOEXEC) != 0 || pipe2(from, O_CLOEXEC) != 0 ||
-      pipe2(log, O_CLOEXEC) != 0) {
+  int to[2] = {-1, -1}, log[2] = {-1, -1};
+  if (pipe2(to, O_CLOEXEC) != 0 || pipe2(log, O_CLOEXEC) != 0) {
     perror("pipe");
     for (int i = 0; i < 2; ++i) {
       if (to[i] >= 0) close(to[i]);
-      if (from[i] >= 0) close(from[i]);
       if (log[i] >= 0) close(log[i]);
     }
     free(environment);
@@ -406,7 +407,7 @@ static bool wine_spawn(Wine *w, const char *argument, const char *also) {
   if (w->child == 0) {
     // Only what is safe between fork and exec in a process with threads.
     dup2(to[0], STDIN_FILENO);
-    dup2(from[1], STDOUT_FILENO);
+    dup2(log[1], STDOUT_FILENO);
     dup2(log[1], STDERR_FILENO);
     sigset_t none;
     sigemptyset(&none);
@@ -422,20 +423,16 @@ static bool wine_spawn(Wine *w, const char *argument, const char *also) {
   }
   free(environment);
   close(to[0]);
-  close(from[1]);
   close(log[1]);
   if (w->child < 0) {
     perror("fork");
     close(to[1]);
-    close(from[0]);
     close(log[0]);
     return false;
   }
   w->wake_out = to[1];
-  w->wake_in = from[0];
   w->log = log[0];
   fcntl(w->wake_out, F_SETFL, O_NONBLOCK);
-  fcntl(w->wake_in, F_SETFL, O_NONBLOCK);
   fcntl(w->log, F_SETFL, O_NONBLOCK);
   return true;
 }
@@ -488,8 +485,8 @@ static bool wine_leave_disk_identity(const char *directory) {
 }
 
 // The private directory the Windows host is pointed at: the shared audio
-// file, the two FIFOs and the disk identity. It is gone again as soon as the
-// Windows host has opened what is in it.
+// file, the control FIFOs, the wake FIFO and the disk identity. It is gone
+// again as soon as the Windows host has opened what is in it.
 static bool wine_make_channel(Wine *w, char *directory, size_t size) {
   if (!wine_make_directory(directory, size))
     return false;
@@ -531,14 +528,24 @@ static bool wine_make_channel(Wine *w, char *directory, size_t size) {
     perror("cannot make the reply FIFO");
     return false;
   }
+  // Read only, like the reply FIFO, so it reads as ended the moment the
+  // Windows host is gone. The Windows host opens it before it answers the
+  // hello, which is before anything here reads it.
+  snprintf(path, sizeof(path), "%s/%s", directory, WIRE_WAKE_FIFO);
+  if (mkfifo(path, 0600) != 0 ||
+      (w->wake_in = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC)) < 0) {
+    perror("cannot make the wake FIFO");
+    return false;
+  }
   return true;
 }
 
 static void wine_remove_channel(const char *directory) {
   if (!directory[0])
     return;
-  static const char *const names[] = {WIRE_AUDIO_FILE, WIRE_REQUEST_FIFO,
-                                      WIRE_REPLY_FIFO, DISK_IDENTITY_FILE};
+  static const char *const names[] = {WIRE_AUDIO_FILE,     WIRE_REQUEST_FIFO,
+                                      WIRE_REPLY_FIFO,     WIRE_WAKE_FIFO,
+                                      WIRE_DESCRIPTION_FIFO, DISK_IDENTITY_FILE};
   char path[PATH_MAX];
   for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
     snprintf(path, sizeof(path), "%s/%s", directory, names[i]);
@@ -1603,14 +1610,32 @@ static bool wine_pass_description(int from) {
   }
 }
 
+// A scan's description FIFO: its hello first, on which the scan's directory
+// is removed, then the description, passed on as it comes. False once it
+// has ended, or when the first byte is no hello, which only a Windows host
+// of another build would send.
+static bool wine_scan_read(int from, bool *opened, bool *foreign, char *directory) {
+  if (!*opened) {
+    char byte = 0;
+    ssize_t count = read(from, &byte, 1);
+    if (count != 1)
+      return count != 0;
+    *opened = true;
+    *foreign = byte != WIRE_SCAN_OPENED;
+    wine_remove_channel(directory);
+    directory[0] = 0;
+  }
+  return !*foreign && wine_pass_description(from);
+}
+
 // `wine scan-clap FILE` and `wine scan-vst3 BUNDLE`: what `scan-clap` and
 // `scan-vst3` are for a native plugin. The Windows host is started with
-// `scan`, and the directory of the disk identity when there is one, and
-// handed the module on its standard input. It describes the
-// module with the scanner this helper has for a native plugin of the format,
-// and what it writes is passed on as it comes: the description from its
-// standard output, the phase lines and the plugin's own from its standard
-// error. The description names the plugin by `path` as it was given.
+// `scan` and a directory of the scan's own, and handed the module on its
+// standard input. It describes the module with the scanner this helper has
+// for a native plugin of the format, and what it writes is passed on as it
+// comes: the description from the FIFO in that directory, the phase lines
+// and whatever the plugin prints from its log. The description names the
+// plugin by `path` as it was given.
 //
 // A scan runs plugin code, so it is waited for with a limit. The pipe the
 // request went down stays open meanwhile, and the Windows host ends itself
@@ -1622,6 +1647,7 @@ int wine_scan(const char *format, const char *path) {
   static WireScan request;
   Wine *w = &scan;
   w->wake_out = w->wake_in = w->request = w->reply = w->log = -1;
+  int held = -1;  // this side's own end for writing, kept while the scan runs
   request.magic = WIRE_MAGIC;
   request.version = WIRE_VERSION;
   request.format = !strcmp(format, "clap") ? WIRE_FORMAT_CLAP : WIRE_FORMAT_VST3;
@@ -1643,19 +1669,33 @@ int wine_scan(const char *format, const char *path) {
   // A write to a Windows host that has just died must come back as an
   // error, not end this process.
   signal(SIGPIPE, SIG_IGN);
-  // A scan loads the plugin as a run does, so it gets the disk identity the
-  // same way, in a directory of its own. A scan has no hello to say when the
-  // Windows host has read the file, and a close of the file does not say it
-  // either: Wine opens a file it is asked for once more than once on some
-  // starts, and closes it in between. So the Windows host removes the file
-  // and the directory itself once it has read the file, and whatever is
-  // still there when the scan ends is removed here.
+  // The scan's directory holds the FIFO the description comes down and,
+  // since a scan loads the plugin as a run does, the disk identity. The
+  // Windows host's first byte down the FIFO says it has both, and the
+  // directory is removed then (wine_scan_read), or when the scan ends.
+  //
+  // The FIFO is read without waiting, and this side holds an end for writing
+  // as well, so that it does not read as ended before the Windows host has
+  // opened it. The scan's end is the child's, and what is left in the FIFO is
+  // read after this side's own end is closed.
   static char disk[PATH_MAX];
-  if (wine_make_directory(disk, sizeof(disk)) && !wine_leave_disk_identity(disk)) {
-    rmdir(disk);
-    disk[0] = 0;
+  if (!wine_make_directory(disk, sizeof(disk)))
+    return 1;
+  char fifo[PATH_MAX + sizeof(WIRE_DESCRIPTION_FIFO) + 1];
+  snprintf(fifo, sizeof(fifo), "%s/%s", disk, WIRE_DESCRIPTION_FIFO);
+  if (mkfifo(fifo, 0600) != 0 ||
+      (w->wake_in = open(fifo, O_RDONLY | O_NONBLOCK | O_CLOEXEC)) < 0 ||
+      (held = open(fifo, O_WRONLY | O_NONBLOCK | O_CLOEXEC)) < 0) {
+    perror("cannot make the description FIFO");
+    if (w->wake_in >= 0)
+      close(w->wake_in);
+    wine_remove_channel(disk);
+    return 1;
   }
-  if (!wine_spawn(w, "scan", disk[0] ? disk : NULL)) {
+  wine_leave_disk_identity(disk);
+  if (!wine_spawn(w, "scan", disk)) {
+    close(held);
+    close(w->wake_in);
     wine_remove_channel(disk);
     return 1;
   }
@@ -1663,6 +1703,7 @@ int wine_scan(const char *format, const char *path) {
   // kernel without it the poll below runs to its timeout.
   int exited = (int)syscall(SYS_pidfd_open, w->child, 0);
   int description = w->wake_in, log = w->log;
+  bool opened = false, foreign = false;
   size_t sent = 0;
   int64_t deadline = wine_now_ms() + WINE_SCAN_MS;
   bool ended;
@@ -1683,7 +1724,7 @@ int wine_scan(const char *format, const char *path) {
     }
     // A pipe every writer has closed is no longer listened to, or the loop
     // would spin on its hang-up until the child can be waited for.
-    if (fds[0].revents && !wine_pass_description(description))
+    if (fds[0].revents && !wine_scan_read(description, &opened, &foreign, disk))
       description = -1;
     wine_drain_log(w);
     if ((fds[1].revents & (POLLHUP | POLLERR)) && !(fds[1].revents & POLLIN))
@@ -1699,8 +1740,11 @@ int wine_scan(const char *format, const char *path) {
     wine_stop_child(w);
   }
   wine_remove_channel(disk);
-  // What it wrote before it ended.
-  wine_pass_description(w->wake_in);
+  // What it wrote before it ended, to the end now that nothing else can
+  // write.
+  close(held);
+  if (description >= 0)
+    wine_scan_read(w->wake_in, &opened, &foreign, disk);
   wine_drain_log(w);
   if (w->log_size)
     fprintf(stderr, "%.*s\n", (int)w->log_size, w->log_line);
@@ -1708,11 +1752,15 @@ int wine_scan(const char *format, const char *path) {
   for (size_t i = 0; i < sizeof(fds) / sizeof(fds[0]); ++i)
     if (*fds[i] >= 0)
       close(*fds[i]);
-  bool whole = ended && WIFEXITED(w->wait_status) && WEXITSTATUS(w->wait_status) == 0;
+  bool whole = ended && WIFEXITED(w->wait_status) && WEXITSTATUS(w->wait_status) == 0 &&
+               opened && !foreign;
   char ending[96];
   if (!ended)
     fprintf(stderr, "the Windows plugin did not finish its scan in %d s\n",
             WINE_SCAN_MS / 1000);
+  else if (foreign)
+    fputs("the scan did not finish: the Windows plugin host is not this build's\n",
+          stderr);
   else if (!whole)
     fprintf(stderr, "the scan did not finish: %s\n",
             wine_ending(w, ending, sizeof(ending), 0));

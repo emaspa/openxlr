@@ -38,6 +38,9 @@ native/tests/winhost-graph
 native/tests/winhost-rtkit
 native/tests/winhost-editor
 native/tests/winhost-plugin.clap
+native/tests/winhost-plugin-msvcrt.clap
+native/tests/winhost-plugin-ucrt.clap
+native/tests/winhost-ucrt.specs
 native/tests/winhost-plugin.vst3
 native/build-config.h
 native/rnnoise/src/*.o
