@@ -68,7 +68,7 @@ internal static class WindowsHostChoiceWindowTests
                 else if (cmd == "getPluginSetup")
                 {
                     Interlocked.Increment(ref setups);
-                    await SocketTestServer.Send(socket, new { type = "pluginSetup", windowsHostInstalled = true }, stop);
+                    await SocketTestServer.Send(socket, new { type = "pluginSetup", windowsHostInstalled = true, windowsHostDefault = "yabridge" }, stop);
                 }
                 if (id is not null) await SocketTestServer.Send(socket, new { type = "commandResult", requestId = id }, stop);
             }
@@ -104,7 +104,7 @@ internal static class WindowsHostChoiceWindowTests
         controls.Show();
         try
         {
-            var choice = controls.FindControl<ToggleButton>("PluginWindowsHost")!;
+            var choice = controls.FindControl<ComboBox>("PluginWindowsHost")!;
             var state = controls.FindControl<TextBlock>("PluginWindowsHostState")!;
             var note = controls.FindControl<TextBlock>("PluginWindowsHostNote")!;
             var rules = controls.FindControl<Button>("ManageNativeEditors")!;
@@ -112,9 +112,10 @@ internal static class WindowsHostChoiceWindowTests
             {
                 Layout(controls, width, 560);
                 Assert.True(choice.IsVisible);
-                Assert.Equal(Localizer.Text("RunOnOpenXlrSWindowsPluginHost"), choice.Content as string);
+                Assert.Equal(3, choice.ItemCount);
+                Assert.Same(insert.WindowsHostOptions[0], choice.SelectedItem);
+                Assert.Equal(Localizer.Text("WindowsHostFollowDefaultYabridge"), insert.WindowsHostOptions[0].Label);
                 Assert.Equal(Localizer.Text("RunOnOpenXlrSWindowsPluginHostTip"), ToolTip.GetTip(choice) as string);
-                Assert.False(choice.IsChecked);
                 Assert.True(controls.FindControl<ToggleButton>("PluginOwnBlock")!.IsVisible);
                 Assert.Equal(Localizer.Text("RunsThroughYabridge"), state.Text);
                 Assert.True(state.IsVisible);
@@ -128,7 +129,7 @@ internal static class WindowsHostChoiceWindowTests
             // yabridge, and no rule blocks it.
             view.Apply(Chain(ClassId, "openxlr", running: true));
             Layout(controls, 420, 560);
-            Assert.True(choice.IsChecked);
+            Assert.Same(insert.WindowsHostOptions[2], choice.SelectedItem);
             Assert.Equal(Localizer.Text("RunsOnTheWindowsPluginHost"), state.Text);
             Assert.True(insert.NativeEditorAvailable);
             Assert.False(rules.IsVisible);
@@ -145,7 +146,7 @@ internal static class WindowsHostChoiceWindowTests
                 + "/home/u/.wine/drive_c/Program Files/Common Files/VST3/Deep Verb.vst3/Contents/x86_64-win/Deep Verb.vst3";
             view.Apply(Chain(ClassId, "openxlr", error: missing));
             Layout(controls, 420, 560);
-            Assert.True(choice.IsChecked);
+            Assert.Same(insert.WindowsHostOptions[2], choice.SelectedItem);
             Assert.True(note.IsVisible);
             Assert.Equal(Localizer.Format("WindowsHostKept", missing), note.Text);
             AssertInside(note, controls);

@@ -216,7 +216,11 @@ public sealed record NativeEditorRulesChangedMessage
     [JsonPropertyName("type")] public string Type => "nativeEditorRulesChanged";
 }
 
-/// <summary>Reply to "getPluginSetup" or "setPluginWineTrace": installation and scanner settings.</summary>
+/// <summary>
+/// Reply to "getPluginSetup", "setPluginWineTrace" or "setWindowsHostDefault":
+/// installation and scanner settings. After "setWindowsHostDefault" it also
+/// goes to every client.
+/// </summary>
 public sealed record PluginSetupMessage(PluginSetup Setup)
 {
     [JsonPropertyName("type")] public string Type => "pluginSetup";
@@ -225,6 +229,12 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     [JsonPropertyName("hostInstalled")] public bool HostInstalled => Setup.HostInstalled;
     /// <summary>Whether the build has the Windows plugin host that "setInsertWindowsHost" moves an insert to.</summary>
     [JsonPropertyName("windowsHostInstalled")] public bool WindowsHostInstalled => Setup.WindowsHostInstalled;
+    /// <summary>
+    /// The host an insert of a Windows plugin runs on while it follows the
+    /// default, "yabridge" or "openxlr", as the daemon had it when this
+    /// message was made. Set with "setWindowsHostDefault".
+    /// </summary>
+    [JsonPropertyName("windowsHostDefault")] public string WindowsHostDefault { get; init; } = OpenXLR.Core.Mixing.WindowsPluginHost.Default;
     [JsonPropertyName("lv2Directory")] public string Lv2Directory => Setup.Lv2Directory;
     [JsonPropertyName("clapDirectory")] public string ClapDirectory => Setup.ClapDirectory;
     [JsonPropertyName("vst3Directory")] public string Vst3Directory => Setup.Vst3Directory;

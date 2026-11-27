@@ -107,6 +107,10 @@ public sealed partial class MainViewModel : ViewModelBase
         OlderDaemonRunning = _client.Presence == DaemonPresence.OlderDaemon;
         _client.ErrorReceived += msg => Dispatcher.UIThread.Post(() => OnDaemonError(msg));
         _client.NativeEditorRulesChanged += () => Dispatcher.UIThread.Post(() => InsertsViewModel.ReloadAll?.Invoke());
+        _client.PluginSetupReceived += setup => Dispatcher.UIThread.Post(() =>
+        {
+            foreach (InsertsViewModel chain in InsertChains()) chain.ApplyWindowsHostSetup(setup);
+        });
         var meters = new MeterUpdates(action => Dispatcher.UIThread.Post(action), ApplyMeters);
         _client.MetersReceived += meters.Publish;
         _client.SoundCheckTakeReceived += take => Dispatcher.UIThread.Post(() =>
@@ -120,6 +124,16 @@ public sealed partial class MainViewModel : ViewModelBase
             foreach (MixViewModel mv in Mixes) mv.Inserts.Refetch();
             foreach (ChannelViewModel channel in Channels) channel.Inserts?.Refetch();
         };
+    }
+
+    /// <summary>Every insert chain the UI shows: both XLR inputs, each mix and each capture channel that has one.</summary>
+    private IEnumerable<InsertsViewModel> InsertChains()
+    {
+        yield return Inserts;
+        yield return Inserts2;
+        foreach (MixViewModel mv in Mixes) yield return mv.Inserts;
+        foreach (ChannelViewModel channel in Channels)
+            if (channel.Inserts is { } chain) yield return chain;
     }
 
     /// <summary>The connection came up or went down. Gone, the panels grey and the meters fall to zero; back, the next state fills them again.</summary>

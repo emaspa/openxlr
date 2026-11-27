@@ -71,7 +71,7 @@ internal static class HistoryPolicy
     // monitoring pause) stay here for good, and so does where processing runs
     // (setEqProcessing, setDynamicsProcessing, setDuckingProcessing, an
     // insert's own block, setInsertOwnBlock, and the host of its Windows
-    // plugin, setInsertWindowsHost), which is machine wiring;
+    // plugin, setInsertWindowsHost and setWindowsHostDefault), which is machine wiring;
     // phantom power, the hardware mute and the unit's locks reach set, which
     // records only DeviceHistory's controls. The layout commands wait for
     // their milestones. The maximizer belongs to hardware mixing, which the
@@ -83,7 +83,7 @@ internal static class HistoryPolicy
         "getState", "getBrowserSession", "syncBrowserTabs", "activateBrowserTab", "getDiagnostics", "getRuntimeDiagnostics", "markGlitch", "getTimeline",
         "getSoundCheckTake", "getSoundboard", "importClip", "exportSoundboard", "importSoundboard", "restoreStarterSounds",
         "listPlugins", "getNativeEditorRules", "setNativeEditorRule", "getPluginDiagnostics", "getPluginSetup",
-        "setPluginWineTrace", "installPlugin", "addWindowsPluginFolder", "removeWindowsPluginFolder", "getWindowsPluginFiles",
+        "setPluginWineTrace", "setWindowsHostDefault", "installPlugin", "addWindowsPluginFolder", "removeWindowsPluginFolder", "getWindowsPluginFiles",
         "removeWindowsPluginInserts", "setWindowsPluginEnabled", "deleteWindowsPlugin", "syncWindowsPlugins",
         "addPluginSearchPath", "removePluginSearchPath", "rescanPlugins",
         "setInputBinding", "setCaptureSource",

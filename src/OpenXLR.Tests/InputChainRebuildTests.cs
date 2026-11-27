@@ -133,6 +133,40 @@ public sealed class InputChainRebuildTests
     }
 
     [Fact]
+    public void AProfileRecallKeepsEachOfTheThreeHostStatesOfAnInsertThatStays()
+    {
+        var current = new Dictionary<string, List<InsertDefinition>>
+        {
+            ["xlr1"] =
+            [
+                Insert("yabridge", "0123", "vst3") with { WindowsHost = "yabridge" },
+                Insert("own", "4567", "vst3") with { WindowsHost = "openxlr" },
+                Insert("following", "89AB", "vst3"),
+            ],
+        };
+        var profile = new Dictionary<string, List<InsertDefinition>>
+        {
+            ["xlr1"] =
+            [
+                // Each was saved with another state than it has now.
+                Insert("yabridge", "0123", "vst3") with { WindowsHost = "openxlr" },
+                Insert("own", "4567", "vst3") with { WindowsHost = "yabridge" },
+                Insert("following", "89AB", "vst3") with { WindowsHost = "yabridge" },
+                // Not in the current chain: it comes back pinned as the profile has it.
+                Insert("back", "CDEF", "vst3") with { WindowsHost = "yabridge" },
+            ],
+        };
+        var next = Mixer.RecallChains(current, profile, _ => false, keepWiring: true);
+        Assert.Equal([("yabridge", "yabridge"), ("own", "openxlr"), ("following", null), ("back", "yabridge")],
+            next["xlr1"].Select(i => (i.Id, i.WindowsHost)));
+        Assert.Equal("yabridge", Mixer.KeepWiring(profile["xlr1"][0], current["xlr1"]).WindowsHost);
+        Assert.Equal("yabridge", Mixer.KeepWiring(profile["xlr1"][3], current["xlr1"]).WindowsHost);
+        // The saved settings carry the yabridge pin as they are.
+        Assert.Equal(["openxlr", "yabridge", "yabridge", "yabridge"],
+            Mixer.RecallChains(current, profile, _ => false, keepWiring: false)["xlr1"].Select(i => i.WindowsHost));
+    }
+
+    [Fact]
     public void SavedSettingsLeaveEveryChainTheyDoNotName()
     {
         List<InsertDefinition> chat = [Insert("c")];

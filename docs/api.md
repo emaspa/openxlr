@@ -154,7 +154,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `starterSounds` | in answer to `restoreStarterSounds` | `ok` (true when it went through, also when no starter clip was missing), `message`, `clips` (the ids added, in library order) and `skipped` (each clip left out, as `name: reason`). See [Starter sounds](#starter-sounds) |
 | `soundboardImport` | in answer to `importSoundboard` | `ok` (true when at least one clip was imported), `message`, `clips` (the ids added, in library order), `renamed` (the archive's id to the new one, for each clip whose id was in use here), `skipped` (each clip left out, as `name: reason`, and on a refusal each clip that could not be taken) and `replaced` (true when the library was replaced). See [Soundboard](#soundboard) |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo input or mix with two or more. `windowsHostOnly` is true for a Windows CLAP or VST3 plugin found in a [Windows plugin folder](#windows-plugin-folders), whose `path` is the Windows bundle itself and which runs only on the Windows plugin host, and false for every other entry |
-| `pluginSetup` | in answer to `getPluginSetup` or `setPluginWineTrace` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which every package but the Flatpak has), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
+| `pluginSetup` | in answer to `getPluginSetup`, `setPluginWineTrace` or `setWindowsHostDefault`, and to every client after a `setWindowsHostDefault` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which every package but the Flatpak has), `windowsHostDefault` (`"yabridge"` or `"openxlr"`, the host an insert of a Windows plugin runs on while it [follows the default](#windows-host-default)), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
 | `windowsPluginFiles` | in answer to `getWindowsPluginFiles` | `ok`, `message` and `plugins`; each plugin file carries `path`, `name`, `format`, `enabled`, `canDelete`, `winePrefix` and `inUse`. Excluded files remain listed |
 | `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
 | `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
@@ -348,6 +348,7 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `getPluginDiagnostics` | none | read bridge status and existing native scan evidence without syncing, rescanning or changing inserts; answered with `pluginDiagnostics` |
 | `getPluginSetup` | none | where plugins are installed and what bridges Windows ones, answered with a `pluginSetup` message |
 | `setPluginWineTrace` | `value` | boolean only; set or clear deep Wine tracing for future plugin scans in the running daemon, answered with `pluginSetup` carrying the current `wineTrace`. No restart, persistence, rescan or cache deletion |
+| `setWindowsHostDefault` | `value` | `"yabridge"` or `"openxlr"`: the host every insert of a Windows plugin that [follows the default](#windows-host-default) runs on, saved as `windowsHostDefault` in `daemon.json`. Rebuilds the chains whose plugins move and leaves the others running. Answered with `pluginSetup`, which also goes to every client. Refused for any other value, and when `daemon.json` exists and cannot be read, which is then left as it is |
 | `installPlugin` | `path` | install what is at an absolute path the user picked: a `.clap` or single-file `.vst3` is copied into `~/.clap` or `~/.vst3`, a `.vst3` or `.lv2` directory into `~/.vst3` or `~/.lv2`, a plain directory installs every plugin inside it. A single Windows VST3/CLAP file or VST3 bundle is copied into its own folder under `windowsImportDirectory`, and only that folder is registered and synced; a plugin already installed inside a Wine prefix is linked from the managed folder instead, preserving its original location and prefix. An explicit Windows plugin folder is registered in place. In a build with the [Windows plugin host](#windows-host) and Wine but no yabridge, the copy alone is enough, since `windowsImportDirectory` is a [Windows plugin folder](#windows-plugin-folders), and an explicit folder is added as a `windows` plugin folder unless the host already searches it. Wine is needed either way. Archives, installers and VST2 files are refused with a message that says what to do. The catalogues are read again before the `pluginInstall` answer |
 | `addWindowsPluginFolder` | `path` | register an existing folder holding Windows VST3 or CLAP plugins and sync it, without copying source files or installing any native plugins alongside them. With no yabridge, in a build with the Windows plugin host and Wine, the folder is added as a `windows` plugin folder instead, unless the host already searches it; answered with `pluginInstall` |
 | `removeWindowsPluginFolder` | `path` | unregister a folder from `windowsDirectories`, sync retained folders and remove only its unused generated VST3/CLAP wrappers. Original files are kept. Refused while affected plugins remain in the mixer's insert chains. A missing source folder can still be removed from the list; answered with `pluginInstall` |
@@ -359,10 +360,10 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `rescanPlugins` | none | read the plugin directories again, for plugins installed by other means; answered with `pluginInstall` |
 | `addPluginSearchPath` | `kind`, `path` | add an existing folder to the `lv2`, `clap` or `vst3` search path, or with `windows` to the [Windows plugin folders](#windows-plugin-folders), without copying anything, save the list in `daemon.json` and read the catalogues again; answered with `pluginInstall`. See [Plugin search paths](#plugin-search-paths) |
 | `removePluginSearchPath` | `kind`, `path` | stop searching an added folder, keeping its files, and read the catalogues again; works for a folder that no longer exists; answered with `pluginInstall` |
-| `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, ownBlock?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. The daemon does not read a `windowsHost` in the chain. An insert keeps the [host of its Windows plugin](#windows-host), and one being added starts on yabridge. Only this chain is rebuilt; every other chain keeps its running plugins |
+| `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, ownBlock?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. The daemon does not read a `windowsHost` in the chain. An insert keeps the [host of its Windows plugin](#windows-host), and one being added follows the default. Only this chain is rebuilt; every other chain keeps its running plugins |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert; rebuilds this chain only |
 | `setInsertOwnBlock` | `channel`, `insertId`, `value` | `true` runs one insert's plugin [on its own block](#own-block), `false` back in PipeWire's cycle; saved with the insert as `ownBlock`. Rebuilds this chain only, which starts that insert's host again in the new mode. Refused when the insert is not in the chain, when `value` is not a boolean, and, for `true`, when the native plugin host is not installed |
-| `setInsertWindowsHost` | `channel`, `insertId`, `value` | `"openxlr"` runs one insert's Windows plugin on the [Windows plugin host](#windows-host) built into OpenXLR, `"yabridge"` back through yabridge, which is the default; saved with the insert as `windowsHost`. Needs a build with that host, which every package but the Flatpak is. Rebuilds this chain only, which starts that insert's helper again on the other host with the same control values. Refused when the insert is not in the chain, when `value` is neither of the two, and, for `"openxlr"`, when the build has no Windows plugin host, the plugin is not a Windows plugin bridged through yabridge, or its Windows module is missing or not 64-bit. `"yabridge"` is never refused |
+| `setInsertWindowsHost` | `channel`, `insertId`, `value` | `"openxlr"` pins one insert's Windows plugin to the [Windows plugin host](#windows-host) built into OpenXLR, `"yabridge"` pins it to yabridge, and `"default"` clears the pin so it follows the [default](#windows-host-default); a pin is saved with the insert as `windowsHost`. Rebuilds this chain only, which starts that insert's helper again with the same control values. Refused when the insert is not in the chain, when `value` is none of the three, and, for `"openxlr"`, when the build has no Windows plugin host, the plugin is not a Windows plugin bridged through yabridge, or its Windows module is missing or not 64-bit. `"yabridge"` and `"default"` are never refused |
 | `setInsertParam` | `channel`, `insertId`, `symbol`, `value` | one plugin control, by the catalogue's `symbol` (LV2 port symbol or decimal CLAP/VST3 parameter id); use catalogue ranges and scale points. Refused when the insert is not in the chain or the catalogue does not declare the symbol for its plugin |
 | `renameInsert` | `channel`, `insertId`, `name` | change one insert's label; `name` is 1 to 256 characters with no control characters. The running plugin, its parameters and the audio path stay as they are. Refused when the insert is not in the chain |
 | `getNativeEditorRules` | none | read release defaults and explicit user overrides for native editor compatibility |
@@ -837,22 +838,35 @@ helper's side is described in
 [native/README.md](../native/README.md#own-block).
 
 <a name="windows-host"></a>
-A CLAP or VST3 insert definition optionally carries `windowsHost: "openxlr"`,
-set with `setInsertWindowsHost`. It is for a Windows plugin, which is in the
-catalogue through the wrapper yabridge made for it. Without the field
-yabridge runs the plugin, as before. With it the native helper runs the
-plugin on the Windows plugin host built into OpenXLR. The daemon reads the
-Windows module back from the wrapper and starts the helper with it. The
-catalogue entry, the class id, the parameter ids and the insert's saved
-values are the same on both hosts, and nothing is scanned again.
+A CLAP or VST3 insert definition optionally carries `windowsHost`, set with
+`setInsertWindowsHost`. It is for a Windows plugin, which is in the
+catalogue through the wrapper yabridge made for it, and the plugin can run
+on either of two hosts: through yabridge, or on the Windows plugin host
+built into OpenXLR. On the second one the daemon reads the Windows module
+back from the wrapper and starts the native helper with it. The catalogue
+entry, the class id, the parameter ids and the insert's saved values are
+the same on both hosts, and nothing is scanned again.
 
-This needs a build with the Windows plugin host, made with
-`make -C native WINHOST=1`. Every package except the Flatpak is built that
-way. A build without it, the Flatpak among them, refuses `"openxlr"` and
-runs every insert through yabridge.
-`windowsHostInstalled` in `pluginSetup` says whether the build has it. The
-daemon looks for `openxlr-winhost.exe` beside the native helper, or where
-`OPENXLR_WINHOST` in its environment names it.
+The field has three states:
+
+- absent: the insert follows the default, `windowsHostDefault` (see
+  [below](#windows-host-default));
+- `"openxlr"`: the insert is pinned to the Windows plugin host;
+- `"yabridge"`: the insert is pinned to yabridge.
+
+`setInsertWindowsHost` with `"default"` clears a pin and removes the field.
+A file with no pinned insert is one an older build reads and writes. A
+build from before the yabridge pin knew only `"openxlr"` and reads a stored
+`"yabridge"` as absent, which was yabridge to it, so a downgrade runs that
+plugin where the user put it. A value this build does not know reads as
+absent.
+
+The Windows plugin host needs a build made with `make -C native WINHOST=1`.
+Every package except the Flatpak is built that way. A build without it, the
+Flatpak among them, refuses `"openxlr"` and runs every insert through
+yabridge. `windowsHostInstalled` in `pluginSetup` says whether the build has
+it. The daemon looks for `openxlr-winhost.exe` beside the native helper, or
+where `OPENXLR_WINHOST` in its environment names it.
 
 `setInsertWindowsHost` refuses `"openxlr"`, with the reason in the error,
 when:
@@ -866,26 +880,64 @@ when:
 - the Windows module behind the wrapper or in the folder is missing, or is
   not a 64-bit Windows module.
 
-`"yabridge"` is never refused, so an insert can always go back. For a plugin
-found in a Windows plugin folder it only clears the saved choice: there is
-no wrapper for yabridge to run, so the plugin stays on the Windows plugin
-host.
+`"yabridge"` and `"default"` are never refused, so an insert can always
+leave the Windows plugin host. For a plugin found in a Windows plugin folder
+they only change the saved field: there is no wrapper for yabridge to run,
+so the plugin stays on the Windows plugin host.
 
-The choice is saved with the insert, in `mixer.json` and in a profile. It is
-absent while it is yabridge, so a file with no moved insert is one an older
-build reads and writes. A value this build does not know reads as yabridge.
-`setInserts` does not change the choice. An insert that stays in the chain,
-the same plugin under the same id, keeps its host, and an insert being added
-starts on yabridge whatever the chain said. An undo or a redo of the chain
-leaves it alone too, and so does a profile recall, on connect or with
-`loadProfile`. An insert that stays keeps its host. Only an insert the
-current chain does not hold takes the one the profile saved.
+The field is saved with the insert, in `mixer.json` and in a profile.
+`setInserts` does not change it. An insert that stays in the chain, the same
+plugin under the same id, keeps its host, and an insert being added follows
+the default whatever the chain said. An undo or a redo of the chain leaves
+it alone too, and so does a profile recall, on connect or with
+`loadProfile`. An insert that stays keeps its host, a pin to either host or
+none. Only an insert the current chain does not hold takes the one the
+profile saved.
 
-A saved choice the build cannot honour when the chain is built, for any of
-the reasons above, does not fail the chain. The insert runs through
-yabridge, the daemon's log says why, and the insert's status carries the
-reason in `windowsHostError`, which is absent (null over HTTP) otherwise.
-The saved choice stays. `windowsHostRunning` is true while the insert's
+<a name="windows-host-default"></a>
+**The default host.** `windowsHostDefault` in `daemon.json`, `"yabridge"`
+or `"openxlr"`, is the host an insert with no pin runs on. When the file
+names none, or a value this build does not know, the build's own default
+applies, which is `"yabridge"` in this release. A user who sets it keeps
+what they set when a later release changes that. `setWindowsHostDefault`
+changes it in the running daemon and saves it; `pluginSetup` reports it as
+`windowsHostDefault`. A client that wants to know where a plugin runs reads
+`windowsHostRunning` in the insert's status, never the absence of
+`windowsHost`.
+
+An insert that follows the default resolves in this order:
+
+1. a plugin found in a Windows plugin folder has no wrapper and runs on the
+   Windows plugin host;
+2. while the default is yabridge, the plugin runs through yabridge;
+3. a plugin on the hold list runs through yabridge, with the list's reason
+   in `windowsHostError`;
+4. otherwise it runs on the Windows plugin host when that host finds a
+   64-bit module behind the wrapper, and through yabridge, with the reason
+   in `windowsHostError`, when it does not. A build without the host runs it
+   through yabridge with nothing in `windowsHostError`.
+
+The hold list ships with the daemon, one entry per plugin by format and id,
+the way the release defaults of `getNativeEditorRules` ship. It is empty in this
+release. A plugin on it still runs on the Windows plugin host when its
+insert is pinned there.
+
+When a plugin that follows the default does not start on the Windows plugin
+host, and yabridge is installed, the daemon starts it once more through
+yabridge and puts the reason in `windowsHostError`, beginning with "it did
+not start on the Windows plugin host". It does not do this when the first
+start ran into the daemon's wait for the helper: Wine was silent, perhaps
+creating or updating its prefix, and yabridge would wait as long for the
+same Wine. The chain then fails with that reason, as it does for a pinned
+insert. The daemon's log and timeline get a line for the second start, and
+none for a plugin of step 4 that the host cannot run, since that would
+repeat at every chain build.
+
+A pin to the Windows plugin host this build cannot honour when the chain
+is built, for any of the reasons above, does not fail the chain. The insert
+runs through yabridge, the daemon's log says why, and the insert's status
+carries the reason in `windowsHostError`, which is absent (null over HTTP)
+otherwise. The pin stays. `windowsHostRunning` is true while the insert's
 plugin runs on the Windows plugin host.
 
 The plugin runs in the Wine prefix yabridge would use. That is the daemon's
@@ -1791,7 +1843,7 @@ bypass, host and control values. The history does not record where
 processing runs (`setEqProcessing`, `setDynamicsProcessing`,
 `setDuckingProcessing`), whether an insert runs on its own block
 (`setInsertOwnBlock`), which host runs an insert's Windows plugin
-(`setInsertWindowsHost`) or the maximizer (`setMixMaximizer`). Every other command leaves the history alone, with these exceptions, which
+(`setInsertWindowsHost`, `setWindowsHostDefault`) or the maximizer (`setMixMaximizer`). Every other command leaves the history alone, with these exceptions, which
 empty it once they succeed: `loadProfile`, a profile recalled on connect,
 `deleteChannel`, `deleteMix` (and `setWaveInterfaceEnabled` when it removes
 a unit's capture channels), `setMixing`, `setActiveDevice` and
@@ -2196,8 +2248,12 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   it saved), written by the daemon and read at each scan and
   each LV2 host start. `yabridgeFolderCopy` is present once the daemon has
   copied the companion's folders into `pluginFolders`, which it does by
-  itself once (see [the one-time copy](#yabridge-folder-copy)). Each writer
-  keeps the keys it does not own.
+  itself once (see [the one-time copy](#yabridge-folder-copy)).
+  `windowsHostDefault` (`"yabridge"` or `"openxlr"`, absent for the build's
+  own default) is the host an insert of a Windows plugin runs on while it
+  [follows the default](#windows-host-default), written by the daemon for
+  `setWindowsHostDefault` and read at start. Each writer keeps the keys it
+  does not own.
 - `bridge/yabridgectl/config.toml`: the managed companion's folder registry,
   separate from the system yabridgectl configuration. The daemon reads it
   once for [the one-time copy](#yabridge-folder-copy) and never writes it. Private wrappers live

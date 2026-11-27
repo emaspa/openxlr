@@ -223,6 +223,11 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
         => PluginOperationAsync("setPluginWineTrace", timeout,
             new Dictionary<string, object> { ["value"] = enabled }, "pluginSetup");
 
+    /// <summary>Set the host every insert that follows the default runs a Windows plugin on, "yabridge" or "openxlr"; the pluginSetup reply, or null on timeout.</summary>
+    public Task<JsonNode?> SetWindowsHostDefaultAsync(string host, TimeSpan timeout)
+        => PluginOperationAsync("setWindowsHostDefault", timeout,
+            new Dictionary<string, object> { ["value"] = host }, "pluginSetup");
+
     /// <summary>
     /// Ask the daemon to install the plugin at a path the user picked. The
     /// reply says what happened and how many plugins the catalogue gained;
@@ -336,6 +341,8 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
     /// <summary>Raised when an error message arrives from the daemon.</summary>
     public event Action<string>? ErrorReceived;
     public event Action? NativeEditorRulesChanged;
+    /// <summary>A pluginSetup arrived, in answer to this client or sent to every client after the default host changed.</summary>
+    public event Action<JsonNode>? PluginSetupReceived;
 
     /// <summary>Raised on every meter frame (id to peak, 0..1 and above when clipping).</summary>
     public event Action<JsonNode>? MetersReceived;
@@ -450,13 +457,18 @@ public sealed class DaemonClient : IAsyncDisposable, IEqCommands, IEqProfileComm
             else if (type is "diagnostics" or "runtimeDiagnostics" or "timeline") StoreReply(type, node);
             else if (type == "plugins") StoreReply(type, node["plugins"]);
             else if (type == "nativeEditorRulesChanged") NativeEditorRulesChanged?.Invoke();
+            else if (type == "pluginSetup")
+            {
+                StoreReply(type, node);
+                PluginSetupReceived?.Invoke(node);
+            }
             else if (type == "browserTabActivation")
             {
                 if (node["tabId"] is JsonValue tabNode && tabNode.TryGetValue<int>(out int tabId)
                     && node["site"] is JsonValue siteNode && siteNode.TryGetValue<string>(out string? site))
                     BrowserTabActivationReceived?.Invoke(tabId, site);
             }
-            else if (type is "pluginSetup" or "pluginInstall" or "pluginDiagnostics" or "windowsPluginFiles" or "nativeEditorRules" or "browserSession" or "clipImport"
+            else if (type is "pluginInstall" or "pluginDiagnostics" or "windowsPluginFiles" or "nativeEditorRules" or "browserSession" or "clipImport"
                      or "soundboardExport" or "soundboardImport" or "starterSounds" or "mixingPlan") StoreReply(type, node);
             else if (type == "commandResult" && node["requestId"]?.GetValue<string>() is string requestId)
             {

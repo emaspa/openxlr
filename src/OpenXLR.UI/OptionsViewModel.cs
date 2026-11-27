@@ -159,6 +159,72 @@ public sealed class OptionsViewModel : ViewModelBase
         }
     }
 
+    private string? _windowsHostDefault;
+    private bool _windowsHostInstalled, _settingWindowsHostDefault;
+
+    /// <summary>The two hosts an insert that follows the default can run a Windows plugin on.</summary>
+    public System.Collections.Generic.IReadOnlyList<WindowsHostOption> WindowsHostDefaultOptions { get; } =
+    [
+        new(InsertsViewModel.WindowsHostYabridge, Localizer.Text("WindowsHostDefaultYabridge")),
+        new(InsertsViewModel.WindowsHostOpenXlr, Localizer.Text("WindowsHostDefaultOpenXlr")),
+    ];
+
+    /// <summary>Shown on a build with the Windows plugin host; a build without it runs every Windows plugin through yabridge.</summary>
+    public bool ShowsWindowsHostDefault => _windowsHostInstalled;
+    public bool CanSetWindowsHostDefault => _windowsHostInstalled && _windowsHostDefault is not null && !_settingWindowsHostDefault;
+
+    /// <summary>The daemon's default host, null until it has said. Choosing the other one sends it.</summary>
+    public WindowsHostOption? SelectedWindowsHostDefault
+    {
+        get => WindowsHostDefaultOptions.FirstOrDefault(o => o.Value == _windowsHostDefault);
+        set
+        {
+            if (value is null || value.Value == _windowsHostDefault || !CanSetWindowsHostDefault) return;
+            _ = SetWindowsHostDefaultAsync(value.Value);
+        }
+    }
+
+    private string? _windowsHostDefaultStatus;
+    public string? WindowsHostDefaultStatus { get => _windowsHostDefaultStatus; private set => Set(ref _windowsHostDefaultStatus, value); }
+
+    public async System.Threading.Tasks.Task SetWindowsHostDefaultAsync(string host)
+    {
+        if (!CanSetWindowsHostDefault) return;
+        _settingWindowsHostDefault = true;
+        Raise(nameof(CanSetWindowsHostDefault));
+        WindowsHostDefaultStatus = Localizer.Text("WindowsHostDefaultUpdating");
+        try
+        {
+            // The chains whose plugins move are built again before the reply.
+            var setup = await _client.SetWindowsHostDefaultAsync(host, TimeSpan.FromSeconds(60));
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // A refusal has no setup to show; the rest of the section stays as it was.
+                if (setup is not null) ApplyPluginSetup(setup);
+                else Raise(nameof(SelectedWindowsHostDefault));
+                if (setup is null || setup["windowsHostDefault"]?.GetValue<string>() != host)
+                    WindowsHostDefaultStatus = Localizer.Text("WindowsHostDefaultNotChanged");
+            });
+        }
+        finally
+        {
+            _settingWindowsHostDefault = false;
+            Raise(nameof(CanSetWindowsHostDefault));
+        }
+    }
+
+    /// <summary>The default host as the daemon's last pluginSetup has it; a refused change puts the choice back.</summary>
+    private void ApplyWindowsHostDefault(System.Text.Json.Nodes.JsonNode? setup)
+    {
+        _windowsHostInstalled = setup?["windowsHostInstalled"]?.GetValue<bool>() == true;
+        string? host = setup?["windowsHostDefault"]?.GetValue<string>();
+        _windowsHostDefault = host is InsertsViewModel.WindowsHostYabridge or InsertsViewModel.WindowsHostOpenXlr ? host : null;
+        WindowsHostDefaultStatus = null;
+        Raise(nameof(ShowsWindowsHostDefault));
+        Raise(nameof(CanSetWindowsHostDefault));
+        Raise(nameof(SelectedWindowsHostDefault));
+    }
+
     /// <summary>Ask the daemon where plugins go and what is there to bridge Windows ones.</summary>
     public async System.Threading.Tasks.Task LoadPluginSetupAsync()
     {
@@ -180,6 +246,7 @@ public sealed class OptionsViewModel : ViewModelBase
         Raise(nameof(CanSetPluginWineTrace));
         PluginWineTraceStatus = _pluginWineTrace is null
             ? Localizer.Text("WineTraceUnavailable") : null;
+        ApplyWindowsHostDefault(setup);
         SearchDirectories.Clear();
         SearchPathWarning = setup?["searchPathWarning"]?.GetValue<string>();
         foreach (var item in setup?["searchDirectories"] as System.Text.Json.Nodes.JsonArray ?? [])

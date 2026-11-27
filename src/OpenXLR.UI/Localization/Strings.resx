@@ -1932,11 +1932,8 @@ Saving will replace it with the current scene.</value>
   <data name="RunOnItsOwnBlockTip" xml:space="preserve">
     <value>Use it for a plugin that cannot keep up, one that makes the sound stutter or the interface drop out while it runs. The plugin then works on 1024 samples at a time on a thread of its own, which adds a fixed delay, 32 ms at a block size of 256. Switching restarts the plugin and interrupts its audio for a moment.</value>
   </data>
-  <data name="RunOnOpenXlrSWindowsPluginHost" xml:space="preserve">
-    <value>Run on OpenXLR's Windows plugin host</value>
-  </data>
   <data name="RunOnOpenXlrSWindowsPluginHostTip" xml:space="preserve">
-    <value>Experimental. Runs this Windows plugin on the Windows plugin host built into OpenXLR instead of yabridge. Switching starts the plugin again with the same control values and interrupts its audio for a moment. Plugin UI opens the plugin's own editor on either host.</value>
+    <value>Experimental. Chooses which host runs this Windows plugin: the default host set in Options, always yabridge, or always the Windows plugin host built into OpenXLR. Switching starts the plugin again with the same control values and interrupts its audio for a moment. Plugin UI opens the plugin's own editor on either host.</value>
   </data>
   <data name="RunsOnTheWindowsPluginHost" xml:space="preserve">
     <value>Running on OpenXLR's Windows plugin host.</value>
@@ -2330,7 +2327,46 @@ Select the interface OpenXLR drives</value>
     <value>WINDOW</value>
   </data>
   <data name="WindowsHostKept" xml:space="preserve">
-    <value>Saved to OpenXLR's Windows plugin host, running through yabridge instead: {0}.</value>
+    <value>Pinned to OpenXLR's Windows plugin host, running through yabridge instead: {0}.</value>
+  </data>
+  <data name="WindowsPluginHostChoice" xml:space="preserve">
+    <value>Host for this Windows plugin</value>
+  </data>
+  <data name="WindowsHostFollowDefault" xml:space="preserve">
+    <value>Default host</value>
+  </data>
+  <data name="WindowsHostFollowDefaultYabridge" xml:space="preserve">
+    <value>Default host: yabridge</value>
+  </data>
+  <data name="WindowsHostFollowDefaultOpenXlr" xml:space="preserve">
+    <value>Default host: OpenXLR's Windows plugin host</value>
+  </data>
+  <data name="WindowsHostPinYabridge" xml:space="preserve">
+    <value>Always yabridge</value>
+  </data>
+  <data name="WindowsHostPinOpenXlr" xml:space="preserve">
+    <value>Always OpenXLR's Windows plugin host</value>
+  </data>
+  <data name="WindowsHostDefaultKept" xml:space="preserve">
+    <value>The default host is OpenXLR's Windows plugin host, running through yabridge instead: {0}.</value>
+  </data>
+  <data name="WindowsPluginsRunOn" xml:space="preserve">
+    <value>Windows plugins run on</value>
+  </data>
+  <data name="WindowsHostDefaultYabridge" xml:space="preserve">
+    <value>yabridge</value>
+  </data>
+  <data name="WindowsHostDefaultOpenXlr" xml:space="preserve">
+    <value>OpenXLR's Windows plugin host</value>
+  </data>
+  <data name="WindowsHostDefaultHint" xml:space="preserve">
+    <value>Every Windows plugin insert that has no host of its own follows this. A plugin's controls window can pin it to either host. Changing it restarts the plugins that move, which interrupts their audio for a moment.</value>
+  </data>
+  <data name="WindowsHostDefaultUpdating" xml:space="preserve">
+    <value>Changing the default host…</value>
+  </data>
+  <data name="WindowsHostDefaultNotChanged" xml:space="preserve">
+    <value>The default host did not change. The daemon has to be connected and able to read daemon.json.</value>
   </data>
   <data name="WindowsHostRefused" xml:space="preserve">
     <value>Not moved to OpenXLR's Windows plugin host: {0}.</value>

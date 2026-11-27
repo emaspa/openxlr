@@ -46,23 +46,26 @@ public sealed record InsertDefinition
 
     /// <summary>
     /// Which host runs a Windows plugin that is in the catalogue through its
-    /// yabridge bundle: <see cref="WindowsPluginHost.OpenXlr"/> for the
-    /// Windows plugin host built into OpenXLR, and absent for yabridge, which
-    /// is the default, so older settings and builds read the same file. Any
-    /// other value, one a newer build wrote for instance, reads as absent. Set
-    /// with <c>setInsertWindowsHost</c>. A choice the build cannot honour when
-    /// the chain is built runs through yabridge and stays saved.
+    /// yabridge bundle. <see cref="WindowsPluginHost.OpenXlr"/> pins the
+    /// Windows plugin host built into OpenXLR, <see cref="WindowsPluginHost.Yabridge"/>
+    /// pins yabridge, and absent follows the daemon's default
+    /// (<see cref="WindowsPluginHost.Default"/>). Any other value, one a newer
+    /// build wrote for instance, reads as absent. An older build, which knew
+    /// only the first value, reads a saved yabridge pin as absent, which is
+    /// yabridge to it, so the file stays readable both ways. Set with
+    /// <c>setInsertWindowsHost</c>. A pin the build cannot honour when the
+    /// chain is built runs through yabridge and stays saved.
     /// </summary>
     public string? WindowsHost
     {
         get => _windowsHost;
-        init => _windowsHost = value == WindowsPluginHost.OpenXlr ? value : null;
+        init => _windowsHost = WindowsPluginHost.IsHost(value) ? value : null;
     }
     private readonly string? _windowsHost;
 
-    /// <summary>Whether the insert is saved to run on the Windows plugin host.</summary>
+    /// <summary>Whether the insert is pinned to the Windows plugin host.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool OnWindowsHost => WindowsHost is not null;
+    public bool OnWindowsHost => WindowsHost == WindowsPluginHost.OpenXlr;
 
     /// <summary>Control values by port symbol; ports not listed keep defaults.</summary>
     public Dictionary<string, double> Params { get; init; } = [];
@@ -95,8 +98,9 @@ public sealed record InsertStatus(InsertDefinition Insert, string? Error,
     /// <summary>Whether the insert's plugin is running on the Windows plugin host built into OpenXLR.</summary>
     public bool WindowsHostRunning { get; init; }
     /// <summary>
-    /// Why an insert saved to the Windows plugin host runs through yabridge
-    /// instead; null when it runs in the host it was saved to.
+    /// Why an insert that should run on the Windows plugin host, pinned there
+    /// or following a default that means it, runs through yabridge instead;
+    /// null when it runs where it should.
     /// </summary>
     public string? WindowsHostError { get; init; }
 }

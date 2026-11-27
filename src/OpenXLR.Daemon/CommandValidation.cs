@@ -196,6 +196,8 @@ public static class CommandValidation
                 return CheckEditorRule(cmd);
             case "setPluginWineTrace":
                 return CheckPluginWineTrace(cmd);
+            case "setWindowsHostDefault":
+                return CheckWindowsHostDefault(cmd);
             case "setMixLatencyCompensation":
             case "setMonitorMuted":
             case "setRouteAppsByDefault":
@@ -478,11 +480,13 @@ public static class CommandValidation
             {
                 if (cmd.Channel is null || cmd.InsertId is null || !layout.IsInsertKey(cmd.Channel)
                     || layout.InsertInChain(cmd.Channel, cmd.InsertId) is not { } insert) return "setInsertWindowsHost: select an existing insert";
-                if (cmd.Value.ValueKind != JsonValueKind.String || cmd.Value.GetString() is not (WindowsPluginHost.Yabridge or WindowsPluginHost.OpenXlr))
-                    return $"setInsertWindowsHost: value must be '{WindowsPluginHost.Yabridge}' or '{WindowsPluginHost.OpenXlr}'";
-                // Going back to yabridge is never refused, so an insert can
-                // always leave a host that is gone or that cannot run it.
-                if (cmd.Value.GetString() == WindowsPluginHost.Yabridge) return null;
+                if (cmd.Value.ValueKind != JsonValueKind.String
+                    || cmd.Value.GetString() is not (WindowsPluginHost.Yabridge or WindowsPluginHost.OpenXlr or WindowsPluginHost.FollowDefault))
+                    return $"setInsertWindowsHost: value must be '{WindowsPluginHost.Yabridge}', '{WindowsPluginHost.OpenXlr}' or '{WindowsPluginHost.FollowDefault}'";
+                // Going back to yabridge or to the default is never refused,
+                // so an insert can always leave a host that is gone or that
+                // cannot run it.
+                if (cmd.Value.GetString() != WindowsPluginHost.OpenXlr) return null;
                 return WindowsPluginHost.Resolve(findPlugin(insert), out string? reason, windowsHostInstalled) is null
                     ? $"setInsertWindowsHost: {reason}" : null;
             }
@@ -881,6 +885,10 @@ public static class CommandValidation
     internal static string? CheckPluginWineTrace(Command cmd)
         => cmd.Value.ValueKind is JsonValueKind.True or JsonValueKind.False
             ? null : "setPluginWineTrace: value must be a boolean";
+
+    internal static string? CheckWindowsHostDefault(Command cmd)
+        => cmd.Value.ValueKind == JsonValueKind.String && WindowsPluginHost.IsHost(cmd.Value.GetString())
+            ? null : $"setWindowsHostDefault: value must be '{WindowsPluginHost.Yabridge}' or '{WindowsPluginHost.OpenXlr}'";
 
     internal static string? CheckPluginSearchPath(Command cmd)
         => PluginSearchPaths.Valid(cmd.Kind, cmd.Path) ? null

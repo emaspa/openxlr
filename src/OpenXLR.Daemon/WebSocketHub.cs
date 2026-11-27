@@ -467,6 +467,28 @@ public sealed partial class WebSocketHub
                     }
                 }));
                 break;
+            case "setWindowsHostDefault":
+            {
+                error = CommandValidation.CheckWindowsHostDefault(cmd);
+                if (error is not null) break;
+                string host = cmd.Value.GetString()!;
+                (string? Error, PluginSetupMessage? Setup) changed = await Task.Run<(string?, PluginSetupMessage?)>(() =>
+                {
+                    lock (_installGate)
+                    {
+                        // Saved first, the way the plugin folders are, so a
+                        // restart keeps what the running daemon now does.
+                        if (OpenXLR.Core.DaemonSettings.SaveWindowsHostDefault(host) is { } refused) return (refused, null);
+                        _mixer.SetWindowsHostDefault(host);
+                        return (null, new PluginSetupMessage(new OpenXLR.Core.Mixing.PluginInstaller().Setup()));
+                    }
+                });
+                error = changed.Error;
+                if (changed.Setup is not { } setup) break;
+                await reply(setup);
+                Broadcast(setup);
+                break;
+            }
             case "installPlugin":
                 if (string.IsNullOrWhiteSpace(cmd.Path)) { error = "installPlugin: missing 'path'"; break; }
                 await ReplyOperationAsync(await Task.Run(() => InstallPlugin(installer => installer.Install(cmd.Path))));

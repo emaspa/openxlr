@@ -337,6 +337,28 @@
                   </ScrollViewer>
                 </StackPanel>
                 <TextBlock Text="{Binding WindowsPlugins}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <!-- Where a Windows plugin runs while its insert pins no host. -->
+                <StackPanel Name="WindowsHostDefault" Spacing="4" IsVisible="{Binding ShowsWindowsHostDefault}">
+                  <Grid ColumnDefinitions="Auto,10,*">
+                    <TextBlock Text="{loc:Text Key=WindowsPluginsRunOn}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    <ComboBox Name="WindowsHostDefaultPicker" Grid.Column="2" HorizontalAlignment="Left"
+                              ItemsSource="{Binding WindowsHostDefaultOptions}"
+                              SelectedItem="{Binding SelectedWindowsHostDefault, Mode=TwoWay}"
+                              IsEnabled="{Binding CanSetWindowsHostDefault}"
+                              AutomationProperties.Name="{loc:Text Key=WindowsPluginsRunOn}">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WindowsHostOption">
+                          <TextBlock Text="{Binding Label}"/>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </Grid>
+                  <TextBlock Text="{loc:Text Key=WindowsHostDefaultHint}"
+                             FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding WindowsHostDefaultStatus}" FontSize="{DynamicResource UiText.FontSize11}"
+                             Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"
+                             IsVisible="{Binding WindowsHostDefaultStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </StackPanel>
                 <!-- A pair of versions that leaves a bridged plugin's own editor deaf
                      to the mouse. Worth saying before the user spends an evening on it. -->
                 <TextBlock Text="{Binding WindowsEditorNote}" IsVisible="{Binding HasWindowsEditorNote}"

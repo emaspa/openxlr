@@ -6,9 +6,10 @@ namespace OpenXLR.Tests;
 
 /// <summary>
 /// The UI's choice of host for a Windows plugin: offered for a plugin bridged
-/// through yabridge on a build with the Windows plugin host, sent as one
-/// command, showing the host that runs it and why it does not, and leaving
-/// the plugin's editor and its compatibility rule as they are on yabridge.
+/// through yabridge on a build with the Windows plugin host, as following the
+/// default, which it names, or a pin to either host, sent as one command,
+/// showing the host that runs it and why it does not, and leaving the
+/// plugin's editor and its compatibility rule as they are on yabridge.
 /// </summary>
 public sealed class InsertWindowsHostChoiceTests
 {
@@ -52,13 +53,62 @@ public sealed class InsertWindowsHostChoiceTests
         InsertViewModel insert = Assert.Single(owner.Items);
         Assert.Equal(bridged, insert.Bridged);
         Assert.Equal(offered, insert.CanChooseWindowsHost);
-        Assert.False(insert.OnWindowsHost);
+        Assert.Null(insert.WindowsHostPin);
+        Assert.Equal("default", insert.SelectedWindowsHost.Value);
         Assert.Equal(offered ? Localizer.Text("RunsThroughYabridge") : null, insert.WindowsHostState);
 
-        // An insert already on the host keeps the switch, so it can go back.
+        // A pinned insert keeps the control, so it can follow the default again.
         owner.Apply(Chain(windowsHost: "openxlr", running: installed && bridged));
-        Assert.True(insert.OnWindowsHost);
+        Assert.Equal("openxlr", insert.WindowsHostPin);
+        Assert.Equal("openxlr", insert.SelectedWindowsHost.Value);
         Assert.True(insert.CanChooseWindowsHost);
+        owner.Apply(Chain(windowsHost: "yabridge"));
+        Assert.Equal("yabridge", insert.WindowsHostPin);
+        Assert.Equal("yabridge", insert.SelectedWindowsHost.Value);
+        Assert.True(insert.CanChooseWindowsHost);
+    }
+
+    [Fact]
+    public void TheControlOffersTheDefaultAndBothPinsAndNamesTheHostTheDefaultMeans()
+    {
+        var owner = new InsertsViewModel(new DaemonClient(), "mix:monitor", 2) { WindowsHostInstalled = true };
+        owner.PluginChoices.Add(Choice(bridged: true));
+        owner.Apply(Chain());
+        InsertViewModel insert = Assert.Single(owner.Items);
+        Assert.Equal(["default", "yabridge", "openxlr"], insert.WindowsHostOptions.Select(o => o.Value));
+        Assert.Equal([Localizer.Text("WindowsHostFollowDefault"), Localizer.Text("WindowsHostPinYabridge"), Localizer.Text("WindowsHostPinOpenXlr")],
+            insert.WindowsHostOptions.Select(o => o.Label));
+
+        // The daemon says what the default is, and the first choice names it.
+        WindowsHostOption first = insert.WindowsHostOptions[0];
+        var raised = new List<string?>();
+        first.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        owner.ApplyWindowsHostSetup(JsonNode.Parse("""{"windowsHostInstalled":true,"windowsHostDefault":"yabridge"}"""));
+        Assert.Equal(Localizer.Text("WindowsHostFollowDefaultYabridge"), first.Label);
+        owner.ApplyWindowsHostSetup(JsonNode.Parse("""{"windowsHostInstalled":true,"windowsHostDefault":"openxlr"}"""));
+        Assert.Equal(Localizer.Text("WindowsHostFollowDefaultOpenXlr"), first.Label);
+        Assert.Contains(nameof(WindowsHostOption.Label), raised);
+        // The same choice objects stay, so the control keeps its selection.
+        Assert.Same(first, insert.WindowsHostOptions[0]);
+        Assert.Same(first, insert.SelectedWindowsHost);
+        // A value this UI does not know names no host, and a new connection forgets it.
+        owner.ApplyWindowsHostSetup(JsonNode.Parse("""{"windowsHostDefault":"a-host-of-a-newer-build"}"""));
+        Assert.Equal(Localizer.Text("WindowsHostFollowDefault"), first.Label);
+        owner.ApplyWindowsHostSetup(JsonNode.Parse("""{"windowsHostDefault":"openxlr"}"""));
+        owner.ResetForNewConnection();
+        Assert.Null(owner.WindowsHostDefault);
+
+        // Following a default that means the host and running through
+        // yabridge says so in words of its own, not as a pin.
+        owner.WindowsHostInstalled = true;
+        owner.PluginChoices.Add(Choice(bridged: true));
+        owner.WindowsHostDefault = "openxlr";
+        const string reason = "it did not start on the Windows plugin host: the plugin did not load";
+        owner.Apply(Chain(error: reason));
+        Assert.Equal(Localizer.Format("WindowsHostDefaultKept", reason), insert.WindowsHostNote);
+        Assert.Equal(Localizer.Text("RunsThroughYabridge"), insert.WindowsHostState);
+        owner.Apply(Chain(windowsHost: "openxlr", error: reason));
+        Assert.Equal(Localizer.Format("WindowsHostKept", reason), insert.WindowsHostNote);
     }
 
     [Fact]
@@ -88,14 +138,14 @@ public sealed class InsertWindowsHostChoiceTests
         owner.PluginChoices.Add(Choice(bridged: true));
         owner.Apply(Chain(windowsHost: "openxlr", running: true));
         InsertViewModel insert = Assert.Single(owner.Items);
-        Assert.True(insert.OnWindowsHost);
+        Assert.Equal("openxlr", insert.WindowsHostPin);
         Assert.True(insert.WindowsHostRunning);
         Assert.Equal(Localizer.Text("RunsOnTheWindowsPluginHost"), insert.WindowsHostState);
         Assert.False(insert.HasWindowsHostNote);
 
         const string reason = "'Deep Verb' is not a 64-bit Windows module, the only kind the Windows plugin host runs";
         owner.Apply(Chain(windowsHost: "openxlr", error: reason));
-        Assert.True(insert.OnWindowsHost, "The saved choice stays.");
+        Assert.Equal("openxlr", insert.WindowsHostPin);   // the saved choice stays
         Assert.False(insert.WindowsHostRunning);
         Assert.Equal(Localizer.Text("RunsThroughYabridge"), insert.WindowsHostState);
         Assert.Equal(Localizer.Format("WindowsHostKept", reason), insert.WindowsHostNote);
@@ -137,7 +187,7 @@ public sealed class InsertWindowsHostChoiceTests
         owner.PluginChoices.Add(Choice(bridged: true));
         owner.Apply(Chain());
         InsertViewModel insert = Assert.Single(owner.Items);
-        await owner.SendWindowsHostAsync(insert, true).WaitAsync(TimeSpan.FromSeconds(5));
+        await owner.SendWindowsHostAsync(insert, "openxlr").WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(Localizer.Text("DaemonDisconnectedNoChange"), insert.WindowsHostNote);
     }
 
@@ -175,25 +225,38 @@ public sealed class InsertWindowsHostChoiceTests
         owner.Apply(Chain());
         Assert.Empty(received);   // applying the daemon's state sends nothing back
 
-        insert.OnWindowsHost = true;
+        insert.SelectedWindowsHost = insert.WindowsHostOptions[2];
         for (var deadline = DateTime.UtcNow.AddSeconds(3); received.IsEmpty && DateTime.UtcNow < deadline;) await Task.Delay(10);
         JsonNode sent = Assert.Single(received);
         Assert.Equal("setInsertWindowsHost", sent["cmd"]!.GetValue<string>());
         Assert.Equal("mix:monitor", sent["channel"]!.GetValue<string>());
         Assert.Equal("fx", sent["insertId"]!.GetValue<string>());
         Assert.Equal("openxlr", sent["value"]!.GetValue<string>());
+        Assert.Equal("openxlr", insert.WindowsHostPin);
         Assert.Null(insert.WindowsHostNote);
+        // Choosing what is already chosen sends nothing, and a control that
+        // clears its selection while it is rebuilt changes nothing.
+        insert.SelectedWindowsHost = insert.WindowsHostOptions[2];
+        insert.SelectedWindowsHost = null!;
+        await Task.Delay(50);
+        Assert.Single(received);
 
-        await owner.SendWindowsHostAsync(insert, false);
+        // Back to the default: the command says "default".
+        insert.SelectedWindowsHost = insert.WindowsHostOptions[0];
+        for (var deadline = DateTime.UtcNow.AddSeconds(3); received.Count < 2 && DateTime.UtcNow < deadline;) await Task.Delay(10);
+        Assert.Equal("default", received.Last()["value"]!.GetValue<string>());
+        Assert.Null(insert.WindowsHostPin);
+
+        await owner.SendWindowsHostAsync(insert, "yabridge");
         Assert.Equal("yabridge", received.Last()["value"]!.GetValue<string>());
 
         // The daemon's state comes before its answer and holds the saved host,
-        // yabridge, so the switch is back off when the refusal is shown.
+        // none, so the control is back on the default when the refusal is shown.
         owner.Apply(Chain());
-        Assert.False(insert.OnWindowsHost);
+        Assert.Null(insert.WindowsHostPin);
         const string reason = "'Deep Verb' is not a 64-bit Windows module, the only kind the Windows plugin host runs";
         refusal = "setInsertWindowsHost: " + reason;
-        await owner.SendWindowsHostAsync(insert, true);
+        await owner.SendWindowsHostAsync(insert, "openxlr");
         Assert.Equal(Localizer.Format("WindowsHostRefused", reason), insert.WindowsHostNote);
         Assert.True(insert.HasWindowsHostNote);
         Assert.False(insert.HasError);
@@ -202,13 +265,13 @@ public sealed class InsertWindowsHostChoiceTests
 
         // The next attempt starts clean, and so does a move made elsewhere.
         refusal = null;
-        await owner.SendWindowsHostAsync(insert, true);
+        await owner.SendWindowsHostAsync(insert, "openxlr");
         Assert.Null(insert.WindowsHostNote);
         refusal = "setInsertWindowsHost: " + reason;
-        await owner.SendWindowsHostAsync(insert, true);
+        await owner.SendWindowsHostAsync(insert, "openxlr");
         Assert.NotNull(insert.WindowsHostNote);
         owner.Apply(Chain(windowsHost: "openxlr", running: true));
         Assert.Null(insert.WindowsHostNote);
-        Assert.Equal(5, received.Count);
+        Assert.Equal(6, received.Count);
     }
 }
