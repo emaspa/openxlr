@@ -44,6 +44,9 @@ compatible plugins separately; lsp-plugins-lv2 supplies LV2 effects.
 Windows VST3/CLAP additionally need Wine and yabridge. The optional
 openxlr-yabridge companion has a separate build/artifact workflow and
 private wrappers; it is not automatically installed with openxlr.
+OpenXLR's own Windows plugin host, /usr/lib/openxlr/daemon/openxlr-winhost.exe,
+is part of this package. It runs a plugin under Wine, which is only
+suggested, so install wine when nothing else brings it.
 
 Manual and bridge setup:
 https://github.com/emaspa/openxlr/blob/main/docs/manual.md#windows-plugins

@@ -17,6 +17,13 @@
     <None Include="../../native/openxlr-lv2-host" Link="openxlr-lv2-host"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
           Condition="$([MSBuild]::IsOSPlatform('Linux')) And ('$(EnableNativeLv2Host)' == 'true' Or Exists('$(MSBuildThisFileDirectory)../../native/openxlr-lv2-host'))" />
+    <!-- The Windows plugin host's program, beside the helper that starts it
+         under Wine. WINHOST=1 in the environment is what the packages set,
+         and it reaches make as well; with it the native build makes the
+         program and fails without mingw. -->
+    <None Include="../../native/openxlr-winhost.exe" Link="openxlr-winhost.exe"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
+          Condition="$([MSBuild]::IsOSPlatform('Linux')) And (('$(EnableNativeLv2Host)' == 'true' And '$(WINHOST)' == '1') Or Exists('$(MSBuildThisFileDirectory)../../native/openxlr-winhost.exe'))" />
   </ItemGroup>
 
   <Target Name="BuildNativeLv2Host" BeforeTargets="BeforeBuild"

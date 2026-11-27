@@ -28,6 +28,16 @@ export CARGO ?= /usr/bin/cargo
 export RUSTC ?= /usr/bin/rustc
 export CARGO_HOME = $(HOME)/.cargo
 
+# Every package carries the Windows plugin host, openxlr-winhost.exe, built
+# with mingw and linked statically; the native build fails instead of
+# leaving it out. Wine runs it and is not needed to build it. The -posix
+# compilers are named because the unsuffixed names are alternatives that
+# may point at either thread model; the program builds with both, and Arch
+# and Fedora have the -posix one.
+export WINHOST = 1
+export MINGW_CC = x86_64-w64-mingw32-gcc-posix
+export MINGW_CXX = x86_64-w64-mingw32-g++-posix
+
 # dh exports the distribution's build flags, and make reads them when the
 # daemon's publish below builds the native helper. Every hardening feature is
 # on, immediate binding included, which Debian leaves off by default;

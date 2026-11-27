@@ -48,6 +48,14 @@ BuildRequires:  libsndfile-devel
 # network for the NuGet restore as well); Cargo.lock pins every one.
 BuildRequires:  cargo
 BuildRequires:  rust
+# The Windows plugin host, openxlr-winhost.exe, is built with mingw and
+# linked statically, so its C++ runtime and threads library are inside.
+# Wine runs it and is not needed to build it.
+BuildRequires:  mingw64-gcc
+BuildRequires:  mingw64-gcc-c++
+BuildRequires:  mingw64-winpthreads-static
+# The helper's Windows backend asks RTKit for a real-time thread over D-Bus.
+BuildRequires:  dbus-devel
 
 # Prebuilt .NET assemblies; dependencies are declared by hand, matching
 # the Debian and Arch packages.
@@ -65,6 +73,7 @@ Requires:       libX11
 Requires:       libICE
 Requires:       libSM
 Requires:       glib2
+Requires:       dbus-libs
 Recommends:     alsa-utils
 Recommends:     pulseaudio-utils
 Recommends:     xdg-utils
@@ -76,6 +85,8 @@ Recommends:     librsvg2
 Suggests:       ladspa-swh-plugins
 Suggests:       lsp-plugins-lv2
 Suggests:       openxlr-yabridge
+# Runs Windows plugins on the Windows plugin host above.
+Suggests:       wine
 
 # Keep the platform's final processing, then hash the finished payload.
 %global __os_install_post %{__os_install_post}\
@@ -105,8 +116,10 @@ install -Dm644 %{SOURCE1} native/deepfilter/model/DeepFilterNet3_onnx.tar.gz
 %build
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 \
        DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-# The native build fails rather than leave DeepFilterNet out.
+# The native build fails rather than leave DeepFilterNet or the Windows
+# plugin host out.
 export DEEPFILTER=1
+export WINHOST=1
 dotnet publish src/OpenXLR.Daemon -c Release -r linux-x64 \
     --self-contained false -p:RestoreLockedMode=true \
     -p:EnableNativeLv2Host=true -o out/daemon

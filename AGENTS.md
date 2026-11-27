@@ -65,6 +65,7 @@ python3 packaging/flatpak/test-package.py  # the Flatpak manifest and its files
 python3 packaging/flatpak/nuget-sources.py --check  # regenerate with no flag after a package change
 python3 packaging/flatpak/cargo-sources.py --check  # regenerate with no flag after a change to native/deepfilter/Cargo.lock
 python3 packaging/check-deepfilter.py  # every package builds DeepFilterNet in, with the pinned model
+python3 packaging/check-winhost.py  # every package but the Flatpak builds the Windows plugin host in, Wine only suggested
 python3 packaging/ppa/test-prune-cargo-vendor.py  # the PPA's pruned crates still pass cargo's checksums
 shellcheck --severity=error tools/check-version.sh tools/check-locked-restore.sh tools/ci-install-packages.sh tools/ci-test-scope.sh packaging/ppa/make-source.sh packaging/omarchy/openxlr-omarchy-enable packaging/flatpak/openxlr-flatpak-service packaging/openxlr-control
 python3 tools/test-ci-test-scope.py  # CI jobs selected for changed paths

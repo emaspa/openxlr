@@ -2935,10 +2935,16 @@ catalogue and the open plugin pickers.
 <a name="windows-plugin-host"></a>
 **OpenXLR's Windows plugin host (experimental).** OpenXLR has its own
 Windows plugin host, which can run a Windows plugin in place of yabridge.
-No package provides it yet. Only a build from source
-made with `make -C native WINHOST=1` has it
-([native/README.md](../native/README.md#windows-plugin-host)). yabridge
-stays the default, and in a build without the host none of this shows.
+It comes inside the OpenXLR package from the AUR, the PPA and COPR, in the
+release's `.deb` and `.rpm`, and in the Nix flake on x86-64, so there is
+nothing extra to install. The Flatpak does not have it. A build from source
+has it when made with `WINHOST=1`
+([native/README.md](../native/README.md#windows-plugin-host)). The host
+runs the plugin under Wine. The package only suggests Wine and does not
+install it, so install Wine from your distribution if nothing else brought
+it. The `openxlr-yabridge` companion above brings it. yabridge stays the
+default for a plugin it bridges, and in a build without the host none of
+this shows.
 
 In a build with the host, the controls window of a Windows VST3 or CLAP
 plugin bridged through yabridge has a **Run on OpenXLR's Windows plugin

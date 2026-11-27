@@ -1,4 +1,6 @@
 { lib
+, stdenv
+, pkgsCross
 , buildDotnetModule
 , dotnetCorePackages
 , gcc
@@ -9,6 +11,7 @@
 , libusb1
 , lilv
 , libsndfile
+, dbus
 , lv2
 , pipewire
 , libx11
@@ -66,6 +69,17 @@ let
       platforms = lib.platforms.linux;
     };
   };
+
+  # The Windows plugin host, openxlr-winhost.exe: an x86-64 Windows program
+  # built with mingw and linked statically, beside the helper that starts it
+  # under Wine. Other systems have no such plugins, and the package has none.
+  # Wine is not a dependency: the daemon starts the wine on PATH, or the one
+  # OPENXLR_WINE names, and without one every Windows plugin stays on
+  # yabridge.
+  winhost = stdenv.hostPlatform.isx86_64;
+  # Named by path, not added as a build input: a cross compiler's setup hook
+  # would make itself CC and CXX for the Linux half of the helper too.
+  mingw = pkgsCross.mingwW64.buildPackages.gcc;
 in
 buildDotnetModule {
   pname = "openxlr";
@@ -95,12 +109,23 @@ buildDotnetModule {
   dotnetFlags = [ "-p:EnableNativeLv2Host=true" ]
     ++ lib.optional (sourceCommit != null) "-p:SourceRevisionId=${sourceCommit}";
   nativeBuildInputs = [ gcc pkg-config python3 ];
-  buildInputs = [ pipewire lilv lv2 libx11 libsndfile ];
-  # make reads both from the environment: DeepFilterNet is built in, from
-  # the library above.
+  # The Windows backend asks RTKit for a real-time thread through libdbus.
+  buildInputs = [ pipewire lilv lv2 libx11 libsndfile ] ++ lib.optional winhost dbus;
+  # make reads these from the environment: DeepFilterNet is built in, from
+  # the library above, and so is the Windows plugin host.
   env = {
     DEEPFILTER = "1";
     DEEPFILTER_LIB = "${deepfilter}/lib/libopenxlr_deepfilter.a";
+  } // lib.optionalAttrs winhost {
+    WINHOST = "1";
+    MINGW_CC = "${mingw}/bin/${mingw.targetPrefix}gcc";
+    MINGW_CXX = "${mingw}/bin/${mingw.targetPrefix}g++";
+    # nixpkgs builds mingw with the mcf thread model, which has no
+    # pthread.h; the program includes host.h, which needs the header alone.
+    # Its C++ runtime is linked statically, and so is that model's library.
+    # These are the variables the wrapper reads for flags of its own.
+    "NIX_CFLAGS_COMPILE_${mingw.suffixSalt}" = "-isystem ${pkgsCross.mingwW64.windows.pthreads}/include";
+    "NIX_CFLAGS_LINK_${mingw.suffixSalt}" = "-L${pkgsCross.mingwW64.windows.mcfgthreads}/lib";
   };
 
   dotnet-sdk = dotnetCorePackages.sdk_10_0;
@@ -119,6 +144,7 @@ buildDotnetModule {
     libx11
     libice
     libsm
+    dbus          # the helper's Windows backend reaches RTKit through libdbus
     # The window draws SVG application icons through GdkPixbuf, which it
     # loads by name, so the library and the GLib it calls are on the path.
     glib

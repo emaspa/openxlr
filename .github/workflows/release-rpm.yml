@@ -27,7 +27,7 @@ jobs:
           dnf install -y --setopt=install_weak_deps=False \
             rpm-build rpmlint git-core dotnet-sdk-10.0 systemd-rpm-macros \
             gcc gcc-c++ make pkgconf-pkg-config pipewire-devel lilv-devel lv2-devel libX11-devel libsndfile-devel \
-            cargo rust
+            cargo rust mingw64-gcc mingw64-gcc-c++ mingw64-winpthreads-static dbus-devel
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -69,6 +69,10 @@ jobs:
           test -x /usr/lib/openxlr/daemon/openxlr-lv2-host
           /usr/lib/openxlr/daemon/openxlr-lv2-host engines | tee engines.json
           grep -q '"deepfilternet"' engines.json
+          # The Windows plugin host: a Windows program, and the helper's wine
+          # backend that starts it.
+          [ "$(head -c 2 /usr/lib/openxlr/daemon/openxlr-winhost.exe)" = MZ ]
+          grep -qa 'openxlr-winhost.exe is missing beside the plugin host' /usr/lib/openxlr/daemon/openxlr-lv2-host
           test -f /usr/share/licenses/openxlr/rnnoise/COPYING
           test -f /usr/share/licenses/openxlr/deepfilter/LICENSE-MIT
           test -f /usr/share/licenses/openxlr/signalsmith/stretch/LICENSE.txt

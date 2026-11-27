@@ -65,9 +65,10 @@ jobs:
           python3 packaging/flatpak/nuget-sources.py --check
           python3 packaging/flatpak/cargo-sources.py --check
 
-      - name: DeepFilterNet built into every package
+      - name: DeepFilterNet and the Windows plugin host built into every package
         run: |
           python3 packaging/check-deepfilter.py
+          python3 packaging/check-winhost.py
           python3 packaging/ppa/test-prune-cargo-vendor.py
 
       - name: Validate Stream Deck/OpenDeck plugin

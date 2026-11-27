@@ -7,6 +7,13 @@ Two local patches apply to the pinned source, and nothing else changes.
 `private-plugin-home.patch` adds an environment-controlled output directory
 to yabridgectl.
 
+OpenXLR's own Windows plugin host is not part of this companion. It ships
+in the main `openxlr` package on every channel but the Flatpak, as
+`openxlr-winhost.exe` beside the native helper, built with mingw and with
+Wine only suggested. The companion stays: yabridge is still the default
+host for every plugin it bridges, and it brings Wine with it. See
+[OpenXLR's Windows plugin host](../../docs/manual.md#windows-plugin-host).
+
 `disk-identity.patch` gives Windows plugins the system disk's identity. In
 Wine, `\\.\PhysicalDrive0` is a placeholder that no drive backs. Its
 answer to the storage property query has no model, firmware revision or

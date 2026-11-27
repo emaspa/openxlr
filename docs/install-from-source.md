@@ -133,6 +133,33 @@ model at `native/deepfilter/model/DeepFilterNet3_onnx.tar.gz` and the
 crates under `native/deepfilter/vendor` (`cargo vendor --locked` in
 `native/deepfilter` fetches them); the build then reads only those.
 
+<a name="windows-plugin-host"></a>
+### Windows plugin host
+
+[OpenXLR's Windows plugin host](manual.md#windows-plugin-host) is
+`openxlr-winhost.exe`, a Windows program the helper starts under Wine. It
+is built with mingw, and only when `WINHOST=1` is set. The helper's side
+of it also links libdbus, to ask RTKit for a real-time thread. Like `DEEPFILTER`,
+`make` reads it from the environment, and the `dotnet build` above then
+copies the program next to the daemon:
+
+```sh
+# Arch Linux, CachyOS and Omarchy
+sudo pacman -S --needed mingw-w64-gcc dbus
+# Fedora
+sudo dnf install mingw64-gcc mingw64-gcc-c++ mingw64-winpthreads-static dbus-devel
+# Debian / Ubuntu
+sudo apt install gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix libdbus-1-dev
+
+WINHOST=1 dotnet build src/OpenXLR.slnx -c Release --no-restore -warnaserror -p:EnableNativeLv2Host=true
+```
+
+Either of mingw's thread models builds it, and `MINGW_CC` and `MINGW_CXX`
+name other compilers. Wine is needed to run the program, not to build it.
+Every package except the Flatpak sets `WINHOST=1`, so a package build
+without mingw fails instead of leaving the host out. Run
+`make -C native clean-native` when you switch the flag.
+
 Use `make -C native clean-native` when you need a fresh C or C++ build,
 for example after changing compiler flags. The next build reuses the
 DeepFilterNet library when its inputs are current. Use
