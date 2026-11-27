@@ -443,7 +443,10 @@ def main():
                    PIPEWIRE_CONFIG_DIR=str(config), XDG_CONFIG_HOME=runtime + "/xdg-config",
                    XDG_STATE_HOME=runtime + "/xdg-state", OPENXLR_WINHOST=winhost,
                    WINEPREFIX=prefix, WINEDEBUG=os.environ.get("WINEDEBUG", "-all"),
-                   WINEDLLOVERRIDES="mscoree,mshtml=;winemenubuilder.exe=d;wineusb.sys=d")
+                   WINEDLLOVERRIDES="mscoree,mshtml=;winemenubuilder.exe=d;wineusb.sys=d",
+                   # The helper asks RTKit when the real-time limit refuses
+                   # it; never the system's.
+                   DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent/openxlr-test-system-bus")
         if os.environ.get("OPENXLR_WINE"):
             env["OPENXLR_WINE"] = wine
         log_path = Path(runtime, "check.log")

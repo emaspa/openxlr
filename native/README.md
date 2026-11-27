@@ -1209,7 +1209,9 @@ The default build leaves both out and is unchanged. The flag needs
 `MINGW_CC` and `MINGW_CXX` name. Either of mingw's thread models builds it,
 since the program starts its threads through Windows itself. On Debian and Ubuntu
 the compilers are the packages `gcc-mingw-w64-x86-64` and
-`g++-mingw-w64-x86-64`. The program is linked statically, so it is
+`g++-mingw-w64-x86-64`. The helper then links libdbus as well, for
+RTKit (below): `libdbus-1-dev` on Debian and Ubuntu, `dbus-devel` on
+Fedora. The program is linked statically, so it is
 one file. Building it does not need Wine; running it does. Run
 `make -C native clean-native` when you switch the flag, as after any change
 of flags.
@@ -1363,10 +1365,41 @@ it: PipeWire's data thread, or the worker of the plugin's own block. A lower
 priority would leave a real-time thread waiting on one that is not, and a
 higher one would let plugin code outrank PipeWire's threads. A Windows
 program cannot ask for this itself. The kernel allows it from outside
-between two processes of one user, within their real-time limit, so the
-user needs a limit that covers PipeWire's priority, as yabridge's host does.
-Without one the helper says so and the thread runs at ordinary priority.
-RTKit is not asked.
+between two processes of one user, within their real-time limit
+(`RLIMIT_RTPRIO`). The helper does that when the user has a limit that
+covers PipeWire's priority, the same limit yabridge's host needs.
+
+On the usual Ubuntu or Fedora desktop the user has no such limit, and
+PipeWire's own threads get real-time from RTKit. There the kernel refuses
+the helper with `EPERM`, so the helper asks RTKit
+(`org.freedesktop.RealtimeKit1` on the system bus) instead, calling
+`MakeThreadRealtimeWithPID` for the Windows host's process and its audio
+thread. It asks for the same priority, or
+RTKit's `MaxRealtimePriority` when that is lower. RTKit grants real-time
+only to a process whose hard real-time CPU limit (`RLIMIT_RTTIME`) is set
+and within its `RTTimeUSecMax`, so the helper lowers that limit on the
+Windows host's process first when it is above, as PipeWire does for its
+own. RTKit gives the thread `SCHED_RR` whatever the waiting thread runs
+at. The helper reaches the bus through libdbus, which PipeWire's RTKit
+support uses too; PipeWire's own thread utilities act only on threads of
+the process that calls them, so they cannot be used for a thread of the
+Windows host. The desktop portal's `Realtime` interface, which a Flatpak
+sandbox would need, is not asked.
+
+One trace line, which the daemon writes to its journal, says what came of
+it:
+
+```text
+trace: the Windows plugin's audio thread runs at real-time priority 20, within this user's real-time limit
+trace: the Windows plugin's audio thread runs at real-time priority 20, granted by RTKit
+trace: the Windows plugin's audio thread runs without real-time priority: this user's real-time limit does not allow it, and RTKit is not on the system bus
+```
+
+The last form ends with what went wrong: RTKit missing, its refusal with
+RTKit's own reason, the thread not found, or, when the thread that waits
+for the Windows side has no real-time priority itself,
+`the thread that waits for it has none either`. The audio runs in every
+case. Without real-time it is more likely to come late under load.
 
 What happens when the Windows side goes wrong:
 
@@ -1729,6 +1762,8 @@ checks:
 - the Windows audio thread gets the scheduling of the thread that waits for
   it, at real-time priority 5 where the user's limit allows, and the test
   notes what a block's round trip costs there;
+- with no real-time limit at all, RTKit is asked instead
+  (`tests/winhost-rtkit.py`, below);
 - a missing plugin, module or Windows program is refused, and nothing is
   left in the runtime directory.
 
@@ -1780,6 +1815,34 @@ lists, and again in every block. With it the test checks:
   The scan whose helper is killed part way leaves no directory behind
   either, because the Windows program has removed it by then. The test's
   last check, that its runtime directory is empty, fails if one is left.
+
+`test-winhost` then runs `tests/winhost-rtkit.py`, which checks the way to
+real-time through RTKit without the system's RTKit. It starts a D-Bus bus of
+its own with `dbus-daemon --session` and points `DBUS_SYSTEM_BUS_ADDRESS` at
+it. On that bus `tests/winhost-rtkit` stands in for RTKit: it answers
+RTKit's properties, with a highest priority of 7, checks each
+`MakeThreadRealtimeWithPID` the way RTKit does and records the process,
+thread and priority it was asked for. `tests/winhost` runs under
+`prlimit --rtprio=0:0`, so the kernel refuses it any real-time priority,
+and the thread that waits for the Windows side is described to the backend
+as `SCHED_FIFO`, which this process cannot really be. Three cases:
+
+- RTKit grants: the backend asks for the Windows host's process and audio
+  thread, at priority 3 as asked and at RTKit's 7 when 9 is asked, with the
+  process's hard real-time CPU limit set within `RTTimeUSecMax` first, and
+  its trace line says the priority was granted by RTKit;
+- RTKit refuses: the trace line says the thread runs without real-time
+  priority and gives RTKit's reason;
+- nothing owns RTKit's name: the trace line says RTKit is not on the system
+  bus.
+
+In each the audio stays exact for 200 more blocks. The stand-in changes no
+thread's scheduling, since the kernel weighs that against the Windows
+host's own limit of 0, so no thread of the check runs at real-time
+priority. The check needs `dbus-daemon` and `prlimit` and says so when one
+is missing. Every other Windows host test points `DBUS_SYSTEM_BUS_ADDRESS`
+at a socket that does not exist, so none of them can reach the system's
+RTKit.
 
 `make -C native test-disk-identity` runs the helper's side alone on
 made-up disks, and `test-audio` runs it too, so CI does. It checks an NVMe

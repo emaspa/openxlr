@@ -917,6 +917,9 @@ int main(int argc, char **argv) {
   setenv("WINEPREFIX", prefix, 1);
   setenv("WINEDLLOVERRIDES", "mscoree,mshtml=;winemenubuilder.exe=d;wineusb.sys=d", 1);
   setenv("OPENXLR_WINHOST", winhost, 1);
+  // Never the system's RTKit, which the backend asks when the real-time
+  // limit refuses it.
+  setenv("DBUS_SYSTEM_BUS_ADDRESS", "unix:path=/nonexistent/openxlr-test-system-bus", 1);
   end_wine_server(wine);
   clap_plugin = clap;
   vst3_plugin = vst3;

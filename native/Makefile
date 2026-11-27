@@ -5,6 +5,12 @@
 # needs nothing beyond the PipeWire, lilv, LV2, X11 and libsndfile
 # development files and a C and C++ compiler.
 PKGS = libpipewire-0.3 lilv-0 lv2 x11 sndfile
+# The Windows plugin host (WINHOST=1, below) asks RTKit for a real-time
+# Windows audio thread over D-Bus, through libdbus, which PipeWire's own
+# RTKit support uses too.
+ifeq ($(WINHOST),1)
+PKGS += dbus-1
+endif
 
 # Hardening: the stack protector, FORTIFY, a position-independent executable,
 # full RELRO with immediate binding and a non-executable stack, plus stack
@@ -111,7 +117,7 @@ WINHOST_TARGETS = openxlr-winhost.exe $(WINHOST_PLUGINS)
 ifeq ($(WINHOST),1)
 OBJECTS += wine.o disk-identity.o
 TEST_OBJECTS += tests/winhost.o tests/winhost-editor.o
-DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS) tests/winhost-graph
+DEP_TARGETS += $(WINHOST_OBJECTS) $(WINHOST_PLUGINS) tests/winhost-graph tests/winhost-rtkit
 .PHONY: all
 all: openxlr-lv2-host openxlr-winhost.exe
 endif
@@ -286,6 +292,11 @@ tests/winhost-graph: tests/winhost-graph.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 	@mv $@.d.tmp $@.d
 
+# A stand-in for RTKit on a private bus, for the RTKit check.
+tests/winhost-rtkit: tests/winhost-rtkit.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(DEPFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
+	@mv $@.d.tmp $@.d
+
 # The same for the editor test, which is the user in front of an editor and
 # needs XTest for the pointer and the keyboard.
 tests/winhost-editor: tests/winhost-editor.o lv2.o lv2-scan.o json.o clap.o vst3.o disk-identity.o
@@ -293,7 +304,10 @@ tests/winhost-editor: tests/winhost-editor.o lv2.o lv2-scan.o json.o clap.o vst3
 
 # The Windows backend against the Windows test plugin, under Wine and with
 # no audio server. Not part of `test`: it needs a build with WINHOST=1,
-# mingw and Wine, and says which one is missing instead of failing.
+# mingw and Wine, and says which one is missing instead of failing. It then
+# runs the RTKit check, tests/winhost again under `prlimit --rtprio=0:0`
+# against a stand-in for RTKit on a private bus (tests/winhost-rtkit.py),
+# which needs dbus-daemon and prlimit as well.
 #
 # test-winhost-graph runs the helper with that backend as a node of a private
 # PipeWire server, between the two nodes of tests/winhost-graph, and needs
@@ -312,8 +326,10 @@ else ifeq ($(shell command -v $(MINGW_CXX) 2>/dev/null),)
 test-winhost test-winhost-graph test-winhost-editor:
 	@echo "SKIP: $@ needs $(MINGW_CXX) to build the Windows plugin host"
 else
-test-winhost: tests/winhost $(WINHOST_TARGETS)
+test-winhost: tests/winhost tests/winhost-rtkit $(WINHOST_TARGETS)
 	./tests/winhost ./openxlr-winhost.exe $(WINHOST_PLUGINS)
+	python3 tests/winhost-rtkit.py ./tests/winhost ./openxlr-winhost.exe $(WINHOST_PLUGINS) \
+	        ./tests/winhost-rtkit
 
 test-winhost-graph: openxlr-lv2-host tests/winhost-graph $(WINHOST_TARGETS)
 	python3 tests/winhost-graph.py ./openxlr-lv2-host ./openxlr-winhost.exe $(WINHOST_PLUGINS) \
@@ -327,7 +343,8 @@ test-winhost-editor: tests/winhost-editor $(WINHOST_TARGETS)
 endif
 endif
 
-WINHOST_TESTS = tests/winhost tests/winhost.o tests/winhost-editor tests/winhost-editor.o tests/winhost-graph
+WINHOST_TESTS = tests/winhost tests/winhost.o tests/winhost-editor tests/winhost-editor.o tests/winhost-graph \
+                tests/winhost-rtkit
 clean-native: clean-winhost
 clean-winhost:
 	rm -f wine.o disk-identity.o $(WINHOST_TESTS) $(WINHOST_OBJECTS) $(WINHOST_TARGETS)
