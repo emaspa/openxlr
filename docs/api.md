@@ -1012,15 +1012,18 @@ Wine's answer alone when the prefix is on another kind of drive.
 
 <a name="yabridge-folder-copy"></a>
 **The one-time copy of the companion's folders.** At its first start in a
-build with both the Windows plugin host and the `openxlr-yabridge`
-companion, before the first scan, the daemon reads the companion's folder
+build with the Windows plugin host, when the `openxlr-yabridge` companion is
+installed or its folder registry is still on disk, before the first scan,
+the daemon reads the companion's folder
 registry (`plugin_dirs` in `bridge/yabridgectl/config.toml` under the
 configuration directory) and adds each folder there to `pluginFolders` as a
 `windows` entry. Nobody is asked. A folder the host already searches,
 itself or inside another, is passed over. The rest are added on the terms
 of `addPluginSearchPath`, the overlap rule and the limit of 32 included,
 and a folder that cannot be added is kept with the reason. The registry is
-not changed, and a system yabridge's own registry is not read.
+not changed, and a system yabridge's own registry is not read. Removing the
+companion package leaves the registry in place, so a user who removes it
+before that first start keeps the folders too.
 
 The daemon writes `daemon.json` once, through the same atomic write as
 the other settings, with the folders and the record

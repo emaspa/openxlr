@@ -144,9 +144,8 @@ public sealed class YabridgeMigrationTests : IDisposable
         string registry = Registry(imported, Path.Combine(CommonFiles, "VST3"), elsewhere, inside, native, missing, "/c:/plugins");
         byte[] registryBefore = File.ReadAllBytes(registry);
 
-        // A build without the host, or without the companion, copies nothing and writes nothing.
+        // A build without the host copies nothing and writes nothing.
         Assert.Null(YabridgeMigration.CopyFoldersOnce(windowsHost: false, bridge: true));
-        Assert.Null(YabridgeMigration.CopyFoldersOnce(windowsHost: true, bridge: false));
         Assert.False(File.Exists(DaemonJson));
 
         BridgeFolderCopy copy = Assert.IsType<BridgeFolderCopy>(YabridgeMigration.CopyFoldersOnce(windowsHost: true, bridge: true));
@@ -167,6 +166,22 @@ public sealed class YabridgeMigrationTests : IDisposable
         Assert.True(PluginSearchPaths.Change("windows", elsewhere, add: false).Ok);
         Assert.Null(YabridgeMigration.CopyFoldersOnce(windowsHost: true, bridge: true));
         Assert.Empty(PluginSearchPaths.Read(out _));
+    }
+
+    [Fact]
+    public void TheRegistryIsCopiedAfterTheCompanionIsGoneAndNothingIsWrittenWithNeither()
+    {
+        // Neither the companion nor its registry: nothing to copy, and daemon.json stays unwritten.
+        Assert.Null(YabridgeMigration.CopyFoldersOnce(windowsHost: true, bridge: false));
+        Assert.False(File.Exists(DaemonJson));
+
+        // The companion was removed before this build's first start: its registry is still there, and its folders count.
+        string elsewhere = Directory.CreateDirectory(Path.Combine(_root, "elsewhere", "TDR Kotelnikov")).FullName;
+        Registry(elsewhere);
+        BridgeFolderCopy copy = Assert.IsType<BridgeFolderCopy>(YabridgeMigration.CopyFoldersOnce(windowsHost: true, bridge: false));
+        Assert.Equal([elsewhere], copy.Added);
+        Assert.Equal([new PluginFolder("windows", elsewhere)], PluginSearchPaths.Read(out _));
+        Assert.Null(YabridgeMigration.CopyFoldersOnce(windowsHost: true, bridge: false));
     }
 
     [Fact]

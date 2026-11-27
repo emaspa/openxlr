@@ -3066,8 +3066,10 @@ with OpenXLR's host copies the companion's other plugin folders, the ones
 folders of the plugin manager. It does this once, by itself. A folder the
 host already looks in is left out, and so is one that cannot be added,
 for instance because it no longer exists or 32 folders are already added.
-The companion keeps its own list as it was. If you remove a copied folder
-in the plugin manager, it stays removed, since the copy does not run again.
+The companion keeps its own list as it was. The copy also runs if you
+removed the companion before that first start, since its list stays in
+your configuration folder. If you remove a copied folder in the plugin
+manager, it stays removed, since the copy does not run again.
 
 If a Windows plugin is not in the picker, run `openxlr doctor` with the
 daemon running. It lists the folders OpenXLR's host looks in, says which
