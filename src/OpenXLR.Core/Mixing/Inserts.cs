@@ -142,6 +142,14 @@ public sealed record PluginInfo(
     public string? Path { get; init; }
 
     /// <summary>
+    /// A Windows plugin found in a Windows plugin folder rather than through
+    /// a yabridge wrapper, so <see cref="Path"/> is the Windows bundle itself
+    /// and only the Windows plugin host built into OpenXLR runs it. False for
+    /// every other plugin, a bridged one included.
+    /// </summary>
+    public bool WindowsHostOnly { get; init; }
+
+    /// <summary>
     /// The chain widths, in channels, the native helper found the plugin's
     /// main buses take when asked the way the host asks at load: a VST3
     /// plugin that reports stereo and accepts mono is listed with both.

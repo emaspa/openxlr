@@ -7,13 +7,20 @@ namespace OpenXLR.Core.Mixing;
 /// it: whether this build has one, which inserts may run on it, and what the
 /// native helper is started with when one does.
 ///
-/// A Windows plugin is in the catalogue once, through the wrapper yabridge
-/// made for it, and yabridge runs it unless the insert says otherwise. This
-/// host has no catalogue entry of its own. For an insert that chooses it, the
-/// Windows module is read back from the wrapper, which links to it, and the
-/// helper is started with its <c>wine</c> backend and that module. The class
-/// id and the parameter ids are the ones the wrapper gave the catalogue, so
-/// the insert keeps its values on either host.
+/// A Windows plugin reaches the catalogue in one of two ways. Through the
+/// wrapper yabridge made for it, yabridge runs it unless the insert says
+/// otherwise; for an insert that chooses this host, the Windows module is
+/// read back from the wrapper, which links to it. Or straight from a Windows
+/// plugin folder (<see cref="Directories"/>), described by the helper's
+/// <c>wine</c> backend; such an entry is <see cref="PluginInfo.WindowsHostOnly"/>
+/// and runs only here. Either way the helper is started with its <c>wine</c>
+/// backend and the module. The class id and the parameter ids are the
+/// plugin's own on both paths, so an insert keeps its values on either host
+/// and finds its plugin through whichever path is there.
+///
+/// The catalogue holds a plugin once. Where a wrapper and a Windows plugin
+/// folder both reach it, the wrapper's entry is kept, because it can run on
+/// either host and yabridge is still the default.
 ///
 /// Nothing here starts a process or loads plugin code. Every answer comes
 /// from names, links and the first bytes of the module.
@@ -59,8 +66,8 @@ internal static class WindowsPluginHost
     /// <summary>
     /// The route for a plugin of the catalogue, or null with the reason this
     /// host cannot run it, as the end of a sentence: the build has no host,
-    /// the plugin is not a Windows plugin bridged through yabridge, or its
-    /// module is gone or not 64-bit.
+    /// the plugin is neither a Windows plugin bridged through yabridge nor one
+    /// found in a Windows plugin folder, or its module is gone or not 64-bit.
     /// </summary>
     /// <param name="installed">The host's presence, for a test; the build's own when null.</param>
     internal static Route? Resolve(PluginInfo? plugin, out string? reason, bool? installed = null)
@@ -78,6 +85,7 @@ internal static class WindowsPluginHost
         }
         try
         {
+            if (plugin.WindowsHostOnly) return Direct(plugin, out reason);
             if (plugin.Path is not { Length: > 0 } bundle || ModuleLink(plugin.Kind, bundle) is not { } link)
             {
                 reason = plugin.Kind == "vst3" && plugin.Path is { Length: > 0 } narrow && Has32BitModule(narrow)
@@ -104,6 +112,78 @@ internal static class WindowsPluginHost
             return null;
         }
     }
+
+    /// <summary>The route of a plugin found in a Windows plugin folder: its module, straight from the bundle the scan named.</summary>
+    private static Route? Direct(PluginInfo plugin, out string? reason)
+    {
+        reason = null;
+        if (plugin.Path is not { Length: > 0 } bundle || Module(plugin.Kind, bundle) is not { } found)
+        {
+            reason = plugin.Kind == "vst3" && plugin.Path is { Length: > 0 } narrow && Only32Bit(narrow)
+                ? $"'{plugin.Name}' has no 64-bit Windows module, the only kind the Windows plugin host runs"
+                : $"the Windows plugin '{plugin.Name}' is missing: {plugin.Path}";
+            return null;
+        }
+        string module = WindowsPluginWrappers.Canonical(found);
+        if (!IsWindows64(module))
+        {
+            reason = $"'{plugin.Name}' is not a 64-bit Windows module, the only kind the Windows plugin host runs";
+            return null;
+        }
+        return new(plugin.Kind, module, PrefixOf(module));
+    }
+
+    /// <summary>
+    /// The Windows module of a bundle in a Windows plugin folder, or null
+    /// when there is none. A CLAP file is its own module, and so is a VST3
+    /// file. A VST3 directory holds its 64-bit module under
+    /// <c>Contents/x86_64-win</c>: the one named after the bundle, or else
+    /// the first <c>.vst3</c> there, which is the one the helper loads.
+    /// </summary>
+    internal static string? Module(string kind, string bundle)
+    {
+        if (kind is not ("clap" or "vst3")) return null;
+        string home = Path.TrimEndingDirectorySeparator(bundle);
+        if (File.Exists(home)) return home;
+        if (kind != "vst3" || !Directory.Exists(home)) return null;
+        string architecture = Path.Combine(home, "Contents", "x86_64-win");
+        string named = Path.Combine(architecture, Path.GetFileNameWithoutExtension(home) + ".vst3");
+        if (File.Exists(named)) return named;
+        if (!Directory.Exists(architecture)) return null;
+        return Directory.EnumerateFiles(architecture).Order(StringComparer.Ordinal)
+            .FirstOrDefault(f => f.EndsWith(".vst3", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Whether a VST3 directory in a Windows plugin folder holds a 32-bit module and no 64-bit one.</summary>
+    internal static bool Only32Bit(string bundle)
+    {
+        string home = Path.TrimEndingDirectorySeparator(bundle);
+        return Directory.Exists(home) && Module("vst3", home) is null
+            && new[] { "x86-win", "i386-win" }.Any(architecture => Directory.Exists(Path.Combine(home, "Contents", architecture))
+                && Directory.EnumerateFiles(Path.Combine(home, "Contents", architecture))
+                    .Any(f => f.EndsWith(".vst3", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>
+    /// Where a Windows installer puts a 64-bit VST3 and CLAP plugin, inside
+    /// the Wine prefix the daemon sees: <c>WINEPREFIX</c>, or <c>~/.wine</c>
+    /// as Wine itself picks. The 32-bit <c>Program Files (x86)</c> folders
+    /// are left out, since this host runs only 64-bit modules.
+    /// </summary>
+    /// <param name="prefix">The prefix, for a test; the daemon's own when null.</param>
+    internal static IReadOnlyList<string> StandardDirectories(string? prefix = null)
+    {
+        string common = Path.Combine(prefix ?? PluginInstaller.DefaultWinePrefix(), "drive_c", "Program Files", "Common Files");
+        return [Path.Combine(common, "VST3"), Path.Combine(common, "CLAP")];
+    }
+
+    /// <summary>
+    /// Every folder whose Windows plugins are scanned for this host: the
+    /// standard ones, then those added with <c>addPluginSearchPath</c> under
+    /// the kind <c>windows</c>. Each is searched for both formats.
+    /// </summary>
+    internal static IReadOnlyList<string> Directories(string? prefix = null)
+        => PluginSearchPaths.Include("windows", StandardDirectories(prefix));
 
     /// <summary>
     /// The entry of a yabridge wrapper that names the Windows module, or null

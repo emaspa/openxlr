@@ -343,8 +343,9 @@ characters each. The diagnostics archive redacts these paths with its
 existing path redaction. Both reply shapes are
 documented in [api.md](api.md); the transport does not select a bridge itself.
 
-`addPluginSearchPath` and `removePluginSearchPath` take `kind` and `path`
-through the same `POST /api/v1/commands` and answer with `pluginInstall`;
+`addPluginSearchPath` and `removePluginSearchPath` take `kind` (`lv2`,
+`clap`, `vst3`, or `windows` for a folder of Windows plugins for the Windows
+plugin host) and `path` through the same `POST /api/v1/commands` and answer with `pluginInstall`;
 check its `ok`, since a refused folder or a failed save is reported there.
 The [search path contract](api.md#plugin-search-paths) has the limits.
 

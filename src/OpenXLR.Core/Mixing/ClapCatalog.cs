@@ -40,10 +40,14 @@ public static class ClapCatalog
         => PluginSearchPaths.Include("clap", ManagedYabridge.Discover() is null ? paths
             : [Path.Combine(ManagedYabridge.PluginHome, "clap"), .. paths]);
 
+    /// <summary>The search path's bundles, then, with no directories named, the Windows plugin folders' on the Windows plugin host.</summary>
     internal static IReadOnlyList<PluginInfo> ScanNow(IEnumerable<string>? directories = null, bool retryFailures = false)
-        => HostScan.Run("clap", "scan-clap", directories ?? SearchPath(),
+    {
+        IReadOnlyList<PluginInfo> found = HostScan.Run("clap", "scan-clap", directories ?? SearchPath(),
             Bundles,
             logs: new PluginScanLogStore(PluginScanLogStore.DefaultDirectory), retryFailures: retryFailures);
+        return directories is null ? HostScan.WithWindows("clap", "scan-clap", found, Bundles, retryFailures) : found;
+    }
 
     internal static IEnumerable<string> Bundles(string directory)
         => HostScan.FindBundles(directory, ".clap", directoryBundles: false);
@@ -96,9 +100,13 @@ public static class Vst3Catalog
     internal static IEnumerable<string> Bundles(string directory, Action<string, Exception>? unreadable)
         => HostScan.FindBundles(directory, ".vst3", directoryBundles: true, StringComparison.OrdinalIgnoreCase, unreadable);
 
+    /// <summary>The search path's bundles, then, with no directories named, the Windows plugin folders' on the Windows plugin host.</summary>
     internal static IReadOnlyList<PluginInfo> ScanNow(IEnumerable<string>? directories = null, bool retryFailures = false)
-        => HostScan.Run("vst3", "scan-vst3", directories ?? SearchPath(), Bundles,
+    {
+        IReadOnlyList<PluginInfo> found = HostScan.Run("vst3", "scan-vst3", directories ?? SearchPath(), Bundles,
             logs: new PluginScanLogStore(PluginScanLogStore.DefaultDirectory), retryFailures: retryFailures);
+        return directories is null ? HostScan.WithWindows("vst3", "scan-vst3", found, Bundles, retryFailures) : found;
+    }
 
     internal static IReadOnlyList<PluginInfo> Parse(string json) => HostScan.Parse(json, "vst3");
 }
@@ -151,6 +159,39 @@ internal static class HostScan
     }
 
     /// <summary>
+    /// The catalogue of one format with the Windows plugin folders' plugins
+    /// after the rest, in a build with the Windows plugin host. A plugin
+    /// already found, through a yabridge wrapper above all, is not listed
+    /// again: the wrapper's entry runs on either host, and yabridge is still
+    /// the default, so an insert saved against it loads as it always did.
+    /// </summary>
+    /// <param name="installed">The host's presence, for a test; the build's own when null.</param>
+    /// <param name="describe">Stands in for the helper, for a test, which then names its own <paramref name="directories"/> and <paramref name="scanCache"/>.</param>
+    internal static IReadOnlyList<PluginInfo> WithWindows(string kind, string command, IReadOnlyList<PluginInfo> found,
+        Func<string, Action<string, Exception>?, IEnumerable<string>> bundlesIn, bool retryFailures,
+        bool? installed = null, IEnumerable<string>? directories = null, Func<string, ProcessResult>? describe = null,
+        ScanCache? scanCache = null)
+    {
+        if (!(installed ?? WindowsPluginHost.Installed)) return found;
+        IReadOnlyList<PluginInfo> windows = Run(kind, command, directories ?? WindowsPluginHost.Directories(), bundlesIn,
+            describe, scanCache, describe is null ? new PluginScanLogStore(PluginScanLogStore.DefaultDirectory) : null,
+            retryFailures, windows: true, taken: found.Select(p => p.Plugin));
+        return windows.Count == 0 ? found : [.. found, .. windows];
+    }
+
+    /// <summary>The evidence's name for a scan of the Windows plugin folders, apart from the format's own.</summary>
+    internal static string WindowsEvidence(string kind) => "windows-" + kind;
+
+    /// <summary>
+    /// Where the Windows plugin folders' descriptions are kept: apart from
+    /// every other, since the same bundle is described by another program
+    /// here, and stamped with the Windows program as well as the helper.
+    /// </summary>
+    internal static ScanCache WindowsCache()
+        => new(Path.Combine(ScanCache.DefaultDirectory, "winhost"),
+            ScanCache.ScannerStamp + "+" + ScanCache.StampText(WindowsPluginHost.Executable));
+
+    /// <summary>
     /// Scan one format. <paramref name="logs"/> is where the whole output of
     /// a failed attempt is kept; the two catalogues pass the daemon's store,
     /// and a caller that supplies its own <paramref name="describe"/> passes
@@ -162,15 +203,23 @@ internal static class HostScan
     /// passes them by, so a bundle that hangs the scanner costs its deadline
     /// once rather than at every start.
     /// </param>
+    /// <param name="windows">
+    /// Describe each bundle on the Windows plugin host, with the helper's
+    /// <c>wine</c> backend, in the Wine prefix it lives in; mark what it
+    /// finds <see cref="PluginInfo.WindowsHostOnly"/>. A bundle with no
+    /// 64-bit Windows module is passed by before anything starts.
+    /// </param>
+    /// <param name="taken">Plugin ids already in the catalogue, counted as duplicates and left out.</param>
     internal static IReadOnlyList<PluginInfo> Run(string kind, string command, IEnumerable<string> directories,
         Func<string, Action<string, Exception>?, IEnumerable<string>> bundlesIn,
         Func<string, ProcessResult>? describe = null, ScanCache? scanCache = null,
-        PluginScanLogStore? logs = null, bool retryFailures = false)
+        PluginScanLogStore? logs = null, bool retryFailures = false, bool windows = false,
+        IEnumerable<string>? taken = null)
     {
         // Nothing here may throw: the catalogue is read once and kept, so an
         // exception would be kept with it, and every lookup after would fail.
         var result = new List<PluginInfo>();
-        var evidence = new PluginScanDiagnostics.Capture(kind);
+        var evidence = new PluginScanDiagnostics.Capture(windows ? WindowsEvidence(kind) : kind);
         try
         {
             if (describe is null && !NativePluginHost.HostInstalled)
@@ -178,17 +227,21 @@ internal static class HostScan
                 evidence.Add(NativePluginHost.Executable, "host-missing");
                 return result;
             }
-            ManagedYabridge? bridge = ManagedYabridge.Discover();
+            // The Windows plugin host is not yabridge, and nothing of the
+            // bridge's goes into its environment, its cache or its logs.
+            ManagedYabridge? bridge = windows ? null : ManagedYabridge.Discover();
             var environment = new PluginHostEnvironment(bridge, scanner: true);
             // What a saved log may say about the tools involved, taken from
             // what discovery has already read. Nothing here probes, launches
             // or asks the network for a version.
             string? bridgeStamp = bridge is null ? null
                 : $"yabridge {bridge.Version} (source {bridge.SourceCommit})";
-            string? scannerStamp = describe is null ? NativePluginHost.Executable : null;
-            var cache = scanCache ?? new ScanCache(bridge is null ? ScanCache.DefaultDirectory
-                : Path.Combine(ScanCache.DefaultDirectory, "bridge-" + bridge.CacheKey));
-            var known = new HashSet<string>(StringComparer.Ordinal);
+            string? scannerStamp = describe is null
+                ? windows ? $"{NativePluginHost.Executable} wine ({WindowsPluginHost.Executable})" : NativePluginHost.Executable
+                : null;
+            var cache = scanCache ?? (windows ? WindowsCache() : new ScanCache(bridge is null ? ScanCache.DefaultDirectory
+                : Path.Combine(ScanCache.DefaultDirectory, "bridge-" + bridge.CacheKey)));
+            var known = new HashSet<string>(taken ?? [], StringComparer.Ordinal);
             foreach (string directory in directories)
             {
                 if (!Directory.Exists(directory))
@@ -213,6 +266,7 @@ internal static class HostScan
                 evidence.Add(directory, "directory", detail: $"{bundles.Count()} candidate bundles");
                 foreach (string bundle in bundles)
                 {
+                    WindowsPluginHost.Route? route = null;
                     try
                     {
                         if (!SourceExists(bundle))
@@ -221,9 +275,25 @@ internal static class HostScan
                                 detail: "The plugin path or its symbolic-link target is missing. Restore the original plugin or install it again, then rescan.");
                             continue;
                         }
+                        if (windows)
+                        {
+                            // Only a 64-bit Windows module can run on this
+                            // host. Anything else is said here and never
+                            // started, so a 32-bit plugin costs no Wine start.
+                            string? module = WindowsPluginHost.Module(kind, bundle);
+                            if (module is null || !WindowsPluginHost.IsWindows64(module))
+                            {
+                                evidence.Add(bundle, "windows-not-64-bit", detail: module is null && !WindowsPluginHost.Only32Bit(bundle)
+                                    ? "The bundle holds no Windows module under Contents/x86_64-win."
+                                    : "The Windows plugin host runs only 64-bit Windows modules; yabridge can bridge a 32-bit one.");
+                                continue;
+                            }
+                            string real = WindowsPluginWrappers.Canonical(module);
+                            route = new(kind, real, WindowsPluginHost.PrefixOf(real));
+                        }
                         // Bridge constructors can show desktop dialogs. Validate the
                         // source before accepting cache entries or retrying a scan.
-                        if (kind == "vst3" && MissingWindowsSource(bundle) is not null)
+                        if (kind == "vst3" && !windows && MissingWindowsSource(bundle) is not null)
                         {
                             cache.Invalidate(bundle);
                             evidence.Add(bundle, "windows-module-missing", detail: MissingWindowsModuleDetail(bundle));
@@ -258,10 +328,17 @@ internal static class HostScan
                         // released plugin by plugin; a minute is generous for that,
                         // and it is spent once per bundle until the bundle changes.
                         ProcessResult scan;
+                        // On the Windows plugin host the minute is Wine's
+                        // too, and Wine may first have to make its prefix,
+                        // so the helper's own limit decides.
                         try { scan = describe is not null ? describe(bundle)
-                            : ProcessRunner.Run(NativePluginHost.Executable, [command, bundle], TimeSpan.FromSeconds(60),
-                                stderrCap: environment.StderrCap,
-                                environment: environment.Overlay, removeEnvironment: environment.RemovedVariables); }
+                            : route is not null
+                                ? ProcessRunner.Run(NativePluginHost.Executable, WindowsScanArguments(command, bundle), TimeSpan.FromSeconds(190),
+                                    stderrCap: environment.StderrCap,
+                                    environment: WindowsScanEnvironment(environment, route), removeEnvironment: environment.RemovedVariables)
+                                : ProcessRunner.Run(NativePluginHost.Executable, [command, bundle], TimeSpan.FromSeconds(60),
+                                    stderrCap: environment.StderrCap,
+                                    environment: environment.Overlay, removeEnvironment: environment.RemovedVariables); }
                         catch (Exception ex)
                         {
                             // A missing helper or temporary resource shortage says
@@ -279,7 +356,7 @@ internal static class HostScan
                         outputCapped = scan.Truncated;
                         if (!scan.Ok)
                         {
-                            bool missingWindows = kind == "vst3" && !scan.TimedOut && !scan.Truncated && !scan.Incomplete
+                            bool missingWindows = kind == "vst3" && !windows && !scan.TimedOut && !scan.Truncated && !scan.Incomplete
                                 && stderr.Contains("does not contain a Windows VST3 module", StringComparison.Ordinal);
                             string outcome = scan.TimedOut ? "timeout" : scan.Truncated ? "output-limit"
                                 : scan.Incomplete ? "output-incomplete"
@@ -299,6 +376,7 @@ internal static class HostScan
                     try
                     {
                         IReadOnlyList<PluginInfo> parsed = Parse(description, kind);
+                        if (windows) parsed = [.. parsed.Select(plugin => plugin with { WindowsHostOnly = true })];
                         if (!cached)
                         {
                             // A bundle can take a minute; one the daemon is
@@ -349,6 +427,26 @@ internal static class HostScan
     private static PluginScanLogRef Keep(PluginScanLogStore? logs, PluginScanAttempt attempt,
         ReadOnlySpan<byte> stdout, string stderr, bool capped)
         => logs is null ? default : logs.Save(attempt, stdout, capped, stderr, capped);
+
+    /// <summary>The helper's arguments to describe a bundle on the Windows plugin host: its <c>wine</c> backend, the format's scan and the bundle.</summary>
+    internal static IReadOnlyList<string> WindowsScanArguments(string command, string bundle) => ["wine", command, bundle];
+
+    /// <summary>
+    /// What a scan on the Windows plugin host is started with: what every
+    /// scanner gets, Wine's USB driver kept out among it, and the Wine prefix
+    /// and Wine by the rule an insert on that host follows, so a plugin is
+    /// described in the prefix it will run in.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> WindowsScanEnvironment(PluginHostEnvironment environment, WindowsPluginHost.Route route,
+        Func<string, string?>? inherited = null)
+    {
+        var overlay = new Dictionary<string, string>(environment.Overlay, StringComparer.Ordinal);
+        inherited ??= Environment.GetEnvironmentVariable;
+        foreach ((string name, string value) in WindowsPluginHost.HelperEnvironment(route,
+                     variable => overlay.TryGetValue(variable, out string? set) ? set : inherited(variable)))
+            overlay[name] = value;
+        return overlay;
+    }
 
     private static bool SourceExists(string path)
     {

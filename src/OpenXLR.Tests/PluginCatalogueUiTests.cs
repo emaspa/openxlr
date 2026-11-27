@@ -26,6 +26,32 @@ internal static class PluginCatalogueUiTests
         await Verify();
         await VerifyControls();
         await VerifyFolderPickerFailures();
+        await VerifyWindowsFolderFormat();
+    }
+
+    /// <summary>Windows is offered for a new folder only where the daemon lists Windows folders, which a build without its Windows plugin host does not.</summary>
+    private static async Task VerifyWindowsFolderFormat()
+    {
+        await using var client = new DaemonClient();
+        var vm = new OptionsViewModel(client, new MainViewModel(client));
+        var window = new PluginFoldersWindow { DataContext = vm };
+        var format = window.FindControl<ComboBox>("SearchFormat")!;
+        vm.ApplyPluginSetup(JsonNode.Parse("""{"searchDirectories":[{"kind":"vst3","path":"/v","custom":false,"exists":true}]}"""));
+        window.ShowFormats(vm);
+        Assert.Equal(["LV2", "CLAP", "VST3"], (string[])format.ItemsSource!);
+        vm.ApplyPluginSetup(JsonNode.Parse("""
+            {"searchDirectories":[{"kind":"vst3","path":"/v","custom":false,"exists":true},
+             {"kind":"windows","path":"/p/drive_c/Program Files/Common Files/VST3","custom":false,"exists":true}]}
+            """));
+        format.SelectedItem = "VST3";
+        window.ShowFormats(vm);
+        Assert.Equal(["LV2", "CLAP", "VST3", "Windows"], (string[])format.ItemsSource!);
+        Assert.Equal("VST3", format.SelectedItem);
+        format.SelectedItem = "Windows";
+        vm.ApplyPluginSetup(JsonNode.Parse("""{"searchDirectories":[]}"""));
+        window.ShowFormats(vm);
+        Assert.Equal("LV2", format.SelectedItem);
+        window.Close();
     }
 
     private static async Task VerifyFolderPickerFailures()

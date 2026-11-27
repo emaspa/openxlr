@@ -1009,6 +1009,11 @@ public sealed class PluginInstaller
             hostExecutable = NativePluginHost.Executable, hostInstalled = _hostInstalled,
             windowsHostExecutable = WindowsPluginHost.Executable,
             windowsHostInstalled = _hostInstalled && File.Exists(WindowsPluginHost.Executable),
+            // The folders the Windows plugin host's scan reads, whether or
+            // not this build has the host, so a reader can tell a plugin in
+            // none of them from one the scan passed by.
+            windowsHostDirectories = WindowsPluginHost.Directories().Take(64)
+                .Select(path => new { path, exists = Directory.Exists(path) }),
             processArchitecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
             searchPaths = new { lv2Override = PluginSearchPaths.Lv2Path() ?? Environment.GetEnvironmentVariable("LV2_PATH"), clap = ClapCatalog.SearchPath().Take(64), vst3 = Vst3Catalog.SearchPath().Take(64) },
             scans = PluginScanDiagnostics.Snapshot(),

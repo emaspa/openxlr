@@ -340,9 +340,12 @@ insert will still name it and keep its values. No package builds it. In a
 build that has it, the daemon runs one insert of a Windows plugin on it when
 a client asks with `setInsertWindowsHost`
 ([docs/api.md](api.md#windows-host)), and back through yabridge the same
-way. yabridge still scans every Windows plugin and runs every insert that
-was not moved. The UI offers the move in a bridged plugin's controls window
-on a build that has the host. Still to come: packaging.
+way. yabridge still runs every insert of a bridged plugin that was not
+moved. The UI offers the move in a bridged plugin's controls window on a
+build that has the host. Such a build also scans the Windows plugin folders
+of the Wine prefix, and folders the user adds, with no yabridge, and runs
+what it finds there on its own host; a plugin with a yabridge wrapper is
+still listed by the wrapper. Still to come: packaging.
 
 ## Parked
 

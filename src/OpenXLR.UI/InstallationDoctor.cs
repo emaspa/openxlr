@@ -42,11 +42,13 @@ internal static class InstallationDoctor
 
     internal static async Task<DoctorReport> Inspect(IEnumerable<string> paths, string? root, bool runtime,
         Func<CancellationToken, Task<string>>? readState = null, bool removed = false, IEnumerable<string>? prefixes = null,
-        Func<CancellationToken, Task<DaemonPresence>>? probe = null)
+        Func<CancellationToken, Task<DaemonPresence>>? probe = null,
+        Func<CancellationToken, Task<string>>? readPluginDiagnostics = null)
     {
         // A supplied state reader stands in for this user's daemon, so only
         // the real one is probed by default.
         probe ??= readState is null ? token => DaemonProbe.ProbeAsync(cancel: token) : null;
+        readPluginDiagnostics ??= readState is null ? ReadPluginDiagnostics : null;
         // A leftover gets a move command only under a prefix this build looks
         // in for packages. The content hash in an archive's name proves its
         // integrity, not who wrote it, so any other path is left to inspection.
@@ -149,8 +151,100 @@ internal static class InstallationDoctor
                 }
             }
         }
-        return new(receipts, findings, daemon, []);
+        // Windows plugins are a question for the running daemon, whatever
+        // installed it: a source build is the only one with the host today.
+        IReadOnlyList<DoctorNote> notes = [];
+        if (runtime && readPluginDiagnostics is not null)
+        {
+            try
+            {
+                // The daemon asks yabridgectl for its status while it answers,
+                // which it gives five seconds.
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                using var reply = JsonDocument.Parse(await readPluginDiagnostics(timeout.Token));
+                notes = WindowsPluginNotes(reply.RootElement);
+            }
+            // A daemon that is not there is already a finding above, or the
+            // receipts could not say which daemon to expect; either way there
+            // is no catalogue to explain.
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException) { }
+        }
+        return new(receipts, findings, daemon, notes);
     }
+
+    /// <summary>The most notes the Windows plugin checks add, so a folder of a thousand plugins stays readable.</summary>
+    internal const int WindowsPluginNoteLimit = 32;
+
+    /// <summary>
+    /// What helps a user whose Windows plugin is not in the picker, from the
+    /// daemon's own plugin diagnostics: where OpenXLR's Windows plugin host
+    /// looks, which of those folders the daemon cannot see, and each bundle
+    /// the last scan of them found and left out, with the reason. Nothing for
+    /// a build without the host, whose Windows plugins come through yabridge
+    /// alone. Information only: none of it is a fault of the installation.
+    /// </summary>
+    internal static IReadOnlyList<DoctorNote> WindowsPluginNotes(JsonElement reply)
+    {
+        var notes = new List<DoctorNote>();
+        JsonElement discovery = default;
+        if (reply.TryGetProperty("messages", out JsonElement messages) && messages.ValueKind == JsonValueKind.Array)
+            foreach (JsonElement message in messages.EnumerateArray())
+                if (message.ValueKind == JsonValueKind.Object && message.TryGetProperty("discovery", out JsonElement found)
+                    && found.ValueKind == JsonValueKind.Object)
+                    discovery = found;
+        if (discovery.ValueKind != JsonValueKind.Object
+            || !discovery.TryGetProperty("windowsHostInstalled", out JsonElement installed) || installed.ValueKind != JsonValueKind.True)
+            return notes;
+        if (discovery.TryGetProperty("windowsHostDirectories", out JsonElement folders) && folders.ValueKind == JsonValueKind.Array)
+            foreach (JsonElement folder in folders.EnumerateArray())
+            {
+                if (Text(folder, "path") is not { } path) continue;
+                bool exists = folder.TryGetProperty("exists", out JsonElement there) && there.ValueKind == JsonValueKind.True;
+                notes.Add(new(path, exists
+                    ? "searched for Windows VST3 and CLAP plugins that run on OpenXLR's Windows plugin host"
+                    : "searched for Windows plugins, but the daemon cannot see this folder. It looks in the Wine prefix it was started with (WINEPREFIX, else ~/.wine); add the folder your plugins are in under Windows in the plugin manager"));
+            }
+        if (discovery.TryGetProperty("scans", out JsonElement scans) && scans.ValueKind == JsonValueKind.Array)
+            foreach (JsonElement scan in scans.EnumerateArray())
+            {
+                if (Text(scan, "kind") is not { } kind || !kind.StartsWith("windows-", StringComparison.Ordinal)
+                    || !scan.TryGetProperty("entries", out JsonElement entries) || entries.ValueKind != JsonValueKind.Array)
+                    continue;
+                foreach (JsonElement entry in entries.EnumerateArray())
+                    if (Text(entry, "path") is { } path && LeftOut(entry) is { } reason)
+                        notes.Add(new(path, reason));
+            }
+        return notes.Count <= WindowsPluginNoteLimit ? notes
+            : [.. notes.Take(WindowsPluginNoteLimit - 1), new("windows plugins", $"{notes.Count - WindowsPluginNoteLimit + 1} more notes; openxlr doctor --json and the diagnostics archive have every scan entry")];
+    }
+
+    /// <summary>Why a bundle the Windows plugin folders' scan found is not in the catalogue as its own entry, or null when it is.</summary>
+    private static string? LeftOut(JsonElement entry)
+    {
+        string? outcome = Text(entry, "outcome");
+        int plugins = Whole(entry, "plugins"), duplicates = Whole(entry, "duplicates");
+        string detail = Text(entry, "detail") is { Length: > 0 } said ? " " + said.Split('\n')[0] : "";
+        return outcome switch
+        {
+            "ok" when plugins > 0 && duplicates == plugins =>
+                "listed through its yabridge wrapper, which runs on either host; the plugin's controls window moves it to OpenXLR's Windows plugin host",
+            "ok" or "directory" or "directory-missing" or "no-plugins" => null,
+            "windows-not-64-bit" => "not listed: OpenXLR's Windows plugin host runs only 64-bit Windows plugins." + detail,
+            "skipped-failed" => "not listed: an earlier scan failed and it is not read again until it changes; press Rescan all plugins in the plugin manager",
+            "timeout" => "not listed: the scan did not finish in time; press Rescan all plugins in the plugin manager",
+            _ => $"not listed: the scan ended with {outcome ?? "no outcome"}." + detail,
+        };
+    }
+
+    private static string? Text(JsonElement element, string name)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out JsonElement value)
+            && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    private static int Whole(JsonElement element, string name)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out JsonElement value)
+            && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number) ? number : 0;
+
+    private static Task<string> ReadPluginDiagnostics(CancellationToken cancel) => Read("/api/v1/plugin-diagnostics", cancel);
 
     private static async Task<DaemonPresence> Probe(Func<CancellationToken, Task<DaemonPresence>> probe)
     {
@@ -169,11 +263,14 @@ internal static class InstallationDoctor
         return metadata.GetGuid(metadata.GetModuleDefinition().Mvid).ToString("D");
     }
 
-    private static async Task<string> ReadState(CancellationToken cancel)
+    private static Task<string> ReadState(CancellationToken cancel) => Read("/api/v1/state", cancel);
+
+    /// <summary>One read of the daemon's HTTP API over its control socket, at most 8 MiB.</summary>
+    private static async Task<string> Read(string path, CancellationToken cancel)
     {
         using var handler = ControlConnection.HttpHandler();
         using var http = new HttpClient(handler);
-        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/api/v1/state");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://localhost" + path);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancel);
         response.EnsureSuccessStatusCode();
         await using var body = await response.Content.ReadAsStreamAsync(cancel);
@@ -182,7 +279,7 @@ internal static class InstallationDoctor
         int count;
         while ((count = await body.ReadAsync(buffer, cancel)) != 0)
         {
-            if (bytes.Length + count > 8 * 1024 * 1024) throw new IOException("daemon state exceeds 8 MiB");
+            if (bytes.Length + count > 8 * 1024 * 1024) throw new IOException("the daemon's answer exceeds 8 MiB");
             bytes.Write(buffer, 0, count);
         }
         return System.Text.Encoding.UTF8.GetString(bytes.ToArray());

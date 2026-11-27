@@ -153,7 +153,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `soundboardExport` | in answer to `exportSoundboard` | `ok`, `message` (a sentence for the user), `clips` (how many clips the archive holds) and `skipped` (each clip left out, as `name: reason`). See [Soundboard](#soundboard) |
 | `starterSounds` | in answer to `restoreStarterSounds` | `ok` (true when it went through, also when no starter clip was missing), `message`, `clips` (the ids added, in library order) and `skipped` (each clip left out, as `name: reason`). See [Starter sounds](#starter-sounds) |
 | `soundboardImport` | in answer to `importSoundboard` | `ok` (true when at least one clip was imported), `message`, `clips` (the ids added, in library order), `renamed` (the archive's id to the new one, for each clip whose id was in use here), `skipped` (each clip left out, as `name: reason`, and on a refusal each clip that could not be taken) and `replaced` (true when the library was replaced). See [Soundboard](#soundboard) |
-| `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo input or mix with two or more |
+| `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo input or mix with two or more. `windowsHostOnly` is true for a Windows CLAP or VST3 plugin found in a [Windows plugin folder](#windows-plugin-folders), whose `path` is the Windows bundle itself and which runs only on the Windows plugin host, and false for every other entry |
 | `pluginSetup` | in answer to `getPluginSetup` or `setPluginWineTrace` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which no package provides yet), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
 | `windowsPluginFiles` | in answer to `getWindowsPluginFiles` | `ok`, `message` and `plugins`; each plugin file carries `path`, `name`, `format`, `enabled`, `canDelete`, `winePrefix` and `inUse`. Excluded files remain listed |
 | `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
@@ -357,7 +357,7 @@ failure in that final acknowledgement (or an `error` without a request id):
 | `deleteWindowsPlugin` | `path` | permanently delete one standalone plugin file or bundle and its wrappers, then refresh the catalogue. Refused for unregistered, Wine-installed, symbolic-link or in-use sources; answered with `pluginInstall`. Clients must confirm deletion with the user first |
 | `syncWindowsPlugins` | none | run yabridge's sync over the folders it knows, clean missing-source wrappers belonging to those folders unless inserts still use them, then read the catalogues again; answered with `pluginInstall` |
 | `rescanPlugins` | none | read the plugin directories again, for plugins installed by other means; answered with `pluginInstall` |
-| `addPluginSearchPath` | `kind`, `path` | add an existing folder to the `lv2`, `clap` or `vst3` search path without copying anything, save the list in `daemon.json` and read the catalogues again; answered with `pluginInstall`. See [Plugin search paths](#plugin-search-paths) |
+| `addPluginSearchPath` | `kind`, `path` | add an existing folder to the `lv2`, `clap` or `vst3` search path, or with `windows` to the [Windows plugin folders](#windows-plugin-folders), without copying anything, save the list in `daemon.json` and read the catalogues again; answered with `pluginInstall`. See [Plugin search paths](#plugin-search-paths) |
 | `removePluginSearchPath` | `kind`, `path` | stop searching an added folder, keeping its files, and read the catalogues again; works for a folder that no longer exists; answered with `pluginInstall` |
 | `setInserts` | `channel`, `inserts[]` | replace a chain; `channel` is `xlr1`, `xlr2`, a capture channel id or `mix:<id>`, each insert is `{id, kind, plugin, label?, bypass?, ownBlock?, params?}` where `kind` is `"lv2"` with the plugin URI, `"clap"` with the plugin's id, or `"vst3"` with the class id as 32 hex digits; a CLAP or VST3 insert always runs in the native host, so its `nativeHost` reads true whatever was sent. An insert being added is refused when its plugin cannot run at the chain's width (`chainWidth` on an input, two on a mix, by `widths` or the port counts as `plugins` describes them); an insert already in the chain, the same plugin under the same id, is left to the chain builder, so one can always be removed; an id kept while its `kind` or `plugin` changes counts as an addition. The daemon does not read a `windowsHost` in the chain. An insert keeps the [host of its Windows plugin](#windows-host), and one being added starts on yabridge. Only this chain is rebuilt; every other chain keeps its running plugins |
 | `setInsertBypass` | `channel`, `insertId`, `value` | bypass one insert; rebuilds this chain only |
@@ -846,14 +846,18 @@ daemon looks for `openxlr-winhost.exe` beside the native helper, or where
 when:
 
 - the build has no Windows plugin host;
-- the insert's plugin is not a Windows plugin bridged through yabridge. The
-  daemon knows one by its wrapper, a VST3 bundle whose
+- the insert's plugin is neither a Windows plugin bridged through yabridge
+  nor one found in a [Windows plugin folder](#windows-plugin-folders). The
+  daemon knows a bridged one by its wrapper, a VST3 bundle whose
   `Contents/x86_64-win/NAME.vst3` is a link, or a CLAP file with a
   `NAME.clap-win` beside it;
-- the Windows module behind the wrapper is missing, or is not a 64-bit
-  Windows module.
+- the Windows module behind the wrapper or in the folder is missing, or is
+  not a 64-bit Windows module.
 
-`"yabridge"` is never refused, so an insert can always go back.
+`"yabridge"` is never refused, so an insert can always go back. For a plugin
+found in a Windows plugin folder it only clears the saved choice: there is
+no wrapper for yabridge to run, so the plugin stays on the Windows plugin
+host.
 
 The choice is saved with the insert, in `mixer.json` and in a profile. It is
 absent while it is yabridge, so a file with no moved insert is one an older
@@ -875,6 +879,47 @@ own `WINEPREFIX` when it has one, else the nearest directory above the
 Windows module that holds `dosdevices`, else Wine's default. A `WINELOADER` in the
 daemon's environment names the Wine to start, as it does for yabridge.
 Wine's USB driver stays out of the prefix on both hosts.
+
+<a name="windows-plugin-folders"></a>
+**Windows plugin folders.** In a build with the Windows plugin host the
+daemon also reads Windows plugins straight from their folders, so a plugin
+needs no yabridge wrapper to reach the catalogue. The folders are
+`drive_c/Program Files/Common Files/VST3` and `.../CLAP` in the daemon's
+Wine prefix (its `WINEPREFIX`, else `~/.wine`), then the folders added with
+`addPluginSearchPath` and `kind: "windows"`. Each one is searched for both
+formats, to any depth, on the terms of the other
+[plugin search paths](#plugin-search-paths). A `windows` folder may not be
+inside or around a folder already searched for CLAP or VST3, so a folder of
+yabridge wrappers is never read twice. The 32-bit `Program Files (x86)`
+folders are not searched.
+
+The native helper describes each bundle with `wine scan-clap` or
+`wine scan-vst3`, in the Wine prefix the insert would run in, under the
+same scan cache rules as a native bundle. The daemon keeps these
+descriptions apart from the others, under `plugin-scans/winhost` in the
+cache directory. A new helper or a new `openxlr-winhost.exe` describes every
+bundle again. A bundle with no 64-bit Windows module (a VST3 bundle without
+`Contents/x86_64-win`, or a 32-bit file) is not started; its scan entry has
+the outcome `windows-not-64-bit`. The scan gives one bundle 190 seconds,
+since Wine may first create the prefix. A build without the host reads none
+of these folders.
+
+An entry found this way has `windowsHostOnly: true` in `plugins` and runs
+on the Windows plugin host whatever its insert saved; if it cannot start
+there, its chain fails with the reason. The catalogue holds a plugin once
+per format. A plugin already found by the format's own search, through a
+yabridge wrapper above all, keeps that entry, and the folder's copy only
+counts as a duplicate in its scan entry: the wrapper's entry runs on either
+host, and yabridge is still the default, so an insert saved against it
+loads exactly as before.
+
+An insert names its plugin by format and id, never by its file. So an
+insert saved against a yabridge wrapper that is later removed, along with
+yabridge perhaps, comes up on the Windows plugin host from the folder's
+entry, provided the Windows module is still in one of these folders. It keeps
+the same class id, parameter ids and saved values. Nothing in the saved file changes. A
+module that was bridged from anywhere else needs its folder added as a
+`windows` folder.
 
 Plugins that tie their licence to the system disk, Elgato Voice Focus among
 them, see the same machine on both hosts. Like the yabridge companion's
@@ -2092,7 +2137,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
   means the unit's environment decides (`OPENXLR_BUILD_MIXER`). It is read
   once at start and written by the UI's Options window.
   `pluginFolders` is the list of `{kind, path}` folders added with
-  `addPluginSearchPath`, written by the daemon and read at each scan and
+  `addPluginSearchPath` (`kind` is `lv2`, `clap`, `vst3` or `windows`; an
+  older daemon skips a `windows` entry with a `searchPathWarning` and keeps
+  it saved), written by the daemon and read at each scan and
   each LV2 host start. Each writer keeps the keys it does not own.
 - `bridge/yabridgectl/config.toml`: the managed companion's folder registry,
   separate from the system yabridgectl configuration. Private wrappers live
@@ -2127,7 +2174,9 @@ All under `~/.config/openxlr/` (or `$XDG_CONFIG_HOME/openxlr/`):
 ## Plugin search paths
 
 `pluginSetup.searchDirectories` lists `{kind, path, custom, exists}` for
-every folder searched: `kind` is `lv2`, `clap` or `vst3`, `custom` marks a
+every folder searched: `kind` is `lv2`, `clap` or `vst3`, or `windows` for
+a [Windows plugin folder](#windows-plugin-folders), listed only in a build
+with the Windows plugin host; `custom` marks a
 folder added with `addPluginSearchPath`, and `exists` is a directory check
 made when the reply was built, not a promise that every bundle in it loads.
 The LV2 entries are `LV2_PATH`, or the standard directories that exist, then
@@ -2220,12 +2269,17 @@ both.
 `getPluginDiagnostics` reads the daemon's environment, not the UI's shell.
 `discovery` includes `controller`, `wineExecutable`, `winePrefix`,
 `sourceCommit` for a managed bridge, `hostExecutable`, `hostInstalled`,
-`windowsHostExecutable`, `windowsHostInstalled`,
+`windowsHostExecutable`, `windowsHostInstalled`, `windowsHostDirectories`,
 `processArchitecture`, `searchPaths` and `scans`. `searchPaths.lv2Override`
 is the `LV2_PATH` LV2 hosts are given (the daemon's own, or the standard
 directories plus added plugin folders) or null for lilv defaults; `clap` and
 `vst3` contain up to 64 effective search directories, including private
-wrappers and added plugin folders.
+wrappers and added plugin folders. `windowsHostDirectories` lists up to 64
+`{path, exists}` [Windows plugin folders](#windows-plugin-folders), whether
+or not the build has the host. The scan of those folders reports under the
+kinds `windows-clap` and `windows-vst3` in `scans`, apart from the formats'
+own reports. A bundle whose plugins are all counted in `duplicates` there is
+in the catalogue through another entry, usually its yabridge wrapper.
 
 Both `pluginSetup` and `discovery` include `memoryLockHardLimitBytes`, the
 daemon's hard memory-lock limit. The existing `memoryLockLimitBytes` stays

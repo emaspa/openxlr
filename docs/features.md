@@ -945,6 +945,12 @@ controls window or the API. It is experimental. No package provides it yet,
 only a source build made with `WINHOST=1`. The plugin's own editor opens on
 either host. yabridge stays the default. See
 [OpenXLR's Windows plugin host](manual.md#windows-plugin-host).
+Such a build also finds Windows VST3 and CLAP plugins in the Wine prefix's
+standard folders, and in Windows folders added in the plugin manager, and
+runs them on that host with no yabridge at all. A plugin that has a yabridge
+wrapper as well is listed once, by the wrapper, and an insert saved against
+a wrapper that is later removed comes back on OpenXLR's host with its
+settings. See [Windows plugins without yabridge](manual.md#windows-plugin-folders).
 
 A block size option forces PipeWire's quantum for the graph OpenXLR runs
 in to 256, 512 or 1024 samples, or leaves it to PipeWire. It holds against

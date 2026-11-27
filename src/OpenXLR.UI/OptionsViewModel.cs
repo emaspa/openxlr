@@ -815,11 +815,17 @@ public sealed class OptionsViewModel : ViewModelBase
 /// <summary>One directory a plugin format searches, as the plugin manager lists it.</summary>
 public sealed record PluginSearchDirectoryItem(string Kind, string Path, bool Custom, bool Exists)
 {
+    /// <summary>The kind of a folder of Windows VST3 and CLAP plugins for OpenXLR's own Windows plugin host.</summary>
+    internal const string WindowsKind = "windows";
+
+    /// <summary>The kind as the list shows it: a format's own name, or Windows for a Windows plugin folder.</summary>
+    public string Format => Kind == WindowsKind ? "Windows" : Kind.ToUpperInvariant();
+
     public string Detail => (Custom, Exists) switch
     {
-        (true, true) => Localizer.Format("SearchDirectoryAdded", Kind.ToUpperInvariant()),
-        (true, false) => Localizer.Format("SearchDirectoryAddedMissing", Kind.ToUpperInvariant()),
-        (false, true) => Localizer.Format("SearchDirectoryStandard", Kind.ToUpperInvariant()),
-        (false, false) => Localizer.Format("SearchDirectoryStandardMissing", Kind.ToUpperInvariant()),
+        (true, true) => Localizer.Format("SearchDirectoryAdded", Format),
+        (true, false) => Localizer.Format("SearchDirectoryAddedMissing", Format),
+        (false, true) => Localizer.Format("SearchDirectoryStandard", Format),
+        (false, false) => Localizer.Format("SearchDirectoryStandardMissing", Format),
     };
 }

@@ -54,6 +54,7 @@ public static class PluginScanDiagnostics
         ["scan-failed"] = "the scanner failed",
         ["source-missing"] = "the plugin file or link target is missing",
         ["windows-module-missing"] = "the original Windows plugin is missing",
+        ["windows-not-64-bit"] = "it has no 64-bit Windows module",
         ["output-limit"] = "it described too much",
         ["output-incomplete"] = "its description ended early",
         ["start-error"] = "the scanner could not start",
