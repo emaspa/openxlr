@@ -75,6 +75,22 @@ static Host h;  // static: the control table is large
 static float in_buffers[MAX_CHANNELS][MAX_FRAMES], out_buffers[MAX_CHANNELS][MAX_FRAMES];
 static float quiet[MAX_FRAMES], spare[MAX_FRAMES];
 static const char *plugin_path;
+// The CLAP test plugin built against each C library a Windows plugin may
+// bring, msvcrt and the Universal C Runtime. One of the two is never the one
+// this host was built with, whichever toolchain built it.
+static char plugin_msvcrt[PATH_MAX], plugin_ucrt[PATH_MAX];
+
+// Whether a module names `library` among what it imports: a plain search of
+// its bytes, which hold the name of every library they import.
+static bool imports(const char *module, const char *library) {
+  FILE *file = fopen(module, "rb");
+  if (!file)
+    return false;
+  static char bytes[8 << 20];
+  size_t size = fread(bytes, 1, sizeof(bytes), file);
+  fclose(file);
+  return memmem(bytes, size, library, strlen(library)) != NULL;
+}
 // The VST3 test plugin: the module by itself, a bundle around it, and a
 // bundle with nothing in it.
 static const char *vst3_module;
@@ -209,13 +225,15 @@ static void expect_reason(void) {
   dup2(fileno(explanation), STDERR_FILENO);
 }
 
+static char explained_text[65536];
+
 static bool explained(const char *reason) {
-  static char text[8192];
+  char *text = explained_text;
   fflush(stderr);
   dup2(kept_stderr, STDERR_FILENO);
   close(kept_stderr);
   rewind(explanation);
-  text[fread(text, 1, sizeof(text) - 1, explanation)] = 0;
+  text[fread(text, 1, sizeof(explained_text) - 1, explanation)] = 0;
   fclose(explanation);
   fputs(text, stderr);
   return strstr(text, reason) != NULL;
@@ -268,6 +286,47 @@ static void check_audio(void) {
   assert(!strcmp(h.plugin_name, "Test Gain"));
   check_halved("CLAP");
   puts("PASS: the Windows plugin's audio comes back exact at every block size, in place too, and its host leaves cleanly");
+}
+
+// A plugin that prints on standard output while it is made, activated and
+// run, through its C library or through Windows, keeps its audio exact and
+// its instance alive, and what it printed reaches the log. Standard output
+// once was the audio wake, where the first byte a plugin printed failed the
+// instance.
+static void check_run_print(void) {
+  static const char *const places[] = {"when made", "when activated", "in a block"};
+  const char *modules[] = {plugin_msvcrt, plugin_ucrt};
+  setenv("OPENXLR_TEST_WINHOST_PRINT", "1", 1);
+  for (size_t m = 0; m < 2; ++m) {
+    expect_reason();
+    assert(begin_at(modules[m], PLUGIN "gain", 2));
+    Wine *w = h.impl;
+    for (unsigned i = 0; i < 40; ++i) {
+      cycle(256);
+      assert(scaled(256, 0.5f));
+    }
+    assert(!atomic_load(&h.audio_error) && !atomic_load(&w->dead));
+    for (unsigned i = 0; i < 50; ++i) {
+      wine_drain_log(w);
+      sleep_ms(10);
+    }
+    wine_backend.deactivate(&h);
+    assert(wine_stop_child(w));
+    wine_drain_log(w);
+    end();
+    explained("");
+    for (size_t i = 0; i < sizeof(places) / sizeof(places[0]); ++i) {
+      char line[96];
+      snprintf(line, sizeof(line), "[printed through the C library %s]", places[i]);
+      assert(strstr(explained_text, line));
+      snprintf(line, sizeof(line), "[printed through the Windows handle %s]", places[i]);
+      assert(strstr(explained_text, line));
+    }
+  }
+  unsetenv("OPENXLR_TEST_WINHOST_PRINT");
+  puts("PASS: a plugin that prints on standard output while it is made, activated and run, "
+       "built against msvcrt or the Universal C Runtime, keeps its audio exact and its "
+       "instance alive, and what it prints is its log");
 }
 
 static void check_layouts(void) {
@@ -1361,10 +1420,11 @@ static void check_scan_crash(void) {
 }
 
 static void check_scan_print(void) {
-  const char *paths[] = {clap_link, vst3_bundle};
-  for (unsigned i = 0; i < 2; ++i) {
-    Described d = run_scan(i ? "scan-vst3" : "scan-clap", paths[i], "print");
-    char *expected = i ? vst3_description(paths[i]) : clap_description(paths[i]);
+  const char *paths[] = {clap_link, vst3_bundle, plugin_msvcrt, plugin_ucrt};
+  for (unsigned i = 0; i < 4; ++i) {
+    bool vst3 = i == 1;
+    Described d = run_scan(vst3 ? "scan-vst3" : "scan-clap", paths[i], "print");
+    char *expected = vst3 ? vst3_description(paths[i]) : clap_description(paths[i]);
     assert(described(&d, expected));
     assert(strstr(d.err, "[printed through the C library]"));
     assert(strstr(d.err, "[printed through the Windows handle]"));
@@ -1373,7 +1433,8 @@ static void check_scan_print(void) {
   }
   puts("PASS: what a plugin prints on standard output while it is described, through "
        "the C library or through Windows, is passed on as its log and the description "
-       "is exact");
+       "is exact, for CLAP and VST3 and for a module built against msvcrt or the "
+       "Universal C Runtime");
 }
 
 static void check_scan_hang(void) {
@@ -1720,8 +1781,8 @@ static int other_system_calls(const char *kind, unsigned count) {
     while (waitpid(tracer, NULL, 0) < 0 && errno == EINTR) {}
   }
   end();
-  // The wake is a one-byte read and the answer a one-byte write, on the
-  // descriptors Wine gave standard input and output. A read strace caught
+  // The wake is a one-byte read on the descriptor Wine gave standard input,
+  // and the answer a one-byte write on the wake FIFO's. A read strace caught
   // half way when it attached ends as a resumed one, and the read it leaves
   // the thread waiting in as a detached one. On a slow machine strace can
   // leave while the answer is still being written, which is a detached write.
@@ -1950,6 +2011,18 @@ int main(int argc, char **argv) {
   setenv("OPENXLR_WINHOST", winhost, 1);
   snprintf(winhost_path, sizeof(winhost_path), "%s", winhost);
   plugin_path = plugin;
+  // tests/winhost-plugin.clap beside tests/winhost-plugin-msvcrt.clap and
+  // tests/winhost-plugin-ucrt.clap, which the Makefile builds with it.
+  size_t stem = strlen(plugin) - strlen(".clap");
+  assert(strlen(plugin) > strlen(".clap") && !strcmp(plugin + stem, ".clap"));
+  snprintf(plugin_msvcrt, sizeof(plugin_msvcrt), "%.*s-msvcrt.clap", (int)stem, plugin);
+  snprintf(plugin_ucrt, sizeof(plugin_ucrt), "%.*s-ucrt.clap", (int)stem, plugin);
+  if (!imports(plugin_msvcrt, "msvcrt.dll") || imports(plugin_msvcrt, "api-ms-win-crt-") ||
+      !imports(plugin_ucrt, "api-ms-win-crt-") || imports(plugin_ucrt, "msvcrt.dll")) {
+    printf("FAIL: %s must use msvcrt and %s the Universal C Runtime\n", plugin_msvcrt,
+           plugin_ucrt);
+    return 1;
+  }
   // A runtime directory of the test's own, so what the backend leaves in it
   // can be told exactly: nothing.
   static char runtime[PATH_MAX];
@@ -1991,6 +2064,7 @@ int main(int argc, char **argv) {
 
   pw_init(NULL, NULL);
   check_audio();
+  check_run_print();
   check_layouts();
   check_latency(begin, "latency", "restart");
   puts("PASS: the plugin's latency is reported, and a restart it asks for changes it in place");

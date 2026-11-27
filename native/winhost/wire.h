@@ -5,10 +5,17 @@
 //
 // - One shared file, mapped by both, with the audio of one cycle and the
 //   plugin's controls.
-// - The audio wake: the Windows host's standard input and output, a pipe
-//   each way, one byte per cycle each way. Under Wine a blocking read on an
-//   inherited pipe is a plain read in the calling thread, so a cycle costs
-//   no call to wineserver.
+// - The audio wake, one byte per cycle each way: the Windows host's
+//   standard input, an inherited pipe, from Linux to Windows, and a FIFO in
+//   the private directory back. Under Wine a blocking read on an inherited
+//   pipe is a plain read in the calling thread, and a write to a file it has
+//   opened is a plain write, so a cycle costs no call to wineserver.
+// - The log: the Windows host's standard output and standard error are one
+//   pipe that the Linux side reads a line at a time. A plugin's C library
+//   takes standard output from Windows when it starts, which for a C
+//   library Wine itself loads is before this program runs, so whatever a
+//   plugin prints, through any C library, can only reach the log. No other
+//   channel is on a standard handle a plugin can write to.
 // - The control channel: two FIFOs, a fixed-size request one way and a
 //   fixed-size reply the other, between the two main threads. Never used on
 //   an audio thread.
@@ -39,11 +46,14 @@
 // itself, a size it asks for or an editor it closes, comes back as a note: a
 // reply nobody asked for, which the Linux side reads on its tick.
 //
-// A scan uses none of this. The Windows host started with the one argument
-// `scan` reads one WireScan from its standard input, writes the module's
-// description to its standard output and leaves. The Linux side holds that
-// input pipe open while it waits, and the Windows host ends itself when the
-// pipe closes, so giving up on a scan is closing it.
+// A scan uses none of this. The Windows host started with `scan` and a
+// private directory opens the FIFO WIRE_DESCRIPTION_FIFO in it, reads the
+// disk identity beside it, and writes WIRE_SCAN_OPENED down the FIFO: the
+// scan's hello, after which the Linux side removes the directory. It then
+// reads one WireScan from its standard input, writes the module's
+// description down the FIFO and leaves. The Linux side holds that input pipe
+// open while it waits, and the Windows host ends itself when the pipe
+// closes, so giving up on a scan is closing it.
 //
 // Every structure has a fixed size and both builds are x86-64, so the two
 // compilers lay them out alike; the assertions below hold them to it.
@@ -55,7 +65,7 @@
 
 enum {
   WIRE_MAGIC = 0x4857584f,  // "OXWH"
-  WIRE_VERSION = 3,
+  WIRE_VERSION = 4,
   WIRE_MAX_FRAMES = 8192,    // MAX_FRAMES in host.h
   WIRE_MAX_CHANNELS = 2,     // MAX_CHANNELS in host.h
   WIRE_MAX_CONTROLS = 4096,  // MAX_CONTROLS in host.h
@@ -75,10 +85,16 @@ enum {
 #define WIRE_AUDIO_FILE "audio"
 #define WIRE_REQUEST_FIFO "request"
 #define WIRE_REPLY_FIFO "reply"
+#define WIRE_WAKE_FIFO "wake"
+// A scan's directory: the description, and the disk identity when there is one.
+#define WIRE_DESCRIPTION_FIFO "description"
 
 // The audio wake, Linux to Windows: process the block in the shared file.
 // The Windows host answers with WIRE_WAKE_DONE.
 enum { WIRE_WAKE_PROCESS = 'P', WIRE_WAKE_DONE = 'D' };
+
+// The first byte down a scan's description FIFO, ahead of the description.
+enum { WIRE_SCAN_OPENED = 'S' };
 
 // How one block went. Anything but WIRE_BLOCK_OK plays as silence.
 enum { WIRE_BLOCK_OK = 1, WIRE_BLOCK_REFUSED = 2 };

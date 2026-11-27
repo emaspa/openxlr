@@ -1308,10 +1308,12 @@ editor, deactivate. `winhost/wire.h` describes it.
   `XDG_RUNTIME_DIR`, or under `/dev/shm` where there is none, and the backend
   removes the directory as soon as the Windows program has opened what is in
   it.
-- The audio wake is the Windows program's standard input and output, one
-  byte each way per cycle. Under Wine a blocking read on an inherited pipe is
-  a plain `read` in the calling thread. A cycle costs the Windows audio
-  thread one `read` and one `write`, and it never calls wineserver.
+- The audio wake is one byte each way per cycle: the Windows program's
+  standard input, an inherited pipe, and a FIFO in the same directory back.
+  Under Wine a blocking read on an inherited pipe is a plain `read` in the
+  calling thread, and a write to a file the program has opened is a plain
+  `write`. A cycle costs the Windows audio thread one `read` and one
+  `write`, and it never calls wineserver.
 - Two FIFOs in the same directory carry the control requests, a fixed-size
   request one way and a fixed-size reply the other, between the two main
   threads.
@@ -1324,9 +1326,15 @@ editor, deactivate. `winhost/wire.h` describes it.
   gives the Windows program a locale that reads UTF-8 when the inherited
   one does not. [The locale](#the-locale-of-the-windows-program) has the
   rule.
-- The helper reads the Windows program's standard error and passes it on a
-  line at a time. The plugin's log and the `trace:` lines reach the daemon's
-  log the way a native backend's do.
+- The Windows program's standard output and standard error are one pipe,
+  which the helper reads and passes on a line at a time. The plugin's log
+  and the `trace:` lines reach the daemon's log the way a native backend's
+  do. Nothing else may be on standard output. A Windows C library takes its
+  standard output from Windows when it starts, and one that Wine loads for
+  itself starts before the Windows program does, so the program cannot move
+  it afterwards. A plugin that prints, through msvcrt, the Universal C
+  Runtime, a C library of its own or Windows itself, writes to the log and
+  to nothing else.
 
 The plugin's parameters are controls of the helper, under the names a native
 plugin of the same format has, so `set`, `control` and `meter` lines read
@@ -1554,10 +1562,14 @@ plugin, three of the fields read as follows:
   VST3 scanner asks no plugin and answers `true` for every class, on both
   systems.
 
-A scan starts the Windows program with the argument `scan`, followed by the
-directory that holds [the disk identity](#the-disk-identity) when there is
-one to give. None of the audio path is set up: no shared file, no FIFO and no audio thread. The
-helper writes one fixed-size request to the program's standard input, with
+A scan starts the Windows program with the argument `scan`, followed by a
+private directory of the scan's own. It holds a FIFO named `description`
+and [the disk identity](#the-disk-identity) when there is one to give. The
+Windows program opens the FIFO, reads the identity and writes one byte down
+the FIFO, which is the scan's hello, and the helper removes the directory
+when that byte arrives. None of the audio path is set up: no shared file and
+no audio thread. The helper writes one fixed-size request to the program's
+standard input, with
 the module to open and the path to name it by. Both cross as bytes, because
 Wine converts a command line through the locale's character set. The program
 runs the scanner and exits with its result, and the helper passes on what it
@@ -1566,12 +1578,11 @@ writes as it arrives.
 A scan runs plugin code. This is what the two sides do about a plugin that
 misbehaves in one:
 
-- The description goes out on a stream only the scanner has. Before any
-  plugin code is loaded the Windows program points its standard output at its
-  standard error, for the C library and for Windows. Text a plugin prints
+- The description goes down the scan's FIFO, which only the scanner writes
+  to. Standard output is the log, as for a load, so text a plugin prints
   during its scan arrives as a line of its log and cannot land in the JSON.
-  This does not cover a Linux library inside the Wine process that writes to
-  file descriptor 1.
+  That holds for a Linux library inside the Wine process that writes to file
+  descriptor 1 as well.
 - A plugin that crashes ends the Windows program with the line naming the
   exception. The helper adds how the program ended and exits with 1. The
   last phase line says where the plugin was.
@@ -1648,9 +1659,9 @@ The helper works the descriptor out before it starts Wine, in
 
 The helper writes the 396 bytes to a file named `disk-identity` in the
 private directory it hands the Windows program, and the file goes with the
-directory. A scan has a directory of its own for it, named after `scan` on
-the Windows program's command line. The Windows program removes the file
-and that directory itself once it has read the file, and the helper removes
+directory. For a load that is after the Windows program has answered the
+hello. A scan's directory goes when the scan's hello arrives, which the
+Windows program sends once it has read the file, and the helper removes
 what is left when the scan ends. The helper cannot tell from a close of the
 file that the program has read it, because Wine opens a file more than once
 on some starts. When there is nothing to give, because the prefix is not on
@@ -1766,6 +1777,13 @@ checks:
   crashes inside a block and one that never returns. In each the audio
   callback keeps returning, plays only the plugin's audio or silence, and
   the failure is reported;
+- a plugin that prints on standard output while it is made, activated and
+  run, through its C library and through Windows, keeps its audio exact and
+  its instance running, and every line reaches the log. The module is built
+  twice for this, against msvcrt (`tests/winhost-plugin-msvcrt.clap`) and
+  against the Universal C Runtime (`tests/winhost-plugin-ucrt.clap`), so one
+  of the two is never the C library the Windows program was built with,
+  whichever toolchain built it. The test checks what each module imports;
 - the Windows audio thread gets the scheduling of the thread that waits for
   it, at real-time priority 5 where the user's limit allows, and the test
   notes what a block's round trip costs there;
@@ -1820,8 +1838,8 @@ lists, and again in every block. With it the test checks:
 - a stand-in for Wine that reads the scan's file, waits and reads it again
   finds it both times, and the scan's directory is gone when the scan ends.
   The scan whose helper is killed part way leaves no directory behind
-  either, because the Windows program has removed it by then. The test's
-  last check, that its runtime directory is empty, fails if one is left.
+  either, because the helper removed it at the scan's hello. The test's last
+  check, that its runtime directory is empty, fails if one is left.
 
 `test-winhost` then runs `tests/winhost-rtkit.py`, which checks the way to
 real-time through RTKit without the system's RTKit. It starts a D-Bus bus of
@@ -1883,7 +1901,8 @@ of their own, as the daemon would start them, and checks:
   exception, the phase it was in and exit code 1;
 - a plugin that prints on standard output with no line end, through the C
   library and through Windows: the description is still exact and the text
-  is in the log;
+  is in the log, for CLAP, for VST3 and for the CLAP module built against
+  each C library;
 - a plugin that never answers: the helper gives up at its limit, which the
   test builds as six seconds, and a helper killed during a scan takes the
   Windows program with it. No Windows program is left after any of these.

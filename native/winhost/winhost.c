@@ -20,13 +20,17 @@
 // thread, with no call to wineserver.
 //
 // Usage: openxlr-winhost.exe DIRECTORY
-// DIRECTORY is a Unix path. It holds the shared audio file and the two
-// control FIFOs under the names wire.h gives them.
+// DIRECTORY is a Unix path. It holds the shared audio file, the two control
+// FIFOs and the wake FIFO under the names wire.h gives them.
 //
-// Usage: openxlr-winhost.exe scan [DIRECTORY]
+// Usage: openxlr-winhost.exe scan DIRECTORY
 // Describes one module and leaves, with none of the above: the module is
-// named on standard input and its description goes to standard output (see
-// "scanning" below).
+// named on standard input and its description goes down the FIFO in
+// DIRECTORY (see "scanning" below).
+//
+// Standard output and standard error are the log, and nothing else is
+// written to them by this program on purpose; whatever a plugin prints ends
+// there too.
 //
 // Either way, the directory may hold the system disk's identity, which a
 // plugin is then given when it asks (disk-hook.h). It is read before any
@@ -160,29 +164,6 @@ static void install_disk_identity(const char *directory) {
     return;
   }
   disk_hook_install(descriptor);
-}
-
-// A scan's directory holds the identity and nothing else, and the Linux side
-// cannot tell when the file has been read: a scan has no hello, and Wine
-// opens a file more than once on some starts, so a close of it says nothing.
-// The one that read it removes it, then. The Linux side removes what is
-// still there when the scan ends.
-static void remove_scan_directory(const char *directory) {
-  char unix_path[WIRE_PATH];
-  int length = snprintf(unix_path, sizeof(unix_path), "%s/%s", directory,
-                        DISK_IDENTITY_FILE);
-  WCHAR *path = length > 0 && (size_t)length < sizeof(unix_path)
-                    ? windows_path(unix_path)
-                    : NULL;
-  if (path) {
-    DeleteFileW(path);
-    HeapFree(GetProcessHeap(), 0, path);
-  }
-  path = windows_path(directory);
-  if (path) {
-    RemoveDirectoryW(path);
-    HeapFree(GetProcessHeap(), 0, path);
-  }
 }
 
 // --- the pipes --------------------------------------------------------------
@@ -627,7 +608,9 @@ static bool start(const char *directory) {
   if (request_in == INVALID_HANDLE_VALUE || reply_out == INVALID_HANDLE_VALUE)
     return false;
   wake_in = GetStdHandle(STD_INPUT_HANDLE);
-  wake_out = GetStdHandle(STD_OUTPUT_HANDLE);
+  wake_out = open_in(directory, WIRE_WAKE_FIFO, GENERIC_WRITE);
+  if (wake_out == INVALID_HANDLE_VALUE)
+    return false;
   HANDLE file = open_in(directory, WIRE_AUDIO_FILE,
                         GENERIC_READ | GENERIC_WRITE);
   LARGE_INTEGER size = {0};
@@ -679,8 +662,8 @@ static DWORD WINAPI watch_requester(void *unused) {
 // the Linux helper has for a native plugin of that format (clap_scan,
 // vst3_scan), built here for Windows, so a description reads the same from
 // either. Nothing of the host above is started: a scan has no shared file,
-// no FIFO and no audio thread.
-static int scan(void) {
+// no control FIFO and no audio thread.
+static int scan(HANDLE description) {
   static WireScan request;
   static char module[WIRE_PATH * 3];
   if (!read_all(GetStdHandle(STD_INPUT_HANDLE), &request, sizeof(request)) ||
@@ -700,21 +683,19 @@ static int scan(void) {
     fputs("the module's path cannot be named on Windows\n", stderr);
     return 1;
   }
-  // The description goes out where standard output went, through a stream
-  // nothing else has. Standard output itself becomes standard error, for the
-  // C library and for Windows, before any plugin code is loaded. What a
-  // plugin prints is then passed on as its log, in the order it was printed,
-  // and cannot land in the description.
-  int described = _dup(_fileno(stdout));
-  FILE *out = described >= 0 && _setmode(described, _O_BINARY) != -1
-                  ? _fdopen(described, "wb")
-                  : NULL;
-  if (!out || _dup2(_fileno(stderr), _fileno(stdout)) != 0) {
-    fputs("openxlr-winhost: cannot set up the description's stream\n", stderr);
+  // The description goes down the scan's FIFO, through a stream nothing
+  // else has. Standard output was the log before this program started, for
+  // every C library a plugin may bring, so what a plugin prints is passed on
+  // as its log, in the order it was printed, and cannot land in the
+  // description.
+  int described = description != INVALID_HANDLE_VALUE
+                      ? _open_osfhandle((intptr_t)description, _O_BINARY)
+                      : -1;
+  FILE *out = described >= 0 ? _fdopen(described, "wb") : NULL;
+  if (!out) {
+    fputs("openxlr-winhost: cannot open the scan's description FIFO\n", stderr);
     return 1;
   }
-  SetStdHandle(STD_OUTPUT_HANDLE, GetStdHandle(STD_ERROR_HANDLE));
-  setvbuf(stdout, NULL, _IONBF, 0);
   HANDLE watch = CreateThread(NULL, 0, watch_requester, NULL, 0, NULL);
   if (!watch)
     return 1;
@@ -740,31 +721,44 @@ int main(void) {
   // What this program and its backends write to standard error is read a
   // line at a time on the Linux side, where a line ends with a line feed.
   _setmode(_fileno(stderr), _O_BINARY);
+  _setmode(_fileno(stdout), _O_BINARY);
   int argc = 0;
   WCHAR **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
   static char directory[WIRE_PATH], disk[WIRE_PATH];
   if (!argv || argc < 2 || argc > 3 ||
       !WideCharToMultiByte(CP_UTF8, 0, argv[1], -1, directory,
                            sizeof(directory), NULL, NULL) ||
-      (argc == 3 && (strcmp(directory, "scan") != 0 ||
-                     !WideCharToMultiByte(CP_UTF8, 0, argv[2], -1, disk,
-                                          sizeof(disk), NULL, NULL)))) {
+      (argc == 3) != !strcmp(directory, "scan") ||
+      (argc == 3 && !WideCharToMultiByte(CP_UTF8, 0, argv[2], -1, disk,
+                                         sizeof(disk), NULL, NULL))) {
     fputs("usage: openxlr-winhost.exe DIRECTORY\n"
-          "       openxlr-winhost.exe scan [DIRECTORY]\n",
+          "       openxlr-winhost.exe scan DIRECTORY\n",
           stderr);
     return 2;
   }
+  HANDLE description = INVALID_HANDLE_VALUE;
   if (strcmp(directory, "scan") != 0)
     install_disk_identity(directory);
-  else if (argc == 3) {
+  else {
+    // The scan's hello, once the directory has given what it holds: the
+    // Linux side removes it on this byte. Wine opens a file more than once on
+    // some starts and closes it in between, so a close of the identity file
+    // would not say it has been read.
+    description = open_in(disk, WIRE_DESCRIPTION_FIFO, GENERIC_WRITE);
     install_disk_identity(disk);
-    remove_scan_directory(disk);
+    char opened = WIRE_SCAN_OPENED;
+    DWORD written = 0;
+    if (description != INVALID_HANDLE_VALUE &&
+        (!WriteFile(description, &opened, 1, &written, NULL) || written != 1)) {
+      CloseHandle(description);
+      description = INVALID_HANDLE_VALUE;
+    }
   }
   // Windows plugins expect their host to have done this on the thread that
   // creates them.
   OleInitialize(NULL);
   if (!strcmp(directory, "scan"))
-    return scan();
+    return scan(description);
   request_ready = CreateEventW(NULL, FALSE, FALSE, NULL);
   request_taken = CreateEventW(NULL, FALSE, FALSE, NULL);
   audio_named = CreateEventW(NULL, TRUE, FALSE, NULL);
