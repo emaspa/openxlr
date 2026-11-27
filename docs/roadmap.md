@@ -336,7 +336,8 @@ runs and scans a native plugin. It reports the system disk's identity to a
 plugin as the companion's host does. It has its own tests, described in
 [native/README.md](../native/README.md#windows-plugin-host). A VST3 plugin
 keeps the class id and the parameter ids it has through yabridge, so a saved
-insert will still name it and keep its values. No package builds it. In a
+insert will still name it and keep its values. Every package except the
+Flatpak builds it in, with mingw, and only suggests Wine. In a
 build that has it, the daemon runs one insert of a Windows plugin on it when
 a client asks with `setInsertWindowsHost`
 ([docs/api.md](api.md#windows-host)), and back through yabridge the same
@@ -345,7 +346,7 @@ moved. The UI offers the move in a bridged plugin's controls window on a
 build that has the host. Such a build also scans the Windows plugin folders
 of the Wine prefix, and folders the user adds, with no yabridge, and runs
 what it finds there on its own host; a plugin with a yabridge wrapper is
-still listed by the wrapper. Still to come: packaging.
+still listed by the wrapper. Still to come: the default.
 
 ## Parked
 

@@ -24,13 +24,13 @@ jobs:
 
       # debian/rules builds DeepFilterNet with the distribution's cargo and
       # rustc (the oldest toolchain a package builds with), not the runner's
-      # rustup one.
+      # rustup one, and the Windows plugin host with mingw.
       - name: Install build dependencies
         run: |
           tools/ci-install-packages.sh \
             build-essential debhelper dotnet-sdk-10.0 lintian \
             pkg-config libpipewire-0.3-dev liblilv-dev lv2-dev libx11-dev libsndfile1-dev \
-            wireplumber cargo rustc
+            wireplumber cargo rustc gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix libdbus-1-dev
           /usr/bin/cargo --version
           /usr/bin/rustc --version
 
@@ -63,12 +63,17 @@ jobs:
                    usr/lib/systemd/user/pipewire.service.d/openxlr.conf \
                    usr/lib/udev/rules.d/70-openxlr.rules \
                    usr/lib/openxlr/daemon/openxlr-lv2-host \
+                   usr/lib/openxlr/daemon/openxlr-winhost.exe \
                    usr/bin/openxlr usr/bin/openxlr-daemon; do
             grep -q " ./$f\$" contents.txt || { echo "missing from the package: $f"; exit 1; }
           done
           dpkg-deb -x dist/openxlr_*.deb pkgroot
           pkgroot/usr/lib/openxlr/daemon/openxlr-lv2-host engines | tee engines.json
           grep -q '"deepfilternet"' engines.json || { echo "the helper lacks DeepFilterNet"; exit 1; }
+          # The Windows plugin host: a Windows program, and the helper's wine
+          # backend that starts it.
+          [ "$(head -c 2 pkgroot/usr/lib/openxlr/daemon/openxlr-winhost.exe)" = MZ ] || { echo "openxlr-winhost.exe is not a Windows program"; exit 1; }
+          grep -qa 'openxlr-winhost.exe is missing beside the plugin host' pkgroot/usr/lib/openxlr/daemon/openxlr-lv2-host || { echo "the helper lacks the wine backend"; exit 1; }
 
       - name: Checksums
         run: cd dist && sha256sum openxlr_*.deb > SHA256SUMS-deb.txt && cat SHA256SUMS-deb.txt

@@ -941,8 +941,9 @@ controls window and the API, and saved with the chain. See
 
 A Windows plugin bridged through yabridge can run on the Windows plugin
 host built into OpenXLR instead, one insert at a time, from a switch in its
-controls window or the API. It is experimental. No package provides it yet,
-only a source build made with `WINHOST=1`. The plugin's own editor opens on
+controls window or the API. It is experimental. Every package except the
+Flatpak includes it, and a source build has it when made with `WINHOST=1`.
+Wine is still needed to run it. The plugin's own editor opens on
 either host. Its audio thread gets PipeWire's real-time priority, through
 the user's real-time limit or, where there is none, through RTKit.
 yabridge stays the default. See

@@ -5,7 +5,8 @@ Maintainer: Emanuele Sparvoli <sparvoli@gmail.com>
 Build-Depends: debhelper-compat (= 13), dotnet-sdk-10.0, python3,
  gcc, g++, make, pkg-config, wireplumber,
  libpipewire-0.3-dev, liblilv-dev, lv2-dev, libx11-dev, libsndfile1-dev,
- cargo, rustc
+ cargo, rustc,
+ gcc-mingw-w64-x86-64-posix, g++-mingw-w64-x86-64-posix, libdbus-1-dev
 Standards-Version: 4.7.0
 Homepage: https://github.com/emaspa/openxlr
 Vcs-Git: https://github.com/emaspa/openxlr.git
@@ -27,9 +28,10 @@ Depends: ${misc:Depends},
  libfontconfig1,
  libx11-6,
  libice6,
- libsm6
+ libsm6,
+ libdbus-1-3
 Recommends: alsa-utils, pulseaudio-utils, xdg-utils, libgdk-pixbuf-2.0-0, librsvg2-common, x11-utils
-Suggests: swh-plugins, lsp-plugins-lv2, openxlr-yabridge
+Suggests: swh-plugins, lsp-plugins-lv2, openxlr-yabridge, wine
 Description: Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
  A Wave Link replacement for Linux. It controls Elgato XLR interfaces
  and the Wave microphones over reverse-engineered USB protocols: gain, DSP,

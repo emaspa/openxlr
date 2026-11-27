@@ -1219,7 +1219,10 @@ of flags.
 This is the start of a host that will replace the yabridge companion. It
 carries CLAP and VST3 audio, parameters and latency, it shows a plugin's
 editor, it scans, and it reports the system disk's identity to a plugin as
-the companion's host does. No package builds it, so nothing here reaches a user. In a build
+the companion's host does. Every package except the Flatpak builds it. The
+package sets `WINHOST=1` in the environment of the daemon's publish, and
+the publish copies `openxlr-winhost.exe` beside the helper.
+`packaging/check-winhost.py` fails when a package stops doing so. In a build
 that has it, the daemon starts it for an insert that asks for it and for no
 other, and never for a scan. [The daemon's side](#the-daemons-side) has
 the rest.
