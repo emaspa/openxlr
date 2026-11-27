@@ -915,6 +915,16 @@ counts as a duplicate in its scan entry: the wrapper's entry runs on either
 host, and yabridge is still the default, so an insert saved against it
 loads exactly as before.
 
+The daemon does not start a bundle whose module a yabridge wrapper in the
+catalogue links to. It compares modules by their real path, after every
+link. So a scan never loads a plugin kept on yabridge on the Windows plugin
+host, a plugin that counts its activations included. The bundle's scan
+entry is `ok` with `cached` false, the wrapper's plugins counted in both
+`plugins` and `duplicates`, and a `detail` that names the wrapper. The scan
+leaves the bundle's cache entry as it was. Once the wrapper is gone, or when
+the wrapper's own scan listed nothing, the next scan describes the module on
+the Windows plugin host like any other.
+
 An insert names its plugin by format and id, never by its file. So an
 insert saved against a yabridge wrapper that is later removed, along with
 yabridge perhaps, comes up on the Windows plugin host from the folder's
@@ -2287,7 +2297,9 @@ wrappers and added plugin folders. `windowsHostDirectories` lists up to 64
 or not the build has the host. The scan of those folders reports under the
 kinds `windows-clap` and `windows-vst3` in `scans`, apart from the formats'
 own reports. A bundle whose plugins are all counted in `duplicates` there is
-in the catalogue through another entry, usually its yabridge wrapper.
+in the catalogue through another entry, usually its yabridge wrapper. When
+that wrapper links to the bundle's own module, the bundle was not started
+and its `detail` names the wrapper.
 
 Both `pluginSetup` and `discovery` include `memoryLockHardLimitBytes`, the
 daemon's hard memory-lock limit. The existing `memoryLockLimitBytes` stays

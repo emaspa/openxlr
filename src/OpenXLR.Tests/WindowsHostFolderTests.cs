@@ -99,14 +99,14 @@ public sealed class WindowsHostFolderTests : IDisposable
 
     /// <summary>The Windows folders' VST3 scan with a stand-in for the helper that answers for the bundles it knows.</summary>
     private IReadOnlyList<PluginInfo> ScanVst3(IReadOnlyList<PluginInfo> found, Dictionary<string, string> answers,
-        List<string>? asked = null, bool installed = true)
+        List<string>? asked = null, bool installed = true, ScanCache? cache = null)
         => HostScan.WithWindows("vst3", "scan-vst3", found, Vst3Catalog.Bundles, retryFailures: false, installed,
             WindowsPluginHost.Directories(), bundle =>
             {
                 asked?.Add(bundle);
                 return answers.TryGetValue(bundle, out string? json) ? Answer(json)
                     : new(1, [], "no such bundle", TimedOut: false, Truncated: false);
-            }, Cache());
+            }, cache ?? Cache());
 
     private static PluginInfo Bridged(string id, string name, string bundle)
         => new("vst3", id, name, "", 2, 2, "", "", [new("5", "Mix", 0, 1, 0.5, false, false, false, false, [])], [], [], []) { Path = bundle };
@@ -229,18 +229,118 @@ public sealed class WindowsHostFolderTests : IDisposable
         string verb = Vst3Bundle(Path.Combine(CommonFiles, "VST3"), "Deep Verb");
         string other = Vst3Bundle(Path.Combine(CommonFiles, "VST3"), "Other");
         string wrapper = Vst3Wrapper("Deep Verb", Path.Combine(verb, "Contents", "x86_64-win", "Deep Verb.vst3"));
+        var asked = new List<string>();
         IReadOnlyList<PluginInfo> catalogue = ScanVst3([Bridged(ClassId, "Deep Verb", wrapper)], new()
         {
             [verb] = Description(verb, ClassId, "Deep Verb"),
             [other] = Description(other, OtherId, "Other"),
-        });
+        }, asked);
         PluginInfo kept = Assert.Single(catalogue, p => p.Plugin == ClassId);
         Assert.Equal(wrapper, kept.Path);
         Assert.False(kept.WindowsHostOnly);
         Assert.True(Assert.Single(catalogue, p => p.Plugin == OtherId).WindowsHostOnly);
-        // The scan says why the folder's copy is not listed.
-        PluginScanEntry entry = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == "windows-vst3").Entries.Single(e => e.Path == verb);
+        // The module the wrapper links to is never loaded on the Windows
+        // plugin host: a plugin kept on yabridge is not started by a scan.
+        Assert.Equal([other], asked);
+        // The scan says why the folder's copy is not listed, as it says of a
+        // bundle whose plugins were all found already.
+        PluginScanReport report = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == "windows-vst3");
+        PluginScanEntry entry = report.Entries.Single(e => e.Path == verb);
+        Assert.Equal(("ok", 1, 1, false), (entry.Outcome, entry.Plugins, entry.Duplicates, entry.Cached));
+        Assert.Equal($"Not loaded on the Windows plugin host: the yabridge wrapper {wrapper} links to this module and lists its plugins.", entry.Detail);
+        // And the doctor explains it in the same words.
+        JsonNode scan = JsonSerializer.SerializeToNode(report, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        DoctorNote note = Assert.Single(InstallationDoctor.WindowsPluginNotes(Diagnostics(new { windowsHostInstalled = true, scans = new[] { scan } })),
+            n => n.Path == verb);
+        Assert.StartsWith("listed through its yabridge wrapper", note.Information);
+    }
+
+    [Fact]
+    public void AModuleCountsEveryPluginItsWrapperListsAndAWrapperThatListsNothingSkipsNothing()
+    {
+        string verb = Vst3Bundle(Path.Combine(CommonFiles, "VST3"), "Deep Verb");
+        string module = Path.Combine(verb, "Contents", "x86_64-win", "Deep Verb.vst3");
+        string wrapper = Vst3Wrapper("Deep Verb", module);
+        // A module of two classes, both listed through the wrapper.
+        IReadOnlyDictionary<string, (string Wrapper, int Plugins)> wrapped = HostScan.WrappedModules("vst3",
+            [Bridged(ClassId, "Deep Verb", wrapper), Bridged(OtherId, "Deep Verb Mono", wrapper),
+             Bridged("AA", "Native", "/usr/lib/vst3/Native.vst3"), Bridged("BB", "Found", verb) with { WindowsHostOnly = true }]);
+        Assert.Equal((wrapper, 2), Assert.Single(wrapped, m => m.Key == module).Value);
+        Assert.Single(wrapped);
+        // Another format's wrapper is not this one's.
+        Assert.Empty(HostScan.WrappedModules("clap", [Bridged(ClassId, "Deep Verb", wrapper)]));
+
+        // The wrapper is there but its own scan listed nothing, so the
+        // catalogue holds nothing of the module: it is described here.
+        var asked = new List<string>();
+        IReadOnlyList<PluginInfo> catalogue = ScanVst3([], new() { [verb] = Description(verb, ClassId, "Deep Verb") }, asked);
+        Assert.Equal([verb], asked);
+        Assert.True(Assert.Single(catalogue).WindowsHostOnly);
+    }
+
+    [Fact]
+    public void AClapModuleItsWrapperLinksToIsNotLoadedEither()
+    {
+        string folder = Path.Combine(CommonFiles, "CLAP");
+        string clap = WriteModule(Path.Combine(folder, "Deep Verb.clap"));
+        string home = Directory.CreateDirectory(Path.Combine(_root, "data", "openxlr", "yabridge", "clap")).FullName;
+        string wrapper = Path.Combine(home, "Deep Verb.clap");
+        File.WriteAllText(wrapper, "bridge");
+        File.CreateSymbolicLink(Path.ChangeExtension(wrapper, ".clap-win"), clap);
+        var asked = new List<string>();
+        IReadOnlyList<PluginInfo> found = [Bridged("com.example.deep-verb", "Deep Verb", wrapper) with { Kind = "clap" }];
+        Assert.Same(found, HostScan.WithWindows("clap", "scan-clap", found, ClapCatalog.Bundles, retryFailures: false, installed: true,
+            WindowsPluginHost.Directories(), bundle => { asked.Add(bundle); return Answer("{}"); }, Cache()));
+        Assert.Empty(asked);
+        PluginScanEntry entry = PluginScanDiagnostics.Snapshot().Single(r => r.Kind == "windows-clap").Entries.Single(e => e.Path == clap);
         Assert.Equal(("ok", 1, 1), (entry.Outcome, entry.Plugins, entry.Duplicates));
+    }
+
+    [Fact]
+    public void OnceTheWrapperIsGoneTheNextScanDescribesTheModuleHereAndTheCacheKeepsUp()
+    {
+        string verb = Vst3Bundle(Path.Combine(CommonFiles, "VST3"), "Deep Verb");
+        string wrapper = Vst3Wrapper("Deep Verb", Path.Combine(verb, "Contents", "x86_64-win", "Deep Verb.vst3"));
+        var answers = new Dictionary<string, string> { [verb] = Description(verb, ClassId, "Deep Verb") };
+        string cacheDirectory = Path.Combine(_root, "cache", "kept");
+        IReadOnlyList<PluginInfo> bridged = [Bridged(ClassId, "Deep Verb", wrapper)];
+        PluginScanEntry Entry() => PluginScanDiagnostics.Snapshot().Single(r => r.Kind == "windows-vst3").Entries.Single(e => e.Path == verb);
+
+        // With the wrapper, nothing is started and nothing is cached.
+        var asked = new List<string>();
+        Assert.Same(bridged, ScanVst3(bridged, answers, asked, cache: new ScanCache(cacheDirectory)));
+        Assert.Empty(asked);
+        Assert.Null(new ScanCache(cacheDirectory).Lookup(verb));
+        Assert.False(new ScanCache(cacheDirectory).KnownFailure(verb));
+
+        // The companion is removed, its wrapper with it: the next scan
+        // describes the module on the Windows plugin host and keeps that.
+        Directory.Delete(wrapper, recursive: true);
+        IReadOnlyList<PluginInfo> alone = ScanVst3([], answers, asked, cache: new ScanCache(cacheDirectory));
+        Assert.Equal([verb], asked);
+        PluginInfo found = Assert.Single(alone);
+        Assert.Equal((ClassId, verb, true), (found.Plugin, found.Path, found.WindowsHostOnly));
+        Assert.Equal(("ok", false, 1, 0), (Entry().Outcome, Entry().Cached, Entry().Plugins, Entry().Duplicates));
+        Assert.NotNull(new ScanCache(cacheDirectory).Lookup(verb));
+
+        // The scan after that reads the cache.
+        asked.Clear();
+        Assert.Single(ScanVst3([], answers, asked, cache: new ScanCache(cacheDirectory)));
+        Assert.Empty(asked);
+        Assert.True(Entry().Cached);
+
+        // A wrapper made again is skipped again, and the cached description
+        // stays for the day it goes once more.
+        wrapper = Vst3Wrapper("Deep Verb", Path.Combine(verb, "Contents", "x86_64-win", "Deep Verb.vst3"));
+        bridged = [Bridged(ClassId, "Deep Verb", wrapper)];
+        Assert.Same(bridged, ScanVst3(bridged, answers, asked, cache: new ScanCache(cacheDirectory)));
+        Assert.Equal(("ok", false, 1, 1), (Entry().Outcome, Entry().Cached, Entry().Plugins, Entry().Duplicates));
+        Assert.Empty(asked);
+        Assert.NotNull(new ScanCache(cacheDirectory).Lookup(verb));
+        Directory.Delete(wrapper, recursive: true);
+        Assert.Single(ScanVst3([], answers, asked, cache: new ScanCache(cacheDirectory)));
+        Assert.Empty(asked);
+        Assert.True(Entry().Cached);
     }
 
     [Fact]

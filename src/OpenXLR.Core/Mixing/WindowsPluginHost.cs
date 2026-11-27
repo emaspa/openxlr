@@ -20,7 +20,8 @@ namespace OpenXLR.Core.Mixing;
 ///
 /// The catalogue holds a plugin once. Where a wrapper and a Windows plugin
 /// folder both reach it, the wrapper's entry is kept, because it can run on
-/// either host and yabridge is still the default.
+/// either host and yabridge is still the default. The scan of the folders
+/// does not load a module a wrapper of the catalogue links to.
 ///
 /// Nothing here starts a process or loads plugin code. Every answer comes
 /// from names, links and the first bytes of the module.

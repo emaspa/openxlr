@@ -164,6 +164,12 @@ internal static class HostScan
     /// already found, through a yabridge wrapper above all, is not listed
     /// again: the wrapper's entry runs on either host, and yabridge is still
     /// the default, so an insert saved against it loads as it always did.
+    ///
+    /// A module a wrapper of the catalogue links to is not even loaded here.
+    /// Its plugins are the wrapper's already, and a plugin that counts the
+    /// machines it is activated on, kept on yabridge by its user, must not be
+    /// started on this host by a scan. Once the wrapper is gone, the next scan
+    /// describes the module here like any other.
     /// </summary>
     /// <param name="installed">The host's presence, for a test; the build's own when null.</param>
     /// <param name="describe">Stands in for the helper, for a test, which then names its own <paramref name="directories"/> and <paramref name="scanCache"/>.</param>
@@ -175,8 +181,33 @@ internal static class HostScan
         if (!(installed ?? WindowsPluginHost.Installed)) return found;
         IReadOnlyList<PluginInfo> windows = Run(kind, command, directories ?? WindowsPluginHost.Directories(), bundlesIn,
             describe, scanCache, describe is null ? new PluginScanLogStore(PluginScanLogStore.DefaultDirectory) : null,
-            retryFailures, windows: true, taken: found.Select(p => p.Plugin));
+            retryFailures, windows: true, taken: found.Select(p => p.Plugin), wrapped: WrappedModules(kind, found));
         return windows.Count == 0 ? found : [.. found, .. windows];
+    }
+
+    /// <summary>
+    /// The Windows modules the yabridge wrappers of a catalogue link to, by
+    /// their real path, each with the first wrapper that links to it and the
+    /// number of catalogue entries those wrappers give. A wrapper whose scan
+    /// listed nothing gives none, so its module is still scanned.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, (string Wrapper, int Plugins)> WrappedModules(string kind, IEnumerable<PluginInfo> found)
+    {
+        var modules = new Dictionary<string, (string Wrapper, int Plugins)>(StringComparer.Ordinal);
+        var bundles = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (PluginInfo plugin in found)
+        {
+            if (plugin.WindowsHostOnly || plugin.Kind != kind || plugin.Path is not { Length: > 0 } bundle) continue;
+            if (!bundles.TryGetValue(bundle, out string? module))
+            {
+                try { module = WindowsPluginHost.ModuleLink(kind, bundle) is { } link ? WindowsPluginWrappers.Canonical(link) : null; }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { module = null; }
+                bundles[bundle] = module;
+            }
+            if (module is null) continue;
+            modules[module] = modules.TryGetValue(module, out var seen) ? (seen.Wrapper, seen.Plugins + 1) : (bundle, 1);
+        }
+        return modules;
     }
 
     /// <summary>The evidence's name for a scan of the Windows plugin folders, apart from the format's own.</summary>
@@ -210,11 +241,18 @@ internal static class HostScan
     /// 64-bit Windows module is passed by before anything starts.
     /// </param>
     /// <param name="taken">Plugin ids already in the catalogue, counted as duplicates and left out.</param>
+    /// <param name="wrapped">
+    /// On the Windows plugin host, the modules yabridge wrappers of the
+    /// catalogue link to (<see cref="WrappedModules"/>). A bundle whose module
+    /// is one of them is not started and its cache entry is left as it is.
+    /// Its scan entry counts the wrapper's plugins as duplicates, as the
+    /// entry of a bundle described and found listed already does.
+    /// </param>
     internal static IReadOnlyList<PluginInfo> Run(string kind, string command, IEnumerable<string> directories,
         Func<string, Action<string, Exception>?, IEnumerable<string>> bundlesIn,
         Func<string, ProcessResult>? describe = null, ScanCache? scanCache = null,
         PluginScanLogStore? logs = null, bool retryFailures = false, bool windows = false,
-        IEnumerable<string>? taken = null)
+        IEnumerable<string>? taken = null, IReadOnlyDictionary<string, (string Wrapper, int Plugins)>? wrapped = null)
     {
         // Nothing here may throw: the catalogue is read once and kept, so an
         // exception would be kept with it, and every lookup after would fail.
@@ -289,6 +327,12 @@ internal static class HostScan
                                 continue;
                             }
                             string real = WindowsPluginWrappers.Canonical(module);
+                            if (wrapped is not null && wrapped.TryGetValue(real, out var through))
+                            {
+                                evidence.Add(bundle, "ok", plugins: through.Plugins, duplicates: through.Plugins,
+                                    detail: $"Not loaded on the Windows plugin host: the yabridge wrapper {through.Wrapper} links to this module and lists its plugins.");
+                                continue;
+                            }
                             route = new(kind, real, WindowsPluginHost.PrefixOf(real));
                         }
                         // Bridge constructors can show desktop dialogs. Validate the
