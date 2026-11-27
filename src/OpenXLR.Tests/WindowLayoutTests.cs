@@ -633,12 +633,21 @@ public sealed class WindowLayoutTests
                 hostPicker.BringIntoView();
                 Settle(options);
                 Capture(options, "options-plugins-yabridge-unused");
-                // An insert on yabridge brings its controls back.
+                // An insert on yabridge brings its controls back, but not the
+                // Wine offer: a new folder goes to the host, never to yabridge.
                 optionsVm.ApplyPluginSetup(HostSetup("openxlr", 1));
                 Settle(options);
                 Assert.True(sync.IsVisible);
-                Assert.True(options.FindControl<Button>("BridgeWine")!.IsVisible);
+                Assert.False(options.FindControl<Button>("BridgeWine")!.IsVisible);
                 Assert.True(memoryWarning.IsEffectivelyVisible);
+                var withYabridge = new PluginFoldersWindow { DataContext = optionsVm };
+                windows.Add(withYabridge);
+                withYabridge.Show();
+                Layout(withYabridge, 720, 820);
+                Assert.True(withYabridge.FindControl<StackPanel>("YabridgeFolders")!.IsVisible);
+                Assert.False(withYabridge.FindControl<Button>("AddFolder")!.IsVisible);
+                Assert.True(withYabridge.FindControl<Button>("RemoveFolder")!.IsVisible);
+                withYabridge.Close();
                 // And with no yabridge there is no host to switch to.
                 optionsVm.ApplyPluginSetup(JsonNode.Parse("""{"wine":true,"windowsHostInstalled":true,"windowsHostDefault":"openxlr"}"""));
                 Settle(options);

@@ -2779,9 +2779,10 @@ is OpenXLR's own and no insert runs on yabridge, Options, PLUGINS gives the
 companion one line, "yabridge 5.1.1.54-2 is installed. No insert uses it."
 It also shows the **Windows plugins run on** setting. Once yabridge is the
 default, or an insert runs on it, Options names the bridge "OpenXLR
-bridge" and shows its folders, its wrapper directory and its buttons. Use
-"Bridge Wine's plugins" or pick a Windows plugin folder to create private
-wrappers.
+bridge" and shows its folders, its wrapper directory and its buttons, for
+the plugins it already wraps. A new plugin goes to OpenXLR's host all the
+same: in a build with the host, "Install file", "Install folder" and the
+plugin manager never hand a folder to yabridge.
 
 Without the companion, a distribution yabridge works only with Wine older
 than 9.22. From 9.22 an embedded plugin window never learns where it is,
@@ -2840,10 +2841,10 @@ wine ~/Downloads/PluginSetup.exe
 
 Then open Options and press one button. Which one depends on whether
 yabridge has seen that folder before. "Bridge Wine's plugins" and "Sync
-Windows plugins" are yabridge's, so in a build with OpenXLR's host they
-show only while yabridge is the default host or an insert runs on it.
-Otherwise the host finds a plugin in Wine's folders by itself, and
-"Rescan" is the button to press.
+Windows plugins" are yabridge's. In a build with OpenXLR's host, the host
+finds a plugin in Wine's folders by itself, so "Bridge Wine's plugins"
+never shows, "Sync Windows plugins" shows only while yabridge is the
+default host or an insert runs on it, and "Rescan" is the button to press.
 
 | The button | When to press it |
 |---|---|
@@ -2869,6 +2870,8 @@ otherwise Windows folders are the Windows entries in the top list.
 - "Add folder" registers a folder holding Windows VST3 or CLAP plugins,
   syncs it and refreshes the catalogue. The original files stay in that
   folder. Use "Install file" or "Install folder" for native Linux plugins.
+  It shows only in a build without OpenXLR's host. With the host, choose
+  Windows in the top list and press "Add plugin folder".
 - Select a folder and press "Remove from list" to unregister it. A
   confirmation explains what will be removed. OpenXLR cleans up only that
   folder's generated VST3 and CLAP wrappers; original plugin files and
@@ -2928,8 +2931,9 @@ search paths or uninstall plugins installed by your package manager.
 Wine keeps its Windows drive in `~/.wine` unless `WINEPREFIX` says otherwise, and an installer
 writes into `Program Files/Common Files/VST3` inside it, or the same for
 CLAP. That is a dotted folder, which file dialogs hide, so OpenXLR looks
-there itself and offers what it finds as "Bridge Wine's plugins" rather
-than asking you to go and find it. Once a folder is bridged, yabridge keeps
+there itself. Its Windows plugin host searches it, and a build without the
+host offers what it finds as "Bridge Wine's plugins" rather than asking
+you to go and find it. Once a folder is bridged, yabridge keeps
 it on its own list, so a second plugin installed into it needs only the
 sync, and the Bridge button has nothing left to offer.
 
@@ -2944,11 +2948,11 @@ drivers it started with.
 
 Picking one Windows `.vst3` or `.clap` file with "Install file" installs
 only that plugin. OpenXLR copies it into its own folder under
-`~/.local/share/openxlr/windows-plugins`, grouped by format and plugin name,
-and registers that folder with yabridge when yabridge is installed.
-OpenXLR's Windows plugin host also looks in that folder, so in a build with
-the host you need only Wine. Without yabridge the copy alone puts the
-plugin in the picker, and it runs on OpenXLR's host. A single Windows `.vst3` bundle
+`~/.local/share/openxlr/windows-plugins`, grouped by format and plugin name.
+OpenXLR's Windows plugin host looks in that folder, so in a build with the
+host the copy alone puts the plugin in the picker and it runs on that host.
+You need only Wine, and an installed yabridge is left out. A build without
+the host registers that folder with yabridge instead. A single Windows `.vst3` bundle
 picked with "Install folder" is copied whole, including its resources.
 The original download is kept and can be deleted afterwards. Other plugins
 beside the selected one, including other downloads, are not registered.
@@ -2956,11 +2960,11 @@ Selecting the same plugin name again updates its managed copy.
 
 A plugin already installed inside a Wine prefix is linked from its managed
 folder instead of being copied or moved. It keeps its original location,
-Wine prefix and neighbouring files. Selecting an ordinary folder or using
-"Add folder" in the folder manager still registers that folder in place.
-Without yabridge, in a build with OpenXLR's host, the folder becomes one of
-the [Windows plugin folders](#windows-plugin-folders) instead, unless the
-host already looks there.
+Wine prefix and neighbouring files. Selecting an ordinary folder keeps it
+in place. In a build with OpenXLR's host it becomes one of the
+[Windows plugin folders](#windows-plugin-folders), unless the host already
+looks there. A build without the host registers it with yabridge, as "Add
+folder" in the folder manager does.
 VST2 `.dll` files are left out because OpenXLR cannot load VST2.
 
 Older folder registrations are not silently removed. If an earlier

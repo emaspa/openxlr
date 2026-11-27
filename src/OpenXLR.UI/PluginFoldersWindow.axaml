@@ -41,7 +41,8 @@
                    FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         <!-- The folders below are the ones yabridge bridges, with its exclusions.
              With OpenXLR's own Windows plugin host and nothing on yabridge, a
-             Windows folder is a Windows entry in the list above instead. -->
+             Windows folder is a Windows entry in the list above instead. With
+             the host, a new folder always goes there, so this half adds none. -->
         <StackPanel Name="YabridgeFolders" Spacing="8" IsVisible="{Binding ShowsYabridgeTools}">
           <TextBlock Text="{loc:Text Key=ChooseAFolderThenSelectAnIndividualPlugin}"
                      FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
@@ -63,7 +64,8 @@
             </Grid>
           </Border>
           <WrapPanel Orientation="Horizontal">
-            <Button Name="AddFolder" Content="{loc:Text Key=AddFolder}" Padding="14,5" Margin="0,0,8,4" Click="OnAddFolder"/>
+            <Button Name="AddFolder" Content="{loc:Text Key=AddFolder}" Padding="14,5" Margin="0,0,8,4" Click="OnAddFolder"
+                    IsVisible="{Binding AddsYabridgeFolders}"/>
             <Button Name="RemoveFolder" Content="{loc:Text Key=RemoveFromList}" Padding="14,5" Margin="0,0,8,4" Click="OnRemoveFolder" IsEnabled="False"/>
             <Button Name="RescanFolders" Content="{loc:Text Key=Rescan}" Padding="14,5" Margin="0,0,0,4" Click="OnRescan"/>
           </WrapPanel>

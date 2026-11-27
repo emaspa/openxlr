@@ -110,6 +110,15 @@ public sealed class OptionsViewModel : ViewModelBase
     /// </summary>
     public bool ShowsYabridgeTools { get => _showsYabridgeTools; private set => Set(ref _showsYabridgeTools, value); }
 
+    private bool _addsYabridgeFolders = true;
+    /// <summary>
+    /// Whether "Add folder" among the yabridge controls is offered. A build
+    /// with the Windows plugin host gives every new Windows plugin folder to
+    /// that host, so yabridge gets no new ones and the button is hidden;
+    /// the folders yabridge already knows stay listed.
+    /// </summary>
+    public bool AddsYabridgeFolders { get => _addsYabridgeFolders; private set => Set(ref _addsYabridgeFolders, value); }
+
     /// <summary>Wine's own plugin folders waiting to be bridged, absolute.</summary>
     public System.Collections.Generic.IReadOnlyList<string> WineFolders { get; private set; } = [];
 
@@ -306,6 +315,7 @@ public sealed class OptionsViewModel : ViewModelBase
         int onYabridge = setup["yabridgeInserts"]?.GetValue<int>() ?? 0;
         bool used = UsesYabridge(windowsHost, defaultHost, onYabridge);
         ShowsYabridgeTools = !windowsHost || (yabridge is not null && used);
+        AddsYabridgeFolders = !windowsHost;
         // Both notes are about yabridge: its editors under some Wine
         // versions, and the warnings a low memory-lock limit gives it.
         WindowsEditorNote = used ? setup["windowsEditorNote"]?.GetValue<string>() : null;
@@ -326,7 +336,7 @@ public sealed class OptionsViewModel : ViewModelBase
         Raise(nameof(HasWindowsDirectories));
         WineFolders = [.. (setup["wineFolders"] as System.Text.Json.Nodes.JsonArray ?? [])
             .Select(f => f?.GetValue<string>()).OfType<string>()];
-        CanBridgeWine = ShowsYabridgeTools && WineFolders.Count > 0;
+        CanBridgeWine = ShowsYabridgeTools && AddsYabridgeFolders && WineFolders.Count > 0;
         BridgeWineLabel = WineFolders.Count > 1
             ? Localizer.Format("BridgeWinePluginFolders", WineFolders.Count)
             : Localizer.Text("BridgeWinePlugins");

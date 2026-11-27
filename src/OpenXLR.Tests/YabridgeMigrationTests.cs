@@ -281,6 +281,37 @@ public sealed class YabridgeMigrationTests : IDisposable
         Assert.Equal("Comp.vst3 is a Windows plugin, and Wine is not installed. Install it, then add it again.", refused.Message);
     }
 
+    [Fact]
+    public void WithTheWindowsHostANewPluginSkipsAnInstalledYabridge()
+    {
+        string downloads = Directory.CreateDirectory(Path.Combine(_root, "Downloads")).FullName;
+        string home = Path.Combine(_root, "home");
+        string log = Path.Combine(_root, "yabridgectl.log");
+        string yabridgectl = ExecutableScript.Write(Path.Combine(_root, "yabridgectl"), $"""
+            echo "$@" >> "{log}"
+            exit 0
+            """);
+        var installer = new PluginInstaller(Path.Combine(home, ".lv2"), Path.Combine(home, ".clap"), Path.Combine(home, ".vst3"),
+            yabridgectl, wine: "/bin/true", hostInstalled: true, windowsHost: true);
+
+        // Install file: the copy in the import directory, and yabridge is never asked.
+        InstallOutcome one = installer.Install(Vst3Bundle(downloads, "Comp"));
+        Assert.True(one.Ok, one.Message);
+        Assert.Equal([Path.Combine(WindowsPluginHost.ImportDirectory, "vst3", "Comp")], one.Destinations);
+        Assert.EndsWith("Comp.vst3 runs on OpenXLR's Windows plugin host.", one.Message);
+
+        // Install folder and Add folder: a Windows plugin folder, not a yabridge one.
+        string vendor = Directory.CreateDirectory(Path.Combine(_root, "Vendor")).FullName;
+        Vst3Bundle(vendor, "Verb");
+        Assert.True(installer.Install(vendor).Ok);
+        string other = Directory.CreateDirectory(Path.Combine(_root, "Other")).FullName;
+        Vst3Bundle(other, "Gate");
+        InstallOutcome added = installer.AddWindowsFolder(other);
+        Assert.True(added.Ok, added.Message);
+        Assert.Equal([new PluginFolder("windows", vendor), new PluginFolder("windows", other)], PluginSearchPaths.Read(out _));
+        Assert.False(File.Exists(log));
+    }
+
     // --- what the companion alone keeps -----------------------------------------------------
 
     [Fact]

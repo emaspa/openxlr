@@ -155,12 +155,16 @@ public sealed class PluginFolderUiTests : IDisposable
         // There is still a second host to choose, with what the choice does in its tooltip.
         Assert.True(vm.ShowsWindowsHostDefault);
 
-        // An insert on it, or the default on it, brings the controls back.
+        // An insert on it, or the default on it, brings the controls back,
+        // for the folders yabridge already knows. A new folder goes to the
+        // host, so there is nothing to add to yabridge and no Wine folder to
+        // give it.
         foreach (string fields in new[] { "\"windowsHostDefault\":\"openxlr\",\"yabridgeInserts\":2", "\"windowsHostDefault\":\"yabridge\",\"yabridgeInserts\":0" })
         {
             vm.ApplyPluginSetup(JsonNode.Parse(Setup(fields)));
             Assert.True(vm.ShowsYabridgeTools);
-            Assert.True(vm.CanBridgeWine);
+            Assert.False(vm.AddsYabridgeFolders);
+            Assert.False(vm.CanBridgeWine);
             Assert.True(vm.HasWindowsEditorNote);
             Assert.True(vm.HasMemoryLockNote);
             Assert.Contains("~/.local/share/openxlr/yabridge", vm.PluginDirectories);
@@ -182,6 +186,7 @@ public sealed class PluginFolderUiTests : IDisposable
         // A build without the host keeps every yabridge control, used or not.
         vm.ApplyPluginSetup(JsonNode.Parse("{" + companion + ",\"windowsHostInstalled\":false,\"windowsHostDefault\":\"openxlr\"}"));
         Assert.True(vm.ShowsYabridgeTools);
+        Assert.True(vm.AddsYabridgeFolders);
         Assert.True(vm.CanBridgeWine);
         Assert.True(vm.HasMemoryLockNote);
         Assert.False(vm.ShowsWindowsHostDefault);
