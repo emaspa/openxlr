@@ -1090,7 +1090,9 @@ restores the split profile when it stops.
   says what the browser still needs. Each routed tab has its own
   playback volume, set in its row and applied by the companion, so two
   tabs on one channel can play at different levels. The level is an edit
-  for that tab or saved for its website. Browser
+  for that tab or saved for its website. The main Monitor's 150% option
+  opens the tab slider to 125% on companions that support boost. Older
+  companions stay at a maximum of 100% and the popup shows why. Browser
   output selection suspends generic Chromium routing while enabled,
   keeping each browser's saved assignment and showing where it plays
   meanwhile; restarting the browser requires activating tabs again
@@ -1127,7 +1129,9 @@ restores the split profile when it stops.
   different levels without a channel each. OpenXLR saves the level by
   application and gives it to streams that start later. A change made in
   the desktop's volume control, or by the program, becomes the saved
-  level, and Reset puts the program back to 100%
+  level, and Reset puts the program back to 100%. The main Monitor's
+  150% option opens the application slider to 150%, and terminal mixer
+  keys can adjust app levels across the same range
 - An app can be set to "Not managed": the mixer hands its streams back to
   the system default output and never touches them again, so a headset
   with separate game and chat sinks keeps its own routing for that app

@@ -800,7 +800,8 @@ public sealed class PipeWireAdapter
         // lower its contribution before raising any channel to avoid a spike.
         if (stream.NodeGain > 1)
             ClearStreamNodeGain(stream.Id, ApplicationStreamVolumeTimeout);
-        SetSinkInputVolume(stream.Serial, volume, Remaining());
+        Run("pactl", Remaining(), "set-sink-input-volume", stream.Serial.ToString(), VolumePercent(volume));
+        InvalidateDump();
         if (stream.NodeGain < 1)
             ClearStreamNodeGain(stream.Id, Remaining());
 

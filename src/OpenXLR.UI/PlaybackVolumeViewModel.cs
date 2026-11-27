@@ -22,10 +22,23 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     public bool Supported => _supported;
     public bool Enabled => _enabled;
     public bool Website => website;
+    private bool _boost;
+    private double _supportedMaximum = 1;
+
+    public double Maximum => Math.Max(Level, _boost ? _supportedMaximum : 1);
+    private bool NeedsCompanionUpdate => Website && _boost && _supportedMaximum <= 1;
+
+    internal void ApplyBoost(bool boost)
+    {
+        if (!Set(ref _boost, boost, nameof(Maximum))) return;
+        Raise(nameof(Hint));
+    }
+
     public bool HasLevel => (_pending ?? _reported).Level is not null;
     /// <summary>The level the button shows; empty at full volume, saved or not, where it shows a speaker.</summary>
-    public string Label => Math.Round(Level * 100) < 100 ? $"{Level * 100:0}%" : "";
-    public string Hint => website ? Localizer.Text("TabPlaybackVolumeHint")
+    public string Label => Math.Round(Level * 100) != 100 ? $"{Level * 100:0}%" : "";
+    public string Hint => NeedsCompanionUpdate ? Localizer.Text("TabPlaybackBoostUnavailable")
+        : website ? Localizer.Text("TabPlaybackVolumeHint")
         : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHint") : Localizer.Text("AppPlaybackVolumeHint");
     public string? Error { get => _error; private set => Set(ref _error, value); }
 
@@ -36,7 +49,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
         {
             if (Enabled && double.IsFinite(value))
             {
-                double volume = Math.Round(Math.Clamp(value, 0, 1) * 100) / 100;
+                double volume = Math.Round(Math.Clamp(value, 0, Maximum) * 100) / 100;
                 if (!HasLevel || volume != Level) Edit(new(volume, Remember));
             }
         }
@@ -54,15 +67,18 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     }
 
     internal void Apply(bool supported, bool enabled, double? level, bool remember = false, bool browserHeld = false,
-        double? live = null)
+        double? live = null, double supportedMaximum = 1)
     {
         Set(ref _supported, supported, nameof(Supported));
         Set(ref _browserHeld, browserHeld, nameof(Hint));
         SetEnabled(enabled);
         var state = new Choice(level, remember);
-        if (_reported == state && _live == live) return;
+        bool maximumChanged = _supportedMaximum != supportedMaximum;
+        if (_reported == state && _live == live && !maximumChanged) return;
+        _supportedMaximum = supportedMaximum;
         _reported = state;
         _live = live;
+        if (maximumChanged) Raise(nameof(Hint));
         if (_pending is null) Refresh();
     }
 
@@ -103,6 +119,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
 
     private void Refresh()
     {
+        Raise(nameof(Maximum));
         Raise(nameof(Level));
         Raise(nameof(Label));
         Raise(nameof(HasLevel));

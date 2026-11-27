@@ -9,7 +9,7 @@
   <Button Name="PlaybackVolume" Content="{Binding Label}" IsEnabled="{Binding Enabled}"
           Padding="6,4" ToolTip.Tip="{Binding Hint}" ToolTip.ShowOnDisabled="True"
           AutomationProperties.Name="{loc:Text Key=PlaybackVolume}">
-    <!-- A speaker until the program plays below full volume, then the level.
+    <!-- A speaker while the program plays at unity, then the level.
          The widest level holds the room so changing it does not shift the row. -->
     <Button.ContentTemplate>
       <DataTemplate x:DataType="x:String">
@@ -26,7 +26,7 @@
         <StackPanel Spacing="6" Width="240">
           <TextBlock Text="{loc:Text Key=PlaybackVolume}" Classes="h"/>
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <Slider Name="PlaybackLevel" Minimum="0" Maximum="1" vm:FaderInput.Step="0.01"
+            <Slider Name="PlaybackLevel" Minimum="0" Maximum="{Binding Maximum}" vm:FaderInput.Step="0.01"
                     Value="{Binding Level, Mode=TwoWay}" AutomationProperties.Name="{loc:Text Key=PlaybackVolume}"/>
             <skin:LitText Grid.Column="1" Text="{Binding Level, StringFormat={}{0:0%}}" Classes="val"
                           VerticalAlignment="Center"/>

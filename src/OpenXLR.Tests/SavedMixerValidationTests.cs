@@ -83,7 +83,7 @@ public sealed class SavedMixerValidationTests
         {
             string path = Path.Combine(root, "mixer.json");
             File.WriteAllText(path, """
-                {"browserSiteVolumes":{"https://teams.microsoft.com":0.55,"https://example.com/path":0.8,"https://other.com":1.1}}
+                {"browserSiteVolumes":{"https://teams.microsoft.com":0.55,"https://example.com/path":0.8,"https://other.com":1.26}}
                 """);
             MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
             Assert.Contains("browserSiteVolumes", warning);

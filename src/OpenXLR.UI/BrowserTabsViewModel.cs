@@ -79,8 +79,10 @@ public sealed partial class MainViewModel
                 supported && _preserveBrowserOutputs,
                 node["activation"] is JsonValue activation && activation.TryGetValue<string>(out string? stage)
                     && stage is "starting" or "popup" or "browser" ? stage : null);
+            tab.PlaybackVolume.ApplyBoost(OutputVolumeRange.Boost);
             tab.PlaybackVolume.Apply(node["volumeSupported"]?.GetValue<bool>() == true, tab.CanEdit,
-                node["volume"]?.GetValue<double>(), node["rememberVolume"]?.GetValue<bool>() == true);
+                node["volume"]?.GetValue<double>(), node["rememberVolume"]?.GetValue<bool>() == true,
+                supportedMaximum: node["volumeMaximum"]?.GetValue<double>() ?? 1);
         }
         for (int i = BrowserTabs.Count - 1; i >= 0; i--)
             if (!seen.Contains((BrowserTabs[i].Session, BrowserTabs[i].Id)))

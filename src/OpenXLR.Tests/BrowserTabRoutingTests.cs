@@ -47,19 +47,41 @@ public sealed class BrowserTabRoutingTests
         Assert.Equal(.45, Assert.Single(restored.BrowserTabs).Volume);
     }
 
+    [Fact]
+    public void SavedTabBoostIsCappedForAnOlderCompanionAndReturnsAfterUpdate()
+    {
+        using var mixer = new Mixer();
+        Guid owner = Guid.NewGuid();
+        string session = mixer.OpenBrowserSession(owner);
+        var modern = Tab(1) with { VolumeSupported = true, VolumeBoostSupported = true };
+        var legacy = Tab(2) with { VolumeSupported = true };
+        mixer.SyncBrowserTabs(owner, session, [modern, legacy]);
+        mixer.SetBrowserTabVolume(session, 1, modern.Site, 1.25, true, _ => null);
+        Assert.Equal((1.25, 1.25), (mixer.BrowserTabs[0].Volume, mixer.BrowserTabs[0].VolumeMaximum));
+        Assert.Equal((1, 1), (mixer.BrowserTabs[1].Volume, mixer.BrowserTabs[1].VolumeMaximum));
+        Assert.Throws<InvalidOperationException>(() =>
+            mixer.SetBrowserTabVolume(session, 2, legacy.Site, 1.01, true, _ => null));
+        Assert.Equal(1.25, mixer.ExportSettings().BrowserSiteVolumes[legacy.Site]);
+
+        mixer.SyncBrowserTabs(owner, session, [modern with { Id = 3 }]);
+        Assert.Equal(1.25, Assert.Single(mixer.BrowserTabs).Volume);
+    }
+
     [Theory]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1.5}""", true)]
+    [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":1.25}""", true)]
     [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":0}""", true)]
     [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":null}""", true)]
     [InlineData("""{"cmd":"setAppVolume","identity":"discord"}""", false)]
     [InlineData("""{"cmd":"setAppVolume","identity":"wine","value":0.5}""", false)]
     [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1e999}""", false)]
-    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1.01}""", false)]
+    [InlineData("""{"cmd":"setAppVolume","identity":"discord","value":1.51}""", false)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":0.4}""", true)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":false,"value":0}""", true)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":null}""", true)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true}""", false)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":1e999}""", false)]
-    [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":1.01}""", false)]
+    [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":true,"value":1.26}""", false)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com/path","remember":true,"value":0.4}""", false)]
     [InlineData("""{"cmd":"setBrowserTabVolume","session":"e3b0c44298fc4c14b9afbf4c8996fb92","tabId":1,"site":"https://example.com","remember":0,"value":0.4}""", false)]
     public void PlaybackVolumeCommandsCheckRangesAndTargets(string json, bool valid)

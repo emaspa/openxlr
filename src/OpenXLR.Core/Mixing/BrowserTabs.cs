@@ -10,6 +10,7 @@ public sealed record BrowserTabRegistration
     public string Title { get; init; } = "";
     public bool Capturing { get; init; }
     public bool VolumeSupported { get; init; }
+    public bool VolumeBoostSupported { get; init; }
     public string? Error { get; init; }
     /// <summary>Where an activation OpenXLR asked for stands in the browser; null when none is in progress.</summary>
     public string? Activation { get; init; }
@@ -21,12 +22,15 @@ public sealed record BrowserTabState(string Session, int Id, string Site, string
     bool Remember, bool Capturing, string? Error, string? Activation = null)
 {
     public bool VolumeSupported { get; init; }
+    public double VolumeMaximum { get; init; } = 1;
     public double? Volume { get; init; }
     public bool RememberVolume { get; init; }
 }
 
 public static class BrowserTabRouting
 {
+    public const double MaxTabVolume = 1.25;
+
     public const int MaxProviders = 8, MaxTabs = 128, MaxSites = 128;
     public const int MaxOrigin = 512, MaxTitle = 160, MaxError = 200;
 
@@ -186,19 +190,21 @@ public sealed partial class Mixer
         return (tabs, tab);
     }
 
-    internal static bool ValidPlaybackVolume(double volume) => volume is >= 0 and <= 1;
+    internal static bool ValidPlaybackVolume(double volume) => volume is >= 0 and <= PipeWireAdapter.MaxSinkVolume;
 
     private static double SnapPlaybackVolume(double volume) => Math.Round(volume * 100) / 100;
 
     public void SetBrowserTabVolume(string session, int tabId, string site, double? volume, bool remember,
         Func<MixerSettings, string?> persist)
     {
-        if (volume is double level && !ValidPlaybackVolume(level))
-            throw new ArgumentOutOfRangeException(nameof(volume), "playback volume must be between 0 and 1");
+        if (volume is double level && !(level is >= 0 and <= BrowserTabRouting.MaxTabVolume))
+            throw new ArgumentOutOfRangeException(nameof(volume), "tab volume must be between 0 and 1.25");
         lock (_gate)
         {
             var (tabs, tab) = FindBrowserTabLocked(session, tabId, site, "setBrowserTabVolume");
             if (!tab.Metadata.VolumeSupported) throw new InvalidOperationException("update the browser companion to adjust tab volume");
+            if (volume > TabVolumeMaximum(tab))
+                throw new InvalidOperationException("update the browser companion to boost tab volume");
             double? next = volume is double value ? SnapPlaybackVolume(value) : null;
             if (!remember)
             {
@@ -254,6 +260,15 @@ public sealed partial class Mixer
         }
     }
 
+    private static double TabVolumeMaximum(BrowserTab tab)
+        => tab.Metadata.VolumeSupported && tab.Metadata.VolumeBoostSupported ? BrowserTabRouting.MaxTabVolume : 1;
+
+    private double? EffectiveTabVolume(BrowserTab tab)
+    {
+        double? volume = tab.Volume ?? (_browserSiteVolumes.TryGetValue(tab.Metadata.Site, out double saved) ? saved : null);
+        return volume is double level ? Math.Min(level, TabVolumeMaximum(tab)) : null;
+    }
+
     private IReadOnlyList<BrowserTabState> BrowserTabsLocked()
         => [.. _browserSessions.OrderBy(s => s.Key, StringComparer.Ordinal).SelectMany(s => s.Value.Values.OrderBy(t => t.Metadata.Id)
             .Select(t => new BrowserTabState(s.Key, t.Metadata.Id, t.Metadata.Site,
@@ -263,7 +278,8 @@ public sealed partial class Mixer
                 t.Metadata.Activation)
             {
                 VolumeSupported = t.Metadata.VolumeSupported,
-                Volume = t.Volume ?? (_browserSiteVolumes.TryGetValue(t.Metadata.Site, out double volume) ? volume : null),
+                VolumeMaximum = TabVolumeMaximum(t),
+                Volume = EffectiveTabVolume(t),
                 RememberVolume = t.Volume is null && _browserSiteVolumes.ContainsKey(t.Metadata.Site),
             }))];
 

@@ -343,7 +343,7 @@ public static class CommandValidation
                 if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "setBrowserTabVolume: supply a browser session and tabId";
                 if (BrowserTabRouting.CanonicalSite(cmd.Site) is null) return "setBrowserTabVolume: supply the tab's HTTP or HTTPS origin";
                 if (cmd.Remember.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return "setBrowserTabVolume: remember must be a boolean";
-                return PlaybackVolume(cmd);
+                return PlaybackVolume(cmd, BrowserTabRouting.MaxTabVolume);
             case "assignBrowserTab":
                 if (!BrowserTabRouting.ValidSession(cmd.Session) || cmd.TabId is not >= 0) return "assignBrowserTab: supply a browser session and tabId";
                 if (BrowserTabRouting.CanonicalSite(cmd.Site) is null) return "assignBrowserTab: supply the tab's HTTP or HTTPS origin";
@@ -555,9 +555,10 @@ public static class CommandValidation
         }
     }
 
-    private static string? PlaybackVolume(Command cmd)
+    private static string? PlaybackVolume(Command cmd, double maximum = PipeWireAdapter.MaxSinkVolume)
         => cmd.Value.ValueKind == JsonValueKind.Null ? null
-            : Finite(cmd, "value") ?? (Mixer.ValidPlaybackVolume(cmd.Value.GetDouble()) ? null : $"{cmd.Cmd}: volume must be between 0 and 1");
+            : Finite(cmd, "value") ?? (cmd.Value.GetDouble() >= 0 && cmd.Value.GetDouble() <= maximum
+                ? null : FormattableString.Invariant($"{cmd.Cmd}: volume must be between 0 and {maximum}"));
 
     /// <summary>
     /// What an EQ command acts on: a microphone or capture input as <c>channel</c>, or, where

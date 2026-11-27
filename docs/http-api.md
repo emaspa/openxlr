@@ -87,6 +87,10 @@ machine setting, not profile state; a refused save returns an error without
 changing the policy. Not managed does not mute playback or bypass an OpenXLR
 system default. See [application names](api.md#application-names).
 
+The mixer resource reports `appVolumeMaximum` for application playback.
+Each browser tab reports its companion's `volumeMaximum`. Call
+`setAppVolume` or `setBrowserTabVolume` through `/commands`.
+
 The mixer resource also reports `preserveBrowserOutputs` and `browserTabs`
 as documented in [browser tabs](api.md#browser-tabs). A tab's `title` is empty
 unless it is capturing or has an assigned channel; its origin remains

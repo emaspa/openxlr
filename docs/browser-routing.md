@@ -30,6 +30,11 @@ browser level, including installed web apps. The tab control adjusts each
 captured tab relative to that shared level. If all tabs are quiet, check
 the shared browser level in **Manage** or the desktop volume controls.
 
+The main Monitor's **150%** option opens the application slider to 150%
+and a routed tab's slider to 125% (about +5.8 dB). Older Chromium
+companions are limited to 100%. The tab's volume popup shows when an
+update is needed. The tab and application gains combine.
+
 The tab volume control follows the browser output selection switch as soon
 as the daemon confirms the change.
 

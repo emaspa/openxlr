@@ -138,6 +138,9 @@ public sealed class TuiViewTests
     [InlineData(null, 0.6, ']', 0.61)]
     [InlineData(0.35, 0.6, '+', 0.4)]
     [InlineData(0.35, null, '[', 0.34)]
+    [InlineData(1.3, null, '-', 1.25)]
+    [InlineData(1.3, null, '+', 1.35)]
+    [InlineData(null, 1.49, '+', 1.5)]
     [InlineData(0.02, null, '-', 0.0)]
     [InlineData(0.35, null, 'r', null)]
     public void AppsStepAndResetAnApplicationVolume(double? saved, double? live, char key, double? expected)
@@ -145,6 +148,7 @@ public sealed class TuiViewTests
         (App app, List<string> sent) = Ready(tab: 4);
         var state = System.Text.Json.Nodes.JsonNode.Parse(StateJson)!;
         state["mixer"]!["appVolumeSupported"] = true;
+        state["mixer"]!["appVolumeMaximum"] = 1.5;
         state["mixer"]!["streams"]![0]!["volume"] = saved;
         state["mixer"]!["streams"]![0]!["liveVolume"] = live;
         app.Link.Receive(state.ToJsonString());

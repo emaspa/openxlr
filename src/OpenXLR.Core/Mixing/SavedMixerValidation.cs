@@ -284,7 +284,7 @@ internal static class SavedMixerValidation
         if (entries is null) notes?.Add($"{field}: {NullEntry}");
         foreach ((string key, double volume) in entries ?? new Dictionary<string, double>())
         {
-            if (BrowserTabRouting.CanonicalSite(key) is { } site && Mixer.ValidPlaybackVolume(volume)
+            if (BrowserTabRouting.CanonicalSite(key) is { } site && volume is >= 0 and <= BrowserTabRouting.MaxTabVolume
                 && kept.Count < BrowserTabRouting.MaxSites)
                 kept.TryAdd(site, Math.Round(volume * 100) / 100);
             else if (notes is not null && !notes.Contains(field)) notes.Add(field);

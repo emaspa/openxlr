@@ -644,6 +644,7 @@ internal sealed record MixerSnapshot
 
     /// <summary>True from a daemon that takes setAppVolume.</summary>
     public bool AppVolumeSupported { get; init; }
+    public double AppVolumeMaximum { get; init; } = 1;
 
     /// <summary>The forced block size in frames, or null when PipeWire chooses.</summary>
     public int? BlockSize { get; init; }

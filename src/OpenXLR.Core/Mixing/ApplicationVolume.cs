@@ -98,7 +98,7 @@ public sealed partial class Mixer
     {
         if (!ValidAppVolumeIdentity(identity)) throw new ArgumentException("invalid application identity");
         if (volume is double level && !ValidPlaybackVolume(level))
-            throw new ArgumentOutOfRangeException(nameof(volume), "playback volume must be between 0 and 1");
+            throw new ArgumentOutOfRangeException(nameof(volume), "playback volume must be between 0 and 1.5");
         string key = AppVolumeKey(identity);
         lock (_gate)
         {
@@ -338,7 +338,7 @@ public sealed partial class Mixer
             // The desktop's volume control or the program itself moved the
             // stream. The saved level follows, as an output's volume does,
             // and the program's other streams get it on this pass or the next.
-            double followed = SnapPlaybackVolume(Math.Min(level, 1));
+            double followed = SnapPlaybackVolume(Math.Min(level, PipeWireAdapter.MaxSinkVolume));
             _appVolumes[key] = followed;
             _appVolumeApplied[stream.Id] = applied with { Target = followed, Written = level, Confirmed = true };
             _appVolumesChanged = adopted = true;
