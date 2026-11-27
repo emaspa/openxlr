@@ -2967,7 +2967,9 @@ unless you pin it to one. To change the default for all of them, open
 Options, Plugins, and pick yabridge or OpenXLR's Windows plugin host under
 **Windows plugins run on**. The plugins that move start again with the same
 control values, and the others keep playing. OpenXLR saves the choice and
-keeps it when a later release changes its own default.
+keeps it when a later release changes its own default. When yabridge is
+installed, the line above the setting says how many plugin inserts still
+run on it.
 
 To pick the host of one plugin, open its controls window. In a build with
 the host, a Windows VST3 or CLAP plugin bridged through yabridge has a host
@@ -3076,6 +3078,11 @@ daemon running. It lists the folders OpenXLR's host looks in, says which
 of them the daemon cannot see, and names each plugin the last scan left
 out, with the reason: a 32-bit plugin, a scan that failed or ran out of
 time, or one listed through its yabridge wrapper instead.
+
+The doctor names the default host, and each insert that runs on yabridge
+because its controls window pins it there or because the release holds
+its plugin there. When the default is yabridge, it counts the inserts that
+follow it.
 
 The doctor also lists what removing the companion would cost. Each insert
 whose plugin is in the picker only through its yabridge wrapper is named,

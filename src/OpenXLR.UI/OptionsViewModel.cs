@@ -285,7 +285,8 @@ public sealed class OptionsViewModel : ViewModelBase
         string? yabridge = setup["yabridge"]?.GetValue<string>();
         bool wine = setup["wine"]?.GetValue<bool>() ?? false;
         int folders = (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray)?.Count ?? 0;
-        WindowsPlugins = WindowsLine(yabridge, wine, folders, setup["bridgeProvider"]?.GetValue<string>() == "openxlr");
+        WindowsPlugins = WindowsLine(yabridge, wine, folders, setup["bridgeProvider"]?.GetValue<string>() == "openxlr",
+            setup["windowsHostInstalled"]?.GetValue<bool>() ?? false, setup["yabridgeInserts"]?.GetValue<int>() ?? 0);
         if (setup["windowsPluginDirectory"]?.GetValue<string>() is { } managedDirectory)
             PluginDirectories += " " + Localizer.Format("WindowsPluginWrappersIn", managedDirectory);
         WindowsImportNote = setup["windowsImportDirectory"]?.GetValue<string>() is { } imports
@@ -306,15 +307,32 @@ public sealed class OptionsViewModel : ViewModelBase
             : Localizer.Text("BridgeWinePlugins");
     }
 
-    /// <summary>One line on Windows plugins, from what the daemon found.</summary>
-    internal static string WindowsLine(string? yabridge, bool wine, int folders, bool managed = false)
+    /// <summary>
+    /// One line on Windows plugins, from what the daemon found. A build with
+    /// the Windows plugin host needs only Wine, so it never sends the user to
+    /// yabridge, and when yabridge is there it says how many inserts still
+    /// run on it.
+    /// </summary>
+    /// <param name="windowsHost">Whether the build has the Windows plugin host.</param>
+    /// <param name="onYabridge">How many inserts run through yabridge.</param>
+    internal static string WindowsLine(string? yabridge, bool wine, int folders, bool managed = false,
+        bool windowsHost = false, int onYabridge = 0)
     {
+        if (windowsHost && yabridge is null)
+            return wine ? Localizer.Text("WindowsPluginsHostReady") : Localizer.Text("WindowsPluginsHostNoWine");
         if (yabridge is null && !wine) return Localizer.Text("WindowsPluginsNothingInstalled");
         if (yabridge is null) return Localizer.Text("WindowsPluginsNoYabridge");
         string bridge = managed ? Localizer.Format("OpenXlrBridgeVersion", yabridge) : $"yabridge {yabridge}";
         if (!wine) return Localizer.Format("WindowsPluginsNoWine", bridge);
         string bridged = folders switch { 0 => Localizer.Text("NoFolderBridged"), 1 => Localizer.Text("OneFolderBridged"), _ => Localizer.Format("FoldersBridged", folders) };
-        return Localizer.Format("WindowsPluginsReady", bridge, bridged);
+        string line = Localizer.Format("WindowsPluginsReady", bridge, bridged);
+        if (!windowsHost) return line;
+        return line + " " + (onYabridge switch
+        {
+            0 => Localizer.Text("NoInsertOnYabridge"),
+            1 => Localizer.Text("OneInsertOnYabridge"),
+            _ => Localizer.Format("InsertsOnYabridge", onYabridge),
+        });
     }
 
     // --- startup behaviour ---

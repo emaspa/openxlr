@@ -19,6 +19,15 @@ public sealed record BridgeOnlyInsert(string Chain, string ChainName, string Id,
 public sealed record WindowsInsert(string Chain, string ChainName, string Id, string Name);
 
 /// <summary>
+/// An insert of a Windows plugin with a yabridge wrapper that runs through
+/// yabridge, and why. <c>Reason</c> is <c>pinned</c> (its controls window
+/// set yabridge), <c>held</c> (this release holds its plugin on yabridge;
+/// <c>Note</c> says why), <c>default</c> (it follows a default that is
+/// yabridge) or <c>no-host</c> (the build has no Windows plugin host).
+/// </summary>
+public sealed record YabridgeInsert(string Chain, string ChainName, string Id, string Name, string Reason, string? Note = null);
+
+/// <summary>
 /// What moving from the yabridge companion to the Windows plugin host built
 /// into OpenXLR needs from the daemon: the one-time copy of the companion's
 /// folders into the Windows plugin folders, and the inserts that still need
@@ -257,6 +266,42 @@ public static class YabridgeMigration
             }
             if (reason is not null)
                 found.Add(new(chain, chainName, insert.Id, insert.Kind, insert.Plugin, insert.Label ?? plugin.Name, bundle, module, reason));
+        }
+        return found;
+    }
+
+    /// <summary>
+    /// Every insert that runs through yabridge, as far as names and settings
+    /// decide, the way the chain builder routes it: an insert of a plugin
+    /// the catalogue reaches through a yabridge wrapper that is pinned to
+    /// yabridge, held on it by this release, follows a default that is
+    /// yabridge, or is in a build without the Windows plugin host. An
+    /// insert pinned to the Windows plugin host, or following a default
+    /// that is that host, is not listed, even when its module turns out not
+    /// to run there when the chain is built.
+    /// </summary>
+    /// <param name="find">The catalogue entry for a format and plugin id.</param>
+    /// <param name="installed">Whether the build has the Windows plugin host; the build's own when null.</param>
+    /// <param name="defaultHost">The default; <see cref="WindowsPluginHost.Default"/> when null.</param>
+    /// <param name="held">The hold list; <see cref="WindowsPluginHost.Held"/> when null.</param>
+    internal static IReadOnlyList<YabridgeInsert> YabridgeInserts(IEnumerable<ChainInsert> inserts, Func<string, string, PluginInfo?> find,
+        bool? installed = null, string? defaultHost = null, IReadOnlyList<WindowsPluginHost.HeldPlugin>? held = null)
+    {
+        bool host = installed ?? WindowsPluginHost.Installed;
+        string standard = defaultHost ?? WindowsPluginHost.Default;
+        var found = new List<YabridgeInsert>();
+        foreach ((string chain, string chainName, InsertDefinition insert) in inserts)
+        {
+            if (insert.Kind is not ("clap" or "vst3")
+                || find(insert.Kind, insert.Plugin) is not { WindowsHostOnly: false, Path: { Length: > 0 } bundle } plugin
+                || !WineSession.Bridged(bundle))
+                continue;
+            string name = insert.Label ?? plugin.Name;
+            if (insert.WindowsHost == WindowsPluginHost.Yabridge) found.Add(new(chain, chainName, insert.Id, name, "pinned"));
+            else if (!host) found.Add(new(chain, chainName, insert.Id, name, "no-host"));
+            else if (insert.WindowsHost is not null) continue;
+            else if (standard == WindowsPluginHost.Yabridge) found.Add(new(chain, chainName, insert.Id, name, "default"));
+            else if (WindowsPluginHost.HeldEntry(insert, held) is { } hold) found.Add(new(chain, chainName, insert.Id, name, "held", hold.Reason));
         }
         return found;
     }

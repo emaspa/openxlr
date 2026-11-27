@@ -315,6 +315,76 @@ public sealed class YabridgeMigrationTests : IDisposable
     }
 
     [Fact]
+    public void TheInsertsOnYabridgeArePinnedHeldOrFollowingAYabridgeDefault()
+    {
+        string covered = Vst3Bundle(Path.Combine(CommonFiles, "VST3"), "Nova");
+        var catalogue = new Dictionary<string, PluginInfo>
+        {
+            ["A"] = Plugin("A", "Nova", Vst3Wrapper("Nova", Path.Combine(covered, "Contents", "x86_64-win", "Nova.vst3"))),
+            ["F"] = Plugin("F", "Direct", covered, windowsHostOnly: true),
+            ["G"] = Plugin("G", "Native", Directory.CreateDirectory(Path.Combine(_root, "vst3", "Native.vst3")).FullName),
+        };
+        PluginInfo? Find(string kind, string id) => kind == "vst3" ? catalogue.GetValueOrDefault(id) : null;
+        static ChainInsert Pinned(string id, string host)
+        {
+            ChainInsert insert = Insert(id, "A");
+            return insert with { Insert = insert.Insert with { WindowsHost = host } };
+        }
+        ChainInsert[] inserts = [Pinned("yabridge", "yabridge"), Pinned("own", "openxlr"), Insert("follows", "A", "Stream"),
+            Insert("direct", "F"), Insert("native", "G"), Insert("unknown", "Z")];
+        string Listed(bool installed, string standard, IReadOnlyList<WindowsPluginHost.HeldPlugin>? held = null)
+            => string.Join(" ", YabridgeMigration.YabridgeInserts(inserts, Find, installed, standard, held ?? []).Select(i => $"{i.Id}:{i.Reason}"));
+
+        Assert.Equal("yabridge:pinned", Listed(installed: true, "openxlr"));
+        Assert.Equal("yabridge:pinned follows:default", Listed(installed: true, "yabridge"));
+        // Without the host every insert of a wrapper runs through yabridge, a pin to the host as well.
+        Assert.Equal("yabridge:pinned own:no-host follows:no-host", Listed(installed: false, "openxlr"));
+        YabridgeInsert held = YabridgeMigration.YabridgeInserts(inserts, Find, true, "openxlr", [new("vst3", "A", "Nova", "its editor freezes")])[1];
+        Assert.Equal(new YabridgeInsert("mic", "Stream", "follows", "Nova", "held", "its editor freezes"), held);
+    }
+
+    [Fact]
+    public void TheDoctorNamesTheDefaultHostAndTheInsertsPinnedOrHeldOnYabridge()
+    {
+        string covered = Vst3Bundle(Path.Combine(CommonFiles, "VST3"), "Nova");
+        PluginInfo plugin = Plugin("A", "Nova", Vst3Wrapper("Nova", Path.Combine(covered, "Contents", "x86_64-win", "Nova.vst3")));
+        ChainInsert follows = Insert("follows", "A", "Stream");
+        ChainInsert pinned = follows with { ChainName = "XLR 1", Insert = follows.Insert with { Id = "pinned", WindowsHost = "yabridge" } };
+        string home = Path.Combine(_root, "home");
+        string before = WindowsPluginHost.Default;
+        IReadOnlyList<DoctorNote> Notes(string standard)
+        {
+            WindowsPluginHost.Default = standard;
+            JsonElement reply = JsonSerializer.SerializeToElement(new
+            {
+                apiVersion = "1", ok = true,
+                messages = new object[]
+                {
+                    new
+                    {
+                        type = "pluginDiagnostics",
+                        discovery = new PluginInstaller(home, home, home, null, "/usr/bin/wine", hostInstalled: true, windowsHost: true)
+                            .Diagnostics([pinned, follows], (kind, id) => id == "A" ? plugin : null),
+                    },
+                },
+            }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            return [.. InstallationDoctor.WindowsPluginNotes(reply).Where(n => !n.Path.StartsWith('/'))];
+        }
+        try
+        {
+            IReadOnlyList<DoctorNote> own = Notes("openxlr");
+            Assert.Equal(["windows plugin host", "XLR 1 Nova"], own.Select(n => n.Path));
+            Assert.Equal("the default host of Windows plugin inserts is OpenXLR's Windows plugin host. An insert's controls window can pin it to yabridge", own[0].Information);
+            Assert.Equal("runs on yabridge, pinned in its controls window. Choose Default host there to have it follow the default host", own[1].Information);
+
+            IReadOnlyList<DoctorNote> bridge = Notes("yabridge");
+            Assert.Equal(["windows plugin host", "XLR 1 Nova"], bridge.Select(n => n.Path));
+            Assert.Equal("the default host of Windows plugin inserts is yabridge, chosen under Windows plugins run on in Options, so 1 insert that follows it runs through yabridge", bridge[0].Information);
+        }
+        finally { WindowsPluginHost.Default = before; }
+    }
+
+    [Fact]
     public void TheDoctorListsWhatTheCompanionAloneKeepsAndAMissingWine()
     {
         string outside = Vst3Bundle(Path.Combine(_root, "elsewhere"), "Kotelnikov");
@@ -339,7 +409,8 @@ public sealed class YabridgeMigrationTests : IDisposable
         }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
         IReadOnlyList<DoctorNote> notes = InstallationDoctor.WindowsPluginNotes(Reply(windowsHost: true));
-        Assert.Equal(["wine", plugin.Path!, plugin.Path!, "/plugins/Vendor"], notes.Take(4).Select(n => n.Path));
+        Assert.Equal(["wine", "windows plugin host", plugin.Path!, plugin.Path!, "/plugins/Vendor"], notes.Take(5).Select(n => n.Path));
+        notes = [.. notes.Where(n => n.Path != "windows plugin host")];
         Assert.Equal("not installed, and 2 inserts use a Windows plugin, which cannot start without it: XLR 1 Kotelnikov, Stream Kotelnikov. "
             + "Install Wine with your distribution's package manager; the package is called wine", notes[0].Information);
         Assert.StartsWith("the plugin of the insert XLR 1 Kotelnikov is in the plugin list only through this yabridge wrapper. Its Windows module, "

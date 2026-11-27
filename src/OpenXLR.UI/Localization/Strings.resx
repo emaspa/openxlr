@@ -2386,6 +2386,21 @@ Select the interface OpenXLR drives</value>
   <data name="WindowsPluginsNoYabridge" xml:space="preserve">
     <value>Windows plugins: Wine is installed, yabridge is not. Install the optional openxlr-yabridge package, then install a Windows VST3 or CLAP plugin here.</value>
   </data>
+  <data name="WindowsPluginsHostReady" xml:space="preserve">
+    <value>Windows plugins: Wine is installed, and they run on OpenXLR's Windows plugin host. Install a Windows VST3 or CLAP plugin here, or add the folder it is in under Windows in the plugin manager.</value>
+  </data>
+  <data name="WindowsPluginsHostNoWine" xml:space="preserve">
+    <value>Windows plugins: Wine is not installed, and OpenXLR's Windows plugin host needs it. Install Wine from your distribution.</value>
+  </data>
+  <data name="NoInsertOnYabridge" xml:space="preserve">
+    <value>No insert runs on yabridge.</value>
+  </data>
+  <data name="OneInsertOnYabridge" xml:space="preserve">
+    <value>One insert runs on yabridge.</value>
+  </data>
+  <data name="InsertsOnYabridge" xml:space="preserve">
+    <value>{0} inserts run on yabridge.</value>
+  </data>
   <data name="WindowsPluginsReady" xml:space="preserve">
     <value>Windows plugins: {0} and Wine are installed, {1}. Run a plugin's installer with Wine, then install the folder it created.</value>
   </data>

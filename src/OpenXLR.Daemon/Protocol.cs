@@ -235,6 +235,8 @@ public sealed record PluginSetupMessage(PluginSetup Setup)
     /// message was made. Set with "setWindowsHostDefault".
     /// </summary>
     [JsonPropertyName("windowsHostDefault")] public string WindowsHostDefault { get; init; } = OpenXLR.Core.Mixing.WindowsPluginHost.Default;
+    /// <summary>How many inserts run through yabridge, pinned, held or following the default.</summary>
+    [JsonPropertyName("yabridgeInserts")] public int YabridgeInserts => Setup.YabridgeInserts;
     [JsonPropertyName("lv2Directory")] public string Lv2Directory => Setup.Lv2Directory;
     [JsonPropertyName("clapDirectory")] public string ClapDirectory => Setup.ClapDirectory;
     [JsonPropertyName("vst3Directory")] public string Vst3Directory => Setup.Vst3Directory;

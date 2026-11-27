@@ -352,9 +352,9 @@ memory-lock limits, the skipped bundles and `hostEnvironment`: the effective
 over the trace preset. Loader values and Wine debug channels are bounded to 4096
 characters each. The diagnostics archive redacts these paths with its
 existing path redaction. `GET /api/v1/plugin-diagnostics` gives the same
-reply, with `bridgeOnlyInserts`, `windowsInsertsNeedingWine` and
-`yabridgeFolderCopy`, the lists `openxlr doctor` reads before the yabridge
-companion is removed. Both reply shapes are
+reply, with `bridgeOnlyInserts`, `windowsInsertsNeedingWine`,
+`yabridgeInserts` and `yabridgeFolderCopy`, the lists `openxlr doctor`
+reads before the yabridge companion is removed. Both reply shapes are
 documented in [api.md](api.md); the transport does not select a bridge itself.
 
 `addPluginSearchPath` and `removePluginSearchPath` take `kind` (`lv2`,

@@ -448,7 +448,7 @@ public sealed partial class WebSocketHub
                 await reply(new PluginDiagnosticsMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Diagnostics(DiagnosticInserts()))));
                 break;
             case "getPluginSetup":
-                await reply(new PluginSetupMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Setup())));
+                await reply(new PluginSetupMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Setup(DiagnosticInserts()))));
                 break;
             case "setPluginWineTrace":
                 error = CommandValidation.CheckPluginWineTrace(cmd);
@@ -463,7 +463,7 @@ public sealed partial class WebSocketHub
                         // remains the user's override. Rescan retries failed bundles;
                         // changing this switch neither scans nor clears good cache entries.
                         Environment.SetEnvironmentVariable("OPENXLR_PLUGIN_WINE_TRACE", cmd.Value.GetBoolean() ? "1" : null);
-                        return new PluginSetupMessage(new OpenXLR.Core.Mixing.PluginInstaller().Setup());
+                        return new PluginSetupMessage(new OpenXLR.Core.Mixing.PluginInstaller().Setup(DiagnosticInserts()));
                     }
                 }));
                 break;
@@ -480,7 +480,7 @@ public sealed partial class WebSocketHub
                         // restart keeps what the running daemon now does.
                         if (OpenXLR.Core.DaemonSettings.SaveWindowsHostDefault(host) is { } refused) return (refused, null);
                         _mixer.SetWindowsHostDefault(host);
-                        return (null, new PluginSetupMessage(new OpenXLR.Core.Mixing.PluginInstaller().Setup()));
+                        return (null, new PluginSetupMessage(new OpenXLR.Core.Mixing.PluginInstaller().Setup(DiagnosticInserts())));
                     }
                 });
                 error = changed.Error;
