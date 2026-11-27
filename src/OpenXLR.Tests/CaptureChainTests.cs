@@ -155,7 +155,7 @@ public sealed class CaptureChainTests
         Assert.Empty(scene.Inserts["stereo"]);
         mixer.SetInserts("mono", [Insert]);
         var recalled = Mixer.RecallChains(mixer.ExportScene().Inserts!, new Dictionary<string, List<InsertDefinition>>
-            { ["xlr1"] = [] }, key => key.StartsWith("mix:", StringComparison.Ordinal));
+            { ["xlr1"] = [] }, key => key.StartsWith("mix:", StringComparison.Ordinal), keepWiring: true);
         Assert.Single(recalled["mono"]);
         Assert.Empty(recalled["stereo"]);
     }

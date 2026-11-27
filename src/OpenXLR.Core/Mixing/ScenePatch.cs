@@ -385,16 +385,10 @@ public sealed partial class Mixer
     private void RestoreChainLocked(string key, InsertChain chain)
     {
         List<InsertDefinition> before = InsertsFor(key);
-        _inserts[key] = [.. chain.Inserts.Select(i =>
+        _inserts[key] = [.. chain.Inserts.Select(i => KeepWiring(i, before) with
         {
-            InsertDefinition? now = before.FirstOrDefault(b => b.Id == i.Id && b.Kind == i.Kind && b.Plugin == i.Plugin);
-            return i with
-            {
-                Params = new Dictionary<string, double>(i.Params),
-                NativeHost = i.RunsNatively,
-                OwnBlock = now?.OwnBlock ?? i.OwnBlock,
-                WindowsHost = now is null ? i.WindowsHost : now.WindowsHost,
-            };
+            Params = new Dictionary<string, double>(i.Params),
+            NativeHost = i.RunsNatively,
         })];
         if (!_built) return;
         bool rebuild;

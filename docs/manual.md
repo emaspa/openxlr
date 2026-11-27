@@ -1695,7 +1695,10 @@ and 512 more to answer in. At a larger block size the 512 become one block,
 43 ms in all at 1024. The latency under the plugin's name includes this, on
 top of the plugin's own, and latency compensation counts it like any other.
 Switching restarts the plugin, which interrupts its chain for a moment. The
-choice is saved with the chain and kept in profiles and effect presets.
+choice is saved with the chain, in profiles and in effect presets.
+Loading a profile leaves it as it is for a plugin that is still in the
+chain, so the choice follows this computer. Only a plugin the profile puts
+back into the chain takes the choice the profile saved.
 Bypass takes the plugin out of the path and its delay with it. Only the
 native host can run a plugin this way, so an LV2 plugin with it on runs
 there whatever its Native host switch says. Turn it on only for a plugin
@@ -2957,7 +2960,10 @@ plugin starts again on OpenXLR's host with the same control values. Its
 chain stops for a moment while it does. Turn it off to go back to
 yabridge. The line under the buttons says which host runs the plugin
 now. The choice is saved with the insert, in the mixer and in profiles.
-Effect presets and undo leave it alone.
+Effect presets and undo leave it alone, and so does loading a profile, by
+hand or when the interface connects. A plugin still in the chain stays on
+the host it runs on now. Only a plugin the profile puts back into the chain
+takes the host the profile saved.
 
 Plugin UI opens the plugin's own editor on this host as it does through
 yabridge, in the same kind of window. What you change in the editor shows
@@ -3404,7 +3410,9 @@ A ducking setup saved without mixes ducks the default monitor mix as well.
 Loading a profile rebuilds only the plugin chains it changes. A chain with
 the same plugins, order, bypass and host as the profile's keeps running and
 takes the profile's control values as it plays, and an open plugin editor
-stays open. A chain the profile changes is rebuilt on its own, so audio
+stays open. A plugin that stays in its chain keeps its **Run on its own
+block** and Windows host choices as they are now. A chain the profile
+changes is rebuilt on its own, so audio
 through that chain stops for a moment. A profile replaces the chains it
 names. A mix it does not name loses its plugins, as before; an input it
 does not name keeps its chain. Older versions saved an input's chain only

@@ -158,6 +158,41 @@ public sealed partial class HistoryHubTests
     }
 
     [Fact]
+    public async Task AProfileRecallLeavesTheHostAndOwnBlockOfAnInsertThatStays()
+    {
+        using var f = new Fixture();
+        UsePlugins(f);
+        await f.Ok(Chain("xlr1", Insert("comp", Comp), Insert("gate", Gate)));
+        await f.Ok(Chain("mix:stream", Insert("wide", Widener)));
+        f.Mixer.SetInsertWindowsHost("xlr1", "gate", true);
+        f.Mixer.SetInsertOwnBlock("xlr1", "gate", true);
+        f.Mixer.SetInsertOwnBlock("mix:stream", "wide", true);
+        await f.Ok("""{"cmd":"saveProfile","name":"show"}""");
+
+        // Since the save: the gate is gone, the compressor is pinned and on
+        // its own block, the widener back in the cycle, and an insert the
+        // profile does not have is pinned.
+        await f.Ok(Chain("xlr1", Insert("comp", Comp, new { threshold = -30 }), Insert("extra", Gate)));
+        f.Mixer.SetInsertWindowsHost("xlr1", "comp", true);
+        f.Mixer.SetInsertOwnBlock("xlr1", "comp", true);
+        f.Mixer.SetInsertWindowsHost("xlr1", "extra", true);
+        f.Mixer.SetInsertOwnBlock("mix:stream", "wide", false);
+
+        await f.Ok("""{"cmd":"loadProfile","name":"show"}""");
+        // The compressor stays and keeps what it has; the gate comes back
+        // with the profile's; the extra insert leaves with its pin.
+        Assert.Equal([("comp", "openxlr", true), ("gate", "openxlr", true)],
+            Inserts(f, "xlr1").Select(i => (i.Id, i.WindowsHost, i.OwnBlock)));
+        Assert.False(Inserts(f, "xlr1")[0].Params.ContainsKey("threshold"));
+        Assert.Equal((null, false), (Assert.Single(Inserts(f, "mix:stream")).WindowsHost, Inserts(f, "mix:stream")[0].OwnBlock));
+        // The chains were built with what they keep.
+        Assert.Equal([(true, true), (true, true)], Built(f, "xlr1")!.Slots.Select(s => (s.OwnBlock, s.WindowsHost)));
+        Assert.False(Assert.Single(Built(f, "mix:stream")!.Slots).OwnBlock);
+        Assert.Equal(["openxlr", "openxlr"],
+            f.State().Mixer!.Inserts["xlr1"].Select(i => i.Insert.WindowsHost));
+    }
+
+    [Fact]
     public async Task AChainKeysBurstIsOneStep()
     {
         using var f = new Fixture();

@@ -120,17 +120,20 @@ public sealed partial class Mixer
     /// <paramref name="recalled"/> null only the low cut and ClipGuard are
     /// compared. <paramref name="absentMixesEmpty"/> keeps a profile's old
     /// rule for mixes: a mix it does not name has no inserts. An input it does
-    /// not name keeps its chain. <paramref name="rebuildAll"/> builds every
-    /// chain, for a change of host such as latency compensation.
+    /// not name keeps its chain. <paramref name="keepWiring"/> keeps the own
+    /// block and the Windows host of every insert that stays, as a profile
+    /// recall does; the saved settings carry this machine's own.
+    /// <paramref name="rebuildAll"/> builds every chain, for a change of host
+    /// such as latency compensation.
     /// </summary>
     private void ApplyChainsLocked(IReadOnlyDictionary<string, List<InsertDefinition>>? recalled,
-        bool absentMixesEmpty, bool rebuildAll)
+        bool absentMixesEmpty, bool keepWiring, bool rebuildAll)
     {
         var before = new Dictionary<string, List<InsertDefinition>>(_inserts, StringComparer.Ordinal);
         if (recalled is not null)
         {
             Dictionary<string, List<InsertDefinition>> next = RecallChains(_inserts, recalled,
-                key => absentMixesEmpty && key.StartsWith("mix:", StringComparison.Ordinal));
+                key => absentMixesEmpty && key.StartsWith("mix:", StringComparison.Ordinal), keepWiring);
             _inserts.Clear();
             foreach ((string key, List<InsertDefinition> list) in next) _inserts[key] = list;
         }
@@ -202,18 +205,44 @@ public sealed partial class Mixer
     /// The chains after a recall. A key the recalled data names is replaced
     /// by a copy of its list. A key it does not name is kept as it is, unless
     /// <paramref name="absentMeansEmpty"/> says that key's absence clears it.
+    /// With <paramref name="keepWiring"/> an insert of a replaced chain that
+    /// stays in it keeps its machine wiring (see <see cref="KeepWiring"/>).
     /// </summary>
     internal static Dictionary<string, List<InsertDefinition>> RecallChains(
         IReadOnlyDictionary<string, List<InsertDefinition>> current,
         IReadOnlyDictionary<string, List<InsertDefinition>> recalled,
-        Func<string, bool> absentMeansEmpty)
+        Func<string, bool> absentMeansEmpty, bool keepWiring)
     {
         var next = new Dictionary<string, List<InsertDefinition>>(StringComparer.Ordinal);
         foreach ((string key, List<InsertDefinition> list) in current)
             if (!recalled.ContainsKey(key) && !absentMeansEmpty(key)) next[key] = list;
-        foreach ((string key, List<InsertDefinition> list) in CopyInserts(recalled)) next[key] = list;
+        foreach ((string key, List<InsertDefinition> list) in CopyInserts(recalled))
+            next[key] = keepWiring && current.TryGetValue(key, out List<InsertDefinition>? now)
+                ? [.. list.Select(i => KeepWiring(i, now))]
+                : list;
         return next;
     }
+
+    /// <summary>
+    /// The insert of <paramref name="chain"/> that <paramref name="insert"/>
+    /// stands for: the same id with the same kind and plugin. The same id
+    /// with another plugin is another insert.
+    /// </summary>
+    internal static InsertDefinition? SameInsert(IEnumerable<InsertDefinition> chain, InsertDefinition insert)
+        => chain.FirstOrDefault(i => i.Id == insert.Id && i.Kind == insert.Kind && i.Plugin == insert.Plugin);
+
+    /// <summary>
+    /// <paramref name="insert"/> with the machine wiring of the same insert
+    /// in <paramref name="current"/>: whether it runs on its own block and
+    /// which host runs its Windows plugin. Where a plugin runs is this
+    /// machine's choice, so an undo and a profile recall leave it as it is
+    /// for an insert that stays. One that comes back, which the current
+    /// chain does not hold, keeps what <paramref name="insert"/> says.
+    /// </summary>
+    internal static InsertDefinition KeepWiring(InsertDefinition insert, IEnumerable<InsertDefinition> current)
+        => SameInsert(current, insert) is { } now
+            ? insert with { OwnBlock = now.OwnBlock, WindowsHost = now.WindowsHost }
+            : insert;
 
     /// <summary>
     /// The control values that differ between two chains of the same

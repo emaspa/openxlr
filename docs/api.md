@@ -447,7 +447,14 @@ A profile never changes an input binding.
 A recall replaces the insert chains the profile's `mixer.inserts` names. An
 input key it does not name, `xlr1` or `xlr2`, keeps its chain; a mix key it
 does not name is cleared, as it always was. A profile with no `inserts` at
-all leaves every chain alone. The daemon rebuilds only a chain whose plugins,
+all leaves every chain alone. Where a plugin runs belongs to the machine,
+not to the profile. An insert of a recalled chain that is in the current
+chain too, the same plugin under the same id, keeps its current
+[`ownBlock`](#own-block) and [`windowsHost`](#windows-host). The profile's
+values for those two apply only to an insert the current chain does not
+hold. A recall on connect follows the same rule. The saved settings in
+`mixer.json` hold this machine's own values and bring both back as saved.
+The daemon rebuilds only a chain whose plugins,
 kinds, order, bypass or host choice differ from the running one. A chain that
 matches takes the recalled control values live, keeps its native editor
 open and stays in the graph under the same nodes. `saveProfile` writes an
@@ -823,6 +830,9 @@ graph's quantum: 1536 frames, 32 ms at 48 kHz, at a quantum of 256, and
 zero for a plugin that gives none, so such an insert reports the delay
 alone. A block the plugin answers late plays as silence and the delay
 stays the same. A bypassed insert is out of the chain, delay included. The
+switch is saved with the insert, in `mixer.json` and in a profile. A
+profile recall, like an undo, leaves it as it is for an insert that stays in
+the chain and applies the profile's only to an insert that comes back. The
 helper's side is described in
 [native/README.md](../native/README.md#own-block).
 
@@ -867,7 +877,9 @@ build reads and writes. A value this build does not know reads as yabridge.
 `setInserts` does not change the choice. An insert that stays in the chain,
 the same plugin under the same id, keeps its host, and an insert being added
 starts on yabridge whatever the chain said. An undo or a redo of the chain
-leaves it alone too.
+leaves it alone too, and so does a profile recall, on connect or with
+`loadProfile`. An insert that stays keeps its host. Only an insert the
+current chain does not hold takes the one the profile saved.
 
 A saved choice the build cannot honour when the chain is built, for any of
 the reasons above, does not fail the chain. The insert runs through
