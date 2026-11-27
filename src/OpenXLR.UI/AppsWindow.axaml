@@ -49,10 +49,10 @@
           <StackPanel Spacing="10">
             <StackPanel Spacing="6" IsVisible="{Binding AppRoutingSupported}">
               <CheckBox Name="RouteAppsByDefault" IsChecked="{Binding RouteAppsByDefault, Mode=OneWay}"
-                        IsEnabled="{Binding CanSetAppRouting}" Click="OnRouteAppsByDefault">
+                        IsEnabled="{Binding CanSetAppRouting}" Click="OnRouteAppsByDefault"
+                        ToolTip.Tip="{loc:Text Key=RouteAppsByDefaultHint}" ToolTip.ShowOnDisabled="True">
                 <TextBlock Text="{loc:Text Key=RouteAppsByDefault}" TextWrapping="Wrap"/>
               </CheckBox>
-              <TextBlock Text="{loc:Text Key=RouteAppsByDefaultHint}" Classes="note" TextWrapping="Wrap"/>
             </StackPanel>
             <!-- the overlay scrollbar would sit on the Forget column. Each row
                  is the same application object the APPLICATIONS tiles bind,

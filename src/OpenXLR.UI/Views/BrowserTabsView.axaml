@@ -11,15 +11,13 @@
   <DockPanel LastChildFill="True">
     <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,6">
       <CheckBox Name="PreserveBrowserOutputs" IsChecked="{Binding PreserveBrowserOutputs, Mode=TwoWay}"
-                IsEnabled="{Binding CanSetBrowserRouting}">
+                IsEnabled="{Binding CanSetBrowserRouting}"
+                ToolTip.Tip="{loc:Text Key=PreserveBrowserOutputsHint}" ToolTip.ShowOnDisabled="True">
         <TextBlock Text="{loc:Text Key=PreserveBrowserOutputs}" TextWrapping="Wrap"/>
       </CheckBox>
-      <TextBlock Text="{loc:Text Key=PreserveBrowserOutputsHint}" Classes="note" TextWrapping="Wrap"/>
       <TextBlock Text="{loc:Text Key=BrowserTabsHeading}" Classes="h" Margin="0,6,0,0"/>
       <TextBlock Name="BrowserTabsEmpty" Text="{loc:Text Key=BrowserTabsEmpty}" Classes="note" TextWrapping="Wrap"
                  IsVisible="{Binding !HasBrowserTabs}"/>
-      <TextBlock Text="{loc:Text Key=BrowserTabCaptureHint}" Classes="note" TextWrapping="Wrap"
-                 IsVisible="{Binding HasBrowserTabs}"/>
     </StackPanel>
     <ScrollViewer Name="BrowserTabList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <!-- the overlay scrollbar would sit on the row controls -->
@@ -42,6 +40,7 @@
                   <ComboBox Name="BrowserTabChannel" ItemsSource="{Binding Channels}" Width="200" MaxWidth="200"
                             HorizontalAlignment="Left" Margin="0,0,12,4" IsEnabled="{Binding CanEdit}"
                             SelectedItem="{Binding SelectedChannel, Mode=TwoWay}"
+                            ToolTip.Tip="{loc:Text Key=BrowserTabCaptureHint}" ToolTip.ShowOnDisabled="True"
                             AutomationProperties.Name="{Binding Title, StringFormat={loc:Text Key=BrowserTabChannelName}}">
                     <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ChannelChoice">
                       <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
