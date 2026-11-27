@@ -5022,4 +5022,7 @@ When the window is in the tray, open it again from the OpenXLR icon or your app 
   <data name="TabPlaybackBoostUnavailable" xml:space="preserve">
     <value>Update OpenXLR and the browser companion to boost this tab above 100%.</value>
   </data>
+  <data name="TabPlaybackBoostHeldByBrowser" xml:space="preserve">
+    <value>The browser itself plays above 120%, so this tab stops lower: together they reach 150% at most.</value>
+  </data>
 </root>

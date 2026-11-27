@@ -63,6 +63,44 @@ public sealed class AppVolumeTests : IDisposable
     }
 
     [Fact]
+    public void ALouderBrowserLowersTheTabCeilingSoTheTwoStayWithin150()
+    {
+        Streams(BrowserGraph.Node(10, 100, BrowserGraph.ChromiumProps));
+        _mixer.SyncStreams();
+        Guid owner = Guid.NewGuid();
+        string session = _mixer.OpenBrowserSession(owner);
+        var video = new BrowserTabRegistration
+        {
+            Id = 1, Site = "https://example.com", Title = "Video", VolumeSupported = true, VolumeBoostSupported = true,
+        };
+        _mixer.SyncBrowserTabs(owner, session, [video]);
+        (double? Volume, double Maximum) Tab() => (_mixer.BrowserTabs.Single().Volume, _mixer.BrowserTabs.Single().VolumeMaximum);
+
+        _mixer.SetBrowserTabVolume(session, 1, video.Site, 1.25, true, _ => null);
+        Assert.Equal((1.25, 1.25), Tab());
+        // 120% in the browser still leaves the whole boost: 1.2 x 1.25 is 1.5.
+        _mixer.SetAppVolume("chromium", 1.2);
+        Assert.Equal((1.25, 1.25), Tab());
+        _mixer.SetAppVolume("chromium", 1.3);
+        Assert.Equal((1.15, 1.15), Tab());
+        // The website keeps its level for when the browser comes down.
+        Assert.Equal(1.25, _mixer.ExportSettings().BrowserSiteVolumes[video.Site]);
+        _mixer.SetAppVolume("chromium", 1.5);
+        Assert.Equal((1, 1), Tab());
+        // A level above the ceiling is taken and plays at the ceiling.
+        _mixer.SetBrowserTabVolume(session, 1, video.Site, 1.2, false, _ => null);
+        Assert.Equal((1, 1), Tab());
+        _mixer.SetAppVolume("chromium", null);
+        Assert.Equal((1.2, 1.25), Tab());
+
+        // The desktop raising the browser counts the same as the fader.
+        Streams(BrowserGraph.Node(10, 100, BrowserGraph.ChromiumProps, 140));
+        _now += 1000;
+        _mixer.SyncStreams();
+        Assert.Equal((1.07, 1.07), Tab());
+    }
+
+    [Fact]
     public void ACommandWritesTheLevelToEveryPlayingStreamOfTheApplicationAtOnce()
     {
         Streams(BrowserGraph.Node(10, 100, Vlc), BrowserGraph.Node(11, 101, Vlc), BrowserGraph.Node(12, 102, Mpv));

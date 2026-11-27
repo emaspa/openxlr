@@ -33,7 +33,12 @@ the shared browser level in **Manage** or the desktop volume controls.
 The main Monitor's **150%** option opens the application slider to 150%
 and a routed tab's slider to 125% (about +5.8 dB). Older Chromium
 companions are limited to 100%. The tab's volume popup shows when an
-update is needed. The tab and application gains combine.
+update is needed. The tab's level multiplies the browser's own level, so
+OpenXLR keeps the two together at 150% at most: with the browser at 130%
+a tab stops at 115%, and with the browser at 150% at 100%. A tab is never
+held below 100% this way, and its saved level comes back when the browser
+is turned down. The popup says when the browser's level is what holds the
+tab lower.
 
 The tab volume control follows the browser output selection switch as soon
 as the daemon confirms the change.

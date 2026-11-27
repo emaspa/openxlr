@@ -88,7 +88,7 @@ changing the policy. Not managed does not mute playback or bypass an OpenXLR
 system default. See [application names](api.md#application-names).
 
 The mixer resource reports `appVolumeMaximum` for application playback.
-Each browser tab reports its companion's `volumeMaximum`. Call
+Each browser tab reports `volumeBoostSupported` and its `volumeMaximum`. Call
 `setAppVolume` or `setBrowserTabVolume` through `/commands`.
 
 The mixer resource also reports `preserveBrowserOutputs` and `browserTabs`
