@@ -80,14 +80,16 @@ is measured over one that is described.
   silent, so multipoint headphones can switch to another device.
 - [x] Plugins. LV2, CLAP and VST3 inserts on every microphone, capture
   input and mix, with generated controls and the plugin's own editor;
-  Windows plugins through yabridge and the optional companion;
+  Windows plugins on OpenXLR's own Windows plugin host, with yabridge and
+  the optional companion as the fallback;
   installation from the UI; presets with A/B comparison; latency
   compensation across mixes; the delay a plugin adds, measured on its
   audio beside the figure it reports; a plugin that cannot keep up
   running on its own 1024-sample block; a plugin's own bypass parameter
   left out of its controls; a scanner that passes over a bundle that
-  hangs. The companion's host reports the system disk's identity, so a
-  Windows plugin that ties its licence to that disk can activate.
+  hangs. OpenXLR's host and the companion's report the system disk's
+  identity, so a Windows plugin that ties its licence to that disk can
+  activate.
 - [x] Clients. The UI, with twenty-five built-in skins, skins that
   rearrange it, Broadcast and Wave among them with the mixer drawn as a
   matrix, system, light and dark modes, a compact and a large density,
@@ -338,15 +340,18 @@ plugin as the companion's host does. It has its own tests, described in
 keeps the class id and the parameter ids it has through yabridge, so a saved
 insert will still name it and keep its values. Every package except the
 Flatpak builds it in, with mingw, and only suggests Wine. In a
-build that has it, the daemon runs one insert of a Windows plugin on it when
-a client asks with `setInsertWindowsHost`
-([docs/api.md](api.md#windows-host)), and back through yabridge the same
-way. yabridge still runs every insert of a bridged plugin that was not
-moved. The UI offers the move in a bridged plugin's controls window on a
-build that has the host. Such a build also scans the Windows plugin folders
+build that has it, a client pins one insert of a Windows plugin to either
+host with `setInsertWindowsHost` ([docs/api.md](api.md#windows-host)) and
+moves every insert that follows the default with `setWindowsHostDefault`;
+the UI offers both, in a bridged plugin's controls window and in Options.
+Such a build also scans the Windows plugin folders
 of the Wine prefix, and folders the user adds, with no yabridge, and runs
 what it finds there on its own host; a plugin with a yabridge wrapper is
-still listed by the wrapper. Still to come: the default.
+still listed by the wrapper. The host is now the default for every bridged
+plugin, and a plugin that follows the default and cannot start there starts
+again through yabridge. The companion is frozen and receives no new work. It is retired once the
+maintainer decides the host has proven itself; the folder commands of the
+yabridge setup are deprecated then and removed the release after.
 
 ## Parked
 

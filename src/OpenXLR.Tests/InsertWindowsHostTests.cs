@@ -683,9 +683,9 @@ public sealed class InsertWindowsHostTests : IDisposable
     // --- the default and the hold list ---------------------------------------------------
 
     [Fact]
-    public void TheBuiltInDefaultIsYabridgeAndAnUnknownSavedValueFallsBackToIt()
+    public void TheBuiltInDefaultIsTheOwnHostAndAnUnknownSavedValueFallsBackToIt()
     {
-        Assert.Equal(WindowsPluginHost.Yabridge, WindowsPluginHost.BuiltInDefault);
+        Assert.Equal(WindowsPluginHost.OpenXlr, WindowsPluginHost.BuiltInDefault);
         Assert.Equal(WindowsPluginHost.OpenXlr, WindowsPluginHost.DefaultFrom("openxlr"));
         Assert.Equal(WindowsPluginHost.Yabridge, WindowsPluginHost.DefaultFrom("yabridge"));
         foreach (string? saved in new[] { null, "", "default", "OpenXLR", "a-host-of-a-newer-build" })

@@ -898,7 +898,8 @@ profile saved.
 **The default host.** `windowsHostDefault` in `daemon.json`, `"yabridge"`
 or `"openxlr"`, is the host an insert with no pin runs on. When the file
 names none, or a value this build does not know, the build's own default
-applies, which is `"yabridge"` in this release. A user who sets it keeps
+applies, which is `"openxlr"`. Releases before the setting existed ran
+every bridged plugin through yabridge. A user who sets it keeps
 what they set when a later release changes that. `setWindowsHostDefault`
 changes it in the running daemon and saves it; `pluginSetup` reports it as
 `windowsHostDefault`. A client that wants to know where a plugin runs reads
