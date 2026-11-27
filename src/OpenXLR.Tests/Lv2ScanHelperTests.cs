@@ -429,10 +429,16 @@ public sealed class Lv2ScanHelperTests(ITestOutputHelper output)
             string calls = Path.Combine(directory, "calls");
             string cacheDirectory = Path.Combine(directory, "cache");
             string kind = Kind();
+            // The first run stalls for its whole 2 second deadline. The 3.5
+            // second budget then leaves the second run at most 1.5 seconds,
+            // less than a deadline, so the budget is what cuts it. Those 1.5
+            // seconds also absorb a slow machine starting and stopping the
+            // first run; with half a second to spare, CI sometimes used it
+            // all and never began the second run.
             long begun = System.Diagnostics.Stopwatch.GetTimestamp();
             Lv2Catalog.Lv2Scan scan = Lv2Catalog.FromHelper(Fussy(directory, calls, bundles), "/plugins", null, kind,
-                TimeSpan.FromSeconds(1), failures: new ScanCache(cacheDirectory), budget: TimeSpan.FromSeconds(1.5));
-            Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(begun) < TimeSpan.FromSeconds(4));
+                TimeSpan.FromSeconds(2), failures: new ScanCache(cacheDirectory), budget: TimeSpan.FromSeconds(3.5));
+            Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(begun) < TimeSpan.FromSeconds(7));
             Assert.False(scan.Complete);
             Assert.Equal(2, Calls(calls).Length);
             Assert.Equal(["urn:first", "urn:second"], scan.Plugins.Select(p => p.Plugin));
