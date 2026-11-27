@@ -650,15 +650,21 @@ public sealed class PluginInstallerTests : IDisposable
         Directory.CreateDirectory(thirtyTwo);
         File.WriteAllBytes(Path.Combine(thirtyTwo, "Nova.vst3"), Windows);
 
-        PluginInstaller withYabridge = new(_lv2, _clap, _vst3, FakeYabridgectl(), wine: "/bin/true", hostInstalled: true, winePrefix: prefix);
+        PluginInstaller withYabridge = new(_lv2, _clap, _vst3, FakeYabridgectl(), wine: "/bin/true", hostInstalled: true, winePrefix: prefix,
+            windowsHost: false);
         Assert.Equal([vst3, clap], withYabridge.WinePluginFolders());   // the 32-bit copy is not offered
         Assert.Equal([vst3, clap], withYabridge.Setup().WineFolders);
+
+        // The Windows plugin host searches Wine's folders by itself, so a build with it offers none, yabridge or not.
+        Assert.Empty(new PluginInstaller(_lv2, _clap, _vst3, FakeYabridgectl(), wine: "/bin/true", hostInstalled: true, winePrefix: prefix,
+            windowsHost: true).Setup().WineFolders);
 
         // Nothing to offer when the tools that would use it are missing.
         Assert.Empty(new PluginInstaller(_lv2, _clap, _vst3, null, null, true, prefix).Setup().WineFolders);
 
         // A folder already bridged is not offered again.
-        PluginInstaller bridged = new(_lv2, _clap, _vst3, FakeYabridgectl(vst3), wine: "/bin/true", hostInstalled: true, winePrefix: prefix);
+        PluginInstaller bridged = new(_lv2, _clap, _vst3, FakeYabridgectl(vst3), wine: "/bin/true", hostInstalled: true, winePrefix: prefix,
+            windowsHost: false);
         Assert.Equal([clap], bridged.Setup().WineFolders);
     }
 

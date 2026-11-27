@@ -544,10 +544,10 @@ public sealed class PluginInstaller
             : "Wine is";
 
     /// <summary>
-    /// Add each directory to yabridge and sync once, or with no yabridge in a
-    /// build with the Windows plugin host, leave them to that host. Returns a
-    /// sentence. <paramref name="picked"/> names the plugin when the user
-    /// picked one rather than a folder, for the wording.
+    /// Leave each directory to the Windows plugin host in a build that has
+    /// it, whether or not yabridge is installed, or else add it to yabridge
+    /// and sync once. Returns a sentence. <paramref name="picked"/> names the
+    /// plugin when the user picked one rather than a folder, for the wording.
     /// <paramref name="imported"/> are the directories under the import
     /// directory, which the host already searches.
     /// </summary>
@@ -560,7 +560,7 @@ public sealed class PluginInstaller
                 : directories.Count == 1 ? $"{Path.GetFileName(directories[0])} holds Windows plugins" : "These are Windows plugins";
             return $"{what}, and {missing} not installed. Install {(missing.StartsWith("yabridge and", StringComparison.Ordinal) ? "them" : "it")}, then add {(picked is not null || directories.Count == 1 ? "it" : "them")} again.";
         }
-        if (_yabridgectl is null) return HostWindows(directories, picked, installed, destinations, imported ?? new HashSet<string>());
+        if (_windowsHost) return HostWindows(directories, picked, installed, destinations, imported ?? new HashSet<string>());
         if (!PrepareManagedBridge()) return "The OpenXLR bridge could not select its packaged libraries.";
         if (!TryWindowsDirectories(out IReadOnlyList<string> directoriesBefore, out string? listError)) return listError!;
         HashSet<string> known = directoriesBefore.ToHashSet(StringComparer.Ordinal);
@@ -583,7 +583,8 @@ public sealed class PluginInstaller
 
     /// <summary>
     /// Leave Windows plugins to the Windows plugin host, for a build that
-    /// has it and Wine but no yabridge. A plugin copied into the import
+    /// has it and Wine. yabridge is not asked, even when it is installed: a
+    /// new plugin goes to the host alone. A plugin copied into the import
     /// directory is already in a folder the host searches. Any other folder
     /// is added as a <c>windows</c> plugin folder, unless the host searches
     /// it already.
@@ -1139,7 +1140,9 @@ public sealed class PluginInstaller
         var known = bridged.Select(d => Path.GetFullPath(d).TrimEnd('/')).ToHashSet(StringComparer.Ordinal);
         // Only the ones still to bridge: a folder already handed over needs
         // no offer, and after bridging one the offer goes away by itself.
-        IReadOnlyList<string> wine = _wine is null || _yabridgectl is null
+        // The Windows plugin host searches Wine's folders by itself, so a
+        // build with it offers none.
+        IReadOnlyList<string> wine = _wine is null || _yabridgectl is null || _windowsHost
             ? []
             : [.. WinePluginFolders().Where(f => !known.Contains(Path.GetFullPath(f).TrimEnd('/')))];
         var memoryLock = PluginMemoryLock.ReadLimits();
