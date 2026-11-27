@@ -795,7 +795,8 @@ generated controls when blocked and refresh availability on
 Rules use the format and stable plugin id, not the filename or display name.
 Only explicit overrides are saved; an untouched plugin follows the defaults
 in each release. An explicit allow or block survives future default changes.
-The initial release default blocks the Elgato De-Esser VST3 editor. Rule ids
+The release defaults block the Elgato De-Esser and Elgato Noise Removal VST3
+editors, on yabridge and on the Windows plugin host alike. Rule ids
 are bounded at 512 characters, names at 200, and the file at 1024 overrides
 and 1 MiB.
 Malformed stored choices are not silently overwritten; release defaults stay
