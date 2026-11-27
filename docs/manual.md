@@ -3013,9 +3013,12 @@ Wine may first have to set up the prefix.
 
 A plugin you also bridged through yabridge is listed once, by its yabridge
 wrapper, because yabridge stays the default and the switch above moves it
-to this host. If you remove yabridge or the wrapper later, an insert that
-used the plugin comes back on OpenXLR's host with the same settings, as
-long as the plugin is still in one of the Windows folders.
+to this host. The scan of the Windows folders never loads that plugin on
+OpenXLR's host, so it cannot use up an activation of a plugin that counts
+the computers it runs on. If you remove yabridge or the wrapper later, the
+next scan reads the plugin on OpenXLR's host, and an insert that used it
+comes back there with the same settings, as long as the plugin is still in
+one of the Windows folders.
 
 If a Windows plugin is not in the picker, run `openxlr doctor` with the
 daemon running. It lists the folders OpenXLR's host looks in, says which

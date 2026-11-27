@@ -353,6 +353,59 @@ public sealed class InsertWindowsHostTests : IDisposable
         Assert.Equal(("voice", ClassId, null), (insert.Id, insert.Plugin, insert.WindowsHost));
     }
 
+    /// <summary>
+    /// A pin written into <c>mixer.json</c> by hand, with the daemon stopped,
+    /// before a build's first start: the daemon reads it as a pin of its own,
+    /// an insert without one as yabridge, and reading the file changes nothing
+    /// in it. What the daemon saves afterwards keeps both as they were. The
+    /// recall into a built mixer is followed through the steps it takes for
+    /// inserts, since building one needs an audio server.
+    /// </summary>
+    [Fact]
+    public void APinWrittenIntoTheFileByHandIsHonouredAndKept()
+    {
+        (_, string module) = InstalledVst3("Deep Verb");
+        PluginInfo bridged = Plugin("vst3", ClassId, "Deep Verb", Vst3Wrapper("wrappers", "Deep Verb", module));
+        string path = Path.Combine(_root, "mixer.json");
+        string written = $$"""
+            {
+              "version": {{MixerSettings.CurrentVersion}},
+              "inserts": {
+                "xlr1": [
+                  { "id": "pinned", "kind": "vst3", "plugin": "{{ClassId}}", "windowsHost": "openxlr" },
+                  { "id": "default", "kind": "vst3", "plugin": "{{ClassId}}" }
+                ]
+              }
+            }
+
+            """;
+        File.WriteAllText(path, written);
+
+        MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+        Assert.Null(warning);
+        Assert.Equal(written, File.ReadAllText(path));
+        Assert.Equal(["mixer.json"], Directory.EnumerateFiles(_root).Select(Path.GetFileName));
+        Assert.Equal(["openxlr", null], loaded.Inserts!["xlr1"].Select(i => i.WindowsHost));
+
+        // The chains as a built mixer takes them from the file (ApplySettings
+        // recalls them over the empty ones it starts with), and what the chain
+        // builder then starts for each insert.
+        List<InsertDefinition> chain = Mixer.RecallChains(new Dictionary<string, List<InsertDefinition>>(), loaded.Inserts, _ => false)["xlr1"];
+        Assert.Equal([true, false], chain.Select(i => i.OnWindowsHost));
+        var adapter = new PipeWireAdapter(() => { }, _ => { });
+        Assert.Equal(module, adapter.WindowsRoute(chain[0], bridged, out string? kept, installed: true)!.Module);
+        Assert.Null(kept);
+        Assert.Null(adapter.WindowsRoute(chain[1], bridged, out _, installed: true));
+        Assert.Equal(written, File.ReadAllText(path));
+
+        // The next save writes the chains back as they were read.
+        Assert.Null((loaded with { Inserts = new() { ["xlr1"] = chain } }).Save(path));
+        JsonArray saved = JsonNode.Parse(File.ReadAllText(path))!["inserts"]!["xlr1"]!.AsArray();
+        Assert.Equal(["pinned", "default"], saved.Select(i => i!["id"]!.GetValue<string>()));
+        Assert.Equal("openxlr", saved[0]!["windowsHost"]!.GetValue<string>());
+        Assert.False(saved[1]!.AsObject().ContainsKey("windowsHost"));
+    }
+
     [Fact]
     public void RewritingAChainLeavesEveryInsertOnTheHostItHas()
     {
