@@ -39,7 +39,7 @@ open `main`, so they can describe changes newer than the installed release.
   and host setup.
 - [Source installation](install-from-source.md): prerequisites, native build,
   service setup, updates, uninstall and environment variables.
-- [Windows bridge](../packaging/yabridge/README.md): companion availability,
+- [Optional yabridge companion](../packaging/yabridge/README.md): availability,
   private wrappers, package builds and rollback.
 - [Experimental UCM profile](../packaging/ucm/README.md): optional Pro channel
   split outside the submixer.

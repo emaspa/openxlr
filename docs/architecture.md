@@ -16,7 +16,8 @@ flowchart TD
     Core --> Catalog["lilv in the daemon: LV2 catalogue, only without the native helper"]
     Core --> Host["Native helper: LV2, CLAP, VST3 and built-in stages (EQ, noise removal, compressor, expander and voice changer, ducking, soundboard player, clock bridge, Sound Check, level)"]
     Host <-->|"audio ports"| Graph
-    Host --> Bridge["Optional yabridge / Wine: Windows plugins"]
+    Host --> WinHost["openxlr-winhost.exe under Wine: Windows plugins"]
+    Host --> Bridge["Optional yabridge under Wine: Windows plugins sent to it"]
 ```
 
 - `OpenXLR.Daemon` owns the device and graph. It polls hardware, maintains
@@ -255,6 +256,17 @@ bundles are described in a helper process each, with bounded output and a
 cache invalidated by bundle changes. An optional managed bridge also keys that cache by its
 package version, source commit and installation directory.
 
+Windows VST3 and CLAP plugins run on OpenXLR's own Windows plugin host by
+default. The native helper's `wine` backend starts `openxlr-winhost.exe`
+under Wine, in a process of its own, and the host runs 64-bit modules only.
+In a build with the host the daemon also scans the Windows plugin folders:
+`Program Files/Common Files/VST3` and `CLAP` in the Wine prefix,
+`$XDG_DATA_HOME/openxlr/windows-plugins`, and folders added under the
+search-path kind `windows`. A build made without `WINHOST=1` has no such
+host. yabridge is optional. It runs a wrapped plugin whose insert is pinned
+to it, and every wrapped plugin that follows the default while
+`windowsHostDefault` in `daemon.json` names it.
+
 `ManagedYabridge` selects a complete companion installation, or falls back
 to the system/user bridge. It prepends the companion to PATH only for the
 scanner, host and controller it starts. Plugin processes retain HOME,
@@ -339,7 +351,8 @@ reopened after 2 s, doubling on each further failure up to 32 s.
 ```
 src/            .NET solution: Core (device + mixer), Daemon, UI, Tui, Probe, Tests
 browser/        the Chromium tab routing companion and its native host manifest
-native/         optional C/C++ plugin host, vendored interface headers, noise removal
+native/         optional C/C++ plugin host, the Windows plugin host (wine.c and the
+                Windows program under winhost/), vendored interface headers, noise removal
                 (RNNoise under rnnoise/, DeepFilterNet's Rust wrapper under deepfilter/),
                 the voice changer's Signalsmith Stretch under signalsmith/, tests
 plugin/         the OpenDeck (Stream Deck) plugin

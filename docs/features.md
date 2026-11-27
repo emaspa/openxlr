@@ -827,8 +827,9 @@ take. Undo never touches phantom power, a lock, the hardware mute or the
 monitoring pause, never moves a locked gain or level, writes a hardware
 step only to the interface it was made on, and leaves alone a value
 something else moved since, the unit's own dial included.
-Loading a profile, deleting a channel or mix, switching the mixing mode or
-the active interface clears the history.
+Loading a profile, resetting the interface to its defaults, deleting a
+channel or mix, switching the mixing mode or the active interface clears
+the history.
 In the terminal mixer `u` undoes and `U` redoes, and the bottom line
 names the step.
 See [Undo and redo](manual.md#undo-and-redo).
@@ -888,7 +889,7 @@ that the chosen backend cannot run. VST2 is not supported.
 | LV2 | PipeWire filter-chain by default; optional native host per insert, which also takes over an insert the filter chain refuses | lilv in a native helper scan (in the daemon on a build without the helper), standard LV2 directories or `LV2_PATH`, plus added folders |
 | CLAP | native host, one process per insert | standard CLAP directories or `CLAP_PATH`, plus added folders |
 | VST3 | native host, one process per insert | standard VST3 directories or `VST3_PATH`, plus added folders |
-| Windows VST3 / CLAP | yabridge and Wine behind the native host | bridge-generated Linux wrappers |
+| Windows VST3 / CLAP | OpenXLR's Windows plugin host under Wine, started by the native host; yabridge for an insert sent to it, a plugin the host cannot run, or a build without the host | the Wine prefix's VST3 and CLAP folders, the folder "Install file" copies into and added Windows folders; yabridge's Linux wrappers when yabridge is installed |
 
 The plugin manager in Options lists every folder the three formats search
 and takes folders of your own, whose plugins are used where they are,
@@ -930,7 +931,7 @@ a plugin with no figure counts as zero. Turning it on or off rebuilds every
 chain. See [plugin latency](manual.md#plugin-latency).
 
 A plugin that cannot keep up with a small block size, typically a Windows
-plugin through yabridge that makes the sound stutter or the interface drop
+plugin that makes the sound stutter or the interface drop
 out, can run on its own block. The native host then calls it with 1024
 samples at a time on a real-time thread of its own while the graph keeps its block
 size, and a block it answers late plays as a short gap instead of stalling
@@ -939,10 +940,10 @@ the device. It adds a fixed delay to that chain, 32 ms at a block size of
 controls window and the API, and saved with the chain. See
 [a plugin that cannot keep up](manual.md#own-block).
 
-A Windows plugin bridged through yabridge can run on the Windows plugin
-host built into OpenXLR instead. A default host in Options moves every such
-plugin at once, and a list in a plugin's controls window, or the API, pins
-one insert to either host. A plugin that follows the default and fails to
+A Windows plugin runs on the Windows plugin host built into OpenXLR. One
+that also has a yabridge wrapper can run on either host. A default host in
+Options moves every such plugin at once, and a list in a plugin's controls
+window, or the API, pins one insert to either host. A plugin that follows the default and fails to
 start on that host starts again through yabridge. Every package except the
 Flatpak includes it, and a source build has it when made with `WINHOST=1`.
 Wine is still needed to run it. The plugin's own editor opens on
@@ -1038,8 +1039,8 @@ a Windows sync, detected Wine folders and the selected bridge's status.
 
 The `openxlr-yabridge` companion is packaged for every channel OpenXLR
 is, the Flatpak bundle apart,
-and includes the Wine 9.22+ editor input fix. Its host also reports the
-system disk's real model and serial number, which Wine leaves empty, so
+and includes the Wine 9.22+ editor input fix. Its host, like OpenXLR's own,
+reports the system disk's real model and serial number, which Wine leaves empty, so
 plugins that tie their licence to a machine ID built from that disk, such as
 [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767),
 can activate. It creates wrappers under

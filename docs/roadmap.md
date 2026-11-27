@@ -92,7 +92,7 @@ is measured over one that is described.
   activate.
 - [x] Clients. The UI, with twenty-five built-in skins, skins that
   rearrange it, Broadcast and Wave among them with the mixer drawn as a
-  matrix, system, light and dark modes, a compact and a large density,
+  matrix, system, light and dark modes, normal and Touch control sizes,
   five text sizes, Mic setup, the Flow window and seven languages. The
   terminal mixer `openxlr-tui`, drawing the same skins, with the EQ's
   band editor. The OpenDeck plugin, with keys and dials drawn like the
@@ -213,8 +213,8 @@ land at any time.
 - [ ] The tests that fail now and then on main are listed by name from
   the run history and fixed, and a failed run keeps its test results and
   a screenshot. Cancelling a superseded run on main stays.
-- [ ] Every test has a job that runs it: the native dynamics suite, the
-  history tooltip test and the starter sounds check have none today, and
+- [ ] Every test has a job that runs it: the native dynamics suite and the
+  history tooltip test have none today, and
   a change to `docs/api.md` skips the unit tests that read it.
 - [ ] Release assets come from workflows with a checksum and a
   provenance attestation. The packages, the plugin zip and the browser
@@ -423,7 +423,8 @@ yabridge setup are deprecated then and removed the release after.
   merged. A pull request does not add its own credit paragraph.
 - The .NET build stays usable without a native compiler. The plugin host
   is optional at source-build time and included in distribution packages.
-  The Windows bridge is a separate optional companion.
+  OpenXLR's Windows plugin host is in every package except the Flatpak,
+  and the yabridge companion is separate and optional.
 - The audio graph is not rebuilt for a change that does not need it;
   every node the daemon creates has a name that survives restarts, and
   existing users' assignments and profiles keep working across upgrades.

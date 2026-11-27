@@ -83,7 +83,7 @@ python3 tools/check-omarchy.py  # Qt 6 QML tools, with external type declaration
 python3 tools/omarchy-skins.py --check  # embedded meter tokens match the generated table
 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -input packaging/omarchy/tests
 node --test packaging/omarchy/tests/*.test.mjs
-make -C native  # C/C++, PipeWire, lilv, LV2 and X11 development headers; cargo for DeepFilterNet (DEEPFILTER=0 builds without)
+make -C native  # C/C++, PipeWire, lilv, LV2, X11 and libsndfile development headers; cargo for DeepFilterNet (DEEPFILTER=0 builds without)
 make -C native test-audio test-clap test-lv2 test-vst3 test-scan  # audio bounds, stall detection, measured delay, the Windows host's disk identity on made-up disks, CLAP bus layouts, latency reports, VST3 parameter and stream checks, scan phase markers
 dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~Lv2BundleTests|FullyQualifiedName~PluginSearchPathTests"  # run with lilv installed, even if the earlier suite ran without it
 python3 tools/test-monitor-volume.py  # private PipeWire server and session bus; pipewire-pulse, wireplumber, pactl, dbus-daemon
@@ -97,6 +97,9 @@ make -C native test-voice  # voice changer: every voice bounded and near the inp
 make -C native test-player  # soundboard player: decoding, limits, press modes and ramps, libsndfile, no audio server
 make -C native test-bridge  # clock bridge: ring, drift loop and resampler between two simulated clocks, no audio server
 python3 native/tests/incremental.py  # the Make plan after the builds above: nothing for an unchanged tree, only the objects that include a changed header
+make -C native clean-native && make -C native WINHOST=1  # the Windows plugin host; mingw-w64 gcc and g++, either thread model, and libdbus; clean-native again before a default build
+xvfb-run -a make -C native WINHOST=1 test-winhost  # the wine backend against the fixture plugins; Wine and Xvfb, and dbus-daemon and prlimit for the RTKit check on a private bus; a SKIP line names what is missing
+make -C native WINHOST=1 test-winhost-graph  # the wine backend as a node of a private PipeWire server; Wine, pipewire, pw-link and pw-dump
 OPENXLR_TEST_DESKTOP=1 xvfb-run -a dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~TrayWindowTests
 OPENXLR_TEST_LAYOUT=1 xvfb-run -a -s '-screen 0 2560x1440x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~WindowLayoutTests
 OPENXLR_TEST_TOOLTIP=1 xvfb-run -a -s '-screen 0 1600x1000x24' dotnet test src/OpenXLR.Tests/OpenXLR.Tests.csproj -c Release --no-build --filter FullyQualifiedName~ToolTipInputTests
@@ -230,7 +233,7 @@ The native-enabled application build uses `-p:EnableNativeLv2Host=true`.
 Keep that flag when rebuilding a local installation that uses CLAP, VST3
 or native LV2 editors. Desktop acceptance checks must include plugin
 controls, resizing, moving and reopening editors; Xvfb tests do not replace
-those checks. The optional Windows bridge has a separate artifact workflow
+those checks. The optional yabridge companion has a separate artifact workflow
 and [package checks](packaging/yabridge/README.md).
 
 ## Dependency updates
@@ -256,7 +259,9 @@ pages and tests skips the build and tests. The unit job still builds and
 runs when the change touches a document its tests read: `docs/skins.md`,
 `docs/manual.md`, `docs/install-from-source.md`, `docs/localization.md` or
 `docs/examples/skins/README.md`. The Omarchy QML check runs only when its
-own files or the workflow change.
+own files or the workflow change. The Windows plugin host job runs only
+when a file under `native/` other than Markdown changes, or when the
+workflow or the CI scripts do.
 Skipped jobs count as passing for the required `ci-ok` check. CodeQL
 skips a change to `README.md` alone.
 

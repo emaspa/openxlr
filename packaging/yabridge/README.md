@@ -10,8 +10,9 @@ to yabridgectl.
 OpenXLR's own Windows plugin host is not part of this companion. It ships
 in the main `openxlr` package on every channel but the Flatpak, as
 `openxlr-winhost.exe` beside the native helper, built with mingw and with
-Wine only suggested. The companion stays: yabridge is still the default
-host for every plugin it bridges, and it brings Wine with it. See
+Wine only suggested. That host is the default for every plugin the
+companion bridges. Options, or a plugin's controls window, sends a plugin
+back to yabridge. The companion's packages depend on Wine. See
 [OpenXLR's Windows plugin host](../../docs/manual.md#windows-plugin-host).
 
 `disk-identity.patch` gives Windows plugins the system disk's identity. In
@@ -96,7 +97,10 @@ sudo pacman -U ./openxlr-yabridge-*-x86_64.pkg.tar.zst
 ```
 
 Restart the daemon with `systemctl --user restart openxlr-daemon`, then use
-Options, "Bridge Wine's plugins", or install a Windows plugin folder.
+Options, "Bridge Wine's plugins", or install a Windows plugin folder. A
+plugin bridged this way still runs on OpenXLR's own host by default. To run
+it through yabridge, choose yabridge under "Windows plugins run on" in
+Options, or pick "Always yabridge" in the plugin's controls window.
 OpenXLR selects the companion's matching libraries and host through its
 isolated helper's PATH. It can still read existing system wrappers; new
 wrappers are private. Other DAWs keep their existing environment and files.
@@ -133,14 +137,14 @@ Install the build tools first:
 
 ```sh
 # Arch
-sudo pacman -S --needed python meson ninja cmake pkgconf rust wine
+sudo pacman -S --needed git python meson ninja cmake pkgconf rust wine
 
 # Debian or Ubuntu
-sudo apt install python3 g++ meson ninja-build cmake pkg-config \
+sudo apt install git python3 g++ meson ninja-build cmake pkg-config \
     wine wine64-tools libwine-dev libxcb1-dev libdbus-1-dev cargo rustc
 
 # Fedora
-sudo dnf install python3 gcc-c++ meson ninja-build cmake pkgconf-pkg-config \
+sudo dnf install git python3 gcc-c++ meson ninja-build cmake pkgconf-pkg-config \
     wine wine-devel libxcb-devel dbus-devel cargo rust
 ```
 

@@ -938,8 +938,8 @@ OpenXLR shows matched 'Mic Capture Volume' in `amixer` at +54 and +36 dB,
 and under its +18 dB floor the control stayed at +18 dB while PipeWire
 attenuated the rest in software.
 
-Beyond that volume, OpenXLR sends nothing to another brand's device. Its
-phantom power, mute button, headphone level and onboard effects stay on the
+Beyond that volume and the source's mute, OpenXLR sends nothing to another
+brand's device. Its phantom power, mute button, headphone level and onboard effects stay on the
 device or with its own software. These need an Elgato device: every control in
 the device sections above, the gain lock, recall on connect, last settings
 restored on connect, the Wave XLR Pro's output routing, USB Aux mix,

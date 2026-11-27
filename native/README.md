@@ -1191,8 +1191,8 @@ openxlr-lv2-host wine scan-clap FILE
 openxlr-lv2-host wine scan-vst3 BUNDLE
 ```
 
-`make -C native WINHOST=1` builds a second way to run a Windows plugin, one
-that does not go through yabridge. It adds a `wine` backend to the helper
+`make -C native WINHOST=1` builds OpenXLR's own Windows plugin host, which
+runs a Windows plugin without yabridge. It adds a `wine` backend to the helper
 (`wine.c`) and builds `openxlr-winhost.exe` beside it. The backend starts
 that program under Wine, and the program loads the plugin. The arguments
 after the format mean what they mean for a native plugin of that format:
@@ -1220,16 +1220,18 @@ one file. Building it does not need Wine; running it does. Run
 `make -C native clean-native` when you switch the flag, as after any change
 of flags.
 
-This is the start of a host that will replace the yabridge companion. It
+In a build that has it, this host is the default for Windows plugin
+inserts, and the yabridge companion is optional. It
 carries CLAP and VST3 audio, parameters and latency, it shows a plugin's
 editor, it scans, and it reports the system disk's identity to a plugin as
 the companion's host does. Every package except the Flatpak builds it. The
 package sets `WINHOST=1` in the environment of the daemon's publish, and
 the publish copies `openxlr-winhost.exe` beside the helper.
 `packaging/check-winhost.py` fails when a package stops doing so. In a build
-that has it, the daemon starts it for an insert that asks for it and for no
-other, and never for a scan. [The daemon's side](#the-daemons-side) has
-the rest.
+that has it, the daemon starts it for every Windows plugin insert that
+follows the default host or is pinned to this one, and to describe the
+plugins in the Windows plugin folders for the catalogue.
+[The daemon's side](#the-daemons-side) has the rest.
 
 The helper keeps the PipeWire node and the Windows program holds the plugin.
 The Windows program has no CLAP or VST3 host of its own. It is built from
@@ -1248,6 +1250,8 @@ these sources:
   the load names.
 - `winhost/editor.c`, which has the window an editor is put in and answers
   what a backend asks of the frame around it.
+- `winhost/disk-hook.c`, which answers a plugin's question about the system
+  disk, as [the disk identity](#the-disk-identity) describes.
 
 The two backends differ on Windows in few places. `clap.c` skips the
 `dlfcn.h` include, has one block for the window an editor sits in, which
@@ -1588,8 +1592,8 @@ misbehaves in one:
   last phase line says where the plugin was.
 - The helper gives up on a plugin that never answers after three minutes.
   Two are what Wine may need to start, as before a load, and one is what the
-  daemon gives the scan of a native bundle. The daemon ends a native scan
-  after that one minute, so its deadline would come first.
+  daemon gives the scan of a native bundle. The daemon gives a scan on this
+  host 190 seconds, so the helper's limit comes first.
 - The helper holds the request's pipe open while it waits, and the Windows
   program ends itself when that pipe closes. The helper gives up by closing
   it. A helper that is killed, as the daemon kills one at its deadline,
@@ -1697,12 +1701,18 @@ its environment names it. `pluginSetup.windowsHostInstalled` reports
 it. A helper built without `WINHOST=1` has no `wine` backend, so the two
 have to come from the same build.
 
-yabridge stays the host of every Windows plugin unless an insert says
-otherwise. `setInsertWindowsHost` moves one insert here and back, and
-[docs/api.md](../docs/api.md#windows-host) has the command, what it refuses
-and the state fields. The catalogue is not scanned again for it. A Windows
-plugin is in the catalogue through the wrapper yabridge made, and the daemon
-reads the Windows module back from that wrapper:
+An insert of a Windows plugin follows the default host unless it is
+pinned. The default is this host, and `setWindowsHostDefault` changes it.
+`setInsertWindowsHost` pins one insert to this host or to yabridge, or
+clears the pin, and
+[docs/api.md](../docs/api.md#windows-host) has the commands, what they refuse
+and the state fields. A Windows plugin reaches the catalogue in one of two
+ways. The daemon finds it in a
+[Windows plugin folder](../docs/api.md#windows-plugin-folders) and describes
+it with `wine scan-clap` or `wine scan-vst3`, and such a plugin runs only
+here. Or it is in the catalogue through the wrapper yabridge made. The
+catalogue is not scanned again for a wrapped plugin that moves here, and the
+daemon reads the Windows module back from that wrapper:
 
 - VST3: `NAME.vst3/Contents/x86_64-win/NAME.vst3` in the wrapper is a link
   to the module.
@@ -1744,10 +1754,15 @@ companion, as [the disk identity](#the-disk-identity) describes. Its editor
 opens as on any other host: `showInsertUi` sends the helper `show`, and a
 compatibility rule blocks it the same way.
 
-A saved choice the build cannot honour when the chain is built, because the
-host is gone after a downgrade or the module is, never fails the chain. The
-insert runs through yabridge, and the daemon's log and the insert's status
-say why.
+A pin to this host that the build cannot honour when the chain is built,
+because the host is gone after a downgrade or the module is, does not fail
+the chain of a plugin with a yabridge wrapper. The insert runs through
+yabridge, and the daemon's log and the insert's status say why. An insert
+that follows the default and fails to start here starts once more through
+yabridge when yabridge is installed, unless the start ran into the daemon's
+wait for Wine. A plugin found only in a Windows plugin folder has no
+wrapper to fall back on, and its chain fails with the reason when it cannot
+start here.
 
 `make -C native WINHOST=1 test-winhost` runs `tests/winhost` against two
 test plugins built with mingw, a CLAP module (`tests/winhost-plugin.c`) and
@@ -2121,7 +2136,9 @@ ends the helper like any other failure, and is not called while inactive.
 
 The interface headers are vendored under `vst3/` (MIT, VST 3.8.1); only their
 inline parts are used, so nothing of the SDK is compiled. Windows VST3
-plugins arrive through yabridge as ordinary bundles. The optional
+plugins run on OpenXLR's own host by default, as
+[Windows plugin host](#windows-plugin-host) describes. One that runs
+through yabridge arrives as an ordinary bundle. The optional
 [OpenXLR companion](../packaging/yabridge/README.md) supplies matching
 64-bit libraries and host with the Wine input fix, selected through the
 helper's PATH. Wine and plugin settings remain in the user's environment.
