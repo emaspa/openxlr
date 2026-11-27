@@ -17,6 +17,14 @@ the repair. A daemon that is not running gets
 daemon is reported as unverified, with the restart as the repair. An absent
 receipt is reported as unknown ownership, not as a healthy installation.
 
+When the running daemon has
+[OpenXLR's Windows plugin host](manual.md#windows-plugin-host), doctor also
+asks it about Windows plugins, with or without a receipt. It adds notes for
+the folders the host looks in, each folder the daemon cannot see, and each
+Windows plugin its last scan left out, with the reason. These are
+information, not findings, so they do not change the exit code. At most 32
+are printed; the last one counts the rest.
+
 ```sh
 openxlr doctor
 openxlr doctor --json

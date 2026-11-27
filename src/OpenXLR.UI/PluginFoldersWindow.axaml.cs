@@ -73,9 +73,26 @@ public partial class PluginFoldersWindow : Window
     {
         string? folder = FolderList.SelectedItem as string;
         await vm.LoadPluginSetupAsync();
+        ShowFormats(vm);
         FolderList.SelectedItem = folder is not null && vm.WindowsDirectories.Contains(folder)
             ? folder : vm.WindowsDirectories.FirstOrDefault();
         await LoadFilesAsync(vm);
+    }
+
+    /// <summary>
+    /// The formats a folder can be added for. Windows is one of them where
+    /// the daemon lists Windows folders, which it does only in a build with
+    /// its own Windows plugin host: a Windows folder there is searched for
+    /// VST3 and CLAP plugins that run on that host.
+    /// </summary>
+    internal void ShowFormats(OptionsViewModel vm)
+    {
+        string[] formats = vm.SearchDirectories.Any(d => d.Kind == PluginSearchDirectoryItem.WindowsKind)
+            ? ["LV2", "CLAP", "VST3", "Windows"] : ["LV2", "CLAP", "VST3"];
+        if (SearchFormat.ItemsSource is string[] shown && shown.SequenceEqual(formats)) return;
+        object? selected = SearchFormat.SelectedItem;
+        SearchFormat.ItemsSource = formats;
+        SearchFormat.SelectedItem = selected is string format && formats.Contains(format) ? format : formats[0];
     }
 
     private async Task LoadFilesAsync(OptionsViewModel vm)

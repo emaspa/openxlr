@@ -9,13 +9,18 @@ public sealed record PluginSearchDirectory(string Kind, string Path, bool Custom
 /// Plugin folders added from the plugin manager, searched on top of each
 /// format's normal places. They are saved in daemon.json. Removing one stops
 /// the search there and never deletes a file.
+///
+/// The kind <c>windows</c> is a folder of Windows VST3 and CLAP plugins for
+/// the Windows plugin host built into OpenXLR, searched for both formats on
+/// top of the standard folders of the Wine prefix
+/// (<see cref="WindowsPluginHost.Directories"/>).
 /// </summary>
 public static class PluginSearchPaths
 {
     public const int MaxPaths = 32;
     private static readonly object Gate = new();
 
-    public static bool Valid(string? kind, string? path) => kind is "lv2" or "clap" or "vst3" &&
+    public static bool Valid(string? kind, string? path) => kind is "lv2" or "clap" or "vst3" or "windows" &&
         path is { Length: > 1 and <= 4096 } && Path.IsPathFullyQualified(path) &&
         !path.Any(char.IsControl) && !path.Contains(':');
 
@@ -64,7 +69,7 @@ public static class PluginSearchPaths
     public static InstallOutcome Change(string kind, string path, bool add)
     {
         if (!Valid(kind, path))
-            return Refused("Choose LV2, CLAP or VST3 and an absolute folder path without a colon or control character.");
+            return Refused("Choose LV2, CLAP, VST3 or Windows and an absolute folder path without a colon or control character.");
         string canonical;
         try { canonical = WindowsPluginWrappers.Canonical(path); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -176,10 +181,17 @@ public static class PluginSearchPaths
         if (Lv2Path() is { } path) start.Environment["LV2_PATH"] = path;
     }
 
+    /// <summary>
+    /// The folders a new one of this kind must stay clear of. A Windows
+    /// folder is searched for CLAP and VST3 alike, so it must stay clear of
+    /// theirs as well: a folder of yabridge wrappers read again as Windows
+    /// plugins would load every module twice to find what is already listed.
+    /// </summary>
     private static IReadOnlyList<string> Directories(string kind) => kind switch
     {
         "clap" => ClapCatalog.SearchPath(),
         "vst3" => Vst3Catalog.SearchPath(),
+        "windows" => [.. WindowsPluginHost.Directories(), .. ClapCatalog.SearchPath(), .. Vst3Catalog.SearchPath()],
         _ => Lv2Directories(),
     };
 
@@ -191,11 +203,19 @@ public static class PluginSearchPaths
         path == Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) ||
         new[] { "/proc", "/sys", "/dev", "/run" }.Any(root => path == root || path.StartsWith(root + "/", StringComparison.Ordinal));
 
-    /// <summary>Every directory each format searches, with the added ones marked.</summary>
-    public static IReadOnlyList<PluginSearchDirectory> Snapshot()
+    /// <summary>
+    /// Every directory each format searches, with the added ones marked. The
+    /// Windows folders are listed only in a build with the Windows plugin
+    /// host, the only one that searches them.
+    /// </summary>
+    /// <param name="windowsHost">The host's presence, for a test; the build's own when null.</param>
+    public static IReadOnlyList<PluginSearchDirectory> Snapshot(bool? windowsHost = null)
     {
         var added = Read(out _).ToHashSet();
+        IEnumerable<(string, IReadOnlyList<string>)> windows = windowsHost ?? WindowsPluginHost.Installed
+            ? [("windows", WindowsPluginHost.Directories())] : [];
         return [.. new[] { ("lv2", Lv2Directories()), ("clap", ClapCatalog.SearchPath()), ("vst3", Vst3Catalog.SearchPath()) }
+            .Concat(windows)
             .SelectMany(group => group.Item2.Select(path => new PluginSearchDirectory(group.Item1, path,
                 added.Contains(new(group.Item1, path)), Directory.Exists(path))))];
     }

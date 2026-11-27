@@ -2064,11 +2064,21 @@ public sealed class PipeWireAdapter
     /// there, or null to start it from its bundle. For a saved choice this
     /// build cannot honour, <paramref name="kept"/> is why yabridge keeps the
     /// insert, and the journal and the timeline get a line.
+    ///
+    /// A plugin found in a Windows plugin folder has no wrapper to fall back
+    /// on, so it runs on the Windows plugin host whatever the insert saved,
+    /// and one that cannot start there fails its chain with the reason. That
+    /// is how an insert saved against a yabridge wrapper that is gone comes up
+    /// on this host, with its values, while its module is still in one of
+    /// those folders.
     /// </summary>
     /// <param name="installed">The host's presence, for a test; the build's own when null.</param>
     internal WindowsPluginHost.Route? WindowsRoute(InsertDefinition insert, PluginInfo info, out string? kept, bool? installed = null)
     {
         kept = null;
+        if (info.WindowsHostOnly)
+            return WindowsPluginHost.Resolve(info, out string? reason, installed)
+                ?? throw new InvalidOperationException($"{InsertName(insert)} runs only on the Windows plugin host and cannot start there: {reason}.");
         if (!insert.OnWindowsHost) return null;
         WindowsPluginHost.Route? route = WindowsPluginHost.Resolve(info, out kept, installed);
         if (route is null)

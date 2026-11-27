@@ -71,5 +71,5 @@ public sealed record DaemonSettings
     public static bool SubmixerEnabled(bool launchDefault) => Load().Submixer ?? launchDefault;
 }
 
-/// <summary>An added plugin search folder: the format (lv2, clap or vst3) and an absolute directory.</summary>
+/// <summary>An added plugin search folder: the format (lv2, clap or vst3, or windows for both Windows formats) and an absolute directory.</summary>
 public sealed record PluginFolder(string Kind, string Path);

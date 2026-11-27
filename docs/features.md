@@ -947,6 +947,12 @@ either host. Its audio thread gets PipeWire's real-time priority, through
 the user's real-time limit or, where there is none, through RTKit.
 yabridge stays the default. See
 [OpenXLR's Windows plugin host](manual.md#windows-plugin-host).
+Such a build also finds Windows VST3 and CLAP plugins in the Wine prefix's
+standard folders, and in Windows folders added in the plugin manager, and
+runs them on that host with no yabridge at all. A plugin that has a yabridge
+wrapper as well is listed once, by the wrapper, and an insert saved against
+a wrapper that is later removed comes back on OpenXLR's host with its
+settings. See [Windows plugins without yabridge](manual.md#windows-plugin-folders).
 
 A block size option forces PipeWire's quantum for the graph OpenXLR runs
 in to 256, 512 or 1024 samples, or leaves it to PipeWire. It holds against

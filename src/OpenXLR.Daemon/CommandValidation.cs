@@ -883,7 +883,7 @@ public static class CommandValidation
 
     internal static string? CheckPluginSearchPath(Command cmd)
         => PluginSearchPaths.Valid(cmd.Kind, cmd.Path) ? null
-            : $"{cmd.Cmd}: kind must be lv2, clap or vst3 and path an absolute folder of at most 4096 characters, without a colon or control character";
+            : $"{cmd.Cmd}: kind must be lv2, clap, vst3 or windows and path an absolute folder of at most 4096 characters, without a colon or control character";
 
     internal static string? CheckPluginPath(Command cmd)
         => string.IsNullOrWhiteSpace(cmd.Path) || cmd.Path.Length > 4096

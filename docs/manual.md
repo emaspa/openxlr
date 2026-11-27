@@ -2664,7 +2664,10 @@ looks for the limiter.
 - Choose LV2, CLAP or VST3 and press "Add plugin folder". OpenXLR searches
   that folder from then on and reads the catalogues again, so its plugins
   are in the picker when it finishes. The list is kept in
-  `~/.config/openxlr/daemon.json` and survives a restart.
+  `~/.config/openxlr/daemon.json` and survives a restart. In a build with
+  [OpenXLR's Windows plugin host](#windows-plugin-host) the list also has
+  Windows, for a folder of Windows VST3 and CLAP plugins that run on that
+  host.
 - Select an added folder and press "Remove added folder" to stop searching
   it. Its files stay where they are. An insert that used one of its plugins
   keeps running, and fails on its next load unless the plugin is found
@@ -2676,7 +2679,7 @@ A folder must be absolute, without a colon, and cannot be the filesystem
 root, `/usr`, `/home`, your home folder itself or a system tree such as
 `/proc`. One inside or around a folder already searched is refused, and
 symbolic-link aliases count as the same folder. Up to 32 folders can be
-added across the three formats. A CLAP or VST3 folder is searched to any
+added across all the formats. A CLAP, VST3 or Windows folder is searched to any
 depth, up to 16,384 entries; a bigger one is reported and the search
 stops there, so choose a narrower folder.
 
@@ -2983,6 +2986,33 @@ The line ends with `within this user's real-time limit`, with
 The first start in a Wine prefix can take longer than OpenXLR waits for a
 plugin. If the plugin reports that Wine did not answer in time, turn the
 insert off and on again.
+
+<a name="windows-plugin-folders"></a>
+**Windows plugins without yabridge.** In a build with the host, OpenXLR
+also finds Windows plugins where their installers put them, with no
+yabridge and no sync: `C:\Program Files\Common Files\VST3` and
+`C:\Program Files\Common Files\CLAP` in your Wine prefix. That is the
+prefix in the daemon's `WINEPREFIX`, or `~/.wine` when it has none. Those
+two folders show in the plugin manager's top list as Windows folders. For
+plugins kept anywhere else, choose Windows there and press "Add plugin
+folder". Such a plugin is in the picker like any other and runs on
+OpenXLR's host, since nothing else can run it. Its controls window has no
+switch, only the line saying it runs on the Windows plugin host. OpenXLR's
+host runs only 64-bit plugins, so it leaves the `Program Files (x86)`
+folders alone. The first scan of a plugin can take a few minutes, because
+Wine may first have to set up the prefix.
+
+A plugin you also bridged through yabridge is listed once, by its yabridge
+wrapper, because yabridge stays the default and the switch above moves it
+to this host. If you remove yabridge or the wrapper later, an insert that
+used the plugin comes back on OpenXLR's host with the same settings, as
+long as the plugin is still in one of the Windows folders.
+
+If a Windows plugin is not in the picker, run `openxlr doctor` with the
+daemon running. It lists the folders OpenXLR's host looks in, says which
+of them the daemon cannot see, and names each plugin the last scan left
+out, with the reason: a 32-bit plugin, a scan that failed or ran out of
+time, or one listed through its yabridge wrapper instead.
 
 <a name="bundle-not-read"></a>
 **A bridged plugin is not in the picker.** A successful yabridge sync means

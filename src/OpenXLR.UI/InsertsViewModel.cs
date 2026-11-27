@@ -660,9 +660,13 @@ public sealed class InsertViewModel : ViewModelBase
         set { if (Set(ref _windowsHostRefusal, value)) RaiseWindowsHost(); }
     }
 
-    /// <summary>Which host runs the plugin now, beside the switch; null while nothing runs it or the switch is not offered.</summary>
-    public string? WindowsHostState => !CanChooseWindowsHost ? null
-        : _windowsHostRunning ? Localizer.Text("RunsOnTheWindowsPluginHost")
+    /// <summary>
+    /// Which host runs the plugin now, beside the switch; null while nothing
+    /// runs it. Without the switch only the Windows plugin host is named: a
+    /// plugin found in a Windows plugin folder runs nowhere else.
+    /// </summary>
+    public string? WindowsHostState => _windowsHostRunning ? Localizer.Text("RunsOnTheWindowsPluginHost")
+        : !CanChooseWindowsHost ? null
         : NativeHostRunning ? Localizer.Text("RunsThroughYabridge")
         : null;
     public bool HasWindowsHostState => WindowsHostState is not null;
