@@ -53,7 +53,63 @@ static void check_failed_monitor(void) {
   puts("PASS: an idle host beats, but a failed host cannot hide behind a blocked editor");
 }
 
+// An output port as pw_filter keeps one (filter.c): two buffers, the free
+// ones and the queued ones in order, and the io area PipeWire takes the
+// buffer from. A cycle recycles the buffer in the io area if it was taken,
+// the callback takes a free buffer and queues it, and the cycle ends with
+// the oldest queued buffer put in the io area if that is free. Once its
+// link is live PipeWire takes that buffer at the end of every cycle.
+typedef struct {
+  struct spa_io_buffers io;
+  float data[2][32];
+  uint32_t free[2], queued[2];
+  unsigned free_count, queued_count;
+  bool linked;
+  float sent;  // the first sample of the buffer taken this cycle, or NAN
+} FilterOutput;
+
+static FilterOutput *filter_outputs;
+static unsigned filter_output_count;
+
+static uint32_t take_first(uint32_t *list, unsigned *count) {
+  uint32_t first = list[0];
+  for (unsigned i = 1; i < *count; ++i) list[i - 1] = list[i];
+  --*count;
+  return first;
+}
+
+static void filter_cycle(Host *h, struct spa_io_position *position) {
+  for (unsigned i = 0; i < filter_output_count; ++i) {
+    FilterOutput *p = &filter_outputs[i];
+    if (p->io.buffer_id < 2 && p->io.status != SPA_STATUS_HAVE_DATA)
+      p->free[p->free_count++] = p->io.buffer_id;
+  }
+  process_audio(h, position);
+  for (unsigned i = 0; i < filter_output_count; ++i) {
+    FilterOutput *p = &filter_outputs[i];
+    if (p->io.status != SPA_STATUS_HAVE_DATA) {
+      p->io.buffer_id = p->queued_count ? take_first(p->queued, &p->queued_count)
+                                        : SPA_ID_INVALID;
+      p->io.status = p->io.buffer_id != SPA_ID_INVALID ? SPA_STATUS_HAVE_DATA
+                                                       : SPA_STATUS_NEED_DATA;
+    }
+    p->sent = NAN;
+    if (p->linked) {
+      if (p->io.status == SPA_STATUS_HAVE_DATA) p->sent = p->data[p->io.buffer_id][0];
+      p->io.status = SPA_STATUS_NEED_DATA;
+    }
+  }
+}
+
 static void *test_dsp_buffer(void *port, uint32_t frames) {
+  for (unsigned i = 0; i < filter_output_count; i++)
+    if (port == &filter_outputs[i]) {
+      FilterOutput *p = &filter_outputs[i];
+      if (!p->free_count) return NULL;
+      uint32_t id = take_first(p->free, &p->free_count);
+      p->queued[p->queued_count++] = id;
+      return p->data[id];
+    }
   for (unsigned i = 0; i < MAX_CHANNELS * 2; i++)
     if (port == &test_buffers[i]) return test_buffers[i];
   return pw_filter_get_dsp_buffer(port, frames);
@@ -172,6 +228,52 @@ static void check_outputs_unread(void) {
   assert_canary(h.silence), assert_canary(h.scratch);
   free(h.silence), free(h.scratch);
   puts("PASS: the main outputs count as unread only when none of them has a buffer");
+}
+
+// A link is made a port at a time, and PipeWire can run a cycle on a port
+// whose buffers and io area it has given before it takes from it. The
+// buffer of that cycle stays in the io area, and a buffer the host takes
+// the cycle after is queued behind it: from then on that channel would play
+// a cycle late, for as long as the link lasts. Here the left output has its
+// buffer left untaken for one cycle, the right one does not, and from the
+// cycle after that the two carry the same cycle's audio, every cycle.
+static void check_output_left_untaken(void) {
+  const Backend gain = {.process = gain_audio};
+  AudioFixture fixture = {0};
+  Host h = {.backend = &gain, .rate = 48000, .channels = 2, .impl = &fixture};
+  h.silence = guarded(), h.scratch = guarded();
+  FilterOutput outputs[2];
+  memset(outputs, 0, sizeof(outputs));
+  filter_outputs = outputs, filter_output_count = 2;
+  for (unsigned c = 0; c < h.channels; ++c) {
+    test_buffers[c] = guarded();
+    h.in_ports[c] = &test_buffers[c];
+    h.out_ports[c] = &outputs[c];
+    outputs[c] = (FilterOutput){.io = {SPA_STATUS_NEED_DATA, SPA_ID_INVALID},
+                                .free = {0, 1}, .free_count = 2, .linked = c == 1};
+    port_io_changed(&h, &outputs[c], SPA_IO_Buffers, &outputs[c].io, sizeof(outputs[c].io));
+  }
+  struct spa_io_position position = {0};
+  position.clock.duration = 32;
+  position.clock.rate.denom = h.rate;
+  for (unsigned cycle = 1; cycle <= 64; ++cycle) {
+    for (unsigned c = 0; c < h.channels; ++c)
+      for (unsigned n = 0; n < 32; ++n) test_buffers[c][n] = (float)cycle;
+    filter_cycle(&h, &position);
+    outputs[0].linked = true;
+    assert(outputs[1].sent == 2 * (float)cycle);
+    if (cycle > 2) assert(outputs[0].sent == outputs[1].sent);
+  }
+  for (unsigned c = 0; c < h.channels; ++c) {
+    port_io_changed(&h, &outputs[c], SPA_IO_Buffers, NULL, 0);
+    assert(!atomic_load(&h.out_io[c]));
+    free(test_buffers[c]);
+    test_buffers[c] = NULL;
+  }
+  filter_outputs = NULL, filter_output_count = 0;
+  assert_canary(h.silence), assert_canary(h.scratch);
+  free(h.silence), free(h.scratch);
+  puts("PASS: an output whose buffer was left untaken for a cycle does not fall a cycle behind the other");
 }
 
 static void check_invalid_audio(void) {
@@ -612,6 +714,7 @@ int main(void) {
   check_failed_monitor();
   check_processing_failure();
   check_outputs_unread();
+  check_output_left_untaken();
   check_invalid_audio();
   check_sustained_invalid_input();
   check_duck_invalid_input();

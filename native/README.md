@@ -62,7 +62,11 @@ from a node that has no work, and invalid input reaches the plugin as
 silence and never stops the host. That holds for three seconds of it on an
 in-place node and for single samples into the duck stage. Invalid output
 is silenced, and counts toward a restart only on sound and only after half
-a second of it. The same target runs `tests/own-block`, which drives the
+a second of it. PipeWire can leave an output's buffer untaken for a cycle
+while it makes a link, and until that buffer is taken the output gets no new
+one. Otherwise pw_filter would queue the next buffer behind it, and that
+channel would play a cycle behind the other for as long as the link lasts.
+The same target runs `tests/own-block`, which drives the
 [own block](#own-block) without a graph: the output is the input delayed
 by exactly the reported delay, sample for sample; a block answered within
 its time is never late and one answered later costs only its own late
@@ -1976,7 +1980,10 @@ plugin's own:
   leaves the graph. A helper asked to quit exits cleanly and takes its node.
 
 Silence while the plugin's audio runs is a block that came late, which a
-loaded machine may cause. It is counted and printed, not failed. No thread
+loaded machine may cause. It is counted and printed, not failed. Any other
+frame fails. The failure says how late each channel was and for how many
+frames the recorder heard something other than the plugin's audio, so a
+lasting skew between the channels cannot pass for a glitch at a link. No thread
 of the check runs above real-time priority 20. The check needs PipeWire's
 server, `pw-link` and `pw-dump` as well as Wine, uses the same Wine prefix as
 `test-winhost` and no display, and runs in the same CI job.
