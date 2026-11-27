@@ -866,5 +866,17 @@ public sealed class PluginInstallerTests : IDisposable
         Assert.Contains("Wine is not", OptionsViewModel.WindowsLine("5.1.1", false, 0));
         Assert.Contains("no folder bridged yet", OptionsViewModel.WindowsLine("5.1.1", true, 0));
         Assert.Contains("2 folders bridged", OptionsViewModel.WindowsLine("5.1.1", true, 2));
+        Assert.DoesNotContain("insert", OptionsViewModel.WindowsLine("5.1.1", true, 2));
+
+        // A build with the Windows plugin host never sends the user to yabridge.
+        Assert.Equal("Windows plugins: Wine is not installed, and OpenXLR's Windows plugin host needs it. Install Wine from your distribution.",
+            OptionsViewModel.WindowsLine(null, false, 0, windowsHost: true));
+        Assert.StartsWith("Windows plugins: Wine is installed, and they run on OpenXLR's Windows plugin host.",
+            OptionsViewModel.WindowsLine(null, true, 0, windowsHost: true));
+        Assert.DoesNotContain("yabridge", OptionsViewModel.WindowsLine(null, true, 0, windowsHost: true));
+        // With yabridge there as well it says how many inserts still run on it.
+        Assert.EndsWith("No insert runs on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true));
+        Assert.EndsWith("One insert runs on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true, onYabridge: 1));
+        Assert.EndsWith(" 3 inserts run on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true, onYabridge: 3));
     }
 }

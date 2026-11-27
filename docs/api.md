@@ -158,7 +158,7 @@ Messages from the daemon, each a JSON object with a `type` field:
 | `starterSounds` | in answer to `restoreStarterSounds` | `ok` (true when it went through, also when no starter clip was missing), `message`, `clips` (the ids added, in library order) and `skipped` (each clip left out, as `name: reason`). See [Starter sounds](#starter-sounds) |
 | `soundboardImport` | in answer to `importSoundboard` | `ok` (true when at least one clip was imported), `message`, `clips` (the ids added, in library order), `renamed` (the archive's id to the new one, for each clip whose id was in use here), `skipped` (each clip left out, as `name: reason`, and on a refusal each clip that could not be taken) and `replaced` (true when the library was replaced). See [Soundboard](#soundboard) |
 | `plugins` | in answer to `listPlugins` | the installed LV2, CLAP and VST3 plugins with their controls, within the message size limit above and always including the plugins the saved chains use; `supported` is false, with `unsupportedFeatures` listed, for a plugin that needs a host feature the PipeWire chain lacks. `audioIns` and `audioOuts` are the plugin's own port counts, or for VST3 its main buses' default width; a VST3 entry also carries `widths`, the chain widths in channels (1 and 2 are the ones the host carries) its main buses accepted when the helper asked the way the host asks at load, so a plugin that reports 2 and lists 1 in `widths` can be inserted on a mono input. An entry without `widths` (LV2, CLAP, or a description an older helper wrote) fits a mono input with one port each way and a stereo input or mix with two or more. `windowsHostOnly` is true for a Windows CLAP or VST3 plugin found in a [Windows plugin folder](#windows-plugin-folders), whose `path` is the Windows bundle itself and which runs only on the Windows plugin host, and false for every other entry |
-| `pluginSetup` | in answer to `getPluginSetup`, `setPluginWineTrace` or `setWindowsHostDefault`, and to every client after a `setWindowsHostDefault` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which every package but the Flatpak has), `windowsHostDefault` (`"yabridge"` or `"openxlr"`, the host an insert of a Windows plugin runs on while it [follows the default](#windows-host-default)), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
+| `pluginSetup` | in answer to `getPluginSetup`, `setPluginWineTrace` or `setWindowsHostDefault`, and to every client after a `setWindowsHostDefault` | where installs go (`lv2Directory`, `clapDirectory`, `vst3Directory`), `hostInstalled`, `windowsHostInstalled` (whether the build has the [Windows plugin host](#windows-host), which every package but the Flatpak has), `windowsHostDefault` (`"yabridge"` or `"openxlr"`, the host an insert of a Windows plugin runs on while it [follows the default](#windows-host-default)), `yabridgeInserts` (how many inserts run through yabridge: pinned to it, held on it by the release, following a default that is yabridge, or, in a build without the host, every insert of a plugin with a yabridge wrapper), `wineTrace` (deep tracing enabled in the running daemon), `yabridge` (its version, or null when not installed), `wine`, `windowsDirectories` (the folders yabridge bridges) and `wineFolders` (Wine's own plugin folders that hold a plugin and are not bridged yet, offered as one press since a file dialog hides them), `memoryLockLimitBytes` (the running daemon's soft limit in bytes; -1 means unlimited, null means unknown) and `memoryLockNote` (recovery advice when Windows plugin support is available and the limit is below 256 MiB, otherwise null), `searchDirectories` (every folder searched, see [Plugin search paths](#plugin-search-paths)) and `searchPathWarning` |
 | `windowsPluginFiles` | in answer to `getWindowsPluginFiles` | `ok`, `message` and `plugins`; each plugin file carries `path`, `name`, `format`, `enabled`, `canDelete`, `winePrefix` and `inUse`. Excluded files remain listed |
 | `nativeEditorRules` | in answer to `getNativeEditorRules` or `setNativeEditorRule` | `rules` with `kind`, `plugin`, `name`, `reason`, `defaultBlocked`, `override` and effective `blocked`; `error` describes a refused change or unreadable configuration |
 | `nativeEditorRulesChanged` | after a successful rule change | notification to refresh the catalogue and editor availability; no plugin rescan is needed |
@@ -2391,7 +2391,7 @@ both.
 `getPluginDiagnostics` reads the daemon's environment, not the UI's shell.
 `discovery` includes `controller`, `wineExecutable`, `winePrefix`,
 `sourceCommit` for a managed bridge, `hostExecutable`, `hostInstalled`,
-`windowsHostExecutable`, `windowsHostInstalled`, `windowsHostDirectories`,
+`windowsHostExecutable`, `windowsHostInstalled`, `windowsHostDefault`, `windowsHostDirectories`,
 `processArchitecture`, `searchPaths` and `scans`. `searchPaths.lv2Override`
 is the `LV2_PATH` LV2 hosts are given (the daemon's own, or the standard
 directories plus added plugin folders) or null for lilv defaults; `clap` and
@@ -2422,6 +2422,17 @@ Wine: no `wine` where it looks for tools (its PATH, `~/.local/bin`,
 is empty when Wine is there.
 `yabridgeFolderCopy` is the record of [the one-time copy](#yabridge-folder-copy)
 from `daemon.json`, or null before it ran.
+
+`yabridgeInserts` lists up to 64 inserts that run through yabridge, as far
+as names and settings decide, as `{chain, chainName, id, name, reason,
+note}`. Only inserts of a plugin the catalogue reaches through a yabridge
+wrapper are listed. `reason` is `pinned` when the insert's controls window
+pins yabridge, `held` when the release holds its plugin on yabridge while
+the insert follows the default, with the release's reason in `note`,
+`default` when it follows a default that is yabridge, and `no-host` for
+any other such insert in a build without the Windows plugin host. An insert
+that is to run on the Windows plugin host is not listed, even when its
+module later turns out not to start there and yabridge runs it instead.
 
 Both `pluginSetup` and `discovery` include `memoryLockHardLimitBytes`, the
 daemon's hard memory-lock limit. The existing `memoryLockLimitBytes` stays

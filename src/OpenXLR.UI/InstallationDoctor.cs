@@ -182,7 +182,9 @@ internal static class InstallationDoctor
     /// the last scan of them found and left out, with the reason. Before
     /// those, what removing the yabridge companion would cost: the inserts
     /// whose plugin only a yabridge wrapper lists, and the yabridge folders
-    /// the daemon could not copy into the Windows plugin folders. A build
+    /// the daemon could not copy into the Windows plugin folders. First of
+    /// all, the default host and each insert pinned to yabridge or held on
+    /// it by this release. A build
     /// without the host, whose Windows plugins come through yabridge alone,
     /// gets none of these. Either build is told when Wine is missing and an
     /// insert has a Windows plugin. Information only: none of it is a fault
@@ -206,6 +208,31 @@ internal static class InstallationDoctor
                 + string.Join(", ", needWine) + ". Install Wine with your distribution's package manager; the package is called wine"));
         if (!discovery.TryGetProperty("windowsHostInstalled", out JsonElement installed) || installed.ValueKind != JsonValueKind.True)
             return notes;
+        // Which host the inserts that pin none run on, then each insert that
+        // runs through yabridge by its own choice or this release's.
+        JsonElement[] onYabridge = [.. Items(discovery, "yabridgeInserts")];
+        int following = onYabridge.Count(insert => Text(insert, "reason") == "default");
+        switch (Text(discovery, "windowsHostDefault"))
+        {
+            case "openxlr":
+                notes.Add(new("windows plugin host", "the default host of Windows plugin inserts is OpenXLR's Windows plugin host. An insert's controls window can pin it to yabridge"));
+                break;
+            case "yabridge":
+                notes.Add(new("windows plugin host", "the default host of Windows plugin inserts is yabridge, chosen under Windows plugins run on in Options, so "
+                    + (following == 0 ? "an insert that follows it runs through yabridge" : $"{Count(following, "insert that follows it runs", "inserts that follow it run")} through yabridge")));
+                break;
+        }
+        foreach (JsonElement insert in onYabridge)
+            switch (Text(insert, "reason"))
+            {
+                case "pinned":
+                    notes.Add(new(InsertName(insert), "runs on yabridge, pinned in its controls window. Choose Default host there to have it follow the default host"));
+                    break;
+                case "held":
+                    notes.Add(new(InsertName(insert), "runs on yabridge while it follows the default, because this release holds its plugin there: "
+                        + (Text(insert, "note") ?? "no reason was given") + ". Its controls window can pin it to OpenXLR's Windows plugin host"));
+                    break;
+            }
         // What would go with the yabridge companion: each insert whose plugin
         // only a wrapper lists, and each yabridge folder the one-time copy
         // could not add to the Windows plugin folders.

@@ -64,6 +64,8 @@ public sealed record PluginSetup(
     /// so <c>setInsertWindowsHost</c> can move an insert to it.
     /// </summary>
     public bool WindowsHostInstalled { get; init; }
+    /// <summary>How many inserts run through yabridge: pinned there, held there, following it as the default, or in a build without the Windows plugin host.</summary>
+    public int YabridgeInserts { get; init; }
 }
 
 /// <summary>
@@ -1070,6 +1072,11 @@ public sealed class PluginInstaller
             hostExecutable = NativePluginHost.Executable, hostInstalled = _hostInstalled,
             windowsHostExecutable = WindowsPluginHost.Executable,
             windowsHostInstalled = _windowsHost,
+            windowsHostDefault = WindowsPluginHost.Default,
+            // The inserts that run through yabridge by name, and why: pinned
+            // there, held there by this release, or following it as the
+            // default.
+            yabridgeInserts = YabridgeMigration.YabridgeInserts(inserts, find, _windowsHost).Take(YabridgeMigration.MaxListed),
             // What has to be settled before the companion can go: the
             // inserts it alone gives a plugin, the yabridge folders the
             // one-time copy could not add, and the inserts with a Windows
@@ -1102,7 +1109,9 @@ public sealed class PluginInstaller
     }
 
     /// <summary>What is there: the directories, the host, yabridge and Wine.</summary>
-    public PluginSetup Setup()
+    /// <param name="inserts">The mixer's inserts, to count those that run through yabridge; none when null.</param>
+    /// <param name="find">The catalogue entry for a format and plugin id, for a test; the daemon's catalogue when null.</param>
+    public PluginSetup Setup(IReadOnlyList<ChainInsert>? inserts = null, Func<string, string, PluginInfo?>? find = null)
     {
         string? version = null;
         if (_yabridgectl is not null)
@@ -1150,6 +1159,7 @@ public sealed class PluginInstaller
             WindowsPluginDirectory = _managed is null ? null : Shorten(ManagedYabridge.PluginHome),
             WindowsImportDirectory = Shorten(_windowsImports),
             WindowsHostInstalled = _windowsHost,
+            YabridgeInserts = YabridgeMigration.YabridgeInserts(inserts ?? [], find ?? PluginCatalog.Find, _windowsHost).Count,
             WindowsEditorNote = _managed is null && EditorsIgnoreTheMouse(version, wineVersion)
                 ? $"A Windows plugin's own editor can ignore the mouse with yabridge {version} and {wineVersion}: since Wine 9.22 its clicks can arrive somewhere else entirely. The optional openxlr-yabridge package includes the input fix. The manual covers bridge selection."
                 : null,
