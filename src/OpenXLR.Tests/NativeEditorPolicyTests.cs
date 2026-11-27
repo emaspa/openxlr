@@ -22,6 +22,19 @@ public sealed class NativeEditorPolicyTests
     ];
 
     [Fact]
+    public void TheReleaseReasonsHoldForEitherWindowsHost()
+    {
+        // The shipped rules apply on yabridge and on the Windows plugin host,
+        // so a reason may name Wine but not one host or its version.
+        foreach (NativeEditorRule rule in NativeEditorPolicy.Curated)
+        {
+            Assert.DoesNotContain("bridge", rule.Reason, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("5.1.1", rule.Reason);
+            Assert.DoesNotContain("11.17", rule.Reason);
+        }
+    }
+
+    [Fact]
     public void TheReleaseListBlocksKnownUnstableEditorsAndLeavesOtherPluginsAlone()
     {
         Run(directory =>

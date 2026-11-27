@@ -2584,7 +2584,8 @@ the input's route, and the plugin host is not needed.
 to choose plugins that should use OpenXLR's generated controls instead of their
 own editor. The release list includes Elgato De-Esser because its
 native editor freezes under Wine, and Elgato Noise Removal because closing
-or reopening its native editor can crash the plugin host.
+or reopening its native editor can crash the plugin. Both blocks apply
+whichever host runs the plugin.
 An open compatibility list refreshes when the daemon reconnects and
 cannot be edited while it is disconnected.
 
@@ -3190,10 +3191,11 @@ the directory. Review paths and output before sharing.
 
 <a name="windows-editor-input"></a>
 Elgato Noise Removal 1.1.2 can crash when its own editor closes or reopens
-with Wine 11.17 and the OpenXLR bridge 5.1.1.54. Its native editor is
-blocked by default. Use its OpenXLR controls; this does not disable the
-effect. Options, Native editors lets users test a different bridge or
-plugin version by explicitly allowing an editor again, and lets anyone put
+under Wine. That was seen with Wine 11.17 through yabridge 5.1.1.54; its
+editor has not been tried on the Windows plugin host yet. Its native editor
+is blocked by default on both hosts. Use its OpenXLR controls; this does not
+disable the effect. Options, Native editors lets users try another host,
+Wine or plugin version by explicitly allowing an editor again, and lets anyone put
 a plugin that is not on the list, Elgato Compressor among them, on OpenXLR
 controls for themselves.
 

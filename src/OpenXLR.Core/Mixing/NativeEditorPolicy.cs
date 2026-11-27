@@ -20,7 +20,7 @@ public sealed record NativeEditorRuleState(string Kind, string Plugin, string Na
 
 /// <summary>
 /// Which plugins run without their own editor. A few plugins bring an editor
-/// that hangs or crashes under the bridge while their audio side is fine, so
+/// that hangs or crashes under Wine while their audio side is fine, so
 /// the insert keeps processing and the user gets the OpenXLR generated
 /// controls instead of the plugin's window.
 ///
@@ -65,7 +65,7 @@ public sealed class NativeEditorPolicy
         new("vst3", "ABCDEF019182FAEB4D616E75466C7665", "Elgato De-Esser",
             "Its native editor freezes under Wine; the OpenXLR controls work."),
         new("vst3", "ABCDEF019182FAEB4D616E7547756770", "Elgato Noise Removal",
-            "Closing or reopening its native editor can crash the plugin with Wine 11.17 and the OpenXLR bridge 5.1.1.54. Use the OpenXLR controls to keep audio processing running."),
+            "Closing or reopening its native editor can crash the plugin under Wine. Use the OpenXLR controls to keep audio processing running."),
     ];
 
     /// <summary>~/.config/openxlr/native-editors.json, honouring XDG_CONFIG_HOME.</summary>
