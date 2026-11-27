@@ -1488,15 +1488,16 @@ public sealed partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// The "no profile" entry of the recall picker; parentheses cannot occur
-    /// in a profile name. An interface without settings memory gets its last
+    /// The "no profile" entry of the recall picker, in parentheses, which
+    /// cannot occur in a profile name, so the entry never stands for one in
+    /// any language. An interface without settings memory gets its last
     /// settings back in that case, so the entry says so there.
     /// </summary>
-    public const string NoRecall = "(none)";
-    public const string LastSettings = "(last settings)";
+    public static string NoRecall => "(" + Localizer.Text("RecallNoProfile") + ")";
+    public static string LastSettings => "(" + Localizer.Text("RecallLastSettings") + ")";
 
     private string NoRecallLabel => CapRetainsSettings ? NoRecall : LastSettings;
-    private static bool IsNoRecall(string value) => value is NoRecall or LastSettings;
+    private static bool IsNoRecall(string value) => value.StartsWith('(');
 
     /// <summary>Recall picker entries: the "no profile" entry then every saved profile.</summary>
     public ObservableCollection<string> RecallChoices { get; } = [NoRecall];

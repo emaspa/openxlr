@@ -2464,7 +2464,7 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
     <value>Sariling volume ng channel. Binabago nito ang bawat mix na pinapadalhan ng channel. Sa zero-latency path ng interface mo naririnig ang mikroponong ito sa headphone. Sinusunod nito ang volume. Kapag nag-on ka ng effect, sa mixer na maririnig ang mikropono, kasama ang effect.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
-    <value>Sa mga mix lang ang volume, hindi sa direct monitor</value>
+    <value>Sinusunod din ng direct monitor ang volume na ito</value>
   </data>
   <data name="MixFaderName" xml:space="preserve">
     <value>Master level ng {0}</value>
@@ -3059,10 +3059,10 @@ Mano-manong host setup pa rin ang Wave XLR Pro UCM profile. I-install ang mga LV
     <value>12 hanggang 20 kHz: hininga at bukas na tunog. Nagdaragdag ng kinang ang banayad na high shelf.</value>
   </data>
   <data name="FlowEq" xml:space="preserve">
-    <value>EQ sa software, {0} sa 4 na band ang on</value>
+    <value>EQ sa software, {0} sa {1} na band ang on</value>
   </data>
   <data name="FlowEqDevice" xml:space="preserve">
-    <value>EQ sa {1}, {0} sa 4 na band ang on</value>
+    <value>EQ sa {1}, {0} sa {2} na band ang on</value>
   </data>
   <data name="CaptureSourcePair" xml:space="preserve">
     <value>{0}, pares {1}</value>

@@ -356,7 +356,7 @@ internal sealed class BrowserNativeHost(DaemonClient client, Stream input, Strea
             if (await pending is { } error)
                 await ErrorAsync(error == "assignBrowserTab: the tab changed website; select it again"
                     ? "The tab changed website. Select it again in the browser extension."
-                    : "OpenXLR could not apply the browser routing change. Check the OpenXLR window.", generation, cancel);
+                    : "OpenXLR could not apply the browser routing change. Open the OpenXLR UI to see why.", generation, cancel);
         }
         finally { _commands.Release(); }
     }

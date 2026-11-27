@@ -216,7 +216,7 @@ public sealed class DeviceDynamicsMixerTests
         Assert.True(mixer.DynamicsRunOnDevice("xlr1"));
         Assert.True(port.UnitOn(W3, 1));
 
-        mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [W3] = Ready() with { RawCaptureInputs = 1 } });
+        mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [W3] = Ready() with { RawCaptureInputs = 1, DynamicsLevels = true } });
         Assert.Equal(DeviceDynamics.Off, port.Posts[^1].Value);
         Assert.False(mixer.DynamicsWantsSoftwareStage("xlr1"), "software waits for the unit to confirm");
         NeverDoubled(mixer, port);
@@ -227,6 +227,7 @@ public sealed class DeviceDynamicsMixerTests
         NeverDoubled(mixer, port);
         Assert.False(Compressor(mixer).Device!.Ready);
         Assert.Equal("rawCapture", Compressor(mixer).Device!.Reason);
+        Assert.True(Compressor(mixer).Device!.Levels);
         Assert.Equal("device", Compressor(mixer).Processing);
     }
 

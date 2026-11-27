@@ -2464,7 +2464,7 @@
     <value>Сопствена јачина канала. Мења сваки микс у који се канал шаље. Слушалице чују овај микрофон преко путање интерфејса без кашњења, која прати јачину. Када укључиш ефекат, чују микрофон преко миксера, са ефектом.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
-    <value>Јачина утиче само на миксеве, не на директно слушање</value>
+    <value>Директно слушање такође прати ову јачину</value>
   </data>
   <data name="MixFaderName" xml:space="preserve">
     <value>Главни ниво: {0}</value>
@@ -3059,10 +3059,10 @@ Wave XLR Pro UCM профил и даље захтева ручно подеша
     <value>12 до 20 kHz: дах и отвореност. Блага висока полица додаје сјај.</value>
   </data>
   <data name="FlowEq" xml:space="preserve">
-    <value>Софтверски EQ, укључено {0} од 4 појаса</value>
+    <value>Софтверски EQ, укључено {0} од {1} појаса</value>
   </data>
   <data name="FlowEqDevice" xml:space="preserve">
-    <value>EQ на {1}, укључено {0} од 4 појаса</value>
+    <value>EQ на {1}, укључено {0} од {2} појаса</value>
   </data>
   <data name="CaptureSourcePair" xml:space="preserve">
     <value>{0}, пар {1}</value>

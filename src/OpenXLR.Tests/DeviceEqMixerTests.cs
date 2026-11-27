@@ -629,7 +629,7 @@ public sealed class DeviceEqMixerTests
         Assert.True(port.UnitOn(Pro, 2));
 
         int posts = port.Posts.Count;
-        Assert.True(mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [Pro] = ProReady() with { RawCaptureInputs = 1 } }));
+        Assert.True(mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [Pro] = ProReady() with { RawCaptureInputs = 1, MaxGain = WaveFxEq.MeasuredMaxGainDb } }));
         Assert.Equal((Pro, 1, DeviceEq.Off), port.Posts.Skip(posts).Single());
         Assert.False(mixer.EqWantsSoftwareStage("xlr1"), "software waits for the unit to confirm");
         NeverDoubled(mixer, port, "xlr1", Pro, 1);
@@ -643,6 +643,8 @@ public sealed class DeviceEqMixerTests
         Assert.False(device.Ready);
         Assert.Equal("rawCapture", device.Reason);
         Assert.Contains("raw capture", device.Note, StringComparison.Ordinal);
+        // The unit's widest gain is a fact of the model, raw capture or not.
+        Assert.Equal(WaveFxEq.MeasuredMaxGainDb, device.MaxGain);
         Assert.Equal("device", Eq(mixer).Processing);
 
         Assert.True(mixer.SetUnitEqSupport(new Dictionary<string, UnitEqSupport> { [Pro] = ProReady() }));

@@ -763,6 +763,7 @@ public sealed partial class Mixer
                 $"The {support.Name} sends this input to the computer before its own processing (raw capture), so the EQ runs in software.")
             {
                 MinimumFirmware = support.MinimumFirmware,
+                MaxGain = support.MaxGain,
             };
         return new MicEqDevice(unit.Unit, unit.Input, support.Name, support.Firmware, support.Ready && failure is null,
             failure is null ? support.Reason : EqDeviceFailedReason, failure is null ? support.Note : $"The {support.Name} {failure}, so the EQ runs in software.")

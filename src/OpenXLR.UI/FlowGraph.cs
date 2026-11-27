@@ -86,8 +86,8 @@ internal sealed record FlowGraph(IReadOnlyList<FlowNode> Nodes, IReadOnlyList<Fl
             {
                 int bands = eq.Bands.Count(b => b.Enabled);
                 stages.Add(eq.IsFaulty ? Localizer.Format("OutputUnavailable", Localizer.Text("Eq"))
-                    : eq.OnDevice ? Localizer.Format("FlowEqDevice", bands, eq.DeviceName ?? Localizer.Text("EqTheInterface"))
-                    : Localizer.Format("FlowEq", bands));
+                    : eq.OnDevice ? Localizer.Format("FlowEqDevice", bands, eq.DeviceName ?? Localizer.Text("EqTheInterface"), eq.Bands.Count)
+                    : Localizer.Format("FlowEq", bands, eq.Bands.Count));
             }
             if (channel.Id == "xlr1")
             {

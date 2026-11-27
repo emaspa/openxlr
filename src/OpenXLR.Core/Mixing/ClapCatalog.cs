@@ -162,8 +162,8 @@ internal static class HostScan
     /// The catalogue of one format with the Windows plugin folders' plugins
     /// after the rest, in a build with the Windows plugin host. A plugin
     /// already found, through a yabridge wrapper above all, is not listed
-    /// again: the wrapper's entry runs on either host, and yabridge is still
-    /// the default, so an insert saved against it loads as it always did.
+    /// again: the wrapper's entry runs on either host, so an insert saved
+    /// against it loads on whichever host it follows, as it always did.
     ///
     /// A module a wrapper of the catalogue links to is not even loaded here.
     /// Its plugins are the wrapper's already, and a plugin that counts the

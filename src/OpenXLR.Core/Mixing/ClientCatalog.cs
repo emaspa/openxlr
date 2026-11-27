@@ -27,8 +27,10 @@ public static class ClientCatalog
 
     /// <summary>
     /// The plugins to offer, out of everything installed: within the size a
-    /// client will read, with the plugins the saved chains use kept whatever
-    /// the budget. A client names an insert and draws its controls from this
+    /// client will read, with the plugins the saved chains use charged first,
+    /// so they are kept before anything else. Only chains whose plugins alone
+    /// pass the whole limit lose any, since a message over it reaches no
+    /// client at all. A client names an insert and draws its controls from this
     /// list, so a plugin the daemon loads and the list leaves out would show
     /// a working chain as a broken one.
     /// </summary>

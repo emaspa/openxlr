@@ -560,13 +560,13 @@ public sealed class EqEditorModelTests
         Assert.False(matrix.Rows.Single(r => r.Channel.Id == "game").ShowsEq);
         // The Flow window's step, first in the input's card.
         string processing = FlowGraph.From(model).Nodes.Single(n => n.Key == "ch:xlr1").Processing;
-        Assert.Equal(Localizer.Format("FlowEq", 3), processing.Split('\n')[0]);
+        Assert.Equal(Localizer.Format("FlowEq", 3, 4), processing.Split('\n')[0]);
 
         // The daemon stops reporting it: the model goes with it, and so does the button.
         ApplyMixer.Invoke(model, [JsonNode.Parse(Mixer(""))]);
         Assert.Null(xlr1.Eq);
         Assert.False(row.ShowsEq);
-        Assert.DoesNotContain(FlowGraph.From(model).Nodes.Single(n => n.Key == "ch:xlr1").Processing.Split('\n'), l => l == Localizer.Format("FlowEq", 3));
+        Assert.DoesNotContain(FlowGraph.From(model).Nodes.Single(n => n.Key == "ch:xlr1").Processing.Split('\n'), l => l == Localizer.Format("FlowEq", 3, 4));
     }
 
     private static JsonNode OnUnit(bool enabled, string backend, string processing, string firmware, bool ready, string? reason = null)
@@ -835,10 +835,10 @@ public sealed class EqEditorModelTests
         ChannelViewModel xlr1 = model.Channels.Single(c => c.Id == "xlr1");
         Assert.True(xlr1.Eq!.OnDevice);
         string Step() => FlowGraph.From(model).Nodes.Single(n => n.Key == "ch:xlr1").Processing.Split('\n')[0];
-        Assert.Equal(Localizer.Format("FlowEqDevice", 3, "Wave XLR Dock MK.2"), Step());
+        Assert.Equal(Localizer.Format("FlowEqDevice", 3, "Wave XLR Dock MK.2", 4), Step());
         Assert.Contains("Wave XLR Dock MK.2", Step());
         ApplyMixer.Invoke(model, [JsonNode.Parse(Mixer("software", "software"))]);
-        Assert.Equal(Localizer.Format("FlowEq", 3), Step());
+        Assert.Equal(Localizer.Format("FlowEq", 3, 4), Step());
     }
 
     /// <summary>
@@ -888,7 +888,7 @@ public sealed class EqEditorModelTests
         Assert.DoesNotContain("ClipGuard", eq.Status);
         Assert.Equal(Localizer.Format("EqWindowTitle", "Guest"), eq.Title);
         string[] steps = FlowGraph.From(model).Nodes.Single(n => n.Key == "ch:guest").Processing.Split('\n');
-        Assert.Equal(Localizer.Format("FlowEq", 3), steps[0]);
+        Assert.Equal(Localizer.Format("FlowEq", 3, 4), steps[0]);
         Assert.Contains("Compressor", steps[1]);
 
         // A state that names a unit and a device backend still offers neither.

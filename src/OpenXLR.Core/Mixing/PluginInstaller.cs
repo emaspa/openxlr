@@ -11,7 +11,7 @@ public enum PluginItemKind
     ClapBundle,
     /// <summary>A .vst3 directory or file built for Linux.</summary>
     Vst3Bundle,
-    /// <summary>A VST3 or CLAP plugin built for Windows: yabridge's job.</summary>
+    /// <summary>A VST3 or CLAP plugin built for Windows, run under Wine.</summary>
     WindowsPlugin,
     /// <summary>A Windows VST2 .dll, which nothing here can load.</summary>
     WindowsVst2,
