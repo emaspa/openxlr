@@ -2946,7 +2946,7 @@ inserts first if the manager asks you to. Removing a folder refreshes the
 catalogue and the open plugin pickers.
 
 <a name="windows-plugin-host"></a>
-**OpenXLR's Windows plugin host (experimental).** OpenXLR has its own
+**OpenXLR's Windows plugin host.** OpenXLR has its own
 Windows plugin host, which can run a Windows plugin in place of yabridge.
 It comes inside the OpenXLR package from the AUR, the PPA and COPR, in the
 release's `.deb` and `.rpm`, and in the Nix flake on x86-64, so there is
@@ -2955,9 +2955,10 @@ has it when made with `WINHOST=1`
 ([native/README.md](../native/README.md#windows-plugin-host)). The host
 runs the plugin under Wine. The package only suggests Wine and does not
 install it, so install Wine from your distribution if nothing else brought
-it. The `openxlr-yabridge` companion above brings it. yabridge stays the
-default for a plugin it bridges, and in a build without the host none of
-this shows.
+it. The `openxlr-yabridge` companion above brings it. Windows plugins
+bridged through yabridge run on OpenXLR's host by default, and Options can
+send them all back to yabridge, as the next paragraph says. In a build
+without the host, yabridge runs them as before and none of this shows.
 
 Every Windows plugin bridged through yabridge runs on the default host
 unless you pin it to one. To change the default for all of them, open

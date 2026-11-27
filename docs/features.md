@@ -943,12 +943,13 @@ A Windows plugin bridged through yabridge can run on the Windows plugin
 host built into OpenXLR instead. A default host in Options moves every such
 plugin at once, and a list in a plugin's controls window, or the API, pins
 one insert to either host. A plugin that follows the default and fails to
-start on that host starts again through yabridge. It is experimental. Every package except the
+start on that host starts again through yabridge. Every package except the
 Flatpak includes it, and a source build has it when made with `WINHOST=1`.
 Wine is still needed to run it. The plugin's own editor opens on
 either host. Its audio thread gets PipeWire's real-time priority, through
 the user's real-time limit or, where there is none, through RTKit.
-yabridge stays the default. See
+The default is OpenXLR's own host; yabridge runs a plugin pinned to it, one
+the host cannot run, and every plugin in a build without the host. See
 [OpenXLR's Windows plugin host](manual.md#windows-plugin-host).
 Such a build also finds Windows VST3 and CLAP plugins in the Wine prefix's
 standard folders, in the folder "Install file" copies a Windows plugin

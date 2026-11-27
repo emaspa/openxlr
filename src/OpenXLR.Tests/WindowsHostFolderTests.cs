@@ -462,16 +462,21 @@ public sealed class WindowsHostFolderTests : IDisposable
         string wrapper = Vst3Wrapper("Deep Verb", module);
         var answers = new Dictionary<string, string> { [verb] = Description(verb, ClassId, "Deep Verb") };
 
-        // The wrapper is there: the insert runs through yabridge from it,
-        // with its saved value, exactly as it did before the folders were read.
+        // The wrapper is there: pinned to yabridge, the insert runs through
+        // yabridge from it, with its saved value, exactly as it did before the
+        // folders were read.
         IReadOnlyList<PluginInfo> withWrapper = ScanVst3([Bridged(ClassId, "Deep Verb", wrapper)], answers);
-        (WindowsPluginHost.Route? route, string[] arguments, string? prefix) = Start(withWrapper, Saved());
+        (WindowsPluginHost.Route? route, string[] arguments, string? prefix) = Start(withWrapper, Saved("yabridge"));
         Assert.Null(route);
         Assert.Equal(["vst3", wrapper, ClassId, "node", "2", "48000", "5=0.25"], arguments);
         Assert.Null(prefix);
-        // Saved to the Windows plugin host, it runs there from the module behind the wrapper.
-        (route, arguments, _) = Start(withWrapper, Saved("openxlr"));
-        Assert.Equal(module, route!.Module);
+        // Following the default, or saved to the Windows plugin host, it runs
+        // there from the module behind the wrapper.
+        foreach (InsertDefinition saved in new[] { Saved(), Saved("openxlr") })
+        {
+            (route, arguments, _) = Start(withWrapper, saved);
+            Assert.Equal(module, route!.Module);
+        }
 
         // The wrapper is gone, yabridge removed with it, and the module is
         // still in the prefix: the same saved insert comes up on the Windows

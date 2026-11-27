@@ -50,7 +50,7 @@ internal static class WindowsPluginHost
     /// <c>daemon.json</c> names none. Moving every such insert to this host
     /// is a change of this line alone.
     /// </summary>
-    internal const string BuiltInDefault = Yabridge;
+    internal const string BuiltInDefault = OpenXlr;
 
     /// <summary>Whether a value names one of the two hosts.</summary>
     internal static bool IsHost(string? value) => value is Yabridge or OpenXlr;
