@@ -37,10 +37,13 @@ public static class YabridgeMigration
 
     /// <summary>
     /// Copy the companion's registered folders into the Windows plugin
-    /// folders, once, in a build with both the Windows plugin host and the
-    /// companion. Only <c>daemon.json</c> is written; the registry is read
-    /// and left as it is. Null when there was nothing to do: the build lacks
-    /// one of the two, the copy already ran, or <c>daemon.json</c> cannot be
+    /// folders, once, in a build with the Windows plugin host, when the
+    /// companion is installed or its registry is still on disk. The registry
+    /// outlives the package, so a user who removes the companion before the
+    /// first start of this build keeps the folders as well. Only
+    /// <c>daemon.json</c> is written; the registry is read and left as it is.
+    /// Null when there was nothing to do: no host, neither the companion nor
+    /// its registry, the copy already ran, or <c>daemon.json</c> cannot be
     /// read. A registry that is missing counts as one with no folders, and
     /// one that cannot be read is named in the record, so the copy is not
     /// tried again either way.
@@ -49,9 +52,10 @@ public static class YabridgeMigration
     /// <param name="bridge">The companion's presence, for a test; found as the daemon finds it when null.</param>
     public static BridgeFolderCopy? CopyFoldersOnce(bool? windowsHost = null, bool? bridge = null)
     {
-        if (!(windowsHost ?? WindowsPluginHost.Installed) || !(bridge ?? ManagedYabridge.Discover() is not null)) return null;
-        if (DaemonSettings.Read(out _) is not { YabridgeFolderCopy: null }) return null;
+        if (!(windowsHost ?? WindowsPluginHost.Installed)) return null;
         string registry = RegistryPath;
+        if (!File.Exists(registry) && !(bridge ?? ManagedYabridge.Discover() is not null)) return null;
+        if (DaemonSettings.Read(out _) is not { YabridgeFolderCopy: null }) return null;
         IReadOnlyList<string> folders = ReadRegistry(registry, out string? problem);
         return PluginSearchPaths.CopyWindowsFolders(folders, problem is null ? [] : [new(registry, problem)]);
     }
