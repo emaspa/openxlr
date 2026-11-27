@@ -100,7 +100,11 @@ characters, more than 4096 ports, or one that would push the message
 past 7 MiB is left out of `plugins` altogether, and at most 512
 controls, 256 scale points and 64 required features are read per plugin;
 a plugin that is listed with `supported: false` is a different case, one
-the chain host cannot run. The UI and terminal accept only text messages
+the chain host cannot run. The room goes first to the plugins the saved
+chains use, then to the whole LV2 list, then to CLAP and VST3 plugins no
+earlier entry already offers under the same name and width, smallest first,
+and last to their copies, so a Windows plugin is not left out to make room
+for the CLAP build of an LV2 plugin. The UI and terminal accept only text messages
 up to 8 MiB, including all fragments. They reconnect when a binary or
 oversized message arrives. The terminal ignores malformed message envelopes
 without stopping its receive loop. The native host's own protocol is bounded the

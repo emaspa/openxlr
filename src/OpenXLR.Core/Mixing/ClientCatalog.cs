@@ -58,9 +58,10 @@ public static class ClientCatalog
     /// the daemon can build is one a client can name and draw controls for.
     /// LV2 comes next and whole, as it always did; the other formats take the
     /// room that is left. When everything fits, every copy of a plugin is
-    /// offered. When it does not, a format's copies of plugins already listed
-    /// go before anything distinct, and then its largest entries, so LV2
-    /// never loses a plugin to a duplicate of itself.
+    /// offered. When it does not, copies of plugins already listed go before
+    /// anything distinct in any format, and then the largest entries, so LV2
+    /// never loses a plugin to a duplicate of itself and a plugin only one
+    /// format offers is never left out for another format's duplicates.
     /// </summary>
     internal static List<PluginInfo> Merge(IReadOnlyList<PluginInfo> lv2, params IReadOnlyList<PluginInfo>[] others)
         => Merge(new HashSet<(string Kind, string Plugin)>(), lv2, others);
@@ -88,20 +89,38 @@ public static class ClientCatalog
         used += withinBudget.Sum(p => (long)Lv2Catalog.Footprint(p));
         var keptLv2 = new HashSet<PluginInfo>(withinBudget);
         List<PluginInfo> kept = [.. lv2.Where(p => pinned.Contains(p) || keptLv2.Contains(p))];
+        // The other formats share what is left. Distinct plugins from every
+        // format come first, smallest first, and only then the copies: one
+        // format's copies of LV2 plugins must not take the room a plugin
+        // offered only in a later format needs. A distinct plugin counts as
+        // listed once taken, so its copy in a later format waits with the
+        // other copies. In each pass the first that does not fit ends it.
+        var listed = new PluginNames([.. kept, .. others.SelectMany(f => f).Where(pinned.Contains)]);
+        var chosen = new List<PluginInfo>();
+        var taken = new HashSet<PluginInfo>();
+        List<PluginInfo> rest = [.. others.SelectMany(f => f).Where(p => !pinned.Contains(p)).OrderBy(Lv2Catalog.Footprint)];
+        foreach (PluginInfo p in rest)
+        {
+            if (listed.Contains(p)) continue;
+            long size = Lv2Catalog.Footprint(p);
+            if (used + size > Lv2Catalog.CatalogBudgetBytes) break;
+            chosen.Add(p);
+            taken.Add(p);
+            listed.Add(p);
+            used += size;
+        }
+        foreach (PluginInfo p in rest.Where(p => !taken.Contains(p)))
+        {
+            long size = Lv2Catalog.Footprint(p);
+            if (used + size > Lv2Catalog.CatalogBudgetBytes) break;
+            chosen.Add(p);
+            used += size;
+        }
         foreach (IReadOnlyList<PluginInfo> format in others)
         {
+            var mine = new HashSet<PluginInfo>(format);
             kept.AddRange(format.Where(pinned.Contains));
-            // Distinct plugins first, smallest first, then the copies with
-            // whatever room is left; the first that does not fit ends it.
-            var listed = new PluginNames(kept);
-            foreach (PluginInfo p in format.Where(p => !pinned.Contains(p))
-                .OrderBy(listed.Contains).ThenBy(Lv2Catalog.Footprint))
-            {
-                long size = Lv2Catalog.Footprint(p);
-                if (used + size > Lv2Catalog.CatalogBudgetBytes) break;
-                kept.Add(p);
-                used += size;
-            }
+            kept.AddRange(chosen.Where(mine.Contains));
         }
         return kept;
     }
@@ -118,12 +137,14 @@ public static class ClientCatalog
 
         public PluginNames(IEnumerable<PluginInfo> plugins)
         {
-            foreach (PluginInfo plugin in plugins)
-            {
-                string name = Simplified(plugin.Name);
-                if (name.Length == 0 || !_whole.Add((plugin.AudioIns, plugin.AudioOuts, name))) continue;
-                foreach (string suffix in Suffixes(name)) _suffixes.Add((plugin.AudioIns, plugin.AudioOuts, suffix));
-            }
+            foreach (PluginInfo plugin in plugins) Add(plugin);
+        }
+
+        public void Add(PluginInfo plugin)
+        {
+            string name = Simplified(plugin.Name);
+            if (name.Length == 0 || !_whole.Add((plugin.AudioIns, plugin.AudioOuts, name))) return;
+            foreach (string suffix in Suffixes(name)) _suffixes.Add((plugin.AudioIns, plugin.AudioOuts, suffix));
         }
 
         public bool Contains(PluginInfo plugin)
