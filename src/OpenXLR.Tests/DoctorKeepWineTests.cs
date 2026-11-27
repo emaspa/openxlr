@@ -70,7 +70,7 @@ public sealed class DoctorKeepWineTests : IDisposable
     [Fact]
     public void RpmAlwaysGetsTheNoteAndAptAndNixNever()
     {
-        Assert.EndsWith("run: sudo dnf mark user wine", Assert.IsType<DoctorNote>(Note("rpm")).Information);
+        Assert.EndsWith("run: sudo dnf mark user -y wine", Assert.IsType<DoctorNote>(Note("rpm")).Information);
         Package("wine", "11.20-1", "1");
         Assert.Null(Note("debian"));
         Assert.Null(Note("nix"));

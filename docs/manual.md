@@ -3031,6 +3031,9 @@ journalctl --user -u openxlr-daemon --no-pager | grep "audio thread runs"
 
 The line ends with `within this user's real-time limit`, with
 `granted by RTKit`, or with `without real-time priority:` and the reason.
+RTKit only grants a user who is logged in at the machine, as on a desktop.
+A user who reaches it only over SSH, with the daemon kept running by
+`loginctl enable-linger`, gets `RTKit refused` in that reason.
 
 The first start in a Wine prefix can take longer than OpenXLR waits for a
 plugin. If the plugin reports that Wine did not answer in time, turn the
@@ -3099,7 +3102,7 @@ The companion depends on Wine and OpenXLR only suggests it, so removing
 the companion can take Wine with it when nothing else needs Wine. On Arch,
 `pacman -Rs openxlr-yabridge` does, and on Fedora `dnf remove` does. While
 the companion is installed, the doctor gives the command that keeps Wine:
-`sudo pacman -D --asexplicit wine` on Arch, or `sudo dnf mark user wine` on
+`sudo pacman -D --asexplicit wine` on Arch, or `sudo dnf mark user -y wine` on
 Fedora. Run it before you remove the companion. On Debian and Ubuntu, apt
 keeps Wine because OpenXLR suggests it.
 
@@ -3381,8 +3384,11 @@ the last bridged insert has stopped, and again when the daemon stops, so
 a few seconds instead of waiting out the unit's stop timeout. Only the
 session OpenXLR started is ended: a plugin installer you are running, or
 another DAW with its own bridged plugins, keeps its Wine whatever OpenXLR
-does. Without `wineserver` on PATH nothing is ended, and the daemon says
-so once in its log. The unit sends SIGTERM to the daemon alone
+does. OpenXLR runs the `wineserver` the session itself runs from, so it
+works where Wine keeps it off PATH, as Debian and Ubuntu do. When that
+program cannot be read and there is no `wineserver` on PATH either,
+nothing is ended, the daemon says so once in its log, and systemd ends
+what is left of Wine when the daemon stops. The unit sends SIGTERM to the daemon alone
 (`KillMode=mixed`, in the packaged unit and in the one the UI writes
 for a source build), which is what gives it the chance: sent to the whole
 group, the signal would take `wineserver` down first and leave the rest of
