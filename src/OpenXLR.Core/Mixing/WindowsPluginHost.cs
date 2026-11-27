@@ -165,16 +165,25 @@ internal static class WindowsPluginHost
     }
 
     /// <summary>
+    /// Where "Install file" puts a Windows plugin: a folder per format and
+    /// plugin under <c>$XDG_DATA_HOME/openxlr/windows-plugins</c>, beside
+    /// the companion's wrappers.
+    /// </summary>
+    internal static string ImportDirectory => Path.Combine(Path.GetDirectoryName(ManagedYabridge.PluginHome)!, "windows-plugins");
+
+    /// <summary>
     /// Where a Windows installer puts a 64-bit VST3 and CLAP plugin, inside
     /// the Wine prefix the daemon sees: <c>WINEPREFIX</c>, or <c>~/.wine</c>
-    /// as Wine itself picks. The 32-bit <c>Program Files (x86)</c> folders
-    /// are left out, since this host runs only 64-bit modules.
+    /// as Wine itself picks. Then <see cref="ImportDirectory"/>, so a plugin
+    /// installed from a file reaches the catalogue with no yabridge wrapper.
+    /// The 32-bit <c>Program Files (x86)</c> folders are left out, since
+    /// this host runs only 64-bit modules.
     /// </summary>
     /// <param name="prefix">The prefix, for a test; the daemon's own when null.</param>
     internal static IReadOnlyList<string> StandardDirectories(string? prefix = null)
     {
         string common = Path.Combine(prefix ?? PluginInstaller.DefaultWinePrefix(), "drive_c", "Program Files", "Common Files");
-        return [Path.Combine(common, "VST3"), Path.Combine(common, "CLAP")];
+        return [Path.Combine(common, "VST3"), Path.Combine(common, "CLAP"), ImportDirectory];
     }
 
     /// <summary>
@@ -221,7 +230,7 @@ internal static class WindowsPluginHost
     }
 
     /// <summary>Whether a VST3 wrapper links a 32-bit module, under either name the two code bases give that directory.</summary>
-    private static bool Has32BitModule(string bundle)
+    internal static bool Has32BitModule(string bundle)
     {
         string home = Path.TrimEndingDirectorySeparator(bundle);
         string module = Path.GetFileNameWithoutExtension(home) + ".vst3";

@@ -179,9 +179,14 @@ internal static class InstallationDoctor
     /// What helps a user whose Windows plugin is not in the picker, from the
     /// daemon's own plugin diagnostics: where OpenXLR's Windows plugin host
     /// looks, which of those folders the daemon cannot see, and each bundle
-    /// the last scan of them found and left out, with the reason. Nothing for
-    /// a build without the host, whose Windows plugins come through yabridge
-    /// alone. Information only: none of it is a fault of the installation.
+    /// the last scan of them found and left out, with the reason. Before
+    /// those, what removing the yabridge companion would cost: the inserts
+    /// whose plugin only a yabridge wrapper lists, and the yabridge folders
+    /// the daemon could not copy into the Windows plugin folders. A build
+    /// without the host, whose Windows plugins come through yabridge alone,
+    /// gets none of these. Either build is told when Wine is missing and an
+    /// insert has a Windows plugin. Information only: none of it is a fault
+    /// of the installation.
     /// </summary>
     internal static IReadOnlyList<DoctorNote> WindowsPluginNotes(JsonElement reply)
     {
@@ -192,9 +197,35 @@ internal static class InstallationDoctor
                 if (message.ValueKind == JsonValueKind.Object && message.TryGetProperty("discovery", out JsonElement found)
                     && found.ValueKind == JsonValueKind.Object)
                     discovery = found;
-        if (discovery.ValueKind != JsonValueKind.Object
-            || !discovery.TryGetProperty("windowsHostInstalled", out JsonElement installed) || installed.ValueKind != JsonValueKind.True)
+        if (discovery.ValueKind != JsonValueKind.Object) return notes;
+        // Either host starts Wine, so a missing one is said with or without
+        // OpenXLR's Windows plugin host.
+        string[] needWine = [.. Items(discovery, "windowsInsertsNeedingWine").Select(InsertName)];
+        if (needWine.Length > 0)
+            notes.Add(new("wine", $"not installed, and {Count(needWine.Length, "insert uses", "inserts use")} a Windows plugin, which cannot start without it: "
+                + string.Join(", ", needWine) + ". Install Wine with your distribution's package manager; the package is called wine"));
+        if (!discovery.TryGetProperty("windowsHostInstalled", out JsonElement installed) || installed.ValueKind != JsonValueKind.True)
             return notes;
+        // What would go with the yabridge companion: each insert whose plugin
+        // only a wrapper lists, and each yabridge folder the one-time copy
+        // could not add to the Windows plugin folders.
+        foreach (JsonElement insert in Items(discovery, "bridgeOnlyInserts"))
+        {
+            if (Text(insert, "wrapper") is not { } wrapper) continue;
+            string which = $"the plugin of the insert {InsertName(insert)} is in the plugin list only through this yabridge wrapper";
+            notes.Add(new(wrapper, Text(insert, "reason") switch
+            {
+                "not-64-bit" => which + ". It is a 32-bit Windows plugin, which only yabridge runs, so the insert loses its plugin when yabridge is removed; its 64-bit build runs on OpenXLR's Windows plugin host",
+                "module-missing" => which + ", and the Windows plugin behind the wrapper is missing. Install the plugin again",
+                _ => which + $". Its Windows module, {Text(insert, "module") ?? "unknown"}, is in no folder OpenXLR's Windows plugin host searches, so the insert loses its plugin when the openxlr-yabridge companion is removed. Add the module's folder under Windows in the plugin manager, or install the plugin again with Install file",
+            }));
+        }
+        if (discovery.TryGetProperty("yabridgeFolderCopy", out JsonElement copy))
+            foreach (JsonElement folder in Items(copy, "notAdded"))
+                if (Text(folder, "path") is { } path)
+                    notes.Add(new(path, "not added to the Windows plugin folders when OpenXLR copied the yabridge companion's folders: "
+                        + (Text(folder, "reason") ?? "no reason was recorded")
+                        + " Plugins there reach the plugin list only through their yabridge wrappers; add the folder under Windows in the plugin manager once that is dealt with"));
         if (discovery.TryGetProperty("windowsHostDirectories", out JsonElement folders) && folders.ValueKind == JsonValueKind.Array)
             foreach (JsonElement folder in folders.EnumerateArray())
             {
@@ -235,6 +266,17 @@ internal static class InstallationDoctor
             _ => $"not listed: the scan ended with {outcome ?? "no outcome"}." + detail,
         };
     }
+
+    /// <summary>The items of an array property, none when it is absent or not an array.</summary>
+    private static IEnumerable<JsonElement> Items(JsonElement element, string name)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out JsonElement value)
+            && value.ValueKind == JsonValueKind.Array ? value.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object) : [];
+
+    /// <summary>An insert as a note names it: its chain, then its plugin.</summary>
+    private static string InsertName(JsonElement insert)
+        => $"{Text(insert, "chainName") ?? Text(insert, "chain") ?? "?"} {Text(insert, "name") ?? Text(insert, "plugin") ?? Text(insert, "id") ?? "?"}";
+
+    private static string Count(int count, string one, string many) => count == 1 ? "1 " + one : $"{count} {many}";
 
     private static string? Text(JsonElement element, string name)
         => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out JsonElement value)

@@ -2918,7 +2918,10 @@ drivers it started with.
 Picking one Windows `.vst3` or `.clap` file with "Install file" installs
 only that plugin. OpenXLR copies it into its own folder under
 `~/.local/share/openxlr/windows-plugins`, grouped by format and plugin name,
-and registers that folder with yabridge. A single Windows `.vst3` bundle
+and registers that folder with yabridge when yabridge is installed.
+OpenXLR's Windows plugin host also looks in that folder, so in a build with
+the host you need only Wine. Without yabridge the copy alone puts the
+plugin in the picker, and it runs on OpenXLR's host. A single Windows `.vst3` bundle
 picked with "Install folder" is copied whole, including its resources.
 The original download is kept and can be deleted afterwards. Other plugins
 beside the selected one, including other downloads, are not registered.
@@ -2928,6 +2931,9 @@ A plugin already installed inside a Wine prefix is linked from its managed
 folder instead of being copied or moved. It keeps its original location,
 Wine prefix and neighbouring files. Selecting an ordinary folder or using
 "Add folder" in the folder manager still registers that folder in place.
+Without yabridge, in a build with OpenXLR's host, the folder becomes one of
+the [Windows plugin folders](#windows-plugin-folders) instead, unless the
+host already looks there.
 VST2 `.dll` files are left out because OpenXLR cannot load VST2.
 
 Older folder registrations are not silently removed. If an earlier
@@ -3001,9 +3007,11 @@ insert off and on again.
 **Windows plugins without yabridge.** In a build with the host, OpenXLR
 also finds Windows plugins where their installers put them, with no
 yabridge and no sync: `C:\Program Files\Common Files\VST3` and
-`C:\Program Files\Common Files\CLAP` in your Wine prefix. That is the
-prefix in the daemon's `WINEPREFIX`, or `~/.wine` when it has none. Those
-two folders show in the plugin manager's top list as Windows folders. For
+`C:\Program Files\Common Files\CLAP` in your Wine prefix, and
+`~/.local/share/openxlr/windows-plugins`, where "Install file" puts a
+Windows plugin. The prefix is the one in the daemon's `WINEPREFIX`, or
+`~/.wine` when it has none. Those three folders show in the plugin
+manager's top list as Windows folders. For
 plugins kept anywhere else, choose Windows there and press "Add plugin
 folder". Such a plugin is in the picker like any other and runs on
 OpenXLR's host, since nothing else can run it. Its controls window has no
@@ -3018,11 +3026,31 @@ to this host. If you remove yabridge or the wrapper later, an insert that
 used the plugin comes back on OpenXLR's host with the same settings, as
 long as the plugin is still in one of the Windows folders.
 
+If you use the `openxlr-yabridge` companion, the first start of a build
+with OpenXLR's host copies the companion's other plugin folders, the ones
+"Add folder" and "Bridge Wine's plugins" registered, into the Windows
+folders of the plugin manager. It does this once, by itself. A folder the
+host already looks in is left out, and so is one that cannot be added,
+for instance because it no longer exists or 32 folders are already added.
+The companion keeps its own list as it was. If you remove a copied folder
+in the plugin manager, it stays removed, since the copy does not run again.
+
 If a Windows plugin is not in the picker, run `openxlr doctor` with the
 daemon running. It lists the folders OpenXLR's host looks in, says which
 of them the daemon cannot see, and names each plugin the last scan left
 out, with the reason: a 32-bit plugin, a scan that failed or ran out of
 time, or one listed through its yabridge wrapper instead.
+
+The doctor also lists what removing the companion would cost. Each insert
+whose plugin is in the picker only through its yabridge wrapper is named,
+with the wrapper and the reason: its Windows module is in none of the
+Windows folders, it is a 32-bit plugin, or its module is gone. Add the
+module's folder under Windows in the plugin manager, or install the plugin
+again with "Install file", and the insert leaves the list. Remove the
+companion only once no insert is listed. Each folder the copy could not add
+is named too, with the reason. When Wine is missing and an insert has a
+Windows plugin, the doctor says so and names the inserts, since neither
+host runs a Windows plugin without Wine.
 
 <a name="bundle-not-read"></a>
 **A bridged plugin is not in the picker.** A successful yabridge sync means

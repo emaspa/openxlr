@@ -85,10 +85,7 @@ public static class PluginSearchPaths
                     return Refused("Choose a dedicated plugin folder, not a system or home root.");
                 if (folders.Any(f => f.Kind == kind && SameFolder(f.Path, canonical)))
                     return new(true, "This folder is already searched.", []) { RefreshCatalogue = false };
-                if (Directories(kind).Any(existing => Overlaps(canonical, existing)))
-                    return Refused("This folder is inside, or holds, a folder that is already searched.");
-                if (!Directory.Exists(canonical)) return Refused("The folder does not exist or cannot be read.");
-                if (folders.Count >= MaxPaths) return Refused($"At most {MaxPaths} plugin folders can be added.");
+                if (AddRefusal(kind, canonical, folders.Count, []) is { } refusal) return Refused(refusal);
                 folders.Add(new(kind, canonical));
             }
             else if (folders.RemoveAll(f => f.Kind == kind && (f.Path == path || SameFolder(f.Path, canonical))) == 0)
@@ -97,6 +94,75 @@ public static class PluginSearchPaths
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             { return Refused("Could not save the plugin folders: " + ex.Message); }
             return new(true, add ? "Plugin folder added." : "Plugin folder removed; its files were kept.", []);
+        }
+    }
+
+    /// <summary>
+    /// Why a resolved folder cannot join the list, or null when it can: the
+    /// overlap rule, against the folders already searched and any
+    /// <paramref name="pending"/> in the same write, its presence, and the limit.
+    /// </summary>
+    private static string? AddRefusal(string kind, string canonical, int count, IEnumerable<string> pending)
+    {
+        if (Directories(kind).Concat(pending).Any(existing => Overlaps(canonical, existing)))
+            return "This folder is inside, or holds, a folder that is already searched.";
+        if (!Directory.Exists(canonical)) return "The folder does not exist or cannot be read.";
+        if (count >= MaxPaths) return $"At most {MaxPaths} plugin folders can be added.";
+        return null;
+    }
+
+    /// <summary>The most folders the record of the yabridge folder copy names as not added.</summary>
+    internal const int MaxRecordedFolders = 64;
+
+    /// <summary>
+    /// Add yabridge's folders as <c>windows</c> folders in one write of
+    /// daemon.json, together with the record that the copy ran, so it runs
+    /// once. A folder the Windows plugin host already searches, by itself or
+    /// inside another, is passed over in silence. One that cannot be added on
+    /// the terms of <see cref="Change"/> is named in the record with the
+    /// reason, after <paramref name="problems"/>. Null, with nothing written,
+    /// when the copy already ran or daemon.json cannot be read; a failed
+    /// write throws, and the next start tries again.
+    /// </summary>
+    internal static BridgeFolderCopy? CopyWindowsFolders(IEnumerable<string> sources, IEnumerable<FolderNotCopied> problems)
+    {
+        lock (Gate)
+        {
+            if (DaemonSettings.Read(out _) is not { } settings || settings.YabridgeFolderCopy is not null) return null;
+            var folders = (settings.PluginFolders ?? []).Where(f => f is not null).ToList();
+            var added = new List<string>();
+            var notAdded = new List<FolderNotCopied>(problems);
+            IReadOnlyList<string> searched = WindowsPluginHost.Directories();
+            foreach (string source in sources.Distinct(StringComparer.Ordinal))
+            {
+                if (!Valid("windows", source))
+                {
+                    notAdded.Add(new(source, "The path is not absolute, or it holds a colon or a control character."));
+                    continue;
+                }
+                string canonical;
+                try { canonical = WindowsPluginWrappers.Canonical(source); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                {
+                    notAdded.Add(new(source, "Could not resolve the folder: " + ex.Message));
+                    continue;
+                }
+                if (searched.Concat(added).Any(folder => WindowsPluginWrappers.Under(canonical, folder)))
+                    continue;
+                string? refusal = !Valid("windows", canonical) || BroadRoot(canonical)
+                    ? "This is a system or home root, not a dedicated plugin folder."
+                    : AddRefusal("windows", canonical, folders.Count, added);
+                if (refusal is not null)
+                {
+                    notAdded.Add(new(source, refusal));
+                    continue;
+                }
+                folders.Add(new("windows", canonical));
+                added.Add(canonical);
+            }
+            var record = new BridgeFolderCopy(added, [.. notAdded.Take(MaxRecordedFolders)]);
+            (settings with { PluginFolders = added.Count > 0 ? folders : settings.PluginFolders, YabridgeFolderCopy = record }).Save();
+            return record;
         }
     }
 

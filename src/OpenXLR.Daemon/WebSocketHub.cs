@@ -445,7 +445,7 @@ public sealed partial class WebSocketHub
                 await reply(new NativeEditorRulesMessage(_mixer.EditorPolicy.Rules, error ?? _mixer.EditorPolicy.Error));
                 break;
             case "getPluginDiagnostics":
-                await reply(new PluginDiagnosticsMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Diagnostics())));
+                await reply(new PluginDiagnosticsMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Diagnostics(DiagnosticInserts()))));
                 break;
             case "getPluginSetup":
                 await reply(new PluginSetupMessage(await Task.Run(() => new OpenXLR.Core.Mixing.PluginInstaller().Setup())));
@@ -1026,6 +1026,17 @@ public sealed partial class WebSocketHub
         => _mixer.InsertPlugins()
             .Select(id => OpenXLR.Core.Mixing.PluginCatalog.Find(id.Kind, id.Plugin)?.Path)
             .OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
+
+    /// <summary>The mixer's inserts with the names of their chains, for the plugin diagnostics.</summary>
+    private IReadOnlyList<OpenXLR.Core.Mixing.ChainInsert> DiagnosticInserts()
+    {
+        if (_mixer.Snapshot() is not { } state) return [];
+        string Name(string key) => (key.StartsWith("mix:", StringComparison.Ordinal)
+            ? state.Mixes.FirstOrDefault(m => m.Id == key[4..])?.Name
+            : state.Channels.FirstOrDefault(c => c.Id == key)?.Name) ?? key;
+        return [.. state.Inserts.SelectMany(chain => chain.Value.Select(status =>
+            new OpenXLR.Core.Mixing.ChainInsert(chain.Key, Name(chain.Key), status.Insert)))];
+    }
 
     /// <summary>
     /// Held for the whole of an install step and the catalogue scan after it,

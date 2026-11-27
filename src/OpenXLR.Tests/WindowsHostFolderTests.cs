@@ -29,6 +29,7 @@ public sealed class WindowsHostFolderTests : IDisposable
     public WindowsHostFolderTests()
     {
         Set("XDG_CONFIG_HOME", Directory.CreateDirectory(Path.Combine(_root, "config")).FullName);
+        Set("XDG_DATA_HOME", Path.Combine(_root, "data"));
         Set("WINEPREFIX", Prefix);
         Directory.CreateDirectory(Path.Combine(Prefix, "dosdevices"));
     }
@@ -116,7 +117,9 @@ public sealed class WindowsHostFolderTests : IDisposable
     [Fact]
     public void TheStandardFoldersAreThePrefixsCommonFilesAndAddedOnesFollow()
     {
-        Assert.Equal([Path.Combine(CommonFiles, "VST3"), Path.Combine(CommonFiles, "CLAP")], WindowsPluginHost.StandardDirectories());
+        // The prefix's two, then the folder Install file copies a Windows plugin into.
+        Assert.Equal([Path.Combine(CommonFiles, "VST3"), Path.Combine(CommonFiles, "CLAP"), Path.Combine(_root, "data", "openxlr", "windows-plugins")],
+            WindowsPluginHost.StandardDirectories());
         // Without WINEPREFIX it is Wine's own default; only the name is
         // worked out here, nothing under the home folder is read.
         Set("WINEPREFIX", null);
@@ -138,8 +141,8 @@ public sealed class WindowsHostFolderTests : IDisposable
         // searches them, and nowhere else.
         PluginSearchDirectory[] listed = [.. PluginSearchPaths.Snapshot(windowsHost: true).Where(d => d.Kind == "windows")];
         Assert.Equal(WindowsPluginHost.Directories(), listed.Select(d => d.Path));
-        Assert.Equal([false, false, true], listed.Select(d => d.Custom));
-        Assert.Equal([false, false, true], listed.Select(d => d.Exists));
+        Assert.Equal([false, false, false, true], listed.Select(d => d.Custom));
+        Assert.Equal([false, false, false, true], listed.Select(d => d.Exists));
         Assert.DoesNotContain(PluginSearchPaths.Snapshot(windowsHost: false), d => d.Kind == "windows");
 
         Assert.True(PluginSearchPaths.Change("windows", added, false).Ok);

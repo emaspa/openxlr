@@ -949,8 +949,13 @@ the user's real-time limit or, where there is none, through RTKit.
 yabridge stays the default. See
 [OpenXLR's Windows plugin host](manual.md#windows-plugin-host).
 Such a build also finds Windows VST3 and CLAP plugins in the Wine prefix's
-standard folders, and in Windows folders added in the plugin manager, and
-runs them on that host with no yabridge at all. A plugin that has a yabridge
+standard folders, in the folder "Install file" copies a Windows plugin
+into, and in Windows folders added in the plugin manager, and runs them on
+that host with no yabridge at all. "Install file" and "Install folder" then
+need only Wine. At its first start such a build copies the
+`openxlr-yabridge` companion's other folders into the Windows folders, once,
+and `openxlr doctor` names every insert that still needs a yabridge
+wrapper. A plugin that has a yabridge
 wrapper as well is listed once, by the wrapper, and an insert saved against
 a wrapper that is later removed comes back on OpenXLR's host with its
 settings. See [Windows plugins without yabridge](manual.md#windows-plugin-folders).
@@ -1024,7 +1029,8 @@ needs the native plugin host. See [Mic setup](manual.md#mic-setup) and the
 "Install file" and "Install folder" accept extracted Linux plugins or
 Windows plugin folders. Linux bundles are copied into `~/.lv2`, `~/.clap`
 or `~/.vst3`. Windows installers must run in Wine first; OpenXLR bridges
-the installed plugins and rescans automatically. Options offers a rescan,
+the installed plugins, or with no yabridge leaves them to its own Windows
+plugin host, and rescans automatically. Options offers a rescan,
 a Windows sync, detected Wine folders and the selected bridge's status.
 
 The `openxlr-yabridge` companion is packaged for every channel OpenXLR
