@@ -492,6 +492,43 @@ public sealed class ClapCatalogTests
 
     }
 
+    [Fact]
+    public void AVst3PluginNoOtherFormatOffersIsNotCrowdedOutByAnEarlierFormatsCopies()
+    {
+        static PluginInfo plugin(string kind, string name, int parameters) => new(kind, kind + ":" + name, name, "",
+            1, 1, "", "", [.. Enumerable.Range(0, parameters).Select(i => new PluginParam(i.ToString(), "p" + i, 0, 1, 0, false, false, false, false, []))],
+            [], [], []);
+
+        // As on a desk with LSP installed in all three formats: LV2 takes
+        // most of the message, the CLAP builds of the same plugins could
+        // fill the rest, and a Windows plugin comes in the VST3 scan after
+        // them, larger than any one CLAP copy.
+        int each = Lv2Catalog.Footprint(plugin("lv2", "LSP Plugin 0", 300));
+        int count = (int)(Lv2Catalog.CatalogBudgetBytes * 9L / 10 / each);
+        List<PluginInfo> lv2 = [.. Enumerable.Range(0, count).Select(i => plugin("lv2", $"LSP Plugin {i}", 300))];
+        List<PluginInfo> clap = [.. Enumerable.Range(0, count).Select(i => plugin("clap", $"Plugin {i}", 300))];
+        PluginInfo nova = plugin("vst3", "TDR Nova", 400);
+        long room = Lv2Catalog.CatalogBudgetBytes - lv2.Sum(p => (long)Lv2Catalog.Footprint(p));
+        Assert.True(room > Lv2Catalog.Footprint(nova));
+        Assert.True(clap.Sum(p => (long)Lv2Catalog.Footprint(p)) > room);
+
+        List<PluginInfo> merged = ClientCatalog.Merge(lv2, clap, [nova]);
+
+        Assert.Equal(lv2.Count, merged.Count(p => p.Kind == "lv2"));
+        Assert.Contains(merged, p => p.Plugin == nova.Plugin);
+        // The copies still take what room is left after it, in their format's place.
+        Assert.Contains(merged, p => p.Kind == "clap");
+        Assert.True(merged.FindIndex(p => p.Kind == "clap") < merged.FindIndex(p => p.Kind == "vst3"));
+        Assert.True(merged.Sum(p => (long)Lv2Catalog.Footprint(p)) <= Lv2Catalog.CatalogBudgetBytes);
+
+        // A plugin two later formats offer and LV2 does not is distinct once:
+        // its second copy waits with the other copies.
+        PluginInfo clapOnly = plugin("clap", "Only Here", 3), vst3Copy = plugin("vst3", "Only Here", 3);
+        List<PluginInfo> both = ClientCatalog.Merge(lv2, [.. clap, clapOnly], [nova, vst3Copy]);
+        Assert.Contains(both, p => p.Plugin == clapOnly.Plugin);
+        Assert.Contains(both, p => p.Plugin == nova.Plugin);
+    }
+
     private sealed class Layout : ILayoutInfo
     {
         public bool HasChannel(string id) => true;
