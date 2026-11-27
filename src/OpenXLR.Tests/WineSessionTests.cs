@@ -26,7 +26,10 @@ public sealed class WineSessionTests : IDisposable
 
     private WineSession Session(string? server = Server, IReadOnlyList<string>? prefixes = null,
         Func<string, IReadOnlyList<string>, IReadOnlyDictionary<string, string>, ProcessResult>? run = null)
-        => new(_notes.Add, run ?? Fake, () => server, () => prefixes ?? [Prefix]);
+        => new(_notes.Add, run ?? Fake, () => server, () => Up(prefixes ?? [Prefix]));
+
+    private static IReadOnlyList<WineSession.Running> Up(IEnumerable<string> prefixes)
+        => [.. prefixes.Select(prefix => new WineSession.Running(prefix, null))];
 
     private void End(WineSession session, bool anyBridgedHelperAlive) => session.Run(session.Decide(anyBridgedHelperAlive));
 
@@ -67,7 +70,7 @@ public sealed class WineSessionTests : IDisposable
         {
             running.Remove(environment["WINEPREFIX"]);
             return Fake(server, arguments, environment);
-        }, () => Server, () => running);
+        }, () => Server, () => Up(running));
         session.HelperStarted();
         End(session, anyBridgedHelperAlive: false);
         End(session, anyBridgedHelperAlive: false);
@@ -110,6 +113,26 @@ public sealed class WineSessionTests : IDisposable
     }
 
     [Fact]
+    public void TheWineserverASessionRunsFromIsRunWhetherOrNotOneIsOnPath()
+    {
+        // Debian and Ubuntu keep wineserver off PATH; the running server's
+        // own program is found anyway, and it wins over PATH because it is
+        // the build that speaks that server's protocol.
+        const string debian = "/usr/lib/x86_64-linux-gnu/wine/wineserver";
+        foreach (string? onPath in new[] { null, Server })
+        {
+            _calls.Clear();
+            WineSession session = new(_notes.Add, Fake, () => onPath,
+                () => [new WineSession.Running(Prefix, debian), new WineSession.Running("/srv/prefixes/plugins", null)]);
+            session.HelperStarted();
+            End(session, anyBridgedHelperAlive: false);
+            Assert.Contains((debian, "-k", Prefix), _calls);
+            Assert.Equal(onPath is null ? 1 : 2, _calls.Count);
+        }
+        Assert.Single(_notes, note => note.Contains("no wineserver found for the Wine prefix /srv/prefixes/plugins", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void WithoutAWineserverOnPathNothingRunsAndItIsSaidOnce()
     {
         WineSession session = Session(server: null);
@@ -118,7 +141,8 @@ public sealed class WineSessionTests : IDisposable
         End(session, anyBridgedHelperAlive: false);
         Assert.Empty(_calls);
         Assert.Single(_notes);
-        Assert.Contains("wineserver", _notes[0]);
+        Assert.Contains("no wineserver found", _notes[0]);
+        Assert.Contains("systemd ends", _notes[0]);
     }
 
     [Fact]
@@ -165,20 +189,27 @@ public sealed class WineSessionTests : IDisposable
         Fixture("11", "pipewire", Prefix, ours);                     // not a wineserver
         Fixture("13", "wineserver", "/home/tester/.other", theirs);  // another application's session
 
-        Assert.Empty(WineSession.PrefixesStartedHere(_root, Prefix));
+        Assert.Empty(WineSession.SessionsStartedHere(_root, Prefix));
 
-        Fixture("14", "wineserver", "/srv/prefixes/plugins/", ours);
-        Assert.Equal(["/srv/prefixes/plugins"], WineSession.PrefixesStartedHere(_root, Prefix));
+        // The server's own program comes with its prefix when the link reads.
+        string program = Path.Combine(_root, "wine", "wineserver");
+        Directory.CreateDirectory(Path.GetDirectoryName(program)!);
+        File.WriteAllText(program, "");
+        Fixture("14", "wineserver", "/srv/prefixes/plugins/", ours, program);
+        Assert.Equal([new WineSession.Running("/srv/prefixes/plugins", program)], WineSession.SessionsStartedHere(_root, Prefix));
 
-        // Wine's own default counts as the prefix when the variable is unset.
-        Fixture("15", "wineserver", null, ours);
-        Assert.Equal([Prefix, "/srv/prefixes/plugins"], WineSession.PrefixesStartedHere(_root, Prefix).Order().ToList());
+        // Wine's own default counts as the prefix when the variable is unset,
+        // and a program replaced by an upgrade while it ran is not offered.
+        Fixture("15", "wineserver", null, ours, program + " (deleted)");
+        Assert.Equal([new WineSession.Running(Prefix, null), new WineSession.Running("/srv/prefixes/plugins", program)],
+            WineSession.SessionsStartedHere(_root, Prefix).OrderBy(session => session.Prefix, StringComparer.Ordinal).ToList());
     }
 
-    private void Fixture(string pid, string comm, string? prefix, string cgroup)
+    private void Fixture(string pid, string comm, string? prefix, string cgroup, string? exe = null)
     {
         string directory = Path.Combine(_root, pid);
         Directory.CreateDirectory(directory);
+        if (exe is not null) File.CreateSymbolicLink(Path.Combine(directory, "exe"), exe);
         File.WriteAllText(Path.Combine(directory, "comm"), comm + "\n");
         File.WriteAllText(Path.Combine(directory, "cgroup"), cgroup + "\n");
         File.WriteAllBytes(Path.Combine(directory, "environ"),

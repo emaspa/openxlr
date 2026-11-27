@@ -309,7 +309,7 @@ internal static class InstallationDoctor
                 + Needs + " To keep Wine when the companion goes, run: sudo pacman -D --asexplicit " + Quote(wine)),
             "rpm" => new("wine",
                 "dnf remove openxlr-yabridge also removes the packages only the companion required, Wine among them when it came with the companion."
-                + Needs + " To keep Wine when the companion goes, run: sudo dnf mark user wine"),
+                + Needs + " To keep Wine when the companion goes, run: sudo dnf mark user -y wine"),
             _ => null,
         };
     }

@@ -65,6 +65,9 @@ BuildRequires:  dbus-devel
 AutoReqProv:    no
 Requires:       aspnetcore-runtime-10.0
 Requires:       pipewire
+# pw-dump, pw-link, pw-cli and pw-loopback build the submix graph; minimal
+# and cloud installs leave this package out.
+Requires:       pipewire-utils
 Requires:       pipewire-pulseaudio
 Requires:       wireplumber
 Requires:       pulseaudio-libs

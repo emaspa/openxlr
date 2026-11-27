@@ -43,9 +43,15 @@ internal sealed class WineSession
     /// <summary>A decided ending: which wineserver to run, against which prefix.</summary>
     public sealed record Ending(string Server, string Prefix);
 
+    /// <summary>
+    /// A Wine session of ours that is up: its prefix, and the program its
+    /// wineserver runs from when that can be read.
+    /// </summary>
+    public sealed record Running(string Prefix, string? Server);
+
     private readonly Func<string, IReadOnlyList<string>, IReadOnlyDictionary<string, string>, ProcessResult> _run;
     private readonly Func<string?> _findServer;
-    private readonly Func<IReadOnlyList<string>> _ourPrefixes;
+    private readonly Func<IReadOnlyList<Running>> _ours;
     private readonly Action<string>? _note;
     private readonly object _gate = new();
     private bool _bridgedRan;
@@ -53,7 +59,7 @@ internal sealed class WineSession
 
     public WineSession(Action<string>? note = null,
         Func<string, IReadOnlyList<string>, IReadOnlyDictionary<string, string>, ProcessResult>? run = null,
-        Func<string?>? findServer = null, Func<IReadOnlyList<string>>? ourPrefixes = null)
+        Func<string?>? findServer = null, Func<IReadOnlyList<Running>>? ours = null)
     {
         _note = note;
         // Helpers are started through ProcessRunner and so is this: arguments
@@ -61,7 +67,7 @@ internal sealed class WineSession
         _run = run ?? ((server, arguments, environment)
             => ProcessRunner.Run(server, arguments, Deadline, environment: environment));
         _findServer = findServer ?? (() => PluginInstaller.OnPath("wineserver"));
-        _ourPrefixes = ourPrefixes ?? (() => PrefixesStartedHere());
+        _ours = ours ?? (() => SessionsStartedHere());
     }
 
     /// <summary>A bridged helper has been started, so Wine is now this daemon's to end.</summary>
@@ -72,8 +78,15 @@ internal sealed class WineSession
 
     /// <summary>
     /// What ending Wine would take now. Empty unless a bridged helper ran
-    /// here, every one of them has gone, there is a wineserver to run, and a
-    /// Wine session of ours is actually up. Asking again after a successful
+    /// here, every one of them has gone, a Wine session of ours is actually
+    /// up, and there is a wineserver to run against it.
+    ///
+    /// The wineserver run is the program the session's own server runs from.
+    /// That is the one Wine build sure to speak the running server's protocol,
+    /// and it is found where PATH has none: Debian and Ubuntu keep wineserver
+    /// in /usr/lib/x86_64-linux-gnu/wine. The one on PATH is the fallback for
+    /// a server whose program cannot be read, or was replaced by an upgrade
+    /// while it ran. Asking again after a successful
     /// ending finds no session and answers empty, so the question can be put
     /// at every rewire and again at the stop; an ending that failed is simply
     /// offered again.
@@ -83,17 +96,19 @@ internal sealed class WineSession
         lock (_gate)
         {
             if (anyBridgedHelperAlive || !_bridgedRan) return [];
-            string? server = _findServer();
-            if (server is null)
+            var endings = new List<Ending>();
+            foreach (Running session in _ours())
             {
-                if (!_saidNoServer)
+                string? server = session.Server ?? _findServer();
+                if (server is not null)
+                    endings.Add(new Ending(server, session.Prefix));
+                else if (!_saidNoServer)
                 {
                     _saidNoServer = true;
-                    _note?.Invoke("no wineserver on PATH: what a bridged plugin leaves of Wine is the system's to clean up, and stopping the daemon waits for it");
+                    _note?.Invoke($"no wineserver found for the Wine prefix {session.Prefix}: systemd ends what is left of it when the daemon stops");
                 }
-                return [];
             }
-            return [.. _ourPrefixes().Select(prefix => new Ending(server, prefix))];
+            return endings;
         }
     }
 
@@ -142,18 +157,18 @@ internal sealed class WineSession
         => bundle is not null && bundle.Split('/').Contains("yabridge");
 
     /// <summary>
-    /// The prefixes of the wineservers that share this process's control
-    /// group. Only a server one of our helpers forked is in it: a wineserver
+    /// The Wine sessions whose wineservers share this process's control
+    /// group, each with the program its server runs from. Only a server one of our helpers forked is in it: a wineserver
     /// is reparented to the user manager the moment it daemonizes, but it
     /// keeps the control group it was forked in, and for a user service that
     /// group is the unit. Usually one prefix, more when a user keeps their
     /// Windows plugins in several.
     /// </summary>
-    internal static IReadOnlyList<string> PrefixesStartedHere(string? procRoot = null, string? homePrefix = null)
+    internal static IReadOnlyList<Running> SessionsStartedHere(string? procRoot = null, string? homePrefix = null)
     {
         procRoot ??= "/proc";
         homePrefix ??= Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".wine");
-        var found = new List<string>();
+        var found = new List<Running>();
         try
         {
             string ours = File.ReadAllText(Path.Combine(procRoot, "self", "cgroup")).Trim();
@@ -168,7 +183,8 @@ internal sealed class WineSession
                     if (File.ReadAllText(Path.Combine(directory, "comm")).Trim() != "wineserver") continue;
                     if (File.ReadAllText(Path.Combine(directory, "cgroup")).Trim() != ours) continue;
                     string prefix = PrefixIn(File.ReadAllBytes(Path.Combine(directory, "environ")), homePrefix);
-                    if (!found.Contains(prefix, StringComparer.Ordinal)) found.Add(prefix);
+                    if (!found.Any(session => string.Equals(session.Prefix, prefix, StringComparison.Ordinal)))
+                        found.Add(new Running(prefix, ServerProgram(directory)));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
                 {
@@ -179,6 +195,20 @@ internal sealed class WineSession
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { }
         return found;
+    }
+
+    /// <summary>
+    /// The program a process runs from, or null when the link cannot be read
+    /// or names a file an upgrade has since replaced.
+    /// </summary>
+    internal static string? ServerProgram(string processDirectory)
+    {
+        try
+        {
+            string? target = new FileInfo(Path.Combine(processDirectory, "exe")).LinkTarget;
+            return target is null || target.EndsWith(" (deleted)", StringComparison.Ordinal) || !File.Exists(target) ? null : target;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }
     }
 
     /// <summary>
