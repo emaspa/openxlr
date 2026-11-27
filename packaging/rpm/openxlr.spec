@@ -23,6 +23,9 @@ Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave m
 # regex families offer Unlicense OR MIT. `cargo metadata --filter-platform
 # x86_64-unknown-linux-gnu` in native/deepfilter lists every crate. The
 # soundboard's starter sounds are CC0-1.0, each credited in their CREDITS.
+# The Windows plugin host links the MinGW-w64 runtime and winpthreads
+# statically (MIT, BSD-3-Clause and similar permissive notices), all in its
+# NOTICE.
 License:        GPL-3.0-only AND BSD-3-Clause AND MIT AND Apache-2.0 AND (MIT OR Apache-2.0) AND (Unlicense OR MIT) AND CC0-1.0 AND OFL-1.1
 URL:            https://github.com/emaspa/openxlr
 Source0:        %{name}-%{version}.tar.gz
@@ -214,6 +217,8 @@ install -Dm644 native/signalsmith/signalsmith-linear/LICENSE.txt \
     %{buildroot}%{_licensedir}/openxlr/signalsmith/linear/LICENSE.txt
 install -Dm644 native/clap/LICENSE %{buildroot}%{_licensedir}/openxlr/clap/LICENSE
 install -Dm644 native/vst3/LICENSE %{buildroot}%{_licensedir}/openxlr/vst3/LICENSE
+# The MinGW-w64 runtime and winpthreads, linked statically into the Windows plugin host.
+install -Dm644 native/winhost/NOTICE %{buildroot}%{_licensedir}/openxlr/winhost/NOTICE
 # The starter sounds' sources and authors; the clips are installed beside the daemon.
 install -Dm644 packaging/starter-sounds/CREDITS \
     %{buildroot}%{_licensedir}/openxlr/starter-sounds/CREDITS
@@ -245,6 +250,7 @@ MSG
 %license %{_licensedir}/openxlr/signalsmith/
 %license %{_licensedir}/openxlr/clap/
 %license %{_licensedir}/openxlr/vst3/
+%license %{_licensedir}/openxlr/winhost/
 %license %{_licensedir}/openxlr/starter-sounds/
 %license %{_licensedir}/openxlr/fira-sans/
 %license %{_licensedir}/openxlr/dseg/

@@ -197,6 +197,10 @@ buildDotnetModule {
     done
     install -Dm644 src/OpenXLR.UI/Assets/icon.svg \
       $out/share/icons/hicolor/scalable/apps/openxlr.svg
+    ${lib.optionalString winhost ''
+      # The MinGW-w64 runtime and winpthreads, linked statically into the Windows plugin host.
+      install -Dm644 native/winhost/NOTICE $out/share/licenses/openxlr/winhost/NOTICE
+    ''}
 
     mkdir -p $out/share/openxlr
     cp -r plugin/com.emaspa.openxlr.sdPlugin $out/share/openxlr/
@@ -212,7 +216,8 @@ buildDotnetModule {
     homepage = "https://github.com/emaspa/openxlr";
     # The native helper also carries RNNoise (BSD-3-Clause), Signalsmith
     # Stretch and Linear (MIT), libDF, the DeepFilterNet model and the Rust
-    # crates (MIT, Apache-2.0 or either);
+    # crates (MIT, Apache-2.0 or either); the Windows plugin host links the
+    # MinGW-w64 runtime and winpthreads (MIT, BSD-3-Clause and similar);
     # the soundboard's starter sounds are CC0-1.0.
     license = with lib.licenses; [ gpl3Only bsd3 mit asl20 cc0 ofl ];
     platforms = lib.platforms.linux;

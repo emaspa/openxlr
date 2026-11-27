@@ -51,6 +51,15 @@ REQUIRED = [
     ('.github/workflows/release-rpm.yml', 'mingw64-gcc mingw64-gcc-c++ mingw64-winpthreads-static dbus-devel'),
     ('.github/workflows/release-rpm.yml', '/usr/lib/openxlr/daemon/openxlr-winhost.exe'),
     ('.github/workflows/ci.yml', 'test-winhost'),
+    # The host links the MinGW-w64 runtime and winpthreads statically, and
+    # their licences ask for their notices to come with it.
+    ('packaging/rpm/openxlr.spec', '\ninstall -Dm644 native/winhost/NOTICE %{buildroot}%{_licensedir}/openxlr/winhost/NOTICE\n'),
+    ('packaging/rpm/openxlr.spec', '\n%license %{_licensedir}/openxlr/winhost/\n'),
+    ('.github/workflows/release-rpm.yml', 'test -f /usr/share/licenses/openxlr/winhost/NOTICE'),
+    ('debian/rules', '\tinstall -Dm644 native/winhost/NOTICE $(PKG)/usr/share/doc/openxlr/winhost/NOTICE\n'),
+    ('debian/copyright', '\nFiles: native/winhost/NOTICE\n'),
+    ('.github/workflows/release-deb.yml', 'usr/share/doc/openxlr/winhost/NOTICE'),
+    ('packaging/nix/package.nix', 'install -Dm644 native/winhost/NOTICE $out/share/licenses/openxlr/winhost/NOTICE'),
 ]
 
 errors = [f'{path}: missing {text.strip()!r}' for path, text in REQUIRED if text not in read(path)]

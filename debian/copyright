@@ -69,6 +69,19 @@ Comment: Rust crates that DeepFilterNet's library is built from, vendored
  native/deepfilter:
  cargo metadata --format-version 1 --filter-platform x86_64-unknown-linux-gnu
 
+Files: native/winhost/NOTICE
+Copyright: 2009-2013 the mingw-w64 project
+ 2011 mingw-w64 project
+ 2010 Lockless Inc.
+ and the other authors the file names
+License: Expat and BSD-3-clause and mingw-w64-runtime
+Comment: The notices of the MinGW-w64 runtime 14.0.0 and of winpthreads,
+ its POSIX threads library, which openxlr-winhost.exe links statically.
+ The file holds every notice in full and is installed as
+ /usr/share/doc/openxlr/winhost/NOTICE. GCC's libstdc++ and libgcc are
+ linked as well, under the GCC Runtime Library Exception, which asks for no
+ notice.
+
 Files: packaging/starter-sounds/*
 Copyright: freesound, FoolBoyMedia, HowardV, tlwmdbt, Scheffler, plasterbrain,
  kirbydx, JohnsonBrandEditing, guitarguy1985, gurie, FreethinkerAnon, qubodup,
@@ -92,6 +105,12 @@ Comment: OpenXLR Segment 7 and 14, compiled into the UI for the VFD skins. They
  are DSEG7 and DSEG14 Classic Italic with the space widened to one cell, the
  point given a width of its own and an ellipsis added, renamed as the licence
  requires because "DSEG" is a Reserved Font Name.
+
+License: mingw-w64-runtime
+ The MinGW-w64 runtime's overall notice is a BSD-style licence, and parts of
+ the runtime are under the notices of getopt, gdtoa, the math library, musl
+ and Wine's headers. Their full texts are in
+ /usr/share/doc/openxlr/winhost/NOTICE.
 
 License: GPL-3
  This program is free software: you can redistribute it and/or modify

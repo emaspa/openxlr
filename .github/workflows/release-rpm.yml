@@ -76,6 +76,7 @@ jobs:
           test -f /usr/share/licenses/openxlr/rnnoise/COPYING
           test -f /usr/share/licenses/openxlr/deepfilter/LICENSE-MIT
           test -f /usr/share/licenses/openxlr/signalsmith/stretch/LICENSE.txt
+          test -f /usr/share/licenses/openxlr/winhost/NOTICE
           test -f /usr/lib/udev/rules.d/70-openxlr.rules
           test -f /usr/share/wireplumber/wireplumber.conf.d/50-xlr-dock-capture-hold.conf
           test -f /usr/share/wireplumber/wireplumber.conf.d/52-openxlr-mk1-capture-hold.conf

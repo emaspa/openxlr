@@ -129,6 +129,9 @@ override_dh_auto_install:
 	done
 	install -Dm644 src/OpenXLR.UI/Assets/icon.svg \
 		$(PKG)/usr/share/icons/hicolor/scalable/apps/openxlr.svg
+	# The notices of the MinGW-w64 runtime and winpthreads, which the
+	# Windows plugin host links statically.
+	install -Dm644 native/winhost/NOTICE $(PKG)/usr/share/doc/openxlr/winhost/NOTICE
 
 	# OpenDeck loads plugins from the user's config dir; ship it for copying.
 	install -dm755 $(PKG)/usr/share/openxlr
