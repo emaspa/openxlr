@@ -64,6 +64,7 @@ jobs:
                    usr/lib/udev/rules.d/70-openxlr.rules \
                    usr/lib/openxlr/daemon/openxlr-lv2-host \
                    usr/lib/openxlr/daemon/openxlr-winhost.exe \
+                   usr/share/doc/openxlr/winhost/NOTICE \
                    usr/bin/openxlr usr/bin/openxlr-daemon; do
             grep -q " ./$f\$" contents.txt || { echo "missing from the package: $f"; exit 1; }
           done
