@@ -478,6 +478,72 @@ public sealed class ProfileStartupTests
     }
 
     /// <summary>
+    /// A profile recalled on connect lands on the saved settings at every
+    /// start, so it must not undo where this machine runs a plugin: an
+    /// insert the saved chain still has keeps its host and its own block, and
+    /// one only the profile has comes back as the profile saved it. The
+    /// plugins are invented and never load.
+    /// </summary>
+    [MonitorPipeWireFact]
+    public async Task ARecallOnConnectKeepsTheWiringOfEveryInsertThatStays()
+    {
+        Assert.StartsWith("openxlr-monitor-test-", Path.GetFileName(Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR")!));
+        string dir = Directory.CreateTempSubdirectory("openxlr-profile-").FullName;
+        string? previous = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+        static OpenXLR.Core.Mixing.InsertDefinition Vst3(string id, string classId)
+            => new() { Id = id, Kind = "vst3", Plugin = classId };
+        const string Voice = "00112233445566778899AABBCCDDEEFF", Verb = "FFEEDDCCBBAA99887766554433221100";
+        try
+        {
+            new DaemonSettings { Submixer = true }.Save();
+            new OpenXLR.Core.Mixing.MixerSettings
+            {
+                UserMixes = [],
+                Inserts = new()
+                {
+                    ["xlr1"] = [Vst3("voice", Voice) with { WindowsHost = "openxlr", OwnBlock = true }, Vst3("only-here", Verb)],
+                    ["mix:monitor"] = [Vst3("wide", Verb)],
+                },
+            }.Save();
+            var config = new ConfigurationBuilder().Build();
+            var dock = new Dock();
+            using var devices = new DeviceManager(NullLogger<DeviceManager>.Instance, config, () => [dock]);
+            ProfileStore.Save("0fd9:00a6", "Saved", new Profile
+            {
+                Mixer = new()
+                {
+                    Inserts = new()
+                    {
+                        ["xlr1"] = [Vst3("voice", Voice), Vst3("back", Verb) with { WindowsHost = "openxlr", OwnBlock = true }],
+                        ["mix:monitor"] = [Vst3("wide", Verb) with { OwnBlock = true, WindowsHost = "openxlr" }],
+                    },
+                },
+            });
+            ProfileStore.SetRecallOnConnect("0fd9:00a6", "Saved");
+            using var lifetime = new Lifetime();
+            using var mixer = new MixerService(NullLogger<MixerService>.Instance, config, devices);
+            var hub = new WebSocketHub(devices, mixer, NullLogger<WebSocketHub>.Instance, lifetime);
+            devices.SweepOnce();
+            try
+            {
+                await mixer.StartAsync(CancellationToken.None);
+                Assert.True(SpinWait.SpinUntil(() => hub.Snapshot().ActiveProfile == "Saved", TimeSpan.FromSeconds(10)));
+                Dictionary<string, List<OpenXLR.Core.Mixing.InsertDefinition>> inserts = mixer.ExportScene().Scene!.Inserts!;
+                Assert.Equal([("voice", "openxlr", true), ("back", "openxlr", true)],
+                    inserts["xlr1"].Select(i => (i.Id, i.WindowsHost, i.OwnBlock)));
+                Assert.Equal((null, false), (Assert.Single(inserts["mix:monitor"]).WindowsHost, inserts["mix:monitor"][0].OwnBlock));
+            }
+            finally { await mixer.StopAsync(CancellationToken.None); }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", previous);
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    /// <summary>
     /// pipewire-pulse stalled when the daemon started (a wedged USB device
     /// can hold it for minutes), so the first graph build failed. The daemon
     /// keeps trying, and the profile recalled on connect meanwhile lands

@@ -1333,7 +1333,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             {
                 Params = new Dictionary<string, double>(i.Params),
                 NativeHost = i.RunsNatively,
-                WindowsHost = before.FirstOrDefault(b => b.Id == i.Id && b.Kind == i.Kind && b.Plugin == i.Plugin)?.WindowsHost,
+                WindowsHost = SameInsert(before, i)?.WindowsHost,
             })];
             if (_built) RewireInsertKeyLocked(channel);
         }
@@ -2009,7 +2009,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             // A chain the file does not name keeps what it has, and only a
             // chain whose structure changed is built again.
             if (chainsChanged || rebuildAll || s.Inserts.Count > 0)
-                ApplyChainsLocked(s.Inserts.Count > 0 ? s.Inserts : null, absentMixesEmpty: false, rebuildAll);
+                ApplyChainsLocked(s.Inserts.Count > 0 ? s.Inserts : null, absentMixesEmpty: false, keepWiring: false, rebuildAll);
             SyncEqStagesLocked();
             SyncMixEqStagesLocked();
             UpdateMixLatencyLocked();
@@ -2153,9 +2153,11 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             }
             // The profile replaces the chains it names. An input it does not
             // name keeps its chain; a mix it does not name has no inserts, as
-            // profiles always had it. Only a chain whose plugins, order,
-            // bypass or host changed is built again; the others take the
-            // profile's control values live.
+            // profiles always had it. An insert that stays keeps its own
+            // block and its Windows host, which are machine wiring; one that
+            // comes back takes the profile's. Only a chain whose plugins,
+            // order, bypass or host changed is built again; the others take
+            // the profile's control values live.
             // A profile without EQs leaves every EQ alone; one with them
             // replaces the EQ of each microphone it names. Values reach a
             // running stage live; an EQ switched on is spliced in.
@@ -2167,7 +2169,7 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
             if (s.Compressor is not null) RecallCompressorLocked(s.Compressor);
             if (s.Expander is not null) RecallExpanderLocked(s.Expander);
             if (chainsChanged || s.Inserts is not null)
-                ApplyChainsLocked(s.Inserts, absentMixesEmpty: true, rebuildAll: false);
+                ApplyChainsLocked(s.Inserts, absentMixesEmpty: true, keepWiring: true, rebuildAll: false);
             if (s.Eq is not null || s.NoiseRemoval is not null || s.VoiceChanger is not null || s.Compressor is not null
                 || s.Expander is not null) SyncEqStagesLocked();
             // The dry monitor switch the same way: a profile without it leaves it alone.
