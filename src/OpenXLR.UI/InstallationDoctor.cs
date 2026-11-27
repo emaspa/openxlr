@@ -249,6 +249,83 @@ internal static class InstallationDoctor
             : [.. notes.Take(WindowsPluginNoteLimit - 1), new("windows plugins", $"{notes.Count - WindowsPluginNoteLimit + 1} more notes; openxlr doctor --json and the diagnostics archive have every scan entry")];
     }
 
+    /// <summary>Where the packaged yabridge companion is installed; its receipt there says it is.</summary>
+    internal const string CompanionDirectory = "/usr/lib/openxlr/yabridge";
+
+    /// <summary>pacman's database of installed packages.</summary>
+    internal const string PacmanLocal = "/var/lib/pacman/local";
+
+    /// <summary>
+    /// A note for a user whose Wine would go with the packaged yabridge
+    /// companion. The companion depends on Wine, OpenXLR only suggests it,
+    /// and OpenXLR's Windows plugin host needs it. pacman's <c>-Rs</c> takes a
+    /// package's dependencies along when nothing else requires them, and an
+    /// optional dependency does not count, so on Arch the note comes when
+    /// pacman records Wine as installed only as a dependency. dnf removes such
+    /// dependencies by default, and its record is not a plain file, so on an
+    /// RPM system the note comes whenever the companion is there. apt keeps a
+    /// suggested package on autoremove, and Nix removes no dependency the user
+    /// installed, so neither gets one. Null when no note is due.
+    /// </summary>
+    /// <param name="manager">The package manager of the openxlr package's receipt.</param>
+    /// <param name="companionDirectory">The packaged companion's folder; none when <c>OPENXLR_YABRIDGE</c> sends the daemon to a system yabridge, as the daemon reads it.</param>
+    internal static DoctorNote? KeepWineNote(string? manager, string? companionDirectory = null, string pacmanLocal = PacmanLocal)
+    {
+        companionDirectory ??= string.Equals(Environment.GetEnvironmentVariable("OPENXLR_YABRIDGE"), "system", StringComparison.OrdinalIgnoreCase)
+            ? null : CompanionDirectory;
+        if (companionDirectory is null || !File.Exists(System.IO.Path.Combine(companionDirectory, "openxlr-yabridge.json"))) return null;
+        const string Needs = " OpenXLR's Windows plugin host needs Wine, and OpenXLR only suggests it.";
+        return manager switch
+        {
+            "arch" when WineDependencyPackage(pacmanLocal) is { } wine => new("wine",
+                $"{wine} is installed only as a dependency, and the openxlr-yabridge companion requires it, so pacman -Rs openxlr-yabridge removes it too when no other package requires it."
+                + Needs + " To keep Wine when the companion goes, run: sudo pacman -D --asexplicit " + Quote(wine)),
+            "rpm" => new("wine",
+                "dnf remove openxlr-yabridge also removes the packages only the companion required, Wine among them when it came with the companion."
+                + Needs + " To keep Wine when the companion goes, run: sudo dnf mark user wine"),
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// The installed package that is or provides <c>wine</c> when pacman
+    /// records it as installed as a dependency, or null: explicitly installed,
+    /// not installed, or a database that cannot be read.
+    /// </summary>
+    internal static string? WineDependencyPackage(string pacmanLocal)
+    {
+        try
+        {
+            foreach (string directory in Directory.EnumerateDirectories(pacmanLocal, "wine*"))
+            {
+                string desc = System.IO.Path.Combine(directory, "desc");
+                if (!File.Exists(desc)) continue;
+                Dictionary<string, List<string>> fields = PacmanFields(RegularFile.ReadText(desc, 1024 * 1024));
+                string? name = fields.GetValueOrDefault("NAME")?.FirstOrDefault();
+                if (name is null) continue;
+                bool wine = name == "wine" || (fields.GetValueOrDefault("PROVIDES") ?? []).Any(p => p.Split('=', '<', '>')[0] == "wine");
+                if (!wine) continue;
+                return fields.GetValueOrDefault("REASON")?.FirstOrDefault() == "1" ? name : null;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return null;
+    }
+
+    /// <summary>The fields of a pacman <c>desc</c> file: a <c>%NAME%</c> line, then its values, up to an empty line.</summary>
+    private static Dictionary<string, List<string>> PacmanFields(string text)
+    {
+        var fields = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        List<string>? values = null;
+        foreach (string line in text.Split('\n'))
+        {
+            if (line.Length > 2 && line[0] == '%' && line[^1] == '%') fields[line[1..^1]] = values = [];
+            else if (line.Length == 0) values = null;
+            else values?.Add(line);
+        }
+        return fields;
+    }
+
     /// <summary>Why a bundle the Windows plugin folders' scan found is not in the catalogue as its own entry, or null when it is.</summary>
     private static string? LeftOut(JsonElement entry)
     {
@@ -258,7 +335,7 @@ internal static class InstallationDoctor
         return outcome switch
         {
             "ok" when plugins > 0 && duplicates == plugins =>
-                "listed through its yabridge wrapper, which runs on either host; the plugin's controls window moves it to OpenXLR's Windows plugin host",
+                "listed through its yabridge wrapper, which runs on either host: the one under Windows plugins run on in Options, or the one picked in the plugin's controls window",
             "ok" or "directory" or "directory-missing" or "no-plugins" => null,
             "windows-not-64-bit" => "not listed: OpenXLR's Windows plugin host runs only 64-bit Windows plugins." + detail,
             "skipped-failed" => "not listed: an earlier scan failed and it is not read again until it changes; press Rescan all plugins in the plugin manager",
@@ -421,6 +498,8 @@ internal static class InstallationCommands
                     else findings.Add(new(p, "startup path is not owned by a receipt; it will not be removed",
                         "mv -T -i -- " + InstallationDoctor.Quote(p) + " " + InstallationDoctor.Quote(p + ".before-openxlr")));
                 }
+                if (InstallationDoctor.KeepWineNote(report.Receipts.FirstOrDefault(r => !r.Archived && r.Installation.Package == "openxlr")?.Installation.Manager) is { } wine)
+                    notes.Add(wine);
                 report = report with { Findings = [.. report.Findings, .. findings], Notes = [.. report.Notes, .. notes] };
             }
             if (json) output.WriteLine(JsonSerializer.Serialize(report, InstallationReceipt.Json));
