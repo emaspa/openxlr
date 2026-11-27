@@ -216,6 +216,12 @@
   <data name="OlderDaemonRunningSentence" xml:space="preserve">
     <value>Ein Daemon von vor dem Update läuft noch.</value>
   </data>
+  <data name="RecallLastSettings" xml:space="preserve">
+    <value>letzte Einstellungen</value>
+  </data>
+  <data name="RecallNoProfile" xml:space="preserve">
+    <value>keins</value>
+  </data>
   <data name="SupportMeOnKoFi" xml:space="preserve">
     <value>Unterstütze mich auf Ko-fi</value>
   </data>
@@ -1008,7 +1014,7 @@
     <value>Effekte für {0}</value>
   </data>
   <data name="InstallAClapOrVst3FileOrA" xml:space="preserve">
-    <value>Eine .clap- oder .vst3-Datei oder ein Windows-Plugin über yabridge installieren</value>
+    <value>Eine .clap- oder .vst3-Datei installieren, auch ein Windows-Plugin</value>
   </data>
   <data name="InstallAPluginFolder" xml:space="preserve">
     <value>Plugin-Ordner installieren</value>
@@ -2554,7 +2560,7 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>Die eigene Lautstärke des Kanals. Sie ändert jeden Mix, in den der Kanal sendet. Deine Kopfhörer hören dieses Mikrofon über den verzögerungsfreien Hardware-Signalweg des Interfaces, der der Lautstärke folgt. Schaltest du einen Effekt ein, hören sie das Mikrofon über den Mixer, mit dem Effekt.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
-    <value>Die Lautstärke wirkt nur auf die Mixe, nicht auf das direkte Monitoring</value>
+    <value>Das direkte Monitoring folgt dieser Lautstärke ebenfalls</value>
   </data>
   <data name="MixFaderName" xml:space="preserve">
     <value>Gesamtpegel von {0}</value>
@@ -3139,10 +3145,10 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>12 bis 20 kHz: Atem und Offenheit. Ein sanftes High Shelf bringt Glanz.</value>
   </data>
   <data name="FlowEq" xml:space="preserve">
-    <value>EQ in Software, {0} von 4 Bändern an</value>
+    <value>EQ in Software, {0} von {1} Bändern an</value>
   </data>
   <data name="FlowEqDevice" xml:space="preserve">
-    <value>EQ auf {1}, {0} von 4 Bändern an</value>
+    <value>EQ auf {1}, {0} von {2} Bändern an</value>
   </data>
   <data name="CaptureSourcePair" xml:space="preserve">
     <value>{0}, Paar {1}</value>
@@ -4594,7 +4600,7 @@ Aus dem Tray holst du den Mixer über das OpenXLR-Symbol oder dein App-Menü zur
     <value>Der Standard-Host wurde nicht geändert. Der Daemon muss verbunden sein und daemon.json lesen können.</value>
   </data>
   <data name="RunOnOpenXlrSWindowsPluginHostTip" xml:space="preserve">
-    <value>Experimentell. Legt fest, welcher Host dieses Windows-Plugin ausführt: der in den Optionen eingestellte Standard-Host, immer yabridge oder immer der in OpenXLR eingebaute Windows-Plugin-Host. Ein Wechsel startet das Plugin mit denselben Reglerwerten neu und unterbricht seinen Ton kurz. Plugin-UI öffnet den eigenen Editor des Plugins auf beiden Hosts.</value>
+    <value>Legt fest, welcher Host dieses Windows-Plugin ausführt: der in den Optionen eingestellte Standard-Host, immer yabridge oder immer der in OpenXLR eingebaute Windows-Plugin-Host. Ein Wechsel startet das Plugin mit denselben Reglerwerten neu und unterbricht seinen Ton kurz. Plugin-UI öffnet den eigenen Editor des Plugins auf beiden Hosts.</value>
   </data>
   <data name="RunsOnTheWindowsPluginHost" xml:space="preserve">
     <value>Läuft auf dem Windows-Plugin-Host von OpenXLR.</value>

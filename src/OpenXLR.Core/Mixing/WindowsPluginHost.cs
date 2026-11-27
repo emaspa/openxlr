@@ -8,9 +8,9 @@ namespace OpenXLR.Core.Mixing;
 /// native helper is started with when one does.
 ///
 /// A Windows plugin reaches the catalogue in one of two ways. Through the
-/// wrapper yabridge made for it, yabridge runs it unless the insert says
-/// otherwise; for an insert that chooses this host, the Windows module is
-/// read back from the wrapper, which links to it. Or straight from a Windows
+/// wrapper yabridge made for it, the insert runs on the default host unless
+/// it is pinned to one; on this host, the Windows module is read back from
+/// the wrapper, which links to it. Or straight from a Windows
 /// plugin folder (<see cref="Directories"/>), described by the helper's
 /// <c>wine</c> backend; such an entry is <see cref="PluginInfo.WindowsHostOnly"/>
 /// and runs only here. Either way the helper is started with its <c>wine</c>

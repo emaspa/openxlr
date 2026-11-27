@@ -207,8 +207,8 @@ internal sealed class NativePluginHost : IDisposable
 
     /// <param name="windows">
     /// Where the plugin runs on the Windows plugin host, for an insert that
-    /// chose it; null starts the plugin from <paramref name="bundle"/>, which
-    /// for a Windows plugin is its yabridge wrapper.
+    /// runs there; null starts the plugin from <paramref name="bundle"/>,
+    /// which for a Windows plugin is then its yabridge wrapper.
     /// </param>
     public NativePluginHost(InsertDefinition insert, string node, int channels, int sampleRate, string? bundle = null,
         Action<string>? note = null, WindowsPluginHost.Route? windows = null)

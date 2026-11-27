@@ -209,6 +209,12 @@
   <data name="BuyMeACoffee" xml:space="preserve">
     <value>Invítame a un café</value>
   </data>
+  <data name="RecallLastSettings" xml:space="preserve">
+    <value>últimos ajustes</value>
+  </data>
+  <data name="RecallNoProfile" xml:space="preserve">
+    <value>ninguno</value>
+  </data>
   <data name="SupportMeOnKoFi" xml:space="preserve">
     <value>Apóyame en Ko-fi</value>
   </data>
@@ -2506,7 +2512,7 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>El volumen propio del canal. Cambia todas las mezclas a las que envía el canal. Tus auriculares oyen este micrófono por la ruta sin latencia de la interfaz, que sigue el volumen. Si activas un efecto, oyen el micrófono por el mezclador, con el efecto.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
-    <value>El volumen solo afecta a las mezclas, no a la monitorización directa</value>
+    <value>La monitorización directa también sigue este volumen</value>
   </data>
   <data name="MixFaderName" xml:space="preserve">
     <value>Nivel general de {0}</value>
@@ -3082,10 +3088,10 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>De 12 a 20 kHz: el aliento y la apertura. Un estante de agudos suave añade brillo.</value>
   </data>
   <data name="FlowEq" xml:space="preserve">
-    <value>EQ en software, {0} de 4 bandas activas</value>
+    <value>EQ en software, {0} de {1} bandas activas</value>
   </data>
   <data name="FlowEqDevice" xml:space="preserve">
-    <value>EQ en {1}, {0} de 4 bandas activas</value>
+    <value>EQ en {1}, {0} de {2} bandas activas</value>
   </data>
   <data name="CaptureSourcePair" xml:space="preserve">
     <value>{0}, par {1}</value>

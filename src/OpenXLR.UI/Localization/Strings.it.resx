@@ -218,6 +218,12 @@
   <data name="OlderDaemonRunningSentence" xml:space="preserve">
     <value>È ancora in esecuzione un demone di prima dell'aggiornamento.</value>
   </data>
+  <data name="RecallLastSettings" xml:space="preserve">
+    <value>ultime impostazioni</value>
+  </data>
+  <data name="RecallNoProfile" xml:space="preserve">
+    <value>nessuno</value>
+  </data>
   <data name="SupportMeOnKoFi" xml:space="preserve">
     <value>Supportami su Ko-fi</value>
   </data>
@@ -2522,7 +2528,7 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
     <value>Il volume proprio del canale. Cambia ogni mix a cui il canale viene inviato. Le tue cuffie sentono questo microfono attraverso il percorso a latenza zero dell'interfaccia, che segue il volume. Se attivi un effetto, sentono il microfono attraverso il mixer, con l'effetto.</value>
   </data>
   <data name="ChannelVolumeMixesOnly" xml:space="preserve">
-    <value>Il volume agisce solo sui mix, non sul monitoraggio diretto</value>
+    <value>Anche il monitoraggio diretto segue questo volume</value>
   </data>
   <data name="MixFaderName" xml:space="preserve">
     <value>Livello master di {0}</value>
@@ -3123,10 +3129,10 @@ Il profilo UCM del Wave XLR Pro resta una configurazione manuale sull'host. Inst
     <value>Da 12 a 20 kHz: il respiro e l'apertura. Un leggero shelf alto aggiunge brillantezza.</value>
   </data>
   <data name="FlowEq" xml:space="preserve">
-    <value>EQ via software, {0} bande su 4 attive</value>
+    <value>EQ via software, {0} bande su {1} attive</value>
   </data>
   <data name="FlowEqDevice" xml:space="preserve">
-    <value>EQ su {1}, {0} bande su 4 attive</value>
+    <value>EQ su {1}, {0} bande su {2} attive</value>
   </data>
   <data name="CaptureSourcePair" xml:space="preserve">
     <value>{0}, coppia {1}</value>

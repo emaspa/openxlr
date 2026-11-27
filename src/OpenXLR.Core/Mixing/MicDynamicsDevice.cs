@@ -256,6 +256,7 @@ public sealed partial class Mixer
                 $"The {support.Name} sends this input to the computer before its own processing (raw capture), so the compressor and expander run in software.")
             {
                 MinimumFirmware = support.MinimumFirmware,
+                Levels = support.DynamicsLevels,
             };
         return new MicEqDevice(unit.Unit, unit.Input, support.Name, support.Firmware, dynamics.Ready && failure is null,
             failure is null ? dynamics.Reason : EqDeviceFailedReason,
