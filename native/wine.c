@@ -36,6 +36,7 @@
 #include "winhost/wire.h"
 
 #include <X11/Xutil.h>
+#include <dbus/dbus.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -51,6 +52,7 @@
 #include <strings.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -76,8 +78,18 @@ enum {
   // How long the report of a death holds on for the way the process ended.
   WINE_ENDING_MS = 200,
   // The least time a block gets before its cycle gives up on it.
-  WINE_BLOCK_MS = 20
+  WINE_BLOCK_MS = 20,
+  // How long the main thread waits for each answer from RTKit, which may
+  // ask polkit before it answers.
+  WINE_RTKIT_MS = 2000
 };
+
+// How the Windows audio thread came by its scheduling (wine_schedule).
+typedef enum {
+  WINE_RT_NONE,   // ordinary priority
+  WINE_RT_LIMIT,  // set from here, within this user's real-time limit
+  WINE_RT_RTKIT   // granted by RTKit
+} WineRealTime;
 
 // How long one block may stay out before the instance is given up, the same
 // patience the host has with a native plugin inside one callback.
@@ -133,6 +145,8 @@ typedef struct {
   bool failed;      // main thread: the failure has been reported
   int64_t dead_at;  // main thread: when it first saw the Windows host dead
   bool scheduled;   // main thread: the audio thread's scheduling is settled
+  WineRealTime real_time;  // main thread: what it was settled as
+  int real_time_priority;  // and at what priority, when real-time
   // Audio thread only: a block went out and its answer has not come back.
   bool pending;
   // The Windows host is gone, or broke the protocol. Either thread may find
@@ -1356,6 +1370,129 @@ static void wine_take_notes(Host *h, Wine *w) {
     host_resize_editor(h, width, height);
 }
 
+// --- real-time through RTKit ------------------------------------------------
+
+// One of RTKit's properties, a number whichever width RTKit gives it in.
+static bool wine_rtkit_number(DBusConnection *bus, const char *name, int64_t *value,
+                              DBusError *error) {
+  const char *interface = "org.freedesktop.RealtimeKit1";
+  DBusMessage *ask = dbus_message_new_method_call(
+      "org.freedesktop.RealtimeKit1", "/org/freedesktop/RealtimeKit1",
+      DBUS_INTERFACE_PROPERTIES, "Get");
+  if (!ask || !dbus_message_append_args(ask, DBUS_TYPE_STRING, &interface,
+                                        DBUS_TYPE_STRING, &name, DBUS_TYPE_INVALID)) {
+    if (ask)
+      dbus_message_unref(ask);
+    dbus_set_error_const(error, DBUS_ERROR_NO_MEMORY, "out of memory");
+    return false;
+  }
+  DBusMessage *answer =
+      dbus_connection_send_with_reply_and_block(bus, ask, WINE_RTKIT_MS, error);
+  dbus_message_unref(ask);
+  if (!answer)
+    return false;
+  DBusMessageIter outer, inner;
+  bool found = false;
+  if (dbus_message_iter_init(answer, &outer) &&
+      dbus_message_iter_get_arg_type(&outer) == DBUS_TYPE_VARIANT) {
+    dbus_message_iter_recurse(&outer, &inner);
+    int type = dbus_message_iter_get_arg_type(&inner);
+    if (type == DBUS_TYPE_INT32) {
+      dbus_int32_t number;
+      dbus_message_iter_get_basic(&inner, &number);
+      *value = number;
+      found = true;
+    } else if (type == DBUS_TYPE_INT64) {
+      dbus_int64_t number;
+      dbus_message_iter_get_basic(&inner, &number);
+      *value = number;
+      found = true;
+    }
+  }
+  dbus_message_unref(answer);
+  if (!found)
+    dbus_set_error(error, DBUS_ERROR_INVALID_SIGNATURE, "%s is not a number", name);
+  return found;
+}
+
+// Ask RTKit, on the system bus, to make the Windows audio thread real-time
+// at `priority`, or at RTKit's highest if that is lower. RTKit does that only
+// for a process whose real-time CPU limit (RLIMIT_RTTIME) is set and within
+// its own bound, so the limit is lowered on the Windows host's process first
+// when it is above. That process is this user's, so the kernel allows it
+// from here. On a refusal `why` says what went wrong.
+static bool wine_rtkit(Wine *w, int priority, int *granted, char *why, size_t size) {
+  DBusError error;
+  dbus_error_init(&error);
+  DBusConnection *bus = dbus_bus_get_private(DBUS_BUS_SYSTEM, &error);
+  if (!bus) {
+    snprintf(why, size, "there is no system bus to reach RTKit on: %s", error.message);
+    dbus_error_free(&error);
+    return false;
+  }
+  // libdbus ends the process when a bus connection drops, unless told not to.
+  dbus_connection_set_exit_on_disconnect(bus, FALSE);
+  bool ok = false;
+  int64_t highest = 0, rttime = 0;
+  struct rlimit limit;
+  if (!wine_rtkit_number(bus, "MaxRealtimePriority", &highest, &error) ||
+      !wine_rtkit_number(bus, "RTTimeUSecMax", &rttime, &error)) {
+    if (dbus_error_has_name(&error, DBUS_ERROR_SERVICE_UNKNOWN) ||
+        dbus_error_has_name(&error, DBUS_ERROR_NAME_HAS_NO_OWNER))
+      snprintf(why, size, "RTKit is not on the system bus");
+    else
+      snprintf(why, size, "RTKit did not answer: %s", error.message);
+  } else if (highest < 1 || rttime < 1) {
+    snprintf(why, size, "RTKit allows no real-time priority");
+  } else if (prlimit(w->process, RLIMIT_RTTIME, NULL, &limit) != 0) {
+    snprintf(why, size, "the Windows host's real-time CPU limit could not be read: %s",
+             strerror(errno));
+  } else {
+    if (priority > highest)
+      priority = (int)highest;
+    bool limited = true;
+    if (limit.rlim_max == RLIM_INFINITY || limit.rlim_max > (rlim_t)rttime) {
+      limit.rlim_max = (rlim_t)rttime;
+      if (limit.rlim_cur > limit.rlim_max)
+        limit.rlim_cur = limit.rlim_max;
+      if (prlimit(w->process, RLIMIT_RTTIME, &limit, NULL) != 0) {
+        snprintf(why, size, "the Windows host's real-time CPU limit could not be set: %s",
+                 strerror(errno));
+        limited = false;
+      }
+    }
+    DBusMessage *ask = limited ? dbus_message_new_method_call(
+                                     "org.freedesktop.RealtimeKit1",
+                                     "/org/freedesktop/RealtimeKit1",
+                                     "org.freedesktop.RealtimeKit1",
+                                     "MakeThreadRealtimeWithPID")
+                               : NULL;
+    dbus_uint64_t process = (dbus_uint64_t)w->process, thread = (dbus_uint64_t)w->audio_tid;
+    dbus_uint32_t asked = (dbus_uint32_t)priority;
+    if (ask && dbus_message_append_args(ask, DBUS_TYPE_UINT64, &process, DBUS_TYPE_UINT64,
+                                        &thread, DBUS_TYPE_UINT32, &asked,
+                                        DBUS_TYPE_INVALID)) {
+      DBusMessage *answer =
+          dbus_connection_send_with_reply_and_block(bus, ask, WINE_RTKIT_MS, &error);
+      if (answer) {
+        dbus_message_unref(answer);
+        *granted = priority;
+        ok = true;
+      } else {
+        snprintf(why, size, "RTKit refused priority %d: %s", priority, error.message);
+      }
+    } else if (limited) {
+      snprintf(why, size, "out of memory");
+    }
+    if (ask)
+      dbus_message_unref(ask);
+  }
+  dbus_error_free(&error);
+  dbus_connection_close(bus);
+  dbus_connection_unref(bus);
+  return ok;
+}
+
 // --- main thread ------------------------------------------------------------
 
 // Give the Windows audio thread the scheduling of the thread that waits for
@@ -1363,29 +1500,50 @@ static void wine_take_notes(Host *h, Wine *w) {
 // and that thread, real-time itself, would wait on one that is not; higher
 // and plugin code would outrank PipeWire's own threads. A Windows program
 // cannot ask for this itself, so it is set from here, which the kernel
-// allows between two processes of one user within the real-time limit they
-// share.
+// allows between two processes of one user within the real-time limit
+// (RLIMIT_RTPRIO) they share. Where the user has no such limit and real-time
+// comes through RTKit, as PipeWire's own threads then do, RTKit is asked
+// instead. One trace line says which it came to, for the daemon's journal.
 static void wine_schedule(Wine *w) {
   w->scheduled = true;
   int policy = atomic_load(&w->waiter_policy);
   int kind = policy & ~SCHED_RESET_ON_FORK;
-  if (kind != SCHED_FIFO && kind != SCHED_RR)
-    return;
-  struct sched_param param = {.sched_priority = atomic_load(&w->waiter_priority)};
-  if (!w->audio_tid)
-    fputs("note: the Windows plugin's audio thread was not found and runs "
-          "without real-time priority\n",
+  if (kind != SCHED_FIFO && kind != SCHED_RR) {
+    fputs("trace: the Windows plugin's audio thread runs without real-time priority: "
+          "the thread that waits for it has none either\n",
           stderr);
-  else if (sched_setscheduler(w->audio_tid, kind | SCHED_RESET_ON_FORK, &param) != 0)
+    return;
+  }
+  struct sched_param param = {.sched_priority = atomic_load(&w->waiter_priority)};
+  char why[256], refused[192];
+  int granted = 0;
+  if (!w->audio_tid) {
+    snprintf(why, sizeof(why), "the thread was not found");
+  } else if (sched_setscheduler(w->audio_tid, kind | SCHED_RESET_ON_FORK, &param) == 0) {
+    w->real_time = WINE_RT_LIMIT;
+    w->real_time_priority = param.sched_priority;
     fprintf(stderr,
-            "note: the Windows plugin's audio thread runs without real-time "
-            "priority: %s\n",
-            strerror(errno));
-  else
-    fprintf(stderr,
-            "trace: the Windows plugin's audio thread runs at real-time "
-            "priority %d\n",
+            "trace: the Windows plugin's audio thread runs at real-time priority %d, "
+            "within this user's real-time limit\n",
             param.sched_priority);
+    return;
+  } else if (errno != EPERM) {
+    snprintf(why, sizeof(why), "%s", strerror(errno));
+  } else if (wine_rtkit(w, param.sched_priority, &granted, refused, sizeof(refused))) {
+    w->real_time = WINE_RT_RTKIT;
+    w->real_time_priority = granted;
+    fprintf(stderr,
+            "trace: the Windows plugin's audio thread runs at real-time priority %d, "
+            "granted by RTKit\n",
+            granted);
+    return;
+  } else {
+    snprintf(why, sizeof(why), "this user's real-time limit does not allow it, and %s",
+             refused);
+  }
+  fprintf(stderr,
+          "trace: the Windows plugin's audio thread runs without real-time priority: %s\n",
+          why);
 }
 
 static void wine_main_thread(Host *h) {

@@ -35,6 +35,7 @@ native/openxlr-winhost.exe
 native/winhost/*.obj
 native/tests/winhost
 native/tests/winhost-graph
+native/tests/winhost-rtkit
 native/tests/winhost-editor
 native/tests/winhost-plugin.clap
 native/tests/winhost-plugin.vst3

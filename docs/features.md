@@ -943,7 +943,9 @@ A Windows plugin bridged through yabridge can run on the Windows plugin
 host built into OpenXLR instead, one insert at a time, from a switch in its
 controls window or the API. It is experimental. No package provides it yet,
 only a source build made with `WINHOST=1`. The plugin's own editor opens on
-either host. yabridge stays the default. See
+either host. Its audio thread gets PipeWire's real-time priority, through
+the user's real-time limit or, where there is none, through RTKit.
+yabridge stays the default. See
 [OpenXLR's Windows plugin host](manual.md#windows-plugin-host).
 
 A block size option forces PipeWire's quantum for the graph OpenXLR runs

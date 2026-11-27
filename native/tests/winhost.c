@@ -737,6 +737,106 @@ static void check_scheduling(void) {
   puts("PASS: the Windows audio thread is given the scheduling of the thread that waits for it");
 }
 
+// --- RTKit --------------------------------------------------------------------
+
+// What winhost-rtkit.py starts the stand-in for RTKit with.
+enum { RTKIT_HIGHEST = 7, RTKIT_RTTIME_US = 200000 };
+
+// The last call the stand-in recorded, or false when it recorded none.
+static bool rtkit_asked(const char *record, long long *pid, long long *tid, int *priority,
+                        long long *rttime) {
+  FILE *file = fopen(record, "r");
+  if (!file) return false;
+  char line[128];
+  bool found = false;
+  while (fgets(line, sizeof(line), file))
+    found = sscanf(line, "%lld %lld %d %lld", pid, tid, priority, rttime) == 4;
+  fclose(file);
+  return found;
+}
+
+// Run by winhost-rtkit.py under `prlimit --rtprio=0:0`, with the system bus
+// a private one: RTKIT is `granted` when a stand-in for RTKit on it grants,
+// `refused` when it refuses, and `absent` when nothing owns RTKit's name.
+// This process can put no thread at real-time priority, so the thread that
+// waits for the Windows side is described to the backend as PipeWire's data
+// thread would be under RTKit: SCHED_FIFO, at the priority the case asks.
+static void check_rtkit(const char *rtkit, const char *record) {
+  struct rlimit limit;
+  assert(getrlimit(RLIMIT_RTPRIO, &limit) == 0);
+  if (limit.rlim_max != 0) {
+    puts("FAIL: the RTKit check runs with no real-time limit: prlimit --rtprio=0:0");
+    exit(1);
+  }
+  const char *bus = getenv("DBUS_SYSTEM_BUS_ADDRESS");
+  if (!bus || !bus[0] || strstr(bus, "/run/dbus/")) {
+    puts("FAIL: the RTKit check runs only with a private system bus");
+    exit(1);
+  }
+  bool granted = !strcmp(rtkit, "granted"), refused = !strcmp(rtkit, "refused");
+  assert(granted || refused || !strcmp(rtkit, "absent"));
+  // At 3, within the stand-in's highest, and at 9, above it.
+  static const int priorities[] = {3, 9};
+  for (size_t i = 0; i < (granted ? 2 : 1); ++i) {
+    int waiter = priorities[i], expected = waiter < RTKIT_HIGHEST ? waiter : RTKIT_HIGHEST;
+    assert(begin("gain", 2));
+    Wine *w = h.impl;
+    assert(w->audio_tid && w->process);
+    atomic_store(&w->waiter_policy, SCHED_FIFO | SCHED_RESET_ON_FORK);
+    atomic_store(&w->waiter_priority, waiter);
+    atomic_store(&w->waiter_known, true);
+    cycle(256);
+    assert(scaled(256, 0.5f));
+    expect_reason();
+    wine_backend.main_thread(&h);
+    char line[160];
+    if (granted)
+      snprintf(line, sizeof(line), "runs at real-time priority %d, granted by RTKit", expected);
+    else if (refused)
+      snprintf(line, sizeof(line), "runs without real-time priority: this user's real-time "
+               "limit does not allow it, and RTKit refused priority %d", expected);
+    else
+      snprintf(line, sizeof(line), "runs without real-time priority: this user's real-time "
+               "limit does not allow it, and RTKit is not on the system bus");
+    assert(explained(line));
+    assert(w->scheduled);
+    assert(w->real_time == (granted ? WINE_RT_RTKIT : WINE_RT_NONE));
+    long long pid = 0, tid = 0, rttime = 0;
+    int priority = 0;
+    bool asked = rtkit_asked(record, &pid, &tid, &priority, &rttime);
+    if (granted || refused) {
+      // Asked for the Windows host's process and its audio thread, at the
+      // waiter's priority or RTKit's highest, with the process's real-time
+      // CPU limit set within RTKit's bound beforehand.
+      assert(asked && pid == w->process && tid == w->audio_tid && priority == expected);
+      assert(rttime > 0 && rttime <= RTKIT_RTTIME_US);
+      struct rlimit cpu;
+      assert(prlimit(w->process, RLIMIT_RTTIME, NULL, &cpu) == 0);
+      assert(cpu.rlim_max == (rlim_t)rttime && cpu.rlim_cur <= cpu.rlim_max);
+    } else {
+      assert(!asked);
+    }
+    if (granted) assert(w->real_time_priority == expected);
+    // The stand-in changes nothing, so the thread is as it was, and the
+    // audio goes on either way.
+    assert((sched_getscheduler(w->audio_tid) & ~SCHED_RESET_ON_FORK) == SCHED_OTHER);
+    for (unsigned n = 0; n < 200; ++n) {
+      cycle(256);
+      assert(scaled(256, 0.5f));
+    }
+    end();
+  }
+  if (granted)
+    puts("PASS: with no real-time limit, RTKit is asked for the Windows audio thread at the "
+         "waiter's priority or RTKit's highest, with the real-time CPU limit set first");
+  else if (refused)
+    puts("PASS: a refusal from RTKit leaves the Windows audio thread at ordinary priority, "
+         "says why, and the audio runs");
+  else
+    puts("PASS: with no RTKit on the bus the Windows audio thread runs at ordinary priority, "
+         "says so, and the audio runs");
+}
+
 static void check_refusals(const char *winhost) {
   assert(!begin("no-such-plugin", 2));
   end();
@@ -1800,11 +1900,26 @@ static void join(char *out, size_t size, const char *directory, const char *name
 int main(int argc, char **argv) {
   static char winhost[PATH_MAX], plugin[PATH_MAX], vst3[PATH_MAX], wine[PATH_MAX],
       prefix[PATH_MAX];
+  // winhost-rtkit.py runs the RTKit check alone, one case at a time.
+  const char *rtkit = NULL, *rtkit_record = NULL;
+  if (argc == 7 && !strcmp(argv[1], "--rtkit")) {
+    rtkit = argv[2];
+    rtkit_record = argv[3];
+    argc -= 3;
+    argv += 3;
+  }
   if (argc != 4 || !realpath(argv[1], winhost) || !realpath(argv[2], plugin) ||
       !realpath(argv[3], vst3)) {
-    fputs("usage: winhost WINHOST-EXE CLAP-PLUGIN VST3-PLUGIN\n", stderr);
+    fputs("usage: winhost [--rtkit granted|refused|absent RECORD] WINHOST-EXE CLAP-PLUGIN "
+          "VST3-PLUGIN\n",
+          stderr);
     return 2;
   }
+  // The backend asks RTKit when the real-time limit refuses it. No test may
+  // reach the system's RTKit, so the system bus is one that is not there,
+  // unless the RTKit check gave a private one.
+  if (!rtkit)
+    setenv("DBUS_SYSTEM_BUS_ADDRESS", "unix:path=/nonexistent/openxlr-test-system-bus", 1);
   setvbuf(stdout, NULL, _IOLBF, 0);
   const char *named = getenv("OPENXLR_WINE");
   if (!wine_find_program(named && named[0] ? named : "wine", wine, sizeof(wine))) {
@@ -1843,6 +1958,16 @@ int main(int argc, char **argv) {
            base && base[0] == '/' ? base : "/tmp");
   assert(mkdtemp(runtime));
   setenv("XDG_RUNTIME_DIR", runtime, 1);
+  if (rtkit) {
+    pw_init(NULL, NULL);
+    check_rtkit(rtkit, rtkit_record);
+    pw_deinit();
+    if (rmdir(runtime) != 0) {
+      perror("FAIL: the backend left something in its runtime directory");
+      return 1;
+    }
+    return 0;
+  }
   // The VST3 module as it is installed: inside a bundle, under the name a
   // Windows bundle gives it. And a bundle with nothing in it.
   static char contents[PATH_MAX], inside[PATH_MAX], bundled[PATH_MAX];

@@ -2963,6 +2963,23 @@ because the build has no host. It then runs through yabridge, and the
 controls window says why. The saved choice stays, and so does the button,
 so you can turn it off.
 
+The plugin's audio runs on a thread of the Windows program, which OpenXLR
+gives the same real-time priority as PipeWire's own audio thread. Where
+your user has a real-time limit, as members of Arch's `realtime` group do,
+OpenXLR sets the priority itself. [Memory lock](#memlock) has the commands
+to join that group. Where it has none, as on a usual Ubuntu or Fedora
+desktop, OpenXLR asks RTKit, the system service that gives PipeWire
+its priority there. If neither works, the plugin still plays, but it is
+more likely to drop out when the machine is busy. The daemon's journal has
+one line per plugin saying which of the three happened:
+
+```sh
+journalctl --user -u openxlr-daemon --no-pager | grep "audio thread runs"
+```
+
+The line ends with `within this user's real-time limit`, with
+`granted by RTKit`, or with `without real-time priority:` and the reason.
+
 The first start in a Wine prefix can take longer than OpenXLR waits for a
 plugin. If the plugin reports that Wine did not answer in time, turn the
 insert off and on again.
