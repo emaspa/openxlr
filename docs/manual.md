@@ -3088,6 +3088,14 @@ is named too, with the reason. When Wine is missing and an insert has a
 Windows plugin, the doctor says so and names the inserts, since neither
 host runs a Windows plugin without Wine.
 
+The companion depends on Wine and OpenXLR only suggests it, so removing
+the companion can take Wine with it when nothing else needs Wine. On Arch,
+`pacman -Rs openxlr-yabridge` does, and on Fedora `dnf remove` does. While
+the companion is installed, the doctor gives the command that keeps Wine:
+`sudo pacman -D --asexplicit wine` on Arch, or `sudo dnf mark user wine` on
+Fedora. Run it before you remove the companion. On Debian and Ubuntu, apt
+keeps Wine because OpenXLR suggests it.
+
 <a name="bundle-not-read"></a>
 **A bridged plugin is not in the picker.** A successful yabridge sync means
 the wrapper exists, not that OpenXLR could read the plugin. Each CLAP or

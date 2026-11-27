@@ -789,7 +789,11 @@ public sealed class StartupReceiptTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(wants)!);
         File.CreateSymbolicLink(wants, StartupReceipt.StartupPaths[1]);
         var output = new StringWriter();
-        await InstallationCommands.Run(["doctor", "--no-runtime", "--json"], output);
+        // The machine's own yabridge companion, and its Wine, stay out of the notes.
+        string? yabridge = Environment.GetEnvironmentVariable("OPENXLR_YABRIDGE");
+        Environment.SetEnvironmentVariable("OPENXLR_YABRIDGE", "system");
+        try { await InstallationCommands.Run(["doctor", "--no-runtime", "--json"], output); }
+        finally { Environment.SetEnvironmentVariable("OPENXLR_YABRIDGE", yabridge); }
         using (var json = JsonDocument.Parse(output.ToString()))
         {
             string[] findings = [.. json.RootElement.GetProperty("findings").EnumerateArray().Select(f => f.GetProperty("path").GetString()!)];
