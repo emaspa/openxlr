@@ -2,7 +2,7 @@
 
 The UI can be translated. Every string it shows lives in one
 English catalogue, and a language is a second catalogue with the same keys.
-OpenXLR ships in English, German (Deutsch), Spanish (Español), Italian (Italiano), Tagalog, Cebuano (Bisaya) and Serbian (Cyrillic). Other
+OpenXLR ships in English, German (Deutsch), Spanish (Español), French (Français), Italian (Italiano), Tagalog, Cebuano (Bisaya) and Serbian (Cyrillic). Other
 languages come from contributors who read and write them, one pull request
 per language.
 
@@ -62,7 +62,7 @@ Routing hints keep the mixer's default channel and mix names, such as
    the catalogue lacks, when an entry is never read, when markup carries
    text of its own, or when a key is built at run time. Its line-break
    and literal-command checks run per language from `InlineData` rows
-   that name `de`, `es`, `it`, `tl`, `ceb` and `sr-Cyrl`; add a row for the new language. The
+   that name `de`, `es`, `fr`, `it`, `tl`, `ceb` and `sr-Cyrl`; add a row for the new language. The
    layout tests measure the fixed-width captions of the main window and
    Options in every shipped language, whichever language the run uses.
    Keep literal English expectations in UI tests for English runs so a wrong
@@ -98,6 +98,7 @@ Chrome has no Cebuano. Keep each `$1` as written.
    new("en", "English"),
    new("de", "Deutsch"),
    new("es", "Español"),
+   new("fr", "Français"),
    new("it", "Italiano"),
    ```
 

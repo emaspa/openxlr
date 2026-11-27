@@ -1567,7 +1567,7 @@ public sealed class EqEditorWindowTests
         string? language = UiSettings.Load().Language;
         try
         {
-            foreach (string choice in new[] { "en", "de", "es", "it", "tl", "ceb", "sr-Cyrl" })
+            foreach (string choice in new[] { "en", "de", "es", "fr", "it", "tl", "ceb", "sr-Cyrl" })
             {
                 Assert.Null((UiSettings.Load() with { Language = choice }).Save());
                 Localizer.Initialize();

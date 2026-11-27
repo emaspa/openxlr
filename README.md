@@ -122,7 +122,7 @@ untested device, open an issue with a diagnostics archive
   socket authenticated by peer credentials.
 - **Terminal mixer** `openxlr-tui` ([manual](docs/manual.md#terminal)),
   an **Omarchy bar** plugin ([omarchy.md](docs/omarchy.md)), twenty-five
-  **skins** as data ([skins.md](docs/skins.md)) and seven **languages**
+  **skins** as data ([skins.md](docs/skins.md)) and eight **languages**
   ([localization](docs/localization.md)).
 
 Every control, area by area: [docs/features.md](docs/features.md).

@@ -130,6 +130,7 @@ public sealed class LocalizationTests
     [Theory]
     [InlineData("Strings.de.resx")]
     [InlineData("Strings.es.resx")]
+    [InlineData("Strings.fr.resx")]
     [InlineData("Strings.it.resx")]
     [InlineData("Strings.tl.resx")]
     [InlineData("Strings.ceb.resx")]
@@ -147,6 +148,7 @@ public sealed class LocalizationTests
     [Theory]
     [InlineData("Strings.de.resx")]
     [InlineData("Strings.es.resx")]
+    [InlineData("Strings.fr.resx")]
     [InlineData("Strings.it.resx")]
     [InlineData("Strings.tl.resx")]
     [InlineData("Strings.ceb.resx")]
@@ -166,6 +168,7 @@ public sealed class LocalizationTests
     [Theory]
     [InlineData("Strings.de.resx")]
     [InlineData("Strings.es.resx")]
+    [InlineData("Strings.fr.resx")]
     [InlineData("Strings.it.resx")]
     [InlineData("Strings.tl.resx")]
     [InlineData("Strings.ceb.resx")]
@@ -189,7 +192,7 @@ public sealed class LocalizationTests
     public void AMissingEntryReadsEnglishAndAnUnknownKeyReadsItself()
     {
         // An unshipped language uses the English catalogue.
-        Assert.Equal("Close", Localizer.Get("Close", CultureInfo.GetCultureInfo("fr")));
+        Assert.Equal("Close", Localizer.Get("Close", CultureInfo.GetCultureInfo("nl")));
         Assert.Equal("Close", Localizer.Get("Close", CultureInfo.GetCultureInfo("pt-BR")));
         Assert.Equal("NoSuchKey", Localizer.Text("NoSuchKey"));
         Assert.Equal("Low Cut 80", Localizer.Format("LowCutFrequency", 80));
@@ -199,6 +202,7 @@ public sealed class LocalizationTests
     [Theory]
     [InlineData("de", "Deutsch", "de-AT", "Schließen")]
     [InlineData("es", "Español", "es-MX", "Cerrar")]
+    [InlineData("fr", "Français", "fr-CA", "Fermer")]
     [InlineData("it", "Italiano", "it-CH", "Chiudi")]
     [InlineData("tl", "Tagalog", "tl-PH", "Isara")]
     [InlineData("ceb", "Bisaya (Cebuano)", "ceb-PH", "Sirad-i")]
@@ -274,7 +278,7 @@ public sealed class LocalizationTests
 
     [Theory]
     [InlineData(null, "LANG=ceb_PH.UTF-8", "ceb")]
-    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=fr:ceb_PH:tl", "ceb")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=nl:ceb_PH:tl", "ceb")]
     [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=ceb--PH:ceb", "ceb")]
     [InlineData(null, "LANG=C.UTF-8 LANGUAGE=ceb", "en")]
     [InlineData(null, "LANG=ceb_PH.UTF-8 LC_MESSAGES=es_ES.UTF-8", "es")]
@@ -293,7 +297,7 @@ public sealed class LocalizationTests
     [Theory]
     [InlineData(null, "LANG=tl_PH.UTF-8", "tl")]
     [InlineData(null, "LANG=fil_PH.UTF-8", "tl")]
-    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=fr:fil_PH:de", "tl")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=nl:fil_PH:de", "tl")]
     [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=tl--PH:fil", "tl")]
     [InlineData(null, "LANG=C.UTF-8 LANGUAGE=tl:fil", "en")]
     [InlineData(null, "LANG=fil_PH.UTF-8 LC_MESSAGES=C", "en")]
@@ -313,7 +317,7 @@ public sealed class LocalizationTests
     [InlineData(null, "LANG=es_ES.UTF-8", "es")]
     [InlineData(null, "LANG=es_MX.UTF-8", "es")]
     [InlineData(null, "LANG=es_AR.UTF-8", "es")]
-    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=fr:es_MX", "es")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=nl:es_MX", "es")]
     [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=es--ES:es", "es")]
     [InlineData(null, "LANG=es_MX.UTF-8 LC_MESSAGES=C.UTF-8", "en")]
     [InlineData(null, "LANG=POSIX LANGUAGE=es", "en")]
@@ -342,7 +346,7 @@ public sealed class LocalizationTests
     [InlineData(null, "LANG=it_CH.UTF-8", "it")]
     [InlineData(null, "LANG=it_SM.UTF-8", "it")]
     [InlineData(null, "LANG=it_IT.UTF-8@euro", "it")]
-    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=fr:it_CH", "it")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=nl:it_CH", "it")]
     [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=it--IT:it", "it")]
     [InlineData(null, "LANG=de_CH.UTF-8 LANGUAGE=it_CH:de_CH", "it")]
     [InlineData(null, "LANG=it_IT.UTF-8 LC_MESSAGES=C.UTF-8", "en")]
@@ -361,8 +365,31 @@ public sealed class LocalizationTests
     }
 
     [Theory]
+    [InlineData(null, "LANG=fr_FR.UTF-8", "fr")]
+    [InlineData(null, "LANG=fr_CA.UTF-8", "fr")]
+    [InlineData(null, "LANG=fr_CH.UTF-8", "fr")]
+    [InlineData(null, "LANG=fr_BE.UTF-8@euro", "fr")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=nl:fr_CA", "fr")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=fr--FR:fr", "fr")]
+    [InlineData(null, "LANG=de_CH.UTF-8 LANGUAGE=fr_CH:de_CH", "fr")]
+    [InlineData(null, "LANG=fr_FR.UTF-8 LC_MESSAGES=C.UTF-8", "en")]
+    [InlineData(null, "LANG=POSIX LANGUAGE=fr", "en")]
+    [InlineData("fr-FR", "LANG=en_US.UTF-8", "fr")]
+    [InlineData("fr-CA", "LANG=de_DE.UTF-8", "fr")]
+    [InlineData("system", "LANG=fr_BE.UTF-8", "fr")]
+    [InlineData("en", "LANG=fr_FR.UTF-8", "en")]
+    [InlineData("it", "LANG=fr_FR.UTF-8", "it")]
+    public void FrenchIsChosenFromTheSavedChoiceOrDesktop(string? saved, string environment, string expected)
+    {
+        Dictionary<string, string> variables = environment.Split(' ')
+            .Select(v => v.Split('=', 2)).ToDictionary(v => v[0], v => v[1]);
+        Assert.Equal(expected, Localizer.Resolve(saved, n => variables.GetValueOrDefault(n),
+            [.. Localizer.Languages.Select(c => c.Id!)]));
+    }
+
+    [Theory]
     [InlineData(null, "LANG=de_DE.UTF-8", "de")]
-    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=fr:de", "de")]
+    [InlineData(null, "LANG=en_US.UTF-8 LANGUAGE=nl:de", "de")]
     [InlineData(null, "LANG=de_CH.UTF-8 LC_MESSAGES=C.UTF-8", "en")]
     [InlineData("de-AT", "LANG=en_US.UTF-8", "de")]
     [InlineData("en", "LANG=de_DE.UTF-8", "en")]
@@ -469,7 +496,7 @@ public sealed class LanguageSettingsTests : IDisposable
         File.WriteAllText(UiJson, """{ "skin": "nord", "futureChoice": 3 }""");
         OptionsViewModel options = Options();
         Assert.Null(options.SelectedLanguage!.Id);
-        Assert.Equal([Localizer.Text("SystemLanguage"), "English", "Deutsch", "Español", "Italiano", "Tagalog", "Bisaya (Cebuano)", "Српски (ћирилица)"],
+        Assert.Equal([Localizer.Text("SystemLanguage"), "English", "Deutsch", "Español", "Français", "Italiano", "Tagalog", "Bisaya (Cebuano)", "Српски (ћирилица)"],
             options.LanguageChoices.Select(c => c.Label));
 
         options.SelectedLanguage = options.LanguageChoices.Single(c => c.Id == "en");
@@ -489,6 +516,7 @@ public sealed class LanguageSettingsTests : IDisposable
 
     [Theory]
     [InlineData("es")]
+    [InlineData("fr")]
     [InlineData("it")]
     [InlineData("tl")]
     [InlineData("ceb")]
@@ -524,6 +552,8 @@ public sealed class LanguageSettingsTests : IDisposable
     [Theory]
     [InlineData("es-MX", "es")]
     [InlineData("ES-419", "es")]
+    [InlineData("fr-CA", "fr")]
+    [InlineData("FR-fr", "fr")]
     [InlineData("it-CH", "it")]
     [InlineData("IT-it", "it")]
     [InlineData("de-AT", "de")]
@@ -534,7 +564,7 @@ public sealed class LanguageSettingsTests : IDisposable
     [InlineData("sr-Cyrl-RS", "sr-Cyrl")]
     [InlineData("sr-Latn-RS", "en")]
     [InlineData("en-GB", "en")]
-    [InlineData("fr", "en")]
+    [InlineData("nl", "en")]
     [InlineData("../es", "en")]
     [InlineData("../it", "en")]
     [InlineData("system", null)]
