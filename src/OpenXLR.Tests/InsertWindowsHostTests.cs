@@ -9,13 +9,17 @@ using OpenXLR.UI;
 namespace OpenXLR.Tests;
 
 /// <summary>
-/// The host of an insert's Windows plugin: yabridge unless the insert says
-/// the Windows plugin host built into OpenXLR. The choice is saved with the
-/// insert and absent when it is yabridge, set by one command that is refused
-/// where it cannot work, and carried in the state. The Windows module and
-/// its Wine prefix are read back from the yabridge wrapper, the helper is
-/// started with its <c>wine</c> backend, and a saved choice the build cannot
-/// honour runs through yabridge. Every plugin here is invented.
+/// The host of an insert's Windows plugin: a pin to yabridge or to the
+/// Windows plugin host built into OpenXLR, or the daemon's default when the
+/// insert has none. The pin is saved with the insert and absent while it
+/// follows the default, set by one command that is refused where it cannot
+/// work, and carried in the state. The default is a daemon setting, and a
+/// hold list keeps a plugin on yabridge while it follows it. The Windows
+/// module and its Wine prefix are read back from the yabridge wrapper, the
+/// helper is started with its <c>wine</c> backend, a pin the build cannot
+/// honour runs through yabridge, and a plugin that follows the default and
+/// fails to start on the host is started again through yabridge. Every
+/// plugin here is invented.
 /// </summary>
 [Collection("xdg-config")]
 public sealed class InsertWindowsHostTests : IDisposable
@@ -255,10 +259,11 @@ public sealed class InsertWindowsHostTests : IDisposable
         Assert.Null(Check(mixer, bridged, "openxlr"));
         Assert.Null(Check(mixer, clap, "openxlr"));
         Assert.Null(Check(mixer, bridged, "yabridge"));
+        Assert.Null(Check(mixer, bridged, "default"));
         Assert.Equal("setInsertWindowsHost: select an existing insert", Check(mixer, bridged, "openxlr", insertId: "missing"));
         Assert.Equal("setInsertWindowsHost: select an existing insert", Check(mixer, bridged, "openxlr", channel: "nowhere"));
-        foreach (object value in new object[] { true, 1, "winhost", "OpenXLR", "" })
-            Assert.Equal("setInsertWindowsHost: value must be 'yabridge' or 'openxlr'", Check(mixer, bridged, value));
+        foreach (object value in new object[] { true, 1, "winhost", "OpenXLR", "Default", "" })
+            Assert.Equal("setInsertWindowsHost: value must be 'yabridge', 'openxlr' or 'default'", Check(mixer, bridged, value));
         Assert.Equal("setInsertWindowsHost: this build has no Windows plugin host, openxlr-winhost.exe is not beside the native plugin host",
             Check(mixer, bridged, "openxlr", installed: false));
         Assert.Equal("setInsertWindowsHost: 'Native' is not a Windows plugin bridged through yabridge",
@@ -267,10 +272,12 @@ public sealed class InsertWindowsHostTests : IDisposable
         string gone = Path.Combine(_root, "nowhere", "Gone.vst3");
         Assert.Equal($"setInsertWindowsHost: the Windows plugin behind 'Gone' is missing: {gone}",
             Check(mixer, Plugin("vst3", ClassId, "Gone", Vst3Wrapper("yabridge/vst3", "Gone", gone)), "openxlr"));
-        // Back to yabridge is never refused, so an insert can always leave
-        // a host that is gone or a plugin that is.
+        // A pin to yabridge and the default are never refused, so an insert
+        // can always leave a host that is gone or a plugin that is.
         Assert.Null(Check(mixer, bridged, "yabridge", installed: false));
         Assert.Null(Check(mixer, null, "yabridge", installed: false));
+        Assert.Null(Check(mixer, bridged, "default", installed: false));
+        Assert.Null(Check(mixer, null, "default", installed: false));
     }
 
     // --- saved with the insert, carried in the state ------------------------------
@@ -283,12 +290,12 @@ public sealed class InsertWindowsHostTests : IDisposable
     private static readonly InsertDefinition Voice = new() { Id = "voice", Kind = "vst3", Plugin = ClassId };
 
     [Fact]
-    public void TheChoiceIsSavedWithTheInsertCarriedInTheStateAndAbsentForYabridge()
+    public void TheChoiceIsSavedWithTheInsertCarriedInTheStateAndAbsentWhileItFollowsTheDefault()
     {
         using var mixer = new Mixer();
         mixer.SetInserts("xlr1", [Voice, Voice with { Id = "other" }]);
-        mixer.SetInsertWindowsHost("xlr1", "voice", true);
-        mixer.SetInsertWindowsHost("xlr1", "missing", true);   // an unknown insert changes nothing
+        mixer.SetInsertWindowsHost("xlr1", "voice", WindowsPluginHost.OpenXlr);
+        mixer.SetInsertWindowsHost("xlr1", "missing", WindowsPluginHost.OpenXlr);   // an unknown insert changes nothing
         IReadOnlyList<InsertStatus> chain = mixer.Snapshot().Inserts["xlr1"];
         Assert.Equal(["openxlr", null], chain.Select(i => i.Insert.WindowsHost));
         Assert.Equal([true, false], chain.Select(i => i.Insert.OnWindowsHost));
@@ -312,7 +319,7 @@ public sealed class InsertWindowsHostTests : IDisposable
         Assert.False(state["inserts"]!["xlr1"]![1]!["insert"]!.AsObject().ContainsKey("windowsHost"));
         Assert.False(state["inserts"]!["xlr1"]![0]!["windowsHostRunning"]!.GetValue<bool>());
 
-        mixer.SetInsertWindowsHost("xlr1", "voice", false);
+        mixer.SetInsertWindowsHost("xlr1", "voice", null);
         Assert.Null(mixer.Snapshot().Inserts["xlr1"][0].Insert.WindowsHost);
         Assert.Null(mixer.ExportSettings().Save(path));
         Assert.DoesNotContain("windowsHost", File.ReadAllText(path));
@@ -321,27 +328,28 @@ public sealed class InsertWindowsHostTests : IDisposable
     [Theory]
     [InlineData("""{"id":"voice","kind":"vst3","plugin":"x"}""", null)]                            // an older save
     [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":"openxlr"}""", "openxlr")]
-    [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":"yabridge"}""", null)]
+    [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":"yabridge"}""", "yabridge")]
+    [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":"default"}""", null)]  // a command value, never saved
     [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":"a-host-of-a-newer-build"}""", null)]
     [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":"OPENXLR"}""", null)]
     [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":""}""", null)]
     [InlineData("""{"id":"voice","kind":"vst3","plugin":"x","windowsHost":null}""", null)]
-    public void AnInsertReadsOnlyTheHostThisBuildKnowsAndEverythingElseIsYabridge(string json, string? host)
+    public void AnInsertReadsOnlyTheHostsThisBuildKnowsAndEverythingElseFollowsTheDefault(string json, string? host)
     {
         InsertDefinition insert = JsonSerializer.Deserialize<InsertDefinition>(json, Wire)!;
         Assert.Equal(host, insert.WindowsHost);
-        Assert.Equal(host is not null, insert.OnWindowsHost);
+        Assert.Equal(host == "openxlr", insert.OnWindowsHost);
         // What is written back holds the field only when it says something.
         Assert.Equal(host is not null, JsonSerializer.SerializeToNode(insert, Wire)!.AsObject().ContainsKey("windowsHost"));
         Assert.False(JsonSerializer.SerializeToNode(insert, Wire)!.AsObject().ContainsKey("onWindowsHost"));
     }
 
     [Fact]
-    public void ASavedFileWithAHostThisBuildDoesNotKnowLoadsWithTheInsertOnYabridge()
+    public void ASavedFileWithAHostThisBuildDoesNotKnowLoadsWithTheInsertFollowingTheDefault()
     {
         using var mixer = new Mixer();
         mixer.SetInserts("xlr1", [Voice]);
-        mixer.SetInsertWindowsHost("xlr1", "voice", true);
+        mixer.SetInsertWindowsHost("xlr1", "voice", WindowsPluginHost.OpenXlr);
         string path = Path.Combine(_root, "mixer.json");
         Assert.Null(mixer.ExportSettings().Save(path));
         JsonNode saved = JsonNode.Parse(File.ReadAllText(path))!;
@@ -354,18 +362,20 @@ public sealed class InsertWindowsHostTests : IDisposable
     }
 
     /// <summary>
-    /// A pin written into <c>mixer.json</c> by hand, with the daemon stopped,
-    /// before a build's first start: the daemon reads it as a pin of its own,
-    /// an insert without one as yabridge, and reading the file changes nothing
-    /// in it. What the daemon saves afterwards keeps both as they were. The
-    /// recall into a built mixer is followed through the steps it takes for
-    /// inserts, since building one needs an audio server.
+    /// Pins written into <c>mixer.json</c> by hand, with the daemon stopped,
+    /// before a build's first start: the daemon reads each as a pin of its
+    /// own, an insert without one as following the default, and reading the
+    /// file changes nothing in it. A default written into <c>daemon.json</c>
+    /// by hand is read the same way and left as it was. What the daemon saves
+    /// afterwards keeps the pins as they were. The recall into a built mixer
+    /// is followed through the steps it takes for inserts, since building one
+    /// needs an audio server.
     /// </summary>
     [Fact]
     public void APinWrittenIntoTheFileByHandIsHonouredAndKept()
     {
         (_, string module) = InstalledVst3("Deep Verb");
-        PluginInfo bridged = Plugin("vst3", ClassId, "Deep Verb", Vst3Wrapper("wrappers", "Deep Verb", module));
+        PluginInfo bridged = Plugin("vst3", ClassId, "Deep Verb", Vst3Wrapper("wrappers/yabridge", "Deep Verb", module));
         string path = Path.Combine(_root, "mixer.json");
         string written = $$"""
             {
@@ -373,6 +383,7 @@ public sealed class InsertWindowsHostTests : IDisposable
               "inserts": {
                 "xlr1": [
                   { "id": "pinned", "kind": "vst3", "plugin": "{{ClassId}}", "windowsHost": "openxlr" },
+                  { "id": "yabridge", "kind": "vst3", "plugin": "{{ClassId}}", "windowsHost": "yabridge" },
                   { "id": "default", "kind": "vst3", "plugin": "{{ClassId}}" }
                 ]
               }
@@ -385,25 +396,66 @@ public sealed class InsertWindowsHostTests : IDisposable
         Assert.Null(warning);
         Assert.Equal(written, File.ReadAllText(path));
         Assert.Equal(["mixer.json"], Directory.EnumerateFiles(_root).Select(Path.GetFileName));
-        Assert.Equal(["openxlr", null], loaded.Inserts!["xlr1"].Select(i => i.WindowsHost));
+        Assert.Equal(["openxlr", "yabridge", null], loaded.Inserts!["xlr1"].Select(i => i.WindowsHost));
 
         // The chains as a built mixer takes them from the file (ApplySettings
         // recalls them over the empty ones it starts with), and what the chain
-        // builder then starts for each insert.
-        List<InsertDefinition> chain = Mixer.RecallChains(new Dictionary<string, List<InsertDefinition>>(), loaded.Inserts, _ => false)["xlr1"];
-        Assert.Equal([true, false], chain.Select(i => i.OnWindowsHost));
+        // builder then starts for each insert, under either default.
+        List<InsertDefinition> chain = Mixer.RecallChains(new Dictionary<string, List<InsertDefinition>>(), loaded.Inserts, _ => false, keepWiring: false)["xlr1"];
+        Assert.Equal(["openxlr", "yabridge", null], chain.Select(i => i.WindowsHost));
+        Assert.Equal([true, false, false], chain.Select(i => i.OnWindowsHost));
         var adapter = new PipeWireAdapter(() => { }, _ => { });
-        Assert.Equal(module, adapter.WindowsRoute(chain[0], bridged, out string? kept, installed: true)!.Module);
-        Assert.Null(kept);
-        Assert.Null(adapter.WindowsRoute(chain[1], bridged, out _, installed: true));
+        WindowsPluginHost.Route? Start(InsertDefinition insert, string host, out string? kept)
+            => adapter.WindowsRoute(insert, bridged, out kept, installed: true, defaultHost: host, held: []);
+        foreach (string host in new[] { WindowsPluginHost.Yabridge, WindowsPluginHost.OpenXlr })
+        {
+            // A pin wins whatever the default.
+            Assert.Equal(module, Start(chain[0], host, out string? kept)!.Module);
+            Assert.Null(kept);
+            Assert.Null(Start(chain[1], host, out kept));
+            Assert.Null(kept);
+            // An absent value means the default.
+            Assert.Equal(host == WindowsPluginHost.OpenXlr ? module : null, Start(chain[2], host, out kept)?.Module);
+            Assert.Null(kept);
+        }
         Assert.Equal(written, File.ReadAllText(path));
+
+        // The default written into daemon.json by hand is read as written,
+        // and an unknown one as the build's own, and reading changes nothing.
+        string config = Path.Combine(_root, "config");
+        Set("XDG_CONFIG_HOME", config);
+        Directory.CreateDirectory(Path.Combine(config, "openxlr"));
+        string daemon = Path.Combine(config, "openxlr", "daemon.json");
+        foreach ((string value, string meant) in new[]
+        {
+            ("yabridge", WindowsPluginHost.Yabridge),
+            ("openxlr", WindowsPluginHost.OpenXlr),
+            ("a-host-of-a-newer-build", WindowsPluginHost.BuiltInDefault),
+        })
+        {
+            string settings = $$"""
+                {
+                  "submixer": true,
+                  "windowsHostDefault": "{{value}}"
+                }
+
+                """;
+            File.WriteAllText(daemon, settings);
+            OpenXLR.Core.DaemonSettings read = OpenXLR.Core.DaemonSettings.Load();
+            Assert.Equal(value, read.WindowsHostDefault);
+            Assert.Equal(meant, WindowsPluginHost.DefaultFrom(read.WindowsHostDefault));
+            Assert.Equal(settings, File.ReadAllText(daemon));
+        }
+        File.WriteAllText(daemon, """{"submixer":true}""");
+        Assert.Equal(WindowsPluginHost.BuiltInDefault, WindowsPluginHost.DefaultFrom(OpenXLR.Core.DaemonSettings.Load().WindowsHostDefault));
 
         // The next save writes the chains back as they were read.
         Assert.Null((loaded with { Inserts = new() { ["xlr1"] = chain } }).Save(path));
         JsonArray saved = JsonNode.Parse(File.ReadAllText(path))!["inserts"]!["xlr1"]!.AsArray();
-        Assert.Equal(["pinned", "default"], saved.Select(i => i!["id"]!.GetValue<string>()));
+        Assert.Equal(["pinned", "yabridge", "default"], saved.Select(i => i!["id"]!.GetValue<string>()));
         Assert.Equal("openxlr", saved[0]!["windowsHost"]!.GetValue<string>());
-        Assert.False(saved[1]!.AsObject().ContainsKey("windowsHost"));
+        Assert.Equal("yabridge", saved[1]!["windowsHost"]!.GetValue<string>());
+        Assert.False(saved[2]!.AsObject().ContainsKey("windowsHost"));
     }
 
     [Fact]
@@ -411,7 +463,7 @@ public sealed class InsertWindowsHostTests : IDisposable
     {
         using var mixer = new Mixer();
         mixer.SetInserts("xlr1", [Voice, Voice with { Id = "other" }]);
-        mixer.SetInsertWindowsHost("xlr1", "voice", true);
+        mixer.SetInsertWindowsHost("xlr1", "voice", WindowsPluginHost.OpenXlr);
         // A client that reorders the chain and adds to it, and knows nothing
         // of the choice: what it sends has no host, or one it made up.
         mixer.SetInserts("xlr1",
@@ -577,10 +629,330 @@ public sealed class InsertWindowsHostTests : IDisposable
         Assert.StartsWith("the Windows plugin behind 'Deep Verb' is missing: ", kept);
         Assert.Equal(2, notes.Count);
 
-        // An insert that never chose the host is not looked at.
-        Assert.Null(adapter.WindowsRoute(Voice, plugin, out kept, installed: true));
+        // An insert that follows a default of yabridge is not looked at.
+        Assert.Null(adapter.WindowsRoute(Voice, plugin, out kept, installed: true, defaultHost: WindowsPluginHost.Yabridge));
         Assert.Null(kept);
         Assert.Equal(2, notes.Count);
+    }
+
+    // --- three stored states ----------------------------------------------------------
+
+    /// <summary>The insert record as the build before the stored yabridge pin read it: only "openxlr" counted.</summary>
+    private sealed record OlderInsert
+    {
+        public required string Id { get; init; }
+        public required string Kind { get; init; }
+        public required string Plugin { get; init; }
+        public string? WindowsHost { get => _host; init => _host = value == "openxlr" ? value : null; }
+        private readonly string? _host;
+    }
+
+    [Fact]
+    public void BothPinsAreSavedAndAnOlderBuildReadsTheYabridgePinAsItsOwnDefault()
+    {
+        using var mixer = new Mixer();
+        mixer.SetInserts("xlr1", [Voice with { Id = "pinned-own" }, Voice with { Id = "pinned-yabridge" }, Voice with { Id = "following" }]);
+        mixer.SetInsertWindowsHost("xlr1", "pinned-own", WindowsPluginHost.OpenXlr);
+        mixer.SetInsertWindowsHost("xlr1", "pinned-yabridge", WindowsPluginHost.Yabridge);
+        string path = Path.Combine(_root, "mixer.json");
+        Assert.Null(mixer.ExportSettings().Save(path));
+        JsonArray chain = JsonNode.Parse(File.ReadAllText(path))!["inserts"]!["xlr1"]!.AsArray();
+        Assert.Equal(["openxlr", "yabridge", null], chain.Select(i => i!["windowsHost"]?.GetValue<string>()));
+        Assert.False(chain[2]!.AsObject().ContainsKey("windowsHost"));
+
+        // This build reads its own file back, all three states.
+        MixerSettings loaded = Assert.IsType<MixerSettings>(MixerSettings.Load(path, out string? warning));
+        Assert.DoesNotContain("inserts", warning ?? "");
+        Assert.Equal(["openxlr", "yabridge", null], loaded.Inserts!["xlr1"].Select(i => i.WindowsHost));
+        // An older build reads the same records: a yabridge pin is absent
+        // to it, which was yabridge, so a downgrade runs that plugin where
+        // the user put it.
+        OlderInsert[] older = [.. chain.Select(i => i.Deserialize<OlderInsert>(Wire)!)];
+        Assert.Equal(["openxlr", null, null], older.Select(i => i.WindowsHost));
+        // And what an older build wrote, absent or "openxlr", reads here as
+        // following the default and the pin it was.
+        string olderFile = JsonSerializer.Serialize(older, Wire);
+        Assert.Equal(["openxlr", null, null],
+            JsonSerializer.Deserialize<InsertDefinition[]>(olderFile, Wire)!.Select(i => i.WindowsHost));
+
+        // Following the default again removes the field.
+        mixer.SetInsertWindowsHost("xlr1", "pinned-yabridge", null);
+        Assert.Equal(["openxlr", null, null], mixer.Snapshot().Inserts["xlr1"].Select(i => i.Insert.WindowsHost));
+    }
+
+    // --- the default and the hold list ---------------------------------------------------
+
+    [Fact]
+    public void TheBuiltInDefaultIsYabridgeAndAnUnknownSavedValueFallsBackToIt()
+    {
+        Assert.Equal(WindowsPluginHost.Yabridge, WindowsPluginHost.BuiltInDefault);
+        Assert.Equal(WindowsPluginHost.OpenXlr, WindowsPluginHost.DefaultFrom("openxlr"));
+        Assert.Equal(WindowsPluginHost.Yabridge, WindowsPluginHost.DefaultFrom("yabridge"));
+        foreach (string? saved in new[] { null, "", "default", "OpenXLR", "a-host-of-a-newer-build" })
+            Assert.Equal(WindowsPluginHost.BuiltInDefault, WindowsPluginHost.DefaultFrom(saved));
+    }
+
+    [Fact]
+    public void TheHoldListShipsEmptyAndHoldsAPluginByFormatAndId()
+    {
+        Assert.Empty(WindowsPluginHost.Held);
+        IReadOnlyList<WindowsPluginHost.HeldPlugin> held = [new("vst3", ClassId, "Deep Verb", "it drops out on this host")];
+        Assert.Equal("Deep Verb", WindowsPluginHost.HeldEntry(Voice, held)?.Name);
+        Assert.Null(WindowsPluginHost.HeldEntry(Voice with { Kind = "clap" }, held));
+        Assert.Null(WindowsPluginHost.HeldEntry(Voice with { Plugin = "FFEEDDCCBBAA99887766554433221100" }, held));
+        Assert.Null(WindowsPluginHost.HeldEntry(Voice));
+    }
+
+    /// <summary>A Windows VST3 plugin installed in a prefix and bridged by the companion, as the catalogue lists it.</summary>
+    private (PluginInfo Plugin, string Module) BridgedVst3(string name = "Deep Verb")
+    {
+        (_, string module) = InstalledVst3(name);
+        return (Plugin("vst3", ClassId, name, Vst3Wrapper("data/openxlr/yabridge/vst3", name, module)), module);
+    }
+
+    [Fact]
+    public void AnInsertThatFollowsTheDefaultResolvesInTheOrderTheDefaultGives()
+    {
+        (PluginInfo plugin, string module) = BridgedVst3();
+        InsertDefinition following = Voice with { Label = "My reverb" };
+        var notes = new List<string>();
+        var events = new List<string>();
+        var adapter = new PipeWireAdapter(() => { }, notes.Add) { Events = (_, text) => events.Add(text) };
+        WindowsPluginHost.Route? Resolve(InsertDefinition insert, out string? kept, string host = WindowsPluginHost.OpenXlr,
+            bool installed = true, IReadOnlyList<WindowsPluginHost.HeldPlugin>? held = null)
+            => adapter.WindowsRoute(insert, plugin, out kept, installed, defaultHost: host, held: held ?? Array.Empty<WindowsPluginHost.HeldPlugin>());
+
+        // The default is yabridge: the wrapper runs, nothing to say.
+        Assert.Null(Resolve(following, out string? kept, host: WindowsPluginHost.Yabridge));
+        Assert.Null(kept);
+        // The default is this host and it finds the 64-bit module.
+        Assert.Equal(module, Resolve(following, out kept)?.Module);
+        Assert.Null(kept);
+        // A held plugin runs through yabridge with the list's reason.
+        IReadOnlyList<WindowsPluginHost.HeldPlugin> held = [new("vst3", ClassId, "Deep Verb", "it drops out on this host")];
+        Assert.Null(Resolve(following, out kept, held: held));
+        Assert.Equal("Deep Verb is held on yabridge in this release: it drops out on this host", kept);
+        // A pin wins over the default and over the list, either way.
+        Assert.Null(Resolve(following with { WindowsHost = "yabridge" }, out kept));
+        Assert.Null(kept);
+        Assert.Equal(module, Resolve(following with { WindowsHost = "openxlr" }, out kept, host: WindowsPluginHost.Yabridge, held: held)?.Module);
+        // A build without the host runs it through yabridge with nothing to say.
+        Assert.Null(Resolve(following, out kept, installed: false));
+        Assert.Null(kept);
+        // A native plugin is never looked at.
+        string native = Path.Combine(_root, "native.vst3");
+        Directory.CreateDirectory(native);
+        Assert.Null(adapter.WindowsRoute(following, Plugin("vst3", ClassId, "Native", native), out kept, installed: true,
+            defaultHost: WindowsPluginHost.OpenXlr, held: []));
+        Assert.Null(kept);
+
+        // The host cannot run it: yabridge does, with the reason, and the
+        // journal and the timeline stay quiet, since every chain build
+        // would say it again.
+        File.Delete(module);
+        Assert.Null(Resolve(following, out kept));
+        Assert.StartsWith("the Windows plugin behind 'Deep Verb' is missing: ", kept);
+        Assert.Empty(notes);
+        Assert.Empty(events);
+        // A pin to the host that cannot run it still says so.
+        Assert.Null(Resolve(following with { WindowsHost = "openxlr" }, out kept));
+        Assert.StartsWith("My reverb is saved to the Windows plugin host and runs through yabridge instead: ", Assert.Single(notes));
+    }
+
+    [Fact]
+    public void TheDefaultDecidesTheChainStructureOnlyForAnUnpinnedBridgedPlugin()
+    {
+        (PluginInfo plugin, _) = BridgedVst3();
+        IReadOnlyList<WindowsPluginHost.HeldPlugin> none = [];
+        bool Wanted(InsertDefinition insert, string host, PluginInfo? found = null, IReadOnlyList<WindowsPluginHost.HeldPlugin>? held = null)
+            => WindowsPluginHost.Wanted(insert, found ?? plugin, host, held ?? none);
+        Assert.False(Wanted(Voice, WindowsPluginHost.Yabridge));
+        Assert.True(Wanted(Voice, WindowsPluginHost.OpenXlr));
+        Assert.True(Wanted(Voice with { WindowsHost = "openxlr" }, WindowsPluginHost.Yabridge));
+        Assert.False(Wanted(Voice with { WindowsHost = "yabridge" }, WindowsPluginHost.OpenXlr));
+        Assert.False(Wanted(Voice, WindowsPluginHost.OpenXlr, held: [new("vst3", ClassId, "Deep Verb", "held")]));
+        // A native plugin and one with no wrapper never move with the default.
+        Assert.False(Wanted(Voice, WindowsPluginHost.OpenXlr, Plugin("vst3", ClassId, "Native", "/usr/lib/vst3/Native.vst3")));
+        Assert.False(Wanted(Voice, WindowsPluginHost.OpenXlr, plugin with { WindowsHostOnly = true }));
+        Assert.False(Wanted(Voice with { Kind = "lv2" }, WindowsPluginHost.OpenXlr));
+    }
+
+    // --- the second start through yabridge ---------------------------------------------
+
+    [Fact]
+    public void APluginThatFollowsTheDefaultAndFailsOnTheHostStartsOnceMoreThroughYabridge()
+    {
+        (PluginInfo plugin, string module) = BridgedVst3();
+        var route = new WindowsPluginHost.Route("vst3", module, null);
+        var notes = new List<string>();
+        var events = new List<string>();
+        var adapter = new PipeWireAdapter(() => { }, notes.Add) { Events = (_, text) => events.Add(text) };
+        var tried = new List<WindowsPluginHost.Route?>();
+        string Start(WindowsPluginHost.Route? on)
+        {
+            tried.Add(on);
+            return on is null ? "yabridge" : throw new InvalidOperationException(NativePluginHost.StartupFailed + "the plugin did not load");
+        }
+        InsertDefinition following = Voice with { Label = "My reverb" };
+
+        string? kept = null;
+        Assert.Equal("yabridge", adapter.StartHelper(following, plugin, route, ref kept, Start, yabridge: () => true));
+        Assert.Equal([route, null], tried);
+        Assert.Equal("it did not start on the Windows plugin host: the plugin did not load", kept);
+        Assert.Equal("My reverb follows the default host and it did not start on the Windows plugin host: the plugin did not load, "
+            + "so it starts through yabridge instead", Assert.Single(notes));
+        Assert.Equal(notes, events);
+
+        // A start that works is the only start.
+        tried.Clear();
+        kept = null;
+        Assert.Equal("own", adapter.StartHelper(following, plugin, route, ref kept, on => { tried.Add(on); return "own"; }, yabridge: () => true));
+        Assert.Equal([route], tried);
+        Assert.Null(kept);
+
+        // A pinned insert, a plugin with no wrapper and a machine without
+        // yabridge fail as they did.
+        foreach ((InsertDefinition insert, PluginInfo info, bool yabridge) in new[]
+        {
+            (following with { WindowsHost = "openxlr" }, plugin, true),
+            (following, plugin with { WindowsHostOnly = true }, true),
+            (following, plugin, false),
+        })
+        {
+            tried.Clear();
+            kept = null;
+            Assert.Throws<InvalidOperationException>(() => adapter.StartHelper(insert, info, route, ref kept, Start, yabridge: () => yabridge));
+            Assert.Equal([route], tried);
+            Assert.Null(kept);
+        }
+        Assert.Single(notes);
+    }
+
+    [Fact]
+    public void AStartThatRanIntoTheDeadlineIsNotStartedAgain()
+    {
+        // Through the real helper start, so the exceptions are the ones the
+        // chain builder sees: a helper that says nothing for the whole wait,
+        // and one that fails at once on the Windows plugin host only.
+        (PluginInfo plugin, string module) = BridgedVst3();
+        var route = new WindowsPluginHost.Route("vst3", module, null);
+        var adapter = new PipeWireAdapter(() => { }, _ => { });
+        const string silent = "import sys\nfor line in sys.stdin: pass\n";
+        const string ownHostFails = """
+            import sys
+            if sys.argv[1] == 'wine':
+                import time
+                sys.stderr.write('the plugin did not load\n')
+                sys.stderr.flush()
+                time.sleep(0.3)
+                sys.exit(1)
+            print('ready', flush=True)
+            for line in sys.stdin: pass
+            """;
+        var tried = new List<bool>();
+        Func<WindowsPluginHost.Route?, NativePluginHost> Helper(string script) => on =>
+        {
+            tried.Add(on is not null);
+            return new NativePluginHost(Voice, "node", 2, 48000, "/usr/bin/python3", ["-u", "-c", script], TimeSpan.FromMilliseconds(600),
+                bundle: plugin.Path, windows: on);
+        };
+        Set("OPENXLR_YABRIDGE", "system");
+
+        string? kept = null;
+        var timeout = Assert.Throws<InvalidOperationException>(() => adapter.StartHelper(Voice, plugin, route, ref kept, Helper(silent), yabridge: () => true));
+        Assert.Equal(NativePluginHost.StartupFailed + WindowsPluginHost.SilentStart, timeout.Message);
+        Assert.Equal([true], tried);
+        Assert.Null(kept);
+
+        tried.Clear();
+        using NativePluginHost started = adapter.StartHelper(Voice, plugin, route, ref kept, Helper(ownHostFails), yabridge: () => true);
+        Assert.Equal([true, false], tried);
+        Assert.False(started.WindowsHost);
+        Assert.True(started.IsRunning);
+        Assert.Equal("it did not start on the Windows plugin host: the plugin did not load", kept);
+    }
+
+    // --- the setting ------------------------------------------------------------------
+
+    [Fact]
+    public async Task TheDefaultIsSavedInDaemonJsonReportedInPluginSetupAndRefusedForAnyOtherValue()
+    {
+        string before = WindowsPluginHost.Default;
+        try
+        {
+            await using var fixture = new PluginWineTraceFixture();
+            string config = Path.Combine(fixture.Root, "config", "openxlr");
+            Directory.CreateDirectory(config);
+            string file = Path.Combine(config, "daemon.json");
+            File.WriteAllText(file, """{"submixer":true,"pluginFolders":[{"kind":"windows","path":"/w"}],"futureKey":7}""");
+
+            var initial = await fixture.Hub.ExecuteForApiAsync("""{"cmd":"getPluginSetup"}""");
+            PluginSetupMessage setup = Assert.IsType<PluginSetupMessage>(Assert.Single(initial.Messages));
+            Assert.Equal(WindowsPluginHost.Default, setup.WindowsHostDefault);
+            Assert.Equal(setup.WindowsHostDefault, JsonSerializer.SerializeToNode(setup)!["windowsHostDefault"]!.GetValue<string>());
+
+            foreach (string host in new[] { "openxlr", "yabridge", "openxlr" })
+            {
+                var result = await fixture.Hub.ExecuteForApiAsync(JsonSerializer.Serialize(new { cmd = "setWindowsHostDefault", value = host, requestId = "d" }));
+                Assert.True(result.Ok);
+                setup = Assert.IsType<PluginSetupMessage>(result.Messages[0]);
+                Assert.Equal(host, setup.WindowsHostDefault);
+                Assert.Null(Assert.IsType<CommandResultMessage>(result.Messages[^1]).Error);
+                JsonNode saved = JsonNode.Parse(File.ReadAllText(file))!;
+                Assert.Equal(host, saved["windowsHostDefault"]!.GetValue<string>());
+                // Every other key stays, the ones this build does not know too.
+                Assert.True(saved["submixer"]!.GetValue<bool>());
+                Assert.Equal("/w", saved["pluginFolders"]![0]!["path"]!.GetValue<string>());
+                Assert.Equal(7, saved["futureKey"]!.GetValue<int>());
+            }
+            Assert.Equal("openxlr", OpenXLR.Core.DaemonSettings.Load().WindowsHostDefault);
+
+            foreach (string fields in new[] { "{}", "{\"value\":null}", "{\"value\":true}", "{\"value\":\"default\"}", "{\"value\":\"OpenXLR\"}" })
+            {
+                JsonNode command = JsonNode.Parse(fields)!;
+                command["cmd"] = "setWindowsHostDefault";
+                command["requestId"] = "refused";
+                Assert.Equal("setWindowsHostDefault: value must be 'yabridge' or 'openxlr'", CommandValidation.CheckWindowsHostDefault(command.Deserialize<Command>()!));
+                var refused = await fixture.Hub.ExecuteForApiAsync(command.ToJsonString());
+                Assert.False(refused.Ok);
+                Assert.Equal("setWindowsHostDefault: value must be 'yabridge' or 'openxlr'", Assert.IsType<CommandResultMessage>(refused.Messages[^1]).Error);
+            }
+            Assert.Equal("openxlr", JsonNode.Parse(File.ReadAllText(file))!["windowsHostDefault"]!.GetValue<string>());
+
+            // A file that cannot be read is not written over.
+            File.WriteAllText(file, "{ not json");
+            var unreadable = await fixture.Hub.ExecuteForApiAsync("""{"cmd":"setWindowsHostDefault","value":"yabridge","requestId":"unreadable"}""");
+            Assert.False(unreadable.Ok);
+            Assert.StartsWith("daemon.json cannot be read", Assert.IsType<CommandResultMessage>(unreadable.Messages[^1]).Error);
+            Assert.Equal("{ not json", File.ReadAllText(file));
+        }
+        finally { WindowsPluginHost.Default = before; }
+    }
+
+    [Fact]
+    public void TheDefaultIsMachineWiringAndNoStep()
+        => Assert.Equal(HistoryClass.Ignored, HistoryPolicy.ClassOf("setWindowsHostDefault"));
+
+    [Fact]
+    public void OptionsShowsTheDefaultOnABuildWithTheHostAndSendsTheOtherChoice()
+    {
+        var client = new DaemonClient();
+        var options = new OptionsViewModel(client, new MainViewModel(client));
+        options.ApplyPluginSetup(JsonNode.Parse("""{"windowsHostInstalled":true,"windowsHostDefault":"yabridge"}"""));
+        Assert.True(options.ShowsWindowsHostDefault);
+        Assert.True(options.CanSetWindowsHostDefault);
+        Assert.Equal("yabridge", options.SelectedWindowsHostDefault?.Value);
+        Assert.Equal(["yabridge", "openxlr"], options.WindowsHostDefaultOptions.Select(o => o.Value));
+        options.ApplyPluginSetup(JsonNode.Parse("""{"windowsHostInstalled":true,"windowsHostDefault":"openxlr"}"""));
+        Assert.Equal("openxlr", options.SelectedWindowsHostDefault?.Value);
+        // A build without the host has nothing to choose.
+        options.ApplyPluginSetup(JsonNode.Parse("""{"windowsHostInstalled":false,"windowsHostDefault":"yabridge"}"""));
+        Assert.False(options.ShowsWindowsHostDefault);
+        Assert.False(options.CanSetWindowsHostDefault);
+        // An older daemon says nothing about it.
+        options.ApplyPluginSetup(JsonNode.Parse("""{"windowsHostInstalled":true}"""));
+        Assert.Null(options.SelectedWindowsHostDefault);
+        Assert.False(options.CanSetWindowsHostDefault);
     }
 
     // --- the editor ---------------------------------------------------------------

@@ -20,19 +20,97 @@ namespace OpenXLR.Core.Mixing;
 ///
 /// The catalogue holds a plugin once. Where a wrapper and a Windows plugin
 /// folder both reach it, the wrapper's entry is kept, because it can run on
-/// either host and yabridge is still the default. The scan of the folders
-/// does not load a module a wrapper of the catalogue links to.
+/// either host. The scan of the folders does not load a module a wrapper
+/// of the catalogue links to.
+///
+/// An insert of a plugin with a wrapper either pins a host, with
+/// <see cref="OpenXlr"/> or <see cref="Yabridge"/> saved as its
+/// <c>windowsHost</c>, or follows the default, with nothing saved. The
+/// default is <see cref="Default"/>: <c>windowsHostDefault</c> in
+/// <c>daemon.json</c> when the user chose one, else <see cref="BuiltInDefault"/>.
+/// A plugin on <see cref="Held"/> runs through yabridge while its insert
+/// follows the default.
 ///
 /// Nothing here starts a process or loads plugin code. Every answer comes
 /// from names, links and the first bytes of the module.
 /// </summary>
 internal static class WindowsPluginHost
 {
-    /// <summary>The <c>setInsertWindowsHost</c> value for yabridge. It is the default, so an insert never holds it.</summary>
+    /// <summary>An insert's <c>windowsHost</c> when it is pinned to yabridge, and the default's value for yabridge.</summary>
     internal const string Yabridge = "yabridge";
 
-    /// <summary>An insert's <c>windowsHost</c> when it runs on this host.</summary>
+    /// <summary>An insert's <c>windowsHost</c> when it is pinned to this host, and the default's value for it.</summary>
     internal const string OpenXlr = "openxlr";
+
+    /// <summary>The <c>setInsertWindowsHost</c> value that clears a pin, so the insert follows the default again. Never saved.</summary>
+    internal const string FollowDefault = "default";
+
+    /// <summary>
+    /// The host an insert that follows the default runs on when
+    /// <c>daemon.json</c> names none. Moving every such insert to this host
+    /// is a change of this line alone.
+    /// </summary>
+    internal const string BuiltInDefault = Yabridge;
+
+    /// <summary>Whether a value names one of the two hosts.</summary>
+    internal static bool IsHost(string? value) => value is Yabridge or OpenXlr;
+
+    /// <summary>The default a saved <c>windowsHostDefault</c> gives: the saved host, or <see cref="BuiltInDefault"/> for none or one this build does not know.</summary>
+    internal static string DefaultFrom(string? saved) => IsHost(saved) ? saved! : BuiltInDefault;
+
+    private static volatile string _default = BuiltInDefault;
+
+    /// <summary>
+    /// The host an insert that follows the default runs on in this daemon,
+    /// set from <c>daemon.json</c> when the daemon starts and by
+    /// <c>setWindowsHostDefault</c>. A build without this host runs every
+    /// such insert through yabridge, whatever it says.
+    /// </summary>
+    internal static string Default
+    {
+        get => _default;
+        set => _default = DefaultFrom(value);
+    }
+
+    /// <summary>A plugin that runs through yabridge while its insert follows the default, and why, in a sentence.</summary>
+    internal sealed record HeldPlugin(string Kind, string Plugin, string Name, string Reason);
+
+    /// <summary>
+    /// The plugins this release holds on yabridge while their inserts follow
+    /// the default, by format and id, the way
+    /// <see cref="NativeEditorPolicy.Curated"/> ships editor rules. A plugin
+    /// that regresses on this host is answered by a release that adds its id
+    /// here. An insert that pins this host still runs on it.
+    /// </summary>
+    internal static IReadOnlyList<HeldPlugin> Held { get; } = [];
+
+    /// <summary>The entry that holds an insert's plugin on yabridge, or null.</summary>
+    /// <param name="held">The list, for a test; <see cref="Held"/> when null.</param>
+    internal static HeldPlugin? HeldEntry(InsertDefinition insert, IReadOnlyList<HeldPlugin>? held = null)
+        => (held ?? Held).FirstOrDefault(h => h.Kind == insert.Kind && h.Plugin == insert.Plugin);
+
+    /// <summary>
+    /// Whether the chain builder tries an insert on this host, as far as
+    /// names and settings decide: it is pinned here, or it follows a
+    /// default that means this host and its plugin is a Windows plugin the
+    /// catalogue reaches through a yabridge wrapper and the list does not
+    /// hold. Whether the module can run here is decided when the chain is
+    /// built. This is what a change of the default rebuilds a chain for.
+    /// </summary>
+    /// <param name="defaultHost">The default, for a test or a change of it; <see cref="Default"/> when null.</param>
+    /// <param name="held">The list, for a test; <see cref="Held"/> when null.</param>
+    internal static bool Wanted(InsertDefinition insert, PluginInfo? plugin, string? defaultHost = null, IReadOnlyList<HeldPlugin>? held = null)
+        => insert.OnWindowsHost
+            || (insert.WindowsHost is null && insert.Kind is "clap" or "vst3"
+                && plugin is { WindowsHostOnly: false } && WineSession.Bridged(plugin.Path)
+                && (defaultHost ?? Default) == OpenXlr && HeldEntry(insert, held) is null);
+
+    /// <summary>
+    /// Whether yabridge is there to run a wrapper: the companion package
+    /// OpenXLR finds, or a system yabridge whose Windows program is on PATH.
+    /// </summary>
+    internal static bool YabridgeInstalled()
+        => ManagedYabridge.Discover() is not null || PluginInstaller.OnPath("yabridge-host.exe") is not null;
 
     /// <summary>Names the Windows program when it is not beside the native helper. The helper reads the same variable.</summary>
     internal const string ProgramVariable = "OPENXLR_WINHOST";

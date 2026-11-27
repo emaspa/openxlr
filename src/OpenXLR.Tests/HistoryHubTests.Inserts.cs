@@ -140,15 +140,19 @@ public sealed partial class HistoryHubTests
         string refused = await f.Refused("""{"cmd":"setInsertWindowsHost","channel":"xlr1","insertId":"gate","value":"openxlr"}""");
         Assert.StartsWith("setInsertWindowsHost: ", refused);
         Assert.True(refused.Contains("no Windows plugin host") || refused.Contains("not a Windows plugin bridged through yabridge"), refused);
-        Assert.Equal("setInsertWindowsHost: value must be 'yabridge' or 'openxlr'",
+        Assert.Equal("setInsertWindowsHost: value must be 'yabridge', 'openxlr' or 'default'",
             await f.Refused("""{"cmd":"setInsertWindowsHost","channel":"xlr1","insertId":"gate","value":true}"""));
-        // Back to yabridge is always taken, and it is no step.
+        // A pin to yabridge and following the default again are always
+        // taken, and neither is a step.
         await f.Ok("""{"cmd":"setInsertWindowsHost","channel":"xlr1","insertId":"gate","value":"yabridge"}""");
+        Assert.Equal("yabridge", Assert.Single(Inserts(f, "xlr1")).WindowsHost);
+        await f.Ok("""{"cmd":"setInsertWindowsHost","channel":"xlr1","insertId":"gate","value":"default"}""");
+        Assert.Null(Assert.Single(Inserts(f, "xlr1")).WindowsHost);
         Assert.Equal(step, f.State().History!.Undo!.Step);
 
         // Where an insert runs is not part of a step: the insert that stays
         // keeps the host it has now through an undo and a redo.
-        f.Mixer.SetInsertWindowsHost("xlr1", "gate", true);
+        f.Mixer.SetInsertWindowsHost("xlr1", "gate", WindowsPluginHost.OpenXlr);
         Assert.Equal(step, f.State().History!.Undo!.Step);
         await f.Ok("""{"cmd":"undo"}""");
         Assert.Equal([("comp", null), ("gate", "openxlr")], Inserts(f, "xlr1").Select(i => (i.Id, i.WindowsHost)));
@@ -164,7 +168,7 @@ public sealed partial class HistoryHubTests
         UsePlugins(f);
         await f.Ok(Chain("xlr1", Insert("comp", Comp), Insert("gate", Gate)));
         await f.Ok(Chain("mix:stream", Insert("wide", Widener)));
-        f.Mixer.SetInsertWindowsHost("xlr1", "gate", true);
+        f.Mixer.SetInsertWindowsHost("xlr1", "gate", WindowsPluginHost.OpenXlr);
         f.Mixer.SetInsertOwnBlock("xlr1", "gate", true);
         f.Mixer.SetInsertOwnBlock("mix:stream", "wide", true);
         await f.Ok("""{"cmd":"saveProfile","name":"show"}""");
@@ -173,9 +177,9 @@ public sealed partial class HistoryHubTests
         // its own block, the widener back in the cycle, and an insert the
         // profile does not have is pinned.
         await f.Ok(Chain("xlr1", Insert("comp", Comp, new { threshold = -30 }), Insert("extra", Gate)));
-        f.Mixer.SetInsertWindowsHost("xlr1", "comp", true);
+        f.Mixer.SetInsertWindowsHost("xlr1", "comp", WindowsPluginHost.OpenXlr);
         f.Mixer.SetInsertOwnBlock("xlr1", "comp", true);
-        f.Mixer.SetInsertWindowsHost("xlr1", "extra", true);
+        f.Mixer.SetInsertWindowsHost("xlr1", "extra", WindowsPluginHost.OpenXlr);
         f.Mixer.SetInsertOwnBlock("mix:stream", "wide", false);
 
         await f.Ok("""{"cmd":"loadProfile","name":"show"}""");
@@ -190,6 +194,29 @@ public sealed partial class HistoryHubTests
         Assert.False(Assert.Single(Built(f, "mix:stream")!.Slots).OwnBlock);
         Assert.Equal(["openxlr", "openxlr"],
             f.State().Mixer!.Inserts["xlr1"].Select(i => i.Insert.WindowsHost));
+    }
+
+    [Fact]
+    public async Task AProfileRecallKeepsAYabridgePinOfAnInsertThatStaysAndRestoresOneThatComesBack()
+    {
+        using var f = new Fixture();
+        UsePlugins(f);
+        await f.Ok(Chain("xlr1", Insert("comp", Comp), Insert("gate", Gate)));
+        f.Mixer.SetInsertWindowsHost("xlr1", "comp", WindowsPluginHost.Yabridge);
+        await f.Ok("""{"cmd":"saveProfile","name":"pinned"}""");
+
+        // Both stay: the compressor now follows the default and the gate is
+        // pinned to yabridge, and the recall leaves both as they are.
+        f.Mixer.SetInsertWindowsHost("xlr1", "comp", null);
+        f.Mixer.SetInsertWindowsHost("xlr1", "gate", WindowsPluginHost.Yabridge);
+        await f.Ok("""{"cmd":"loadProfile","name":"pinned"}""");
+        Assert.Equal([("comp", null), ("gate", "yabridge")], Inserts(f, "xlr1").Select(i => (i.Id, i.WindowsHost)));
+
+        // The compressor is gone, so it comes back with the pin the profile saved.
+        await f.Ok(Chain("xlr1", Insert("gate", Gate)));
+        await f.Ok("""{"cmd":"loadProfile","name":"pinned"}""");
+        Assert.Equal([("comp", "yabridge"), ("gate", "yabridge")], Inserts(f, "xlr1").Select(i => (i.Id, i.WindowsHost)));
+        Assert.Equal(["yabridge", "yabridge"], f.State().Mixer!.Inserts["xlr1"].Select(i => i.Insert.WindowsHost));
     }
 
     [Fact]

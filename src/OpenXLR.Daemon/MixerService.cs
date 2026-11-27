@@ -914,8 +914,23 @@ public sealed partial class MixerService : IHostedService, IDisposable
         }
     }
 
+    /// <summary>
+    /// Run every insert that follows the default on <paramref name="host"/>
+    /// from now on, building again the chains whose plugins move. The hub
+    /// saves the choice in daemon.json first.
+    /// </summary>
+    public void SetWindowsHostDefault(string host)
+    {
+        _mixer.SetWindowsHostDefault(host);
+        Changed?.Invoke();
+    }
+
     public Task StartAsync(CancellationToken ct)
     {
+        // The host an insert of a Windows plugin follows when it pins none,
+        // read before the first chain is built.
+        OpenXLR.Core.Mixing.WindowsPluginHost.Default =
+            OpenXLR.Core.Mixing.WindowsPluginHost.DefaultFrom(DaemonSettings.Load().WindowsHostDefault);
         if (!SubmixerEnabled)
         {
             _initialized.TrySetResult();
@@ -1982,8 +1997,9 @@ public sealed partial class MixerService : IHostedService, IDisposable
                     _mixer.SetInsertOwnBlock(cmd.Channel!, cmd.InsertId!, cmd.Value.GetBoolean());   // checked by CommandValidation
                     break;
                 case "setInsertWindowsHost":
+                    // checked by CommandValidation: a host pins it, "default" clears the pin
                     _mixer.SetInsertWindowsHost(cmd.Channel!, cmd.InsertId!,
-                        cmd.Value.GetString() == OpenXLR.Core.Mixing.WindowsPluginHost.OpenXlr);   // checked by CommandValidation
+                        cmd.Value.GetString() is var host && OpenXLR.Core.Mixing.WindowsPluginHost.IsHost(host) ? host : null);
                     break;
                 case "setInsertParam":
                     if (cmd.Channel is null || cmd.InsertId is null || cmd.Symbol is null)

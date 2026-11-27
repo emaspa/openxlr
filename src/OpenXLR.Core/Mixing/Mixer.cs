@@ -1432,20 +1432,41 @@ public sealed partial class Mixer : IDisposable, ILayoutInfo
     }
 
     /// <summary>
-    /// Run one insert's Windows plugin on the Windows plugin host built into
-    /// OpenXLR, or back through yabridge; rewires when built, which starts
-    /// that insert's helper again on the other host with the same control
-    /// values.
+    /// Pin one insert's Windows plugin to the Windows plugin host built into
+    /// OpenXLR (<see cref="WindowsPluginHost.OpenXlr"/>) or to yabridge
+    /// (<see cref="WindowsPluginHost.Yabridge"/>), or with null let it follow
+    /// the default again. Rewires when built and the choice changed, which
+    /// starts that insert's helper again with the same control values.
     /// </summary>
-    public void SetInsertWindowsHost(string channel, string insertId, bool windowsHost)
+    public void SetInsertWindowsHost(string channel, string insertId, string? host)
     {
         lock (_gate)
         {
             if (!_inserts.TryGetValue(channel, out List<InsertDefinition>? list)) return;
             int idx = list.FindIndex(i => i.Id == insertId);
-            if (idx < 0 || list[idx].OnWindowsHost == windowsHost) return;
-            list[idx] = list[idx] with { WindowsHost = windowsHost ? WindowsPluginHost.OpenXlr : null };
+            if (idx < 0 || list[idx].WindowsHost == host) return;
+            list[idx] = list[idx] with { WindowsHost = host };
             if (_built) RewireInsertKeyLocked(channel);
+        }
+    }
+
+    /// <summary>
+    /// Change the host an insert that follows the default runs on. When
+    /// built, every chain with an insert that moves is built again; a chain
+    /// of pinned or native plugins keeps running.
+    /// </summary>
+    public void SetWindowsHostDefault(string host)
+    {
+        lock (_gate)
+        {
+            string before = WindowsPluginHost.Default;
+            WindowsPluginHost.Default = host;
+            string after = WindowsPluginHost.Default;
+            if (before == after || !_built) return;
+            List<string> moved = [.. _inserts.Where(chain => chain.Value.Any(i => !i.Bypass && PluginCatalog.Find(i) is var plugin
+                    && WindowsPluginHost.Wanted(i, plugin, before) != WindowsPluginHost.Wanted(i, plugin, after)))
+                .Select(chain => chain.Key)];
+            if (moved.Count > 0) RewireInsertKeysLocked(moved);
         }
     }
 

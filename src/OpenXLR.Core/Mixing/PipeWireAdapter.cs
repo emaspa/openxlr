@@ -2017,16 +2017,17 @@ public sealed class PipeWireAdapter
                         throw new InvalidOperationException("The native plugin host is not installed.");
                     if (insert.NativeHost && !info.NativeEditorSupported)
                         throw new InvalidOperationException($"{info.Name} has no editor the native host can open; select the filter chain.");
-                    // An insert saved to the Windows plugin host runs there
-                    // when this build can do it. When it cannot, the insert
-                    // runs through yabridge as it always could, and says why:
-                    // a saved choice never costs the chain.
+                    // An insert that should run on the Windows plugin host
+                    // runs there when this build can do it. When it cannot,
+                    // the insert runs through yabridge as it always could,
+                    // and says why: the host never costs the chain.
                     WindowsPluginHost.Route? windows = WindowsRoute(insert, info, out string? kept);
-                    var host = new NativePluginHost(insert, node, channels, rate, info.Path, _note, windows);
+                    NativePluginHost host = StartHelper(insert, info, windows, ref kept,
+                        route => new NativePluginHost(insert, node, channels, rate, info.Path, _note, route));
                     _nativeHosts.Add(host);
-                    Event(TimelineKind.Plugin, windows is null
-                        ? $"plugin host started for {InsertName(insert)} on {node}"
-                        : $"plugin host started for {InsertName(insert)} on {node}, on the Windows plugin host");
+                    Event(TimelineKind.Plugin, host.WindowsHost
+                        ? $"plugin host started for {InsertName(insert)} on {node}, on the Windows plugin host"
+                        : $"plugin host started for {InsertName(insert)} on {node}");
                     // Wine starts behind a bridged plugin and outlives this
                     // helper, so from here on it is this daemon's to end.
                     if (host.Bridged) _wine.HelperStarted();
@@ -2061,10 +2062,10 @@ public sealed class PipeWireAdapter
     }
 
     /// <summary>
-    /// Where an insert saved to the Windows plugin host runs: its route
-    /// there, or null to start it from its bundle. For a saved choice this
-    /// build cannot honour, <paramref name="kept"/> is why yabridge keeps the
-    /// insert, and the journal and the timeline get a line.
+    /// Where an insert's Windows plugin runs: its route on the Windows plugin
+    /// host, or null to start it from its bundle, through yabridge for a
+    /// wrapper. <paramref name="kept"/> is why an insert that should run on
+    /// the Windows plugin host runs through yabridge instead.
     ///
     /// A plugin found in a Windows plugin folder has no wrapper to fall back
     /// on, so it runs on the Windows plugin host whatever the insert saved,
@@ -2072,23 +2073,82 @@ public sealed class PipeWireAdapter
     /// is how an insert saved against a yabridge wrapper that is gone comes up
     /// on this host, with its values, while its module is still in one of
     /// those folders.
+    ///
+    /// An insert pinned to a host runs there. A pin to the Windows plugin host
+    /// this build cannot honour runs through yabridge, and the journal and the
+    /// timeline get a line.
+    ///
+    /// An insert that follows the default runs through yabridge while the
+    /// default is yabridge, and while its plugin is on the hold list, with the
+    /// list's reason. Otherwise it runs on the Windows plugin host when that
+    /// host finds a 64-bit module behind the wrapper, and through yabridge
+    /// with the reason when it does not. Nothing is written to the journal or
+    /// the timeline for it, since a build or a plugin that cannot do it would
+    /// repeat the line at every chain build. A build without the host runs it
+    /// through yabridge with nothing to say.
     /// </summary>
     /// <param name="installed">The host's presence, for a test; the build's own when null.</param>
-    internal WindowsPluginHost.Route? WindowsRoute(InsertDefinition insert, PluginInfo info, out string? kept, bool? installed = null)
+    /// <param name="defaultHost">The default, for a test; <see cref="WindowsPluginHost.Default"/> when null.</param>
+    /// <param name="held">The hold list, for a test; <see cref="WindowsPluginHost.Held"/> when null.</param>
+    internal WindowsPluginHost.Route? WindowsRoute(InsertDefinition insert, PluginInfo info, out string? kept, bool? installed = null,
+        string? defaultHost = null, IReadOnlyList<WindowsPluginHost.HeldPlugin>? held = null)
     {
         kept = null;
         if (info.WindowsHostOnly)
             return WindowsPluginHost.Resolve(info, out string? reason, installed)
                 ?? throw new InvalidOperationException($"{InsertName(insert)} runs only on the Windows plugin host and cannot start there: {reason}.");
-        if (!insert.OnWindowsHost) return null;
-        WindowsPluginHost.Route? route = WindowsPluginHost.Resolve(info, out kept, installed);
-        if (route is null)
+        WindowsPluginHost.Route? route;
+        if (insert.WindowsHost is not null)
         {
-            string line = $"{InsertName(insert)} is saved to the Windows plugin host and runs through yabridge instead: {kept}";
+            if (!insert.OnWindowsHost) return null;
+            route = WindowsPluginHost.Resolve(info, out kept, installed);
+            if (route is null)
+            {
+                string line = $"{InsertName(insert)} is saved to the Windows plugin host and runs through yabridge instead: {kept}";
+                Note(line);
+                Event(TimelineKind.Plugin, line);
+            }
+            return route;
+        }
+        if (!WindowsPluginHost.Wanted(insert, info, defaultHost, held: [])) return null;
+        if (!(installed ?? WindowsPluginHost.Installed)) return null;
+        if (WindowsPluginHost.HeldEntry(insert, held) is { } hold)
+        {
+            kept = $"{hold.Name} is held on yabridge in this release: {hold.Reason}";
+            return null;
+        }
+        return WindowsPluginHost.Resolve(info, out kept, installed: true);
+    }
+
+    /// <summary>
+    /// Start an insert's helper on the route <see cref="WindowsRoute"/> gave.
+    /// For an insert that follows the default, a plugin with a yabridge
+    /// wrapper that fails to start on the Windows plugin host is started once
+    /// more through yabridge, when yabridge is there, with the reason in
+    /// <paramref name="kept"/> and a line in the journal and the timeline. A
+    /// pinned insert fails as it did, and so does a start that ran into the
+    /// daemon's deadline: Wine was silent, perhaps preparing its prefix, and
+    /// yabridge would wait as long for the same Wine under the mixer's lock.
+    /// </summary>
+    /// <param name="start">Starts the helper on a route, or from the bundle for null.</param>
+    /// <param name="yabridge">Whether yabridge is there, for a test; <see cref="WindowsPluginHost.YabridgeInstalled"/> when null.</param>
+    internal T StartHelper<T>(InsertDefinition insert, PluginInfo info, WindowsPluginHost.Route? windows, ref string? kept,
+        Func<WindowsPluginHost.Route?, T> start, Func<bool>? yabridge = null)
+    {
+        try { return start(windows); }
+        catch (InvalidOperationException ex) when (windows is not null && insert.WindowsHost is null && !info.WindowsHostOnly
+            && ex.InnerException is not TimeoutException && (yabridge ?? WindowsPluginHost.YabridgeInstalled)())
+        {
+            string said = (ex.Message.StartsWith(NativePluginHost.StartupFailed, StringComparison.Ordinal)
+                ? ex.Message[NativePluginHost.StartupFailed.Length..] : ex.Message).Trim().TrimEnd('.');
+            kept = said.Length == 0
+                ? "it did not start on the Windows plugin host"
+                : $"it did not start on the Windows plugin host: {said}";
+            string line = $"{InsertName(insert)} follows the default host and {kept}, so it starts through yabridge instead";
             Note(line);
             Event(TimelineKind.Plugin, line);
+            return start(null);
         }
-        return route;
     }
 
     internal static int ParseGraphSampleRate(string metadata)

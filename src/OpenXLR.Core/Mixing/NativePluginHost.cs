@@ -179,6 +179,9 @@ internal sealed class NativePluginHost : IDisposable
         return found;
     }
 
+    /// <summary>What a helper that did not start says before its own words.</summary>
+    internal const string StartupFailed = "Native LV2 startup failed: ";
+
     /// <summary>Whether the optional helper was built and installed beside the daemon.</summary>
     public static bool HostInstalled => File.Exists(Executable);
     /// <summary>
@@ -270,7 +273,7 @@ internal sealed class NativePluginHost : IDisposable
             // no reason would leave the user nothing to act on.
             string said = windows is not null && ex is TimeoutException && string.IsNullOrWhiteSpace(_error)
                 ? WindowsPluginHost.SilentStart : _error;
-            throw new InvalidOperationException($"Native LV2 startup failed: {said}", ex);
+            throw new InvalidOperationException(StartupFailed + said, ex);
         }
     }
 

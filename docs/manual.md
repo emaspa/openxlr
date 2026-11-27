@@ -2959,17 +2959,30 @@ it. The `openxlr-yabridge` companion above brings it. yabridge stays the
 default for a plugin it bridges, and in a build without the host none of
 this shows.
 
-In a build with the host, the controls window of a Windows VST3 or CLAP
-plugin bridged through yabridge has a **Run on OpenXLR's Windows plugin
-host** button beside **Run on its own block**. Turn it on and that one
-plugin starts again on OpenXLR's host with the same control values. Its
-chain stops for a moment while it does. Turn it off to go back to
-yabridge. The line under the buttons says which host runs the plugin
-now. The choice is saved with the insert, in the mixer and in profiles.
-Effect presets and undo leave it alone, and so does loading a profile, by
-hand or when the interface connects. A plugin still in the chain stays on
-the host it runs on now. Only a plugin the profile puts back into the chain
-takes the host the profile saved.
+Every Windows plugin bridged through yabridge runs on the default host
+unless you pin it to one. To change the default for all of them, open
+Options, Plugins, and pick yabridge or OpenXLR's Windows plugin host under
+**Windows plugins run on**. The plugins that move start again with the same
+control values, and the others keep playing. OpenXLR saves the choice and
+keeps it when a later release changes its own default.
+
+To pick the host of one plugin, open its controls window. In a build with
+the host, a Windows VST3 or CLAP plugin bridged through yabridge has a host
+list beside **Run on its own block**, with three choices:
+
+- **Default host**, followed by the host the default means now: the plugin
+  follows the setting in Options;
+- **Always yabridge**: the plugin stays on yabridge whatever the default;
+- **Always OpenXLR's Windows plugin host**: the plugin stays on OpenXLR's
+  host whatever the default.
+
+The plugin starts again with the same control values when you change it,
+and its chain stops for a moment while it does. The line under the buttons
+says which host runs the plugin now. The choice is saved with the insert,
+in the mixer and in profiles. Effect presets and undo leave it alone, and
+so does loading a profile, by hand or when the interface connects. A plugin
+still in the chain keeps its choice. Only a plugin the profile puts back
+into the chain takes the choice the profile saved.
 
 Plugin UI opens the plugin's own editor on this host as it does through
 yabridge, in the same kind of window. What you change in the editor shows
@@ -2978,15 +2991,24 @@ editors** list blocks the editor on either host. The window resizes by its
 border only where the plugin allows it. A menu the plugin has open closes
 when you resize or close the window.
 
-OpenXLR refuses the switch, and says why under the buttons, when the
-plugin is not a 64-bit Windows module or when its module is missing.
-A plugin that ties its licence to the system disk, such as Elgato Voice
-Focus, sees the same machine on both hosts, since this host reports the
-disk's identity the way the companion's does. A plugin can also be saved to the host
-and fail to run there when its chain starts, for one of those reasons or
-because the build has no host. It then runs through yabridge, and the
-controls window says why. The saved choice stays, and so does the button,
-so you can turn it off.
+OpenXLR refuses **Always OpenXLR's Windows plugin host**, and says why
+under the buttons, when the plugin is not a 64-bit Windows module or when
+its module is missing. A plugin that ties its licence to the system disk,
+such as Elgato Voice Focus, sees the same machine on both hosts, since this
+host reports the disk's identity the way the companion's does. A plugin can
+also be pinned to the host and fail to run there when its chain starts, for
+one of those reasons or because the build has no host. It then runs through
+yabridge, and the controls window says why. The pin stays, and so does the
+list, so you can pick another choice.
+
+When the default is OpenXLR's host, a plugin that follows it runs through
+yabridge in two cases: OpenXLR's host cannot run it, or it fails to start
+there and yabridge is installed. The controls window says why. A start that
+ran out of time waiting for Wine is not tried again through yabridge, which
+would wait for the same Wine. A release can also hold a plugin that is
+known to misbehave on OpenXLR's host on yabridge while it follows the
+default, and the controls window then says so. A pinned plugin is never
+held, and no plugin is held in this release.
 
 The plugin's audio runs on a thread of the Windows program, which OpenXLR
 gives the same real-time priority as PipeWire's own audio thread. Where
@@ -3021,14 +3043,14 @@ manager's top list as Windows folders. For
 plugins kept anywhere else, choose Windows there and press "Add plugin
 folder". Such a plugin is in the picker like any other and runs on
 OpenXLR's host, since nothing else can run it. Its controls window has no
-switch, only the line saying it runs on the Windows plugin host. OpenXLR's
+host list, only the line saying it runs on the Windows plugin host. OpenXLR's
 host runs only 64-bit plugins, so it leaves the `Program Files (x86)`
 folders alone. The first scan of a plugin can take a few minutes, because
 Wine may first have to set up the prefix.
 
 A plugin you also bridged through yabridge is listed once, by its yabridge
-wrapper, because yabridge stays the default and the switch above moves it
-to this host. The scan of the Windows folders never loads that plugin on
+wrapper, because the wrapper can run on either host and the host list above
+picks one. The scan of the Windows folders never loads that plugin on
 OpenXLR's host, so it cannot use up an activation of a plugin that counts
 the computers it runs on. If you remove yabridge or the wrapper later, the
 next scan reads the plugin on OpenXLR's host, and an insert that used it
@@ -5952,7 +5974,7 @@ settings. See
 | `~/.config/openxlr/devices/<vid-pid>/last-state.json` | the settings restored on connect when `retainsSettings` is false |
 | `~/.config/openxlr/devices/<vid-pid>/seen.json` | the boot and USB address at which the daemon last opened such an interface, a Wave:3 or a Wave:1, so a daemon start can tell whether it stayed plugged in ([Restoring settings on connect](#profiles)) |
 | `~/.config/openxlr/devices/<vid-pid>/defaults.json` | the firmware defaults of such an interface, recorded after a power cycle, written back by "Reset device to defaults" (the Pro has no such file: its reset writes OpenXLR's baseline) |
-| `~/.config/openxlr/daemon.json` | the submixer on/off preference and the added plugin folders |
+| `~/.config/openxlr/daemon.json` | the submixer on/off preference, the added plugin folders and the default host for Windows plugins |
 | `~/.config/openxlr/active-device.json` | the interface picked last in the header, driven again after a restart |
 | `~/.config/openxlr/gainlock.json` | which devices have the gain lock set |
 | `~/.config/openxlr/leds.json` | the LED ring set from OpenXLR on a Wave XLR MK.2, written back each time it connects |

@@ -75,9 +75,16 @@
         <ToggleButton Name="PluginOwnBlock" Content="{loc:Text Key=RunOnItsOwnBlock}" IsChecked="{Binding OwnBlock, Mode=TwoWay}"
                       Padding="12,4" Margin="0,0,6,6" IsVisible="{Binding CanChooseOwnBlock}"
                       ToolTip.Tip="{loc:Text Key=RunOnItsOwnBlockTip}"/>
-        <ToggleButton Name="PluginWindowsHost" Content="{loc:Text Key=RunOnOpenXlrSWindowsPluginHost}" IsChecked="{Binding OnWindowsHost, Mode=TwoWay}"
-                      Padding="12,4" Margin="0,0,6,6" IsVisible="{Binding CanChooseWindowsHost}"
-                      ToolTip.Tip="{loc:Text Key=RunOnOpenXlrSWindowsPluginHostTip}"/>
+        <ComboBox Name="PluginWindowsHost" ItemsSource="{Binding WindowsHostOptions}" SelectedItem="{Binding SelectedWindowsHost, Mode=TwoWay}"
+                  Margin="0,0,6,6" IsVisible="{Binding CanChooseWindowsHost}"
+                  AutomationProperties.Name="{loc:Text Key=WindowsPluginHostChoice}"
+                  ToolTip.Tip="{loc:Text Key=RunOnOpenXlrSWindowsPluginHostTip}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:WindowsHostOption">
+              <TextBlock Text="{Binding Label}"/>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
       </WrapPanel>
       <TextBlock Name="PluginWindowsHostState" Text="{Binding WindowsHostState}" Classes="hint" TextWrapping="Wrap"
                  Margin="0,0,0,8" IsVisible="{Binding HasWindowsHostState}"/>

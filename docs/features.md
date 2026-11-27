@@ -940,8 +940,10 @@ controls window and the API, and saved with the chain. See
 [a plugin that cannot keep up](manual.md#own-block).
 
 A Windows plugin bridged through yabridge can run on the Windows plugin
-host built into OpenXLR instead, one insert at a time, from a switch in its
-controls window or the API. It is experimental. Every package except the
+host built into OpenXLR instead. A default host in Options moves every such
+plugin at once, and a list in a plugin's controls window, or the API, pins
+one insert to either host. A plugin that follows the default and fails to
+start on that host starts again through yabridge. It is experimental. Every package except the
 Flatpak includes it, and a source build has it when made with `WINHOST=1`.
 Wine is still needed to run it. The plugin's own editor opens on
 either host. Its audio thread gets PipeWire's real-time priority, through

@@ -18,8 +18,14 @@ internal sealed record ChainStructure(int LowCutHz, bool ClipGuard, IReadOnlyLis
         bool OwnBlock = false, bool WindowsHost = false);
 
     internal static ChainStructure Of(IEnumerable<InsertDefinition> inserts, int lowCutHz = 0, bool clipGuard = false)
-        => new(lowCutHz, clipGuard, [.. inserts.Select(i =>
-            new Slot(i.Id, i.Kind, i.Plugin, i.Bypass, i.RunsNatively, PluginCatalog.Find(i) is not null, i.OwnBlock, i.OnWindowsHost))]);
+        => new(lowCutHz, clipGuard, [.. inserts.Select(SlotOf)]);
+
+    /// <summary>One insert's slot. Its Windows host is the one it is tried on, pinned or by the default.</summary>
+    private static Slot SlotOf(InsertDefinition i)
+    {
+        PluginInfo? found = PluginCatalog.Find(i);
+        return new(i.Id, i.Kind, i.Plugin, i.Bypass, i.RunsNatively, found is not null, i.OwnBlock, WindowsPluginHost.Wanted(i, found));
+    }
 
     public bool Equals(ChainStructure? other)
         => other is not null && LowCutHz == other.LowCutHz && ClipGuard == other.ClipGuard && Slots.SequenceEqual(other.Slots);

@@ -196,7 +196,8 @@ public sealed partial class InsertsViewModel : ViewModelBase
                     p["nativeEditorSupported"]?.GetValue<bool>() == true,
                     p["kind"]?.GetValue<string>() ?? "lv2",
                     p["nativeUiBlocked"]?.GetValue<bool>() == true,
-                    PluginChoice.IsBridged(p["kind"]?.GetValue<string>() ?? "lv2", p["path"]?.GetValue<string>())));
+                    PluginChoice.IsBridged(p["kind"]?.GetValue<string>() ?? "lv2", p["path"]?.GetValue<string>())
+                        && p["windowsHostOnly"]?.GetValue<bool>() != true));
             }
             foreach (InsertViewModel insert in Items) insert.RefreshCatalogue();
             EnsureWindowsHostKnown();
@@ -244,6 +245,36 @@ public sealed partial class InsertsViewModel : ViewModelBase
         }
     }
 
+    private string? _windowsHostDefault;
+    /// <summary>
+    /// The host an insert that follows the default runs on, as the daemon's
+    /// <c>windowsHostDefault</c> says: <see cref="WindowsHostYabridge"/> or
+    /// <see cref="WindowsHostOpenXlr"/>, null until the daemon has said.
+    /// </summary>
+    internal string? WindowsHostDefault
+    {
+        get => _windowsHostDefault;
+        set
+        {
+            string? known = value is WindowsHostYabridge or WindowsHostOpenXlr ? value : null;
+            if (_windowsHostDefault == known) return;
+            _windowsHostDefault = known;
+            foreach (InsertViewModel insert in Items) insert.RaiseWindowsHost();
+        }
+    }
+
+    /// <summary>
+    /// Take what a <c>pluginSetup</c> says about the Windows plugin host. The
+    /// daemon sends one to every client when the default changes, so a chain
+    /// that already asked learns the new default too.
+    /// </summary>
+    internal void ApplyWindowsHostSetup(JsonNode? setup)
+    {
+        if (setup is null || IsDetached) return;
+        if (setup["windowsHostInstalled"] is JsonValue installed && installed.TryGetValue(out bool has)) WindowsHostInstalled = has;
+        if (setup["windowsHostDefault"] is JsonValue host && host.TryGetValue(out string? value)) WindowsHostDefault = value;
+    }
+
     /// <summary>Ask the daemon about the Windows plugin host once a Windows plugin is in this chain.</summary>
     internal void EnsureWindowsHostKnown()
     {
@@ -268,6 +299,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
                 return;
             }
             WindowsHostInstalled = setup["windowsHostInstalled"]?.GetValue<bool>() == true;
+            ApplyWindowsHostSetup(setup);
         });
     }
 
@@ -281,6 +313,7 @@ public sealed partial class InsertsViewModel : ViewModelBase
         _setupRequested = false;
         _setupTask = null;
         WindowsHostInstalled = false;
+        WindowsHostDefault = null;
         PluginChoices.Clear();
         SelectedPlugin = null;
         Note = null;
@@ -415,21 +448,21 @@ public sealed partial class InsertsViewModel : ViewModelBase
         if (!_applying && !IsDetached) { EffectEdited(); _ = _client.SetInsertOwnBlockAsync(_channel, item.Id, ownBlock); }
     }
 
-    /// <summary>The two values of <c>setInsertWindowsHost</c>.</summary>
-    internal const string WindowsHostOpenXlr = "openxlr", WindowsHostYabridge = "yabridge";
+    /// <summary>The values of <c>setInsertWindowsHost</c>: the two pins, and following the default.</summary>
+    internal const string WindowsHostOpenXlr = "openxlr", WindowsHostYabridge = "yabridge", WindowsHostDefaultValue = "default";
 
     /// <summary>
-    /// Move one insert to the Windows plugin host or back to yabridge. The
-    /// choice is machine wiring, not part of the effect, so the effect
-    /// workflow is left alone, as the daemon's history leaves it. A refusal
-    /// comes back as its reason, after the daemon's state has put the switch
-    /// back where it was.
+    /// Pin one insert to the Windows plugin host or to yabridge, or let it
+    /// follow the default. The choice is machine wiring, not part of the
+    /// effect, so the effect workflow is left alone, as the daemon's history
+    /// leaves it. A refusal comes back as its reason, after the daemon's
+    /// state has put the choice back where it was.
     /// </summary>
-    internal async Task SendWindowsHostAsync(InsertViewModel item, bool on)
+    internal async Task SendWindowsHostAsync(InsertViewModel item, string value)
     {
         if (_applying || IsDetached) return;
         item.WindowsHostRefusal = null;
-        string? error = await _client.SetInsertWindowsHostAsync(_channel, item.Id, on ? WindowsHostOpenXlr : WindowsHostYabridge);
+        string? error = await _client.SetInsertWindowsHostAsync(_channel, item.Id, value);
         if (!item.IsDetached) item.WindowsHostRefusal = error;
     }
 
@@ -620,31 +653,61 @@ public sealed class InsertViewModel : ViewModelBase
     /// <summary>A Windows plugin bridged through yabridge, by its catalogue entry.</summary>
     public bool Bridged => _owner.PluginChoices.Any(p => p.Kind == Kind && p.Uri == Plugin && p.Bridged);
 
-    private bool _onWindowsHost;
+    private string? _windowsHostPin;
     /// <summary>
-    /// The insert is saved to the Windows plugin host built into OpenXLR
-    /// instead of yabridge. Switching starts its plugin again on the other
-    /// host with the same control values.
+    /// The host the insert is pinned to, <see cref="InsertsViewModel.WindowsHostOpenXlr"/>
+    /// or <see cref="InsertsViewModel.WindowsHostYabridge"/>, or null while it
+    /// follows the default.
     /// </summary>
-    public bool OnWindowsHost
+    public string? WindowsHostPin => _windowsHostPin;
+
+    private WindowsHostOption[]? _windowsHostOptions;
+    /// <summary>The three choices of the host control: following the default, then the two pins.</summary>
+    public IReadOnlyList<WindowsHostOption> WindowsHostOptions => _windowsHostOptions ??=
+    [
+        new(InsertsViewModel.WindowsHostDefaultValue, DefaultHostLabel()),
+        new(InsertsViewModel.WindowsHostYabridge, Localizer.Text("WindowsHostPinYabridge")),
+        new(InsertsViewModel.WindowsHostOpenXlr, Localizer.Text("WindowsHostPinOpenXlr")),
+    ];
+
+    /// <summary>The first choice names the host the default means now, once the daemon has said.</summary>
+    private string DefaultHostLabel() => _owner.WindowsHostDefault switch
     {
-        get => _onWindowsHost;
+        InsertsViewModel.WindowsHostOpenXlr => Localizer.Text("WindowsHostFollowDefaultOpenXlr"),
+        InsertsViewModel.WindowsHostYabridge => Localizer.Text("WindowsHostFollowDefaultYabridge"),
+        _ => Localizer.Text("WindowsHostFollowDefault"),
+    };
+
+    /// <summary>
+    /// The choice that matches the saved host. Choosing another sends it to
+    /// the daemon, which starts the plugin again with the same control values.
+    /// </summary>
+    public WindowsHostOption SelectedWindowsHost
+    {
+        get => WindowsHostOptions[_windowsHostPin switch
+        {
+            InsertsViewModel.WindowsHostYabridge => 1,
+            InsertsViewModel.WindowsHostOpenXlr => 2,
+            _ => 0,
+        }];
         set
         {
-            if (IsDetached) return;
-            if (Set(ref _onWindowsHost, value))
-            {
-                RaiseWindowsHost();
-                _ = _owner.SendWindowsHostAsync(this, value);
-            }
+            // A list control clears its selection while it is rebuilt.
+            if (IsDetached || value is null) return;
+            string? pin = value.Value == InsertsViewModel.WindowsHostDefaultValue ? null : value.Value;
+            if (pin == _windowsHostPin) return;
+            _windowsHostPin = pin;
+            RaiseWindowsHost();
+            _ = _owner.SendWindowsHostAsync(this, value.Value);
         }
     }
 
     /// <summary>
     /// Offered for a bridged Windows plugin when the daemon's build has the
-    /// host, and always while it is on, so the insert can go back to yabridge.
+    /// host, and always while the insert is pinned, so it can follow the
+    /// default again.
     /// </summary>
-    public bool CanChooseWindowsHost => _onWindowsHost || (_owner.WindowsHostInstalled && Bridged);
+    public bool CanChooseWindowsHost => _windowsHostPin is not null || (_owner.WindowsHostInstalled && Bridged);
 
     private bool _windowsHostRunning;
     /// <summary>The plugin is running on the Windows plugin host now.</summary>
@@ -674,20 +737,24 @@ public sealed class InsertViewModel : ViewModelBase
     private const string RefusalPrefix = "setInsertWindowsHost: ";
 
     /// <summary>
-    /// What went wrong with the host: the daemon refused the switch, or the
-    /// insert is saved to the Windows plugin host and runs through yabridge
-    /// instead. Shown with the insert's error.
+    /// What went wrong with the host: the daemon refused the choice, or the
+    /// insert should run on the Windows plugin host, pinned there or by the
+    /// default, and runs through yabridge instead. Shown with the insert's error.
     /// </summary>
     public string? WindowsHostNote => _windowsHostRefusal is { } refusal
         ? refusal.StartsWith(RefusalPrefix, StringComparison.Ordinal)
             ? Localizer.Format("WindowsHostRefused", refusal[RefusalPrefix.Length..])
             : refusal
-        : _windowsHostError is { } kept ? Localizer.Format("WindowsHostKept", kept)
-        : null;
+        : _windowsHostError is not { } kept ? null
+        : _windowsHostPin == InsertsViewModel.WindowsHostOpenXlr ? Localizer.Format("WindowsHostKept", kept)
+        : Localizer.Format("WindowsHostDefaultKept", kept);
     public bool HasWindowsHostNote => WindowsHostNote is not null;
 
     internal void RaiseWindowsHost()
     {
+        _windowsHostOptions?[0].SetLabel(DefaultHostLabel());
+        Raise(nameof(WindowsHostPin));
+        Raise(nameof(SelectedWindowsHost));
         Raise(nameof(Bridged));
         Raise(nameof(CanChooseWindowsHost));
         Raise(nameof(WindowsHostRunning));
@@ -822,14 +889,16 @@ public sealed class InsertViewModel : ViewModelBase
         _bypass = ins["bypass"]?.GetValue<bool>() ?? false;
         _nativeHost = ins["nativeHost"]?.GetValue<bool>() ?? false;
         _ownBlock = ins["ownBlock"]?.GetValue<bool>() ?? false;
-        // A refusal is about the switch as it was; once the saved host moves,
+        // A refusal is about the choice as it was; once the saved host moves,
         // by this window or another client, it no longer applies.
-        bool onWindowsHost = ins["windowsHost"]?.GetValue<string>() == InsertsViewModel.WindowsHostOpenXlr;
-        if (onWindowsHost != _onWindowsHost) _windowsHostRefusal = null;
-        _onWindowsHost = onWindowsHost;
+        string? pin = ins["windowsHost"]?.GetValue<string>() is InsertsViewModel.WindowsHostOpenXlr or InsertsViewModel.WindowsHostYabridge
+            ? ins["windowsHost"]!.GetValue<string>() : null;
+        if (pin != _windowsHostPin) _windowsHostRefusal = null;
+        _windowsHostPin = pin;
         Raise(nameof(NativeHost));
         Raise(nameof(OwnBlock));
-        Raise(nameof(OnWindowsHost));
+        Raise(nameof(WindowsHostPin));
+        Raise(nameof(SelectedWindowsHost));
         Raise(nameof(Bypass));
         Raise(nameof(StateText));
         Raise(nameof(IsActive));
@@ -1005,4 +1074,19 @@ public sealed class InsertParamViewModel : ViewModelBase
         try { Value = v; }
         finally { _applying = false; }
     }
+}
+
+/// <summary>One choice of an insert's host control: a <c>setInsertWindowsHost</c> value and what the control shows for it.</summary>
+public sealed class WindowsHostOption(string value, string label) : ViewModelBase
+{
+    /// <summary>"default", "yabridge" or "openxlr".</summary>
+    public string Value { get; } = value;
+
+    private string _label = label;
+    /// <summary>What the control shows. The default's choice names the host the default means now.</summary>
+    public string Label { get => _label; private set => Set(ref _label, value); }
+
+    internal void SetLabel(string label) => Label = label;
+
+    public override string ToString() => Label;
 }

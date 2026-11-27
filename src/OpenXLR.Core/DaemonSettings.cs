@@ -16,6 +16,12 @@ namespace OpenXLR.Core;
 /// PluginFolders are the plugin search folders added from the plugin
 /// manager. The daemon writes them itself; the window's mirror keeps fields
 /// it does not know, so neither side drops what the other wrote.
+///
+/// WindowsHostDefault is the host a Windows plugin runs on while its insert
+/// follows the default: "yabridge" or "openxlr", written by the daemon for
+/// setWindowsHostDefault. Absent, or a value this build does not know, means
+/// the build's own default, so a user who chose one keeps it when that
+/// changes.
 /// </summary>
 public sealed record DaemonSettings
 {
@@ -30,6 +36,8 @@ public sealed record DaemonSettings
     /// companion. Absent until then.
     /// </summary>
     public BridgeFolderCopy? YabridgeFolderCopy { get; init; }
+
+    public string? WindowsHostDefault { get; init; }
 
     /// <summary>Keys this version does not know, written back unchanged by a save.</summary>
     [System.Text.Json.Serialization.JsonExtensionData]
@@ -70,6 +78,26 @@ public sealed record DaemonSettings
     }
 
     public void Save() => OpenXlrPaths.WriteAtomicJson(FilePath, this, Json, OpenXlrPaths.MaxPreferenceBytes);
+
+    /// <summary>
+    /// Save the default host for Windows plugins, keeping every other key.
+    /// Null when saved, otherwise why not. A file that cannot be read is not
+    /// written over.
+    /// </summary>
+    public static string? SaveWindowsHostDefault(string host)
+    {
+        if (Read(out string? problem) is not { } settings)
+            return "daemon.json cannot be read, so it was not written over. Repair or remove it, then try again: " + problem;
+        try
+        {
+            (settings with { WindowsHostDefault = host }).Save();
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return "Could not save the default host for Windows plugins: " + ex.Message;
+        }
+    }
 
     /// <summary>
     /// The effective submixer switch: the saved choice when there is one,

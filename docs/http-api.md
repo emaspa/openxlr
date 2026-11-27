@@ -331,6 +331,13 @@ soft limit is at least 256 MiB or unlimited.
 skipped after a failed scan, including their reason and original failure
 time. The list is capped at 128; the count includes omitted bundles.
 `wineTrace` reports the running daemon's deep Wine trace setting.
+`windowsHostDefault` reports the host, `"yabridge"` or `"openxlr"`, that an
+insert of a Windows plugin with no pin runs on. `setWindowsHostDefault`
+through `POST /api/v1/commands` takes one of those two as `value`, saves it
+in `daemon.json`, rebuilds the chains whose plugins move and replies with
+`pluginSetup`. `setInsertWindowsHost` takes `"default"` as well as the two
+hosts, to clear an insert's pin. See
+[the default host](api.md#windows-host-default).
 `setPluginWineTrace` through `POST /api/v1/commands` requires a boolean
 `value` and replies with `pluginSetup`. It changes only the daemon's process
 environment, without a restart or a saved preference. Enable it, send
