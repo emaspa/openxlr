@@ -22,11 +22,15 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     public bool Supported => _supported;
     public bool Enabled => _enabled;
     public bool Website => website;
-    private bool _boost;
+    private bool _boost, _companionBoost;
     private double _supportedMaximum = 1;
+    // The most a tab plays at when the browser itself is at 100% or less;
+    // the daemon lowers it while the browser plays louder.
+    private const double TabBoostCeiling = 1.25;
 
     public double Maximum => Math.Max(Level, _boost ? _supportedMaximum : 1);
-    private bool NeedsCompanionUpdate => Website && _boost && _supportedMaximum <= 1;
+    private bool NeedsCompanionUpdate => Website && _boost && !_companionBoost;
+    private bool HeldByBrowserLevel => Website && _boost && _companionBoost && _supportedMaximum < TabBoostCeiling;
 
     internal void ApplyBoost(bool boost)
     {
@@ -38,6 +42,7 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     /// <summary>The level the button shows; empty at full volume, saved or not, where it shows a speaker.</summary>
     public string Label => Math.Round(Level * 100) != 100 ? $"{Level * 100:0}%" : "";
     public string Hint => NeedsCompanionUpdate ? Localizer.Text("TabPlaybackBoostUnavailable")
+        : HeldByBrowserLevel ? Localizer.Text("TabPlaybackBoostHeldByBrowser")
         : website ? Localizer.Text("TabPlaybackVolumeHint")
         : _browserHeld ? Localizer.Text("BrowserPlaybackVolumeHint") : Localizer.Text("AppPlaybackVolumeHint");
     public string? Error { get => _error; private set => Set(ref _error, value); }
@@ -67,18 +72,19 @@ public sealed class PlaybackVolumeViewModel(Func<double?, bool, Task<string?>> s
     }
 
     internal void Apply(bool supported, bool enabled, double? level, bool remember = false, bool browserHeld = false,
-        double? live = null, double supportedMaximum = 1)
+        double? live = null, double supportedMaximum = 1, bool companionBoost = false)
     {
         Set(ref _supported, supported, nameof(Supported));
         Set(ref _browserHeld, browserHeld, nameof(Hint));
         SetEnabled(enabled);
         var state = new Choice(level, remember);
-        bool maximumChanged = _supportedMaximum != supportedMaximum;
+        bool maximumChanged = _supportedMaximum != supportedMaximum || _companionBoost != companionBoost;
         if (_reported == state && _live == live && !maximumChanged) return;
         _supportedMaximum = supportedMaximum;
+        _companionBoost = companionBoost;
         _reported = state;
         _live = live;
-        if (maximumChanged) Raise(nameof(Hint));
+        if (maximumChanged) { Raise(nameof(Hint)); Raise(nameof(Maximum)); }
         if (_pending is null) Refresh();
     }
 

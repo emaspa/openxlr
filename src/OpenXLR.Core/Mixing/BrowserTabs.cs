@@ -22,6 +22,7 @@ public sealed record BrowserTabState(string Session, int Id, string Site, string
     bool Remember, bool Capturing, string? Error, string? Activation = null)
 {
     public bool VolumeSupported { get; init; }
+    public bool VolumeBoostSupported { get; init; }
     public double VolumeMaximum { get; init; } = 1;
     public double? Volume { get; init; }
     public bool RememberVolume { get; init; }
@@ -203,7 +204,7 @@ public sealed partial class Mixer
         {
             var (tabs, tab) = FindBrowserTabLocked(session, tabId, site, "setBrowserTabVolume");
             if (!tab.Metadata.VolumeSupported) throw new InvalidOperationException("update the browser companion to adjust tab volume");
-            if (volume > TabVolumeMaximum(tab))
+            if (volume > 1 && !tab.Metadata.VolumeBoostSupported)
                 throw new InvalidOperationException("update the browser companion to boost tab volume");
             double? next = volume is double value ? SnapPlaybackVolume(value) : null;
             if (!remember)
@@ -260,13 +261,31 @@ public sealed partial class Mixer
         }
     }
 
-    private static double TabVolumeMaximum(BrowserTab tab)
-        => tab.Metadata.VolumeSupported && tab.Metadata.VolumeBoostSupported ? BrowserTabRouting.MaxTabVolume : 1;
+    /// <summary>
+    /// How loud a tab may play. Its gain multiplies the browser's own playback
+    /// level, so the ceiling keeps the two together at the desktop's 150% and
+    /// takes boost away first: it never puts a tab below 100%. A companion does
+    /// not say which browser it runs in, so the loudest browser sets it.
+    /// </summary>
+    private double TabVolumeMaximumLocked(BrowserTab tab)
+    {
+        if (!tab.Metadata.VolumeSupported || !tab.Metadata.VolumeBoostSupported) return 1;
+        double browser = 1;
+        foreach (string identity in _browserIdentities)
+        {
+            string key = AppVolumeKey(identity);
+            double level = _appVolumes.TryGetValue(key, out double saved) ? saved
+                : _appLiveVolumes.TryGetValue(key, out double playing) ? playing : 1;
+            browser = Math.Max(browser, level);
+        }
+        double room = Math.Floor(PipeWireAdapter.MaxSinkVolume / browser * 100 + 1e-9) / 100;
+        return Math.Clamp(room, 1, BrowserTabRouting.MaxTabVolume);
+    }
 
-    private double? EffectiveTabVolume(BrowserTab tab)
+    private double? EffectiveTabVolumeLocked(BrowserTab tab)
     {
         double? volume = tab.Volume ?? (_browserSiteVolumes.TryGetValue(tab.Metadata.Site, out double saved) ? saved : null);
-        return volume is double level ? Math.Min(level, TabVolumeMaximum(tab)) : null;
+        return volume is double level ? Math.Min(level, TabVolumeMaximumLocked(tab)) : null;
     }
 
     private IReadOnlyList<BrowserTabState> BrowserTabsLocked()
@@ -278,8 +297,9 @@ public sealed partial class Mixer
                 t.Metadata.Activation)
             {
                 VolumeSupported = t.Metadata.VolumeSupported,
-                VolumeMaximum = TabVolumeMaximum(t),
-                Volume = EffectiveTabVolume(t),
+                VolumeBoostSupported = t.Metadata.VolumeSupported && t.Metadata.VolumeBoostSupported,
+                VolumeMaximum = TabVolumeMaximumLocked(t),
+                Volume = EffectiveTabVolumeLocked(t),
                 RememberVolume = t.Volume is null && _browserSiteVolumes.ContainsKey(t.Metadata.Site),
             }))];
 

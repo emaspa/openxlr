@@ -82,7 +82,8 @@ public sealed partial class MainViewModel
             tab.PlaybackVolume.ApplyBoost(OutputVolumeRange.Boost);
             tab.PlaybackVolume.Apply(node["volumeSupported"]?.GetValue<bool>() == true, tab.CanEdit,
                 node["volume"]?.GetValue<double>(), node["rememberVolume"]?.GetValue<bool>() == true,
-                supportedMaximum: node["volumeMaximum"]?.GetValue<double>() ?? 1);
+                supportedMaximum: node["volumeMaximum"]?.GetValue<double>() ?? 1,
+                companionBoost: node["volumeBoostSupported"]?.GetValue<bool>() == true);
         }
         for (int i = BrowserTabs.Count - 1; i >= 0; i--)
             if (!seen.Contains((BrowserTabs[i].Session, BrowserTabs[i].Id)))

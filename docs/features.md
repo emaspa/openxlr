@@ -1091,7 +1091,8 @@ restores the split profile when it stops.
   playback volume, set in its row and applied by the companion, so two
   tabs on one channel can play at different levels. The level is an edit
   for that tab or saved for its website. The main Monitor's 150% option
-  opens the tab slider to 125% on companions that support boost. Older
+  opens the tab slider to 125% on companions that support boost, less
+  what a browser above 120% takes so the two together stay at 150%. Older
   companions stay at a maximum of 100% and the popup shows why. Browser
   output selection suspends generic Chromium routing while enabled,
   keeping each browser's saved assignment and showing where it plays

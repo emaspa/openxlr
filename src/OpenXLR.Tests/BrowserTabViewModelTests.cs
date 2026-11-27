@@ -546,9 +546,15 @@ public sealed class BrowserTabViewModelTests
         legacy["volume"] = 1d;
         var modern = Tab(id: 2);
         modern["volumeSupported"] = true;
+        modern["volumeBoostSupported"] = true;
         modern["volumeMaximum"] = 1.25;
         modern["volume"] = 1.22;
-        Report(model, true, new JsonArray(legacy, modern));
+        // The browser plays at 130%, so the daemon leaves this tab 115%.
+        var loudBrowser = Tab(id: 3);
+        loudBrowser["volumeSupported"] = true;
+        loudBrowser["volumeBoostSupported"] = true;
+        loudBrowser["volumeMaximum"] = 1.15;
+        Report(model, true, new JsonArray(legacy, modern, loudBrowser));
 
         var oldVolume = model.BrowserTabs[0].PlaybackVolume;
         Assert.Equal(1, oldVolume.Maximum);
@@ -556,6 +562,12 @@ public sealed class BrowserTabViewModelTests
         var newVolume = model.BrowserTabs[1].PlaybackVolume;
         Assert.Equal(1.25, newVolume.Maximum);
         Assert.Equal("122%", newVolume.Label);
+        Assert.Equal(Localizer.Text("TabPlaybackVolumeHint"), newVolume.Hint);
+        var heldVolume = model.BrowserTabs[2].PlaybackVolume;
+        Assert.Equal(1.15, heldVolume.Maximum);
+        Assert.Equal(Localizer.Text("TabPlaybackBoostHeldByBrowser"), heldVolume.Hint);
+        model.OutputVolumeRange.Boost = false;
+        Assert.Equal(Localizer.Text("TabPlaybackVolumeHint"), heldVolume.Hint);
     }
 
     internal static JsonObject Tab(string session = Session, int id = 7, string title = "A browser tab", string? channel = null,
