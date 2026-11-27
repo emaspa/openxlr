@@ -337,14 +337,17 @@
                   </ScrollViewer>
                 </StackPanel>
                 <TextBlock Text="{Binding WindowsPlugins}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                <!-- Where a Windows plugin runs while its insert pins no host. -->
+                <!-- Where a Windows plugin runs while its insert pins no host,
+                     offered while yabridge is there to choose. What the choice
+                     does is in the tooltip. -->
                 <StackPanel Name="WindowsHostDefault" Spacing="4" IsVisible="{Binding ShowsWindowsHostDefault}">
-                  <Grid ColumnDefinitions="Auto,10,*">
+                  <Grid ColumnDefinitions="Auto,10,*" ToolTip.Tip="{loc:Text Key=WindowsHostDefaultHint}">
                     <TextBlock Text="{loc:Text Key=WindowsPluginsRunOn}" VerticalAlignment="Center" TextWrapping="Wrap"/>
                     <ComboBox Name="WindowsHostDefaultPicker" Grid.Column="2" HorizontalAlignment="Left"
                               ItemsSource="{Binding WindowsHostDefaultOptions}"
                               SelectedItem="{Binding SelectedWindowsHostDefault, Mode=TwoWay}"
                               IsEnabled="{Binding CanSetWindowsHostDefault}"
+                              ToolTip.Tip="{loc:Text Key=WindowsHostDefaultHint}"
                               AutomationProperties.Name="{loc:Text Key=WindowsPluginsRunOn}">
                       <ComboBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:WindowsHostOption">
@@ -353,8 +356,6 @@
                       </ComboBox.ItemTemplate>
                     </ComboBox>
                   </Grid>
-                  <TextBlock Text="{loc:Text Key=WindowsHostDefaultHint}"
-                             FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
                   <TextBlock Text="{Binding WindowsHostDefaultStatus}" FontSize="{DynamicResource UiText.FontSize11}"
                              Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"
                              IsVisible="{Binding WindowsHostDefaultStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
@@ -375,14 +376,15 @@
                 <Button Name="BridgeWine" Content="{Binding BridgeWineLabel}" Padding="14,5" HorizontalAlignment="Left"
                         IsVisible="{Binding CanBridgeWine}" Click="OnBridgeWinePlugins"
                         ToolTip.Tip="{loc:Text Key=HandThePluginsAWindowsInstallerLeftIn}"/>
-                <Grid ColumnDefinitions="Auto,8,Auto,10,*">
-                  <Button Name="SyncWindows" Content="{loc:Text Key=SyncWindowsPlugins}" Padding="14,5" Click="OnSyncWindowsPlugins"
-                          IsEnabled="{Binding CanSyncWindows}"
+                <!-- The sync is yabridge's, so it is there only while something uses yabridge. -->
+                <DockPanel>
+                  <Button Name="SyncWindows" DockPanel.Dock="Left" Margin="0,0,8,0" Content="{loc:Text Key=SyncWindowsPlugins}" Padding="14,5" Click="OnSyncWindowsPlugins"
+                          IsEnabled="{Binding CanSyncWindows}" IsVisible="{Binding ShowsYabridgeTools}"
                           ToolTip.Tip="{loc:Text Key=BridgeAgainEveryFolderYabridgeKnowsForWindows}"/>
-                  <Button Grid.Column="2" Content="{loc:Text Key=Manual}" Padding="10,5" Click="OnPluginsManual"
+                  <Button DockPanel.Dock="Left" Margin="0,0,10,0" Content="{loc:Text Key=Manual}" Padding="10,5" Click="OnPluginsManual"
                           ToolTip.Tip="{loc:Text Key=OpenTheManualSectionOnInstallingPlugins}"/>
-                  <TextBlock Grid.Column="4" Name="PluginStatus" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                </Grid>
+                  <TextBlock Name="PluginStatus" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                </DockPanel>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -506,7 +508,7 @@
                 <CheckBox Name="WineTrace" Content="{loc:Text Key=DeepWineTraceForPluginScans}"
                           IsChecked="{Binding PluginWineTrace, Mode=OneWay}"
                           IsEnabled="{Binding CanSetPluginWineTrace}" Click="OnPluginWineTrace"/>
-                <TextBlock Text="{loc:Text Key=ForReproducingABridgedPluginFailureForA}"
+                <TextBlock Text="{loc:Text Key=ForReproducingAWindowsPluginFailureForA}"
                            FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>
                 <TextBlock Text="{loc:Text Key=DoNotLeaveThisOnTheSwitchIs}"
                            FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Muted}" TextWrapping="Wrap"/>

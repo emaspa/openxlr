@@ -619,6 +619,44 @@ public sealed class WindowsHostFolderTests : IDisposable
     }
 
     [Fact]
+    public void TheDoctorNamesYabridgeOnlyWhereSomethingUsesIt()
+    {
+        object Discovery(string? controller, string standard, object[] onYabridge) => new
+        {
+            controller,
+            windowsHostInstalled = true,
+            windowsHostDefault = standard,
+            yabridgeInserts = onYabridge,
+            scans = new object[]
+            {
+                new { kind = "windows-vst3", entries = new object[] { new { path = "/p/VST3/Wrapped.vst3", outcome = "ok", plugins = 1, duplicates = 1 } } },
+            },
+        };
+        object[] none = [];
+        object[] pinned = [new { chain = "mic", chainName = "XLR 1", id = "fx", name = "Nova", reason = "pinned" }];
+
+        // No yabridge: the default host alone.
+        IReadOnlyList<DoctorNote> notes = InstallationDoctor.WindowsPluginNotes(Diagnostics(Discovery(null, "openxlr", none)));
+        Assert.Equal("the default host of Windows plugin inserts is OpenXLR's Windows plugin host", Assert.Single(notes).Information);
+
+        // Installed and unused: one short clause, and a plugin its wrapper
+        // lists is in the picker like any other, so it needs no note.
+        notes = InstallationDoctor.WindowsPluginNotes(Diagnostics(Discovery("/usr/bin/yabridgectl", "openxlr", none)));
+        Assert.Equal("the default host of Windows plugin inserts is OpenXLR's Windows plugin host. yabridge is installed, and no insert uses it",
+            Assert.Single(notes).Information);
+
+        // An insert on it brings back the pin, the insert and the wrapper.
+        notes = InstallationDoctor.WindowsPluginNotes(Diagnostics(Discovery("/usr/bin/yabridgectl", "openxlr", pinned)));
+        Assert.Equal(["windows plugin host", "XLR 1 Nova", "/p/VST3/Wrapped.vst3"], notes.Select(n => n.Path));
+        Assert.EndsWith("An insert's controls window can pin it to yabridge", notes[0].Information);
+        Assert.StartsWith("listed through its yabridge wrapper", notes[2].Information);
+
+        // So does a default on yabridge.
+        notes = InstallationDoctor.WindowsPluginNotes(Diagnostics(Discovery("/usr/bin/yabridgectl", "yabridge", none)));
+        Assert.Equal(["windows plugin host", "/p/VST3/Wrapped.vst3"], notes.Select(n => n.Path));
+    }
+
+    [Fact]
     public void TheDoctorKeepsItsWindowsNotesToAFewAndCountsTheRest()
     {
         var entries = Enumerable.Range(0, 100).Select(i => new { path = $"/p/VST3/{i}.vst3", outcome = "windows-not-64-bit" }).ToArray();

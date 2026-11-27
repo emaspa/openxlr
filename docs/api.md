@@ -2411,7 +2411,7 @@ lists up to 64 inserts whose plugin is in the catalogue only through a
 yabridge wrapper, as `{chain, chainName, id, kind, plugin, name, wrapper,
 module, reason}`. `reason` is `outside-windows-folders` when the wrapper's
 64-bit module is in none of the Windows plugin folders, `not-64-bit` when
-the module is 32-bit, which only yabridge runs, and `module-missing` when
+the module is 32-bit, which OpenXLR does not run, and `module-missing` when
 the module is gone. `module` is null for a wrapper that links only a 32-bit
 module. An insert with a plugin found in a Windows plugin folder,
 or through a wrapper whose module is in one, is not listed, and neither is

@@ -2774,16 +2774,22 @@ yourself, with the build dependencies for each distribution and where to
 install the result so OpenXLR finds it.
 
 Restart the daemon with `systemctl --user restart openxlr-daemon` so it
-finds the companion; this briefly interrupts audio. Options then
-identifies the selected bridge as "OpenXLR bridge". Use "Bridge Wine's
-plugins" or pick a Windows plugin folder to create private wrappers.
+finds the companion; this briefly interrupts audio. While the default host
+is OpenXLR's own and no insert runs on yabridge, Options, PLUGINS gives the
+companion one line, "yabridge 5.1.1.54-2 is installed. No insert uses it."
+It also shows the **Windows plugins run on** setting. Once yabridge is the
+default, or an insert runs on it, Options names the bridge "OpenXLR
+bridge" and shows its folders, its wrapper directory and its buttons. Use
+"Bridge Wine's plugins" or pick a Windows plugin folder to create private
+wrappers.
 
 Without the companion, a distribution yabridge works only with Wine older
 than 9.22. From 9.22 an embedded plugin window never learns where it is,
 so every click lands as far from the pointer as the window is from the
 corner of the screen, and the plugin ignores the mouse entirely. Options
-says so when it sees that pair of versions. If it cannot read the Wine
-version, the rest of the setup still shows, without this warning.
+says so when it sees that pair of versions and something uses yabridge. If
+it cannot read the Wine version, the rest of the setup still shows, without
+this warning.
 
 Some plugins, [Elgato Voice Focus](https://marketplace.elgato.com/product/voice-focus-cadb20d0-18f1-45da-bf59-0f898f1e1767)
 among them, tie their licence to a machine ID built from the system disk's
@@ -2833,7 +2839,11 @@ wine ~/Downloads/PluginSetup.exe
 ```
 
 Then open Options and press one button. Which one depends on whether
-yabridge has seen that folder before:
+yabridge has seen that folder before. "Bridge Wine's plugins" and "Sync
+Windows plugins" are yabridge's, so in a build with OpenXLR's host they
+show only while yabridge is the default host or an insert runs on it.
+Otherwise the host finds a plugin in Wine's folders by itself, and
+"Rescan" is the button to press.
 
 | The button | When to press it |
 |---|---|
@@ -2852,7 +2862,9 @@ has to be restarted.
 <a name="plugin-folders"></a>
 **Managing Windows plugin folders.** Open Options, PLUGINS, then "Plugin
 manager". Its lower half lists the folders registered with the selected
-yabridge provider.
+yabridge provider. In a build with OpenXLR's host, that half shows only
+while yabridge is installed and is the default host or runs an insert;
+otherwise Windows folders are the Windows entries in the top list.
 
 - "Add folder" registers a folder holding Windows VST3 or CLAP plugins,
   syncs it and refreshes the catalogue. The original files stay in that
@@ -2975,11 +2987,18 @@ without the host, yabridge runs them as before and none of this shows.
 Every Windows plugin bridged through yabridge runs on the default host
 unless you pin it to one. To change the default for all of them, open
 Options, Plugins, and pick yabridge or OpenXLR's Windows plugin host under
-**Windows plugins run on**. The plugins that move start again with the same
+**Windows plugins run on**. Its tooltip says what the choice does. The
+setting is there while yabridge is installed, since without it there is
+nothing to switch to. The plugins that move start again with the same
 control values, and the others keep playing. OpenXLR saves the choice and
-keeps it when a later release changes its own default. When yabridge is
-installed, the line above the setting says how many plugin inserts still
-run on it.
+keeps it when a later release changes its own default.
+
+The line above the setting says what yabridge is doing. While the default
+is OpenXLR's host and no insert runs on yabridge, it says only that
+yabridge is installed and no insert uses it. Once an insert runs on
+yabridge, or the default is yabridge, the line names the bridge, says how
+many folders it has bridged and counts the inserts that run on it. The
+yabridge buttons come back with it.
 
 To pick the host of one plugin, open its controls window. In a build with
 the host, a Windows VST3 or CLAP plugin bridged through yabridge has a host
@@ -3089,20 +3108,23 @@ manager, it stays removed, since the copy does not run again.
 If a Windows plugin is not in the picker, run `openxlr doctor` with the
 daemon running. It lists the folders OpenXLR's host looks in, says which
 of them the daemon cannot see, and names each plugin the last scan left
-out, with the reason: a 32-bit plugin, a scan that failed or ran out of
-time, or one listed through its yabridge wrapper instead.
+out, with the reason: a 32-bit plugin, or a scan that failed or ran out of
+time. While something uses yabridge, it also names each plugin listed
+through its yabridge wrapper instead.
 
 The doctor names the default host, and each insert that runs on yabridge
 because its controls window pins it there or because the release holds
 its plugin there. When the default is yabridge, it counts the inserts that
-follow it.
+follow it. When the default is OpenXLR's host and no insert runs on
+yabridge, it adds only that yabridge is installed and no insert uses it.
 
 The doctor also lists what removing the companion would cost. Each insert
 whose plugin is in the picker only through its yabridge wrapper is named,
 with the wrapper and the reason: its Windows module is in none of the
 Windows folders, it is a 32-bit plugin, or its module is gone. Add the
 module's folder under Windows in the plugin manager, or install the plugin
-again with "Install file", and the insert leaves the list. Remove the
+again with "Install file", and the insert leaves the list. OpenXLR does
+not run 32-bit plugins, so for one of those install its 64-bit build. Remove the
 companion only once no insert is listed. Each folder the copy could not add
 is named too, with the reason. When Wine is missing and an insert has a
 Windows plugin, the doctor says so and names the inserts, since neither
@@ -3372,8 +3394,9 @@ grep 'Max locked memory' /proc/$(systemctl --user show openxlr-daemon -p MainPID
 "unlimited" there means the plugins the daemon starts inherit it too.
 
 Options, PLUGINS also checks the running daemon's memory-lock limit. When
-Wine, yabridge and the native host are available, a limit below 256 MiB
-shows a warning and a Memory-lock setup link here. This is yabridge's
+Wine, yabridge and the native host are available and something uses
+yabridge, a limit below 256 MiB shows a warning and a Memory-lock setup
+link here. This is yabridge's
 warning threshold; it is not a measurement of how much memory a plugin
 needs. An unreadable limit is unknown, not zero. Diagnostics archives
 include the same effective limit in `plugin-setup.json`.

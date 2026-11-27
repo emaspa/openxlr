@@ -824,8 +824,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Kalimti</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>Aron masubli ang pagkapakyas sa gi-bridge nga plugin alang sa bug report. Mas hinay ang scan ug dagko ang mga log. I-enable kini, pislita ang Pangitaa pag-usab sa MGA PLUGIN, hulata nga mahuman, tigoma ang diagnostics, dayon i-off kini. Sulayan pag-usab sa pagpangita ang napakyas nga mga bundle; magpabiling naka-cache ang malampuson ug wala mausab nga mga bundle.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>Aron masubli ang pagkapakyas sa Windows plugin alang sa bug report. Mas hinay ang scan ug dagko ang mga log. I-enable kini, pislita ang Pangitaa pag-usab sa MGA PLUGIN, hulata nga mahuman, tigoma ang diagnostics, dayon i-off kini. Sulayan pag-usab sa pagpangita ang napakyas nga mga bundle; magpabiling naka-cache ang malampuson ug wala mausab nga mga bundle.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Jack sa atubangan</value>
@@ -2209,7 +2209,10 @@ Pilia ang interface nga kontrolon sa OpenXLR</value>
     <value>WINDOW</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Mga Windows plugin: gisusi ang yabridge…</value>
+    <value>Mga Windows plugin: gisusi…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>Na-install ang yabridge {0}. Walay insert nga mogamit niini.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Mga Windows plugin: walay tubag ang daemon.</value>

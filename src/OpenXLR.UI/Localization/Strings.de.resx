@@ -916,8 +916,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Vergessen</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>Zum Nachstellen eines Fehlers eines über yabridge eingebundenen Plugins für einen Fehlerbericht. Die Suche wird deutlich langsamer und erzeugt große Protokolle. Aktiviere dies, klicke unter PLUGINS auf Neu suchen, warte bis zum Abschluss, sammle die Diagnose und deaktiviere es wieder. Die erneute Suche prüft fehlgeschlagene Bundles noch einmal; erfolgreiche unveränderte Bundles bleiben im Cache.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>Zum Nachstellen eines Fehlers eines Windows-Plugins für einen Fehlerbericht. Die Suche wird deutlich langsamer und erzeugt große Protokolle. Aktiviere dies, klicke unter PLUGINS auf Neu suchen, warte bis zum Abschluss, sammle die Diagnose und deaktiviere es wieder. Die erneute Suche prüft fehlgeschlagene Bundles noch einmal; erfolgreiche unveränderte Bundles bleiben im Cache.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Vorderer Anschluss</value>
@@ -2305,7 +2305,10 @@ Von OpenXLR gesteuertes Interface wählen</value>
     <value>FENSTER</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Windows-Plugins: yabridge wird geprüft…</value>
+    <value>Windows-Plugins: Prüfung läuft…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>yabridge {0} ist installiert. Kein Effekt verwendet es.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Windows-Plugins: Der Daemon hat nicht geantwortet.</value>

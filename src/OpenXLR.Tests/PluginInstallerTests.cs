@@ -874,9 +874,22 @@ public sealed class PluginInstallerTests : IDisposable
         Assert.StartsWith("Windows plugins: Wine is installed, and they run on OpenXLR's Windows plugin host.",
             OptionsViewModel.WindowsLine(null, true, 0, windowsHost: true));
         Assert.DoesNotContain("yabridge", OptionsViewModel.WindowsLine(null, true, 0, windowsHost: true));
-        // With yabridge there as well it says how many inserts still run on it.
+        // With yabridge there and the default on it, it says what yabridge
+        // bridged and how many inserts run on it.
+        Assert.Equal("Windows plugins: yabridge 5.1.1 and Wine are installed, 1 folder bridged. Run a plugin's installer with Wine, then install the folder it created. No insert runs on yabridge.",
+            OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true, defaultHost: "yabridge"));
         Assert.EndsWith("No insert runs on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true));
-        Assert.EndsWith("One insert runs on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true, onYabridge: 1));
-        Assert.EndsWith(" 3 inserts run on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true, onYabridge: 3));
+        // An insert on yabridge counts as use whatever the default.
+        Assert.EndsWith("One insert runs on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true, onYabridge: 1, defaultHost: "openxlr"));
+        Assert.EndsWith(" 3 inserts run on yabridge.", OptionsViewModel.WindowsLine("5.1.1", true, 1, windowsHost: true, onYabridge: 3, defaultHost: "openxlr"));
+        // With the default on the built-in host and nothing on yabridge, the
+        // line is the host's, and yabridge gets one short sentence.
+        Assert.Equal("Windows plugins: Wine is installed, and they run on OpenXLR's Windows plugin host. Install a Windows VST3 or CLAP plugin here, or add the folder it is in under Windows in the plugin manager. "
+            + "yabridge 5.1.1.54-2 is installed. No insert uses it.",
+            OptionsViewModel.WindowsLine("5.1.1.54-2", true, 7, managed: true, windowsHost: true, defaultHost: "openxlr"));
+        Assert.Equal("Windows plugins: Wine is not installed, and OpenXLR's Windows plugin host needs it. Install Wine from your distribution. yabridge 5.1.1 is installed. No insert uses it.",
+            OptionsViewModel.WindowsLine("5.1.1", false, 0, windowsHost: true, defaultHost: "openxlr"));
+        // A build without the host runs every Windows plugin through yabridge.
+        Assert.Contains("1 folder bridged", OptionsViewModel.WindowsLine("5.1.1", true, 1, defaultHost: "openxlr"));
     }
 }

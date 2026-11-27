@@ -824,8 +824,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Заборави</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>За понављање грешке повезаног додатка ради пријаве проблема. Претрага постаје много спорија и прави велике дневнике. Укључи ово, притисни Претражи поново у ДОДАЦИМА, сачекај завршетак, прикупи дијагностику, па искључи. Претрага поново покушава с неуспелим пакетима; успешни непромењени пакети остају у кешу.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>За понављање грешке Windows додатка ради пријаве проблема. Претрага постаје много спорија и прави велике дневнике. Укључи ово, притисни Претражи поново у ДОДАЦИМА, сачекај завршетак, прикупи дијагностику, па искључи. Претрага поново покушава с неуспелим пакетима; успешни непромењени пакети остају у кешу.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Предњи прикључак</value>
@@ -2209,7 +2209,10 @@
     <value>ПРОЗОР</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Windows додаци: провера yabridge-а…</value>
+    <value>Windows додаци: провера…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>yabridge {0} је инсталиран. Ниједан ефекат га не користи.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Windows додаци: сервис није одговорио.</value>

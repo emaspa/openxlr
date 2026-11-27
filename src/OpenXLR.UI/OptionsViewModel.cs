@@ -82,7 +82,7 @@ public sealed class OptionsViewModel : ViewModelBase
     public string PluginDirectories { get => _pluginDirectories; private set => Set(ref _pluginDirectories, value); }
 
     private string _windowsPlugins = Localizer.Text("WindowsPluginsChecking");
-    /// <summary>yabridge and Wine as found, and how many folders are bridged.</summary>
+    /// <summary>Wine and the Windows plugin host as found, and yabridge where something uses it.</summary>
     public string WindowsPlugins { get => _windowsPlugins; private set => Set(ref _windowsPlugins, value); }
 
     private bool _canSyncWindows;
@@ -99,6 +99,16 @@ public sealed class OptionsViewModel : ViewModelBase
 
     private bool _systemBridge;
     public bool SystemBridge { get => _systemBridge; private set => Set(ref _systemBridge, value); }
+
+    private bool _showsYabridgeTools;
+    /// <summary>
+    /// Whether the yabridge controls are shown: the sync, the offer to bridge
+    /// Wine's folders and the folders yabridge knows. A build without the
+    /// Windows plugin host runs every Windows plugin through yabridge, so it
+    /// always shows them. A build with the host shows them only while
+    /// yabridge is installed and something uses it.
+    /// </summary>
+    public bool ShowsYabridgeTools { get => _showsYabridgeTools; private set => Set(ref _showsYabridgeTools, value); }
 
     /// <summary>Wine's own plugin folders waiting to be bridged, absolute.</summary>
     public System.Collections.Generic.IReadOnlyList<string> WineFolders { get; private set; } = [];
@@ -160,7 +170,7 @@ public sealed class OptionsViewModel : ViewModelBase
     }
 
     private string? _windowsHostDefault;
-    private bool _windowsHostInstalled, _settingWindowsHostDefault;
+    private bool _windowsHostInstalled, _yabridgeInstalled, _settingWindowsHostDefault;
 
     /// <summary>The two hosts an insert that follows the default can run a Windows plugin on.</summary>
     public System.Collections.Generic.IReadOnlyList<WindowsHostOption> WindowsHostDefaultOptions { get; } =
@@ -169,8 +179,14 @@ public sealed class OptionsViewModel : ViewModelBase
         new(InsertsViewModel.WindowsHostOpenXlr, Localizer.Text("WindowsHostDefaultOpenXlr")),
     ];
 
-    /// <summary>Shown on a build with the Windows plugin host; a build without it runs every Windows plugin through yabridge.</summary>
-    public bool ShowsWindowsHostDefault => _windowsHostInstalled;
+    /// <summary>
+    /// Shown on a build with the Windows plugin host while there is a second
+    /// host to choose: yabridge is installed, or the default is still
+    /// yabridge and has to be put back. A build without the host runs every
+    /// Windows plugin through yabridge.
+    /// </summary>
+    public bool ShowsWindowsHostDefault => _windowsHostInstalled
+        && (_yabridgeInstalled || _windowsHostDefault == InsertsViewModel.WindowsHostYabridge);
     public bool CanSetWindowsHostDefault => _windowsHostInstalled && _windowsHostDefault is not null && !_settingWindowsHostDefault;
 
     /// <summary>The daemon's default host, null until it has said. Choosing the other one sends it.</summary>
@@ -217,6 +233,7 @@ public sealed class OptionsViewModel : ViewModelBase
     private void ApplyWindowsHostDefault(System.Text.Json.Nodes.JsonNode? setup)
     {
         _windowsHostInstalled = setup?["windowsHostInstalled"]?.GetValue<bool>() == true;
+        _yabridgeInstalled = setup?["yabridge"]?.GetValue<string>() is not null;
         string? host = setup?["windowsHostDefault"]?.GetValue<string>();
         _windowsHostDefault = host is InsertsViewModel.WindowsHostYabridge or InsertsViewModel.WindowsHostOpenXlr ? host : null;
         WindowsHostDefaultStatus = null;
@@ -272,6 +289,7 @@ public sealed class OptionsViewModel : ViewModelBase
             WindowsPlugins = Localizer.Text("WindowsPluginsNoAnswer");
             CanSyncWindows = false;
             CanManageWindows = false;
+            // The yabridge controls stay shown or hidden as the last answer had them.
             return;
         }
         string lv2 = setup["lv2Directory"]?.GetValue<string>() ?? "~/.lv2";
@@ -280,14 +298,21 @@ public sealed class OptionsViewModel : ViewModelBase
         bool host = setup["hostInstalled"]?.GetValue<bool>() ?? true;
         PluginDirectories = Localizer.Format("PluginDirectoriesFound", lv2, clap, vst3)
             + (host ? "" : " " + Localizer.Text("NativeHostMissing"));
-        WindowsEditorNote = setup["windowsEditorNote"]?.GetValue<string>();
-        MemoryLockNote = setup["memoryLockNote"]?.GetValue<string>();
         string? yabridge = setup["yabridge"]?.GetValue<string>();
         bool wine = setup["wine"]?.GetValue<bool>() ?? false;
         int folders = (setup["windowsDirectories"] as System.Text.Json.Nodes.JsonArray)?.Count ?? 0;
+        bool windowsHost = setup["windowsHostInstalled"]?.GetValue<bool>() ?? false;
+        string? defaultHost = setup["windowsHostDefault"]?.GetValue<string>();
+        int onYabridge = setup["yabridgeInserts"]?.GetValue<int>() ?? 0;
+        bool used = UsesYabridge(windowsHost, defaultHost, onYabridge);
+        ShowsYabridgeTools = !windowsHost || (yabridge is not null && used);
+        // Both notes are about yabridge: its editors under some Wine
+        // versions, and the warnings a low memory-lock limit gives it.
+        WindowsEditorNote = used ? setup["windowsEditorNote"]?.GetValue<string>() : null;
+        MemoryLockNote = used ? setup["memoryLockNote"]?.GetValue<string>() : null;
         WindowsPlugins = WindowsLine(yabridge, wine, folders, setup["bridgeProvider"]?.GetValue<string>() == "openxlr",
-            setup["windowsHostInstalled"]?.GetValue<bool>() ?? false, setup["yabridgeInserts"]?.GetValue<int>() ?? 0);
-        if (setup["windowsPluginDirectory"]?.GetValue<string>() is { } managedDirectory)
+            windowsHost, onYabridge, defaultHost);
+        if (ShowsYabridgeTools && setup["windowsPluginDirectory"]?.GetValue<string>() is { } managedDirectory)
             PluginDirectories += " " + Localizer.Format("WindowsPluginWrappersIn", managedDirectory);
         WindowsImportNote = setup["windowsImportDirectory"]?.GetValue<string>() is { } imports
             ? Localizer.Format("SinglePluginImportsIn", imports) : null;
@@ -301,25 +326,39 @@ public sealed class OptionsViewModel : ViewModelBase
         Raise(nameof(HasWindowsDirectories));
         WineFolders = [.. (setup["wineFolders"] as System.Text.Json.Nodes.JsonArray ?? [])
             .Select(f => f?.GetValue<string>()).OfType<string>()];
-        CanBridgeWine = WineFolders.Count > 0;
+        CanBridgeWine = ShowsYabridgeTools && WineFolders.Count > 0;
         BridgeWineLabel = WineFolders.Count > 1
             ? Localizer.Format("BridgeWinePluginFolders", WineFolders.Count)
             : Localizer.Text("BridgeWinePlugins");
     }
 
     /// <summary>
+    /// Whether anything runs a Windows plugin through yabridge: always in a
+    /// build without the Windows plugin host, else while the default host is
+    /// yabridge or an insert runs on it. A default the daemon did not name is
+    /// taken as yabridge, the default before the built-in host.
+    /// </summary>
+    internal static bool UsesYabridge(bool windowsHost, string? defaultHost, int onYabridge)
+        => !windowsHost || defaultHost != InsertsViewModel.WindowsHostOpenXlr || onYabridge > 0;
+
+    /// <summary>
     /// One line on Windows plugins, from what the daemon found. A build with
     /// the Windows plugin host needs only Wine, so it never sends the user to
-    /// yabridge, and when yabridge is there it says how many inserts still
-    /// run on it.
+    /// yabridge. While yabridge is installed and nothing uses it, it gets a
+    /// short sentence of its own; while something does, the line says what
+    /// yabridge has bridged and how many inserts run on it.
     /// </summary>
     /// <param name="windowsHost">Whether the build has the Windows plugin host.</param>
     /// <param name="onYabridge">How many inserts run through yabridge.</param>
+    /// <param name="defaultHost">The daemon's default host for Windows plugins, read as <see cref="UsesYabridge"/> reads it.</param>
     internal static string WindowsLine(string? yabridge, bool wine, int folders, bool managed = false,
-        bool windowsHost = false, int onYabridge = 0)
+        bool windowsHost = false, int onYabridge = 0, string? defaultHost = null)
     {
-        if (windowsHost && yabridge is null)
-            return wine ? Localizer.Text("WindowsPluginsHostReady") : Localizer.Text("WindowsPluginsHostNoWine");
+        if (windowsHost && (yabridge is null || !UsesYabridge(windowsHost, defaultHost, onYabridge)))
+        {
+            string host = wine ? Localizer.Text("WindowsPluginsHostReady") : Localizer.Text("WindowsPluginsHostNoWine");
+            return yabridge is null ? host : host + " " + Localizer.Format("YabridgeInstalledUnused", yabridge);
+        }
         if (yabridge is null && !wine) return Localizer.Text("WindowsPluginsNothingInstalled");
         if (yabridge is null) return Localizer.Text("WindowsPluginsNoYabridge");
         string bridge = managed ? Localizer.Format("OpenXlrBridgeVersion", yabridge) : $"yabridge {yabridge}";

@@ -37,60 +37,65 @@
                    Classes="hint" TextWrapping="Wrap"/>
         <skin:LitText Text="{loc:Text Key=WindowsVST3AndCLAPPlugins}" Classes="title" Margin="0,12,0,0"/>
         <TextBlock Text="{Binding WindowsPlugins}" Classes="hint" TextWrapping="Wrap"/>
-        <TextBlock Text="{loc:Text Key=ChooseAFolderThenSelectAnIndividualPlugin}"
-                   FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
         <TextBlock Text="{Binding WindowsImportNote}" IsVisible="{Binding WindowsImportNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
-        <TextBlock Text="{loc:Text Key=TheseFoldersAndExclusionsAreSharedWithOther}"
-                   IsVisible="{Binding SystemBridge}" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Warning}" TextWrapping="Wrap"/>
-        <Border Background="{DynamicResource Ox.Card.Background}" CornerRadius="8" Padding="8" Height="240">
-          <Grid>
-            <ListBox Name="FolderList" ItemsSource="{Binding WindowsDirectories}"
-                     SelectionMode="Single" SelectionChanged="OnSelectionChanged"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,4,12,4" FontSize="{DynamicResource UiText.FontSize12}"/>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-            <TextBlock Text="{loc:Text Key=NoRegisteredFolders}" IsVisible="{Binding !HasWindowsDirectories}"
-                       Margin="8" Foreground="{DynamicResource Ox.Text.Secondary}" IsHitTestVisible="False"/>
-          </Grid>
-        </Border>
-        <WrapPanel Orientation="Horizontal">
-          <Button Name="AddFolder" Content="{loc:Text Key=AddFolder}" Padding="14,5" Margin="0,0,8,4" Click="OnAddFolder"/>
-          <Button Name="RemoveFolder" Content="{loc:Text Key=RemoveFromList}" Padding="14,5" Margin="0,0,8,4" Click="OnRemoveFolder" IsEnabled="False"/>
-          <Button Name="RescanFolders" Content="{loc:Text Key=Rescan}" Padding="14,5" Margin="0,0,0,4" Click="OnRescan"/>
-        </WrapPanel>
-        <Border Background="{DynamicResource Ox.Card.Background}" CornerRadius="8" Padding="8" Height="190">
-          <Grid>
-            <ListBox Name="PluginList" SelectionMode="Single" SelectionChanged="OnPluginSelectionChanged"
-                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:WindowsPluginEntry">
-                  <Grid ColumnDefinitions="*,8,45,8,64" Margin="0,5,12,5">
-                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Path}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding FormatLabel}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}"/>
-                    <TextBlock Grid.Column="4" Text="{Binding Status}" FontSize="{DynamicResource UiText.FontSize11}"/>
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-            <TextBlock Name="EmptyPlugins" Text="{loc:Text Key=SelectAFolderToSeeItsPlugins}" Margin="8"
-                       Foreground="{DynamicResource Ox.Text.Secondary}" IsHitTestVisible="False" TextWrapping="Wrap"/>
-          </Grid>
-        </Border>
-        <WrapPanel Orientation="Horizontal">
-          <Button Name="RemoveUses" Content="{loc:Text Key=RemoveFromAllChains}" Padding="14,5" Margin="0,0,8,4"
-                  Click="OnRemoveUses" IsVisible="False"/>
-          <Button Name="TogglePlugin" Content="{loc:Text Key=DisableInOpenXLR}" Padding="14,5" Margin="0,0,8,4" Click="OnTogglePlugin" IsEnabled="False"/>
-          <Button Name="DeletePlugin" Content="{loc:Text Key=DeleteFile}" Padding="14,5" Margin="0,0,8,4" Click="OnDeletePlugin" IsEnabled="False"/>
-          <Button Name="WineUninstaller" Content="{loc:Text Key=WineUninstaller}" Padding="14,5" Margin="0,0,0,4" Click="OnWineUninstaller" IsVisible="False"/>
-        </WrapPanel>
-        <TextBlock Name="PluginDetail" Text="{loc:Text Key=SelectAPluginToManageIt}" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
-        <TextBlock Text="{loc:Text Key=DisablingKeepsTheFilesDeleteFilePermanentlyRemoves}"
-                   FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+        <!-- The folders below are the ones yabridge bridges, with its exclusions.
+             With OpenXLR's own Windows plugin host and nothing on yabridge, a
+             Windows folder is a Windows entry in the list above instead. -->
+        <StackPanel Name="YabridgeFolders" Spacing="8" IsVisible="{Binding ShowsYabridgeTools}">
+          <TextBlock Text="{loc:Text Key=ChooseAFolderThenSelectAnIndividualPlugin}"
+                     FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+          <TextBlock Text="{loc:Text Key=TheseFoldersAndExclusionsAreSharedWithOther}"
+                     IsVisible="{Binding SystemBridge}" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Warning}" TextWrapping="Wrap"/>
+          <Border Background="{DynamicResource Ox.Card.Background}" CornerRadius="8" Padding="8" Height="240">
+            <Grid>
+              <ListBox Name="FolderList" ItemsSource="{Binding WindowsDirectories}"
+                       SelectionMode="Single" SelectionChanged="OnSelectionChanged"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,4,12,4" FontSize="{DynamicResource UiText.FontSize12}"/>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <TextBlock Text="{loc:Text Key=NoRegisteredFolders}" IsVisible="{Binding !HasWindowsDirectories}"
+                         Margin="8" Foreground="{DynamicResource Ox.Text.Secondary}" IsHitTestVisible="False"/>
+            </Grid>
+          </Border>
+          <WrapPanel Orientation="Horizontal">
+            <Button Name="AddFolder" Content="{loc:Text Key=AddFolder}" Padding="14,5" Margin="0,0,8,4" Click="OnAddFolder"/>
+            <Button Name="RemoveFolder" Content="{loc:Text Key=RemoveFromList}" Padding="14,5" Margin="0,0,8,4" Click="OnRemoveFolder" IsEnabled="False"/>
+            <Button Name="RescanFolders" Content="{loc:Text Key=Rescan}" Padding="14,5" Margin="0,0,0,4" Click="OnRescan"/>
+          </WrapPanel>
+          <Border Background="{DynamicResource Ox.Card.Background}" CornerRadius="8" Padding="8" Height="190">
+            <Grid>
+              <ListBox Name="PluginList" SelectionMode="Single" SelectionChanged="OnPluginSelectionChanged"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:WindowsPluginEntry">
+                    <Grid ColumnDefinitions="*,8,45,8,64" Margin="0,5,12,5">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Path}"/>
+                      <TextBlock Grid.Column="2" Text="{Binding FormatLabel}" FontSize="{DynamicResource UiText.FontSize11}" Foreground="{DynamicResource Ox.Text.Secondary}"/>
+                      <TextBlock Grid.Column="4" Text="{Binding Status}" FontSize="{DynamicResource UiText.FontSize11}"/>
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <TextBlock Name="EmptyPlugins" Text="{loc:Text Key=SelectAFolderToSeeItsPlugins}" Margin="8"
+                         Foreground="{DynamicResource Ox.Text.Secondary}" IsHitTestVisible="False" TextWrapping="Wrap"/>
+            </Grid>
+          </Border>
+          <WrapPanel Orientation="Horizontal">
+            <Button Name="RemoveUses" Content="{loc:Text Key=RemoveFromAllChains}" Padding="14,5" Margin="0,0,8,4"
+                    Click="OnRemoveUses" IsVisible="False"/>
+            <Button Name="TogglePlugin" Content="{loc:Text Key=DisableInOpenXLR}" Padding="14,5" Margin="0,0,8,4" Click="OnTogglePlugin" IsEnabled="False"/>
+            <Button Name="DeletePlugin" Content="{loc:Text Key=DeleteFile}" Padding="14,5" Margin="0,0,8,4" Click="OnDeletePlugin" IsEnabled="False"/>
+            <Button Name="WineUninstaller" Content="{loc:Text Key=WineUninstaller}" Padding="14,5" Margin="0,0,0,4" Click="OnWineUninstaller" IsVisible="False"/>
+          </WrapPanel>
+          <TextBlock Name="PluginDetail" Text="{loc:Text Key=SelectAPluginToManageIt}" FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+          <TextBlock Text="{loc:Text Key=DisablingKeepsTheFilesDeleteFilePermanentlyRemoves}"
+                     FontSize="{DynamicResource UiText.FontSize12}" Foreground="{DynamicResource Ox.Text.Secondary}" TextWrapping="Wrap"/>
+        </StackPanel>
       </StackPanel>
     </ScrollViewer>
     <Grid Grid.Row="2" ColumnDefinitions="*,12,Auto">

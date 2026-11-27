@@ -873,8 +873,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Olvidar</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>Para reproducir un fallo de un plugin adaptado con yabridge y adjuntarlo a un informe de error. Las búsquedas se vuelven mucho más lentas y generan registros grandes. Activa esto, pulsa Volver a buscar en PLUGINS, espera a que termine, recopila el diagnóstico y desactívalo. Volver a buscar reintenta los paquetes que fallaron; los que funcionaron y no han cambiado permanecen en caché.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>Para reproducir un fallo de un plugin de Windows y adjuntarlo a un informe de error. Las búsquedas se vuelven mucho más lentas y generan registros grandes. Activa esto, pulsa Volver a buscar en PLUGINS, espera a que termine, recopila el diagnóstico y desactívalo. Volver a buscar reintenta los paquetes que fallaron; los que funcionaron y no han cambiado permanecen en caché.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Conector frontal</value>
@@ -2259,7 +2259,10 @@ Selecciona la interfaz que controla OpenXLR</value>
     <value>VENTANA</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Plugins de Windows: comprobando yabridge…</value>
+    <value>Plugins de Windows: comprobando…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>yabridge {0} está instalado. Ninguna inserción lo usa.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Plugins de Windows: el demonio no ha respondido.</value>

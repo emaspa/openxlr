@@ -130,4 +130,62 @@ public sealed class PluginFolderUiTests : IDisposable
             Assert.Contains(command, CommandValidation.CheckPluginPath(new Command { Cmd = command, Path = path }));
         Assert.Null(CommandValidation.CheckPluginPath(new Command { Cmd = command, Path = "/home/user/Windows plugins" }));
     }
+
+    [Fact]
+    public void OptionsShowsTheYabridgeControlsOnlyWhereSomethingUsesYabridge()
+    {
+        var client = new DaemonClient();
+        var vm = new OptionsViewModel(client, new MainViewModel(client));
+        const string companion = """
+            "yabridge":"5.1.1.54-2","wine":true,"bridgeProvider":"openxlr",
+            "windowsPluginDirectory":"~/.local/share/openxlr/yabridge","windowsDirectories":["/a","/b"],
+            "wineFolders":["/w/VST3"],"windowsEditorNote":"editor","memoryLockNote":"memory lock"
+            """;
+        string Setup(string fields) => "{" + companion + ",\"windowsHostInstalled\":true," + fields + "}";
+
+        // Installed, and nothing uses it.
+        vm.ApplyPluginSetup(JsonNode.Parse(Setup("\"windowsHostDefault\":\"openxlr\",\"yabridgeInserts\":0")));
+        Assert.False(vm.ShowsYabridgeTools);
+        Assert.False(vm.CanBridgeWine);
+        Assert.False(vm.HasWindowsEditorNote);
+        Assert.False(vm.HasMemoryLockNote);
+        Assert.DoesNotContain("wrappers", vm.PluginDirectories);
+        Assert.EndsWith("yabridge 5.1.1.54-2 is installed. No insert uses it.", vm.WindowsPlugins);
+        Assert.DoesNotContain("bridged", vm.WindowsPlugins);
+        // There is still a second host to choose, with what the choice does in its tooltip.
+        Assert.True(vm.ShowsWindowsHostDefault);
+
+        // An insert on it, or the default on it, brings the controls back.
+        foreach (string fields in new[] { "\"windowsHostDefault\":\"openxlr\",\"yabridgeInserts\":2", "\"windowsHostDefault\":\"yabridge\",\"yabridgeInserts\":0" })
+        {
+            vm.ApplyPluginSetup(JsonNode.Parse(Setup(fields)));
+            Assert.True(vm.ShowsYabridgeTools);
+            Assert.True(vm.CanBridgeWine);
+            Assert.True(vm.HasWindowsEditorNote);
+            Assert.True(vm.HasMemoryLockNote);
+            Assert.Contains("~/.local/share/openxlr/yabridge", vm.PluginDirectories);
+            Assert.Contains("OpenXLR bridge 5.1.1.54-2 (64-bit) and Wine are installed, 2 folders bridged.", vm.WindowsPlugins);
+            Assert.True(vm.ShowsWindowsHostDefault);
+        }
+
+        // No yabridge at all: nothing of it, and nothing to choose between.
+        vm.ApplyPluginSetup(JsonNode.Parse("""{"wine":true,"windowsHostInstalled":true,"windowsHostDefault":"openxlr","memoryLockNote":"memory lock"}"""));
+        Assert.False(vm.ShowsYabridgeTools);
+        Assert.False(vm.ShowsWindowsHostDefault);
+        Assert.False(vm.HasMemoryLockNote);
+        Assert.DoesNotContain("yabridge", vm.WindowsPlugins);
+        // Unless the default is still yabridge, which the picker has to be able to put back.
+        vm.ApplyPluginSetup(JsonNode.Parse("""{"wine":true,"windowsHostInstalled":true,"windowsHostDefault":"yabridge"}"""));
+        Assert.True(vm.ShowsWindowsHostDefault);
+        Assert.False(vm.ShowsYabridgeTools);
+
+        // A build without the host keeps every yabridge control, used or not.
+        vm.ApplyPluginSetup(JsonNode.Parse("{" + companion + ",\"windowsHostInstalled\":false,\"windowsHostDefault\":\"openxlr\"}"));
+        Assert.True(vm.ShowsYabridgeTools);
+        Assert.True(vm.CanBridgeWine);
+        Assert.True(vm.HasMemoryLockNote);
+        Assert.False(vm.ShowsWindowsHostDefault);
+        vm.ApplyPluginSetup(JsonNode.Parse("""{"wine":true,"windowsHostInstalled":false}"""));
+        Assert.True(vm.ShowsYabridgeTools);
+    }
 }

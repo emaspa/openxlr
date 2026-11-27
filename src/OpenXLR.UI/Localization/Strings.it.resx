@@ -882,8 +882,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Dimentica</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>Serve a riprodurre un errore di un plugin con bridge per una segnalazione di bug. Le scansioni diventano molto più lente e producono log di grandi dimensioni. Attivala, premi Ripeti scansione in PLUGIN, attendi che finisca, raccogli la diagnostica, poi disattivala. La nuova scansione riprova i bundle non riusciti; i bundle riusciti e invariati restano in cache.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>Serve a riprodurre un errore di un plugin Windows per una segnalazione di bug. Le scansioni diventano molto più lente e producono log di grandi dimensioni. Attivala, premi Ripeti scansione in PLUGIN, attendi che finisca, raccogli la diagnostica, poi disattivala. La nuova scansione riprova i bundle non riusciti; i bundle riusciti e invariati restano in cache.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Presa frontale</value>
@@ -2273,7 +2273,10 @@ Seleziona l'interfaccia gestita da OpenXLR</value>
     <value>FINESTRA</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Plugin Windows: ricerca di yabridge…</value>
+    <value>Plugin Windows: verifica in corso…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>yabridge {0} è installato. Nessun insert lo usa.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Plugin Windows: il demone non ha risposto.</value>
