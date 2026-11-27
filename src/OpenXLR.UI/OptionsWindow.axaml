@@ -399,6 +399,7 @@
                   <ComboBox Name="SkinPicker" Grid.Column="1" HorizontalAlignment="Stretch"
                             ItemsSource="{Binding SkinChoices}"
                             SelectedItem="{Binding SelectedSkin, Mode=TwoWay}"
+                            ToolTip.Tip="{Binding SkinFolderHint}"
                             AutomationProperties.Name="{loc:Text Key=Skin}">
                     <ComboBox.ItemTemplate>
                       <DataTemplate x:DataType="vm:SkinChoice">
@@ -485,7 +486,6 @@
                 <TextBlock Text="{loc:Text Key=LanguageHint}" Classes="hint" TextWrapping="Wrap"/>
                 <TextBlock Text="{Binding SkinNote}" FontSize="{DynamicResource UiText.FontSize11}" Classes="hint" TextWrapping="Wrap"
                            IsVisible="{Binding SkinNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                <TextBlock Text="{Binding SkinFolderHint}" FontSize="{DynamicResource UiText.FontSize11}" Classes="note" TextWrapping="Wrap"/>
                 <TextBlock Text="{Binding SkinError}" FontSize="{DynamicResource UiText.FontSize11}" Classes="warn" TextWrapping="Wrap"
                            IsVisible="{Binding HasSkinError}"/>
                 <Button Content="{loc:Text Key=Manual}" Padding="10,5" HorizontalAlignment="Left" Click="OnSkinsManual"

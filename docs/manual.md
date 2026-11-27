@@ -1345,7 +1345,9 @@ card and the Manage list clear their stale entries.
 
 Select the volume button beside a program's channel picker to adjust its
 playback volume from 0 to 100%. The button shows a speaker at full volume
-and the level below it. The same control in **Manage**
+and the level below it, and hovering it says what the level does.
+**Reset**, at the top right of the control, puts the program back to
+full volume. The same control in **Manage**
 works for remembered programs that are closed. OpenXLR uses the playback
 streams published through PipeWire. Audio that bypasses PipeWire does not
 appear here. This level applies to the
