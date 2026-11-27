@@ -909,8 +909,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Oublier</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>Pour reproduire l'échec d'un plugin ponté en vue d'un rapport de bogue. Les analyses deviennent bien plus lentes et produisent de gros journaux. Activez cette option, appuyez sur Réanalyser dans PLUGINS, attendez la fin, collectez les diagnostics, puis désactivez-la. Réanalyser réessaie les bundles en échec ; les bundles réussis et inchangés restent en cache.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>Pour reproduire l'échec d'un plugin Windows en vue d'un rapport de bogue. Les analyses deviennent bien plus lentes et produisent de gros journaux. Activez cette option, appuyez sur Réanalyser dans PLUGINS, attendez la fin, collectez les diagnostics, puis désactivez-la. Réanalyser réessaie les bundles en échec ; les bundles réussis et inchangés restent en cache.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Prise avant</value>
@@ -2382,7 +2382,10 @@ Sélectionner l'interface qu'OpenXLR pilote</value>
     <value>Non déplacé vers l'hôte de plugins Windows d'OpenXLR : {0}.</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Plugins Windows : recherche de yabridge…</value>
+    <value>Plugins Windows : vérification…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>yabridge {0} est installé. Aucun insert ne l'utilise.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Plugins Windows : le démon n'a pas répondu.</value>

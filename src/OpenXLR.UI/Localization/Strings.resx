@@ -909,8 +909,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Forget</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>For reproducing a bridged-plugin failure for a bug report. Scans get much slower and produce large logs. Turn this on, press Rescan in PLUGINS, wait for it to finish, collect diagnostics, then turn this off. Rescan retries failed bundles; successful unchanged bundles stay cached.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>For reproducing a Windows plugin failure for a bug report. Scans get much slower and produce large logs. Turn this on, press Rescan in PLUGINS, wait for it to finish, collect diagnostics, then turn this off. Rescan retries failed bundles; successful unchanged bundles stay cached.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Front jack</value>
@@ -2378,7 +2378,10 @@ Select the interface OpenXLR drives</value>
     <value>Not moved to OpenXLR's Windows plugin host: {0}.</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Windows plugins: checking for yabridge…</value>
+    <value>Windows plugins: checking…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>yabridge {0} is installed. No insert uses it.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Windows plugins: the daemon did not answer.</value>

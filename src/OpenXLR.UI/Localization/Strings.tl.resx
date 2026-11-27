@@ -824,8 +824,8 @@
   <data name="Forget" xml:space="preserve">
     <value>Kalimutan</value>
   </data>
-  <data name="ForReproducingABridgedPluginFailureForA" xml:space="preserve">
-    <value>Para maulit ang pagkabigo ng naka-bridge na plugin para sa bug report. Mas mabagal ang scan at malalaki ang log. Paganahin ito, pindutin ang Maghanap muli sa MGA PLUGIN, hintaying matapos, kolektahin ang diagnostics, saka patayin ito. Sinusubukang muli ng paghahanap ang pumalyang bundle; naka-cache pa rin ang matagumpay at hindi nagbagong bundle.</value>
+  <data name="ForReproducingAWindowsPluginFailureForA" xml:space="preserve">
+    <value>Para maulit ang pagkabigo ng Windows plugin para sa bug report. Mas mabagal ang scan at malalaki ang log. Paganahin ito, pindutin ang Maghanap muli sa MGA PLUGIN, hintaying matapos, kolektahin ang diagnostics, saka patayin ito. Sinusubukang muli ng paghahanap ang pumalyang bundle; naka-cache pa rin ang matagumpay at hindi nagbagong bundle.</value>
   </data>
   <data name="FrontJack" xml:space="preserve">
     <value>Jack sa harap</value>
@@ -2209,7 +2209,10 @@ Piliin ang interface na kinokontrol ng OpenXLR</value>
     <value>WINDOW</value>
   </data>
   <data name="WindowsPluginsChecking" xml:space="preserve">
-    <value>Mga Windows plugin: hinahanap ang yabridge…</value>
+    <value>Mga Windows plugin: sinusuri…</value>
+  </data>
+  <data name="YabridgeInstalledUnused" xml:space="preserve">
+    <value>Naka-install ang yabridge {0}. Walang insert na gumagamit nito.</value>
   </data>
   <data name="WindowsPluginsNoAnswer" xml:space="preserve">
     <value>Mga Windows plugin: walang sagot ang daemon.</value>

@@ -1034,8 +1034,11 @@ needs the native plugin host. See [Mic setup](manual.md#mic-setup) and the
 Windows plugin folders. Linux bundles are copied into `~/.lv2`, `~/.clap`
 or `~/.vst3`. Windows installers must run in Wine first; OpenXLR bridges
 the installed plugins, or with no yabridge leaves them to its own Windows
-plugin host, and rescans automatically. Options offers a rescan,
-a Windows sync, detected Wine folders and the selected bridge's status.
+plugin host, and rescans automatically. Options offers a rescan and the
+Windows plugin host's status. While yabridge is the default host or runs an
+insert, it adds a Windows sync, detected Wine folders and the selected
+bridge's status; otherwise an installed yabridge gets one line saying no
+insert uses it.
 
 The `openxlr-yabridge` companion is packaged for every channel OpenXLR
 is, the Flatpak bundle apart,
@@ -1047,9 +1050,9 @@ can activate. It creates wrappers under
 `~/.local/share/openxlr/yabridge` and keeps its controller registry under
 `~/.config/openxlr/bridge`, honoring XDG overrides. Other DAWs' wrappers and controller settings remain separate.
 Private wrappers take priority over duplicate global copies. A system/user
-bridge remains supported; Options warns about known incompatible versions.
-Options also checks the running daemon's memory-lock allowance for Windows
-plugins and links directly to the relevant memory-lock or editor-input fix.
+bridge remains supported. While something uses yabridge, Options warns
+about known incompatible versions, checks the running daemon's memory-lock
+allowance for it and links to the memory-lock or editor-input fix.
 See [Windows plugins](manual.md#windows-plugins) for availability and setup.
 
 The catalogue sent to clients is bounded. While it fits, all formats are
@@ -1544,7 +1547,7 @@ taps on the Stream Deck + XL need OpenDeck newer than 2.14.0
   underruns, application streams on channels), without polling for it, and
   the diagnostics archive's `timeline.txt` lists each marker with the 30
   seconds before it ([manual](manual.md#glitch-marker))
-- Deep Wine trace checkbox in Options, SUPPORT for reproducing a bridged
+- Deep Wine trace checkbox in Options, SUPPORT for reproducing a Windows
   plugin scan failure. Enable it, Rescan, collect diagnostics, then disable
   it. Scans get much slower and produce large logs. The switch takes effect
   without a daemon restart and is not saved across restarts

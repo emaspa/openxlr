@@ -212,10 +212,16 @@ internal static class InstallationDoctor
         // runs through yabridge by its own choice or this release's.
         JsonElement[] onYabridge = [.. Items(discovery, "yabridgeInserts")];
         int following = onYabridge.Count(insert => Text(insert, "reason") == "default");
-        switch (Text(discovery, "windowsHostDefault"))
+        string? defaultHost = Text(discovery, "windowsHostDefault");
+        // yabridge is named only where something uses it, as in Options. A
+        // default the daemon did not name is taken as yabridge.
+        bool yabridgeUsed = defaultHost != "openxlr" || onYabridge.Length > 0;
+        switch (defaultHost)
         {
             case "openxlr":
-                notes.Add(new("windows plugin host", "the default host of Windows plugin inserts is OpenXLR's Windows plugin host. An insert's controls window can pin it to yabridge"));
+                notes.Add(new("windows plugin host", "the default host of Windows plugin inserts is OpenXLR's Windows plugin host"
+                    + (yabridgeUsed ? ". An insert's controls window can pin it to yabridge"
+                        : Text(discovery, "controller") is not null ? ". yabridge is installed, and no insert uses it" : "")));
                 break;
             case "yabridge":
                 notes.Add(new("windows plugin host", "the default host of Windows plugin inserts is yabridge, chosen under Windows plugins run on in Options, so "
@@ -242,7 +248,7 @@ internal static class InstallationDoctor
             string which = $"the plugin of the insert {InsertName(insert)} is in the plugin list only through this yabridge wrapper";
             notes.Add(new(wrapper, Text(insert, "reason") switch
             {
-                "not-64-bit" => which + ". It is a 32-bit Windows plugin, which only yabridge runs, so the insert loses its plugin when yabridge is removed; its 64-bit build runs on OpenXLR's Windows plugin host",
+                "not-64-bit" => which + ". It is a 32-bit Windows plugin, which OpenXLR does not run, so the insert loses its plugin when yabridge is removed; its 64-bit build runs on OpenXLR's Windows plugin host",
                 "module-missing" => which + ", and the Windows plugin behind the wrapper is missing. Install the plugin again",
                 _ => which + $". Its Windows module, {Text(insert, "module") ?? "unknown"}, is in no folder OpenXLR's Windows plugin host searches, so the insert loses its plugin when the openxlr-yabridge companion is removed. Add the module's folder under Windows in the plugin manager, or install the plugin again with Install file",
             }));
@@ -269,7 +275,7 @@ internal static class InstallationDoctor
                     || !scan.TryGetProperty("entries", out JsonElement entries) || entries.ValueKind != JsonValueKind.Array)
                     continue;
                 foreach (JsonElement entry in entries.EnumerateArray())
-                    if (Text(entry, "path") is { } path && LeftOut(entry) is { } reason)
+                    if (Text(entry, "path") is { } path && LeftOut(entry, yabridgeUsed) is { } reason)
                         notes.Add(new(path, reason));
             }
         return notes.Count <= WindowsPluginNoteLimit ? notes
@@ -353,15 +359,21 @@ internal static class InstallationDoctor
         return fields;
     }
 
-    /// <summary>Why a bundle the Windows plugin folders' scan found is not in the catalogue as its own entry, or null when it is.</summary>
-    private static string? LeftOut(JsonElement entry)
+    /// <summary>
+    /// Why a bundle the Windows plugin folders' scan found is not in the
+    /// catalogue as its own entry, or null when it is. One listed through its
+    /// yabridge wrapper is in the picker all the same, and runs on OpenXLR's
+    /// Windows plugin host while nothing uses yabridge, so it is explained only
+    /// while something does.
+    /// </summary>
+    private static string? LeftOut(JsonElement entry, bool yabridgeUsed)
     {
         string? outcome = Text(entry, "outcome");
         int plugins = Whole(entry, "plugins"), duplicates = Whole(entry, "duplicates");
         string detail = Text(entry, "detail") is { Length: > 0 } said ? " " + said.Split('\n')[0] : "";
         return outcome switch
         {
-            "ok" when plugins > 0 && duplicates == plugins =>
+            "ok" when plugins > 0 && duplicates == plugins && yabridgeUsed =>
                 "listed through its yabridge wrapper, which runs on either host: the one under Windows plugins run on in Options, or the one picked in the plugin's controls window",
             "ok" or "directory" or "directory-missing" or "no-plugins" => null,
             "windows-not-64-bit" => "not listed: OpenXLR's Windows plugin host runs only 64-bit Windows plugins." + detail,

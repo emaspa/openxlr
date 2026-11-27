@@ -602,6 +602,58 @@ public sealed class WindowLayoutTests
                 Assert.Null(trace.IsChecked);
                 Assert.False(trace.IsEnabled);
 
+                // The built-in host as the default, with the companion installed
+                // and nothing on it: no sync, no Wine offer, no memory-lock
+                // warning, and the host picker explains itself in a tooltip.
+                var sync = options.FindControl<Button>("SyncWindows")!;
+                var hostPicker = options.FindControl<ComboBox>("WindowsHostDefaultPicker")!;
+                JsonNode HostSetup(string standard, int onYabridge)
+                {
+                    JsonNode setup = JsonNode.Parse("""
+                        {"yabridge":"5.1.1.54-2","wine":true,"bridgeProvider":"openxlr","windowsHostInstalled":true,
+                         "windowsPluginDirectory":"~/.local/share/openxlr/yabridge","windowsDirectories":["/a"],"wineFolders":["/w/VST3"]}
+                        """)!;
+                    setup["windowsHostDefault"] = standard;
+                    setup["yabridgeInserts"] = onYabridge;
+                    setup["memoryLockNote"] = OpenXLR.Core.Mixing.PluginMemoryLock.Note(8388608, 8388608, true);
+                    return setup;
+                }
+                optionsVm.ApplyPluginSetup(HostSetup("openxlr", 0));
+                Settle(options);
+                Assert.False(sync.IsVisible);
+                Assert.False(options.FindControl<Button>("BridgeWine")!.IsVisible);
+                Assert.False(memoryWarning.IsEffectivelyVisible);
+                Assert.True(hostPicker.IsEffectivelyVisible);
+                Assert.Equal(Localizer.Text("WindowsHostDefaultHint"), ToolTip.GetTip(hostPicker) as string);
+                var shown = options.GetVisualDescendants().OfType<TextBlock>().Where(b => b.IsEffectivelyVisible).Select(b => b.Text ?? "").ToList();
+                Assert.DoesNotContain(Localizer.Text("WindowsHostDefaultHint"), shown);
+                Assert.DoesNotContain(shown, text => text.Contains(Localizer.Text("OneFolderBridged"), StringComparison.Ordinal)
+                    || text.Contains(Localizer.Format("WindowsPluginWrappersIn", "~/.local/share/openxlr/yabridge"), StringComparison.Ordinal));
+                Assert.Contains(shown, text => text.EndsWith(Localizer.Format("YabridgeInstalledUnused", "5.1.1.54-2"), StringComparison.Ordinal));
+                hostPicker.BringIntoView();
+                Settle(options);
+                Capture(options, "options-plugins-yabridge-unused");
+                // An insert on yabridge brings its controls back.
+                optionsVm.ApplyPluginSetup(HostSetup("openxlr", 1));
+                Settle(options);
+                Assert.True(sync.IsVisible);
+                Assert.True(options.FindControl<Button>("BridgeWine")!.IsVisible);
+                Assert.True(memoryWarning.IsEffectivelyVisible);
+                // And with no yabridge there is no host to switch to.
+                optionsVm.ApplyPluginSetup(JsonNode.Parse("""{"wine":true,"windowsHostInstalled":true,"windowsHostDefault":"openxlr"}"""));
+                Settle(options);
+                Assert.False(sync.IsVisible);
+                Assert.False(hostPicker.IsEffectivelyVisible);
+                var hostOnly = new PluginFoldersWindow { DataContext = optionsVm };
+                windows.Add(hostOnly);
+                hostOnly.Show();
+                Layout(hostOnly, 720, 820);
+                Assert.False(hostOnly.FindControl<StackPanel>("YabridgeFolders")!.IsVisible);
+                Assert.False(hostOnly.FindControl<ListBox>("FolderList")!.IsEffectivelyVisible);
+                Capture(hostOnly, "plugin-folders-host-only");
+                hostOnly.Close();
+                optionsVm.ApplyPluginSetup(JsonNode.Parse("{}"));
+
                 var focusedRules = new NativeEditorRulesWindow(new DaemonClient(), "vst3", "ABCDEF019182FAEB4D616E75466C7665");
                 windows.Add(focusedRules);
                 focusedRules.ApplyRules(JsonNode.Parse("""
