@@ -272,6 +272,28 @@ test('a channel the device cannot feed is left out, and an older daemon keeps th
   assert.deepEqual(plain(mixer.shownChannels(undefined)), []);
 });
 
+test('the popout leaves hidden strips and mixes out and sends to a shown mix', () => {
+  const hide = { icon: '', colour: null, hidden: true };
+  const show = { icon: '', colour: null, hidden: false };
+  const channels = [{ id: 'xlr1', appearance: show }, { id: 'game', appearance: hide }, { id: 'music' }];
+  assert.deepEqual(plain(mixer.mixerEntries(channels)).map(c => c.id), ['xlr1', 'music']);
+  assert.deepEqual(plain(mixer.mixerEntries(null)), []);
+  const all = [{ id: 'monitor', kind: 'monitor', appearance: hide }, { id: 'stream', appearance: show }, { id: 'chat' }];
+  const mixes = mixer.mixerEntries(all);
+  assert.deepEqual(plain(mixes).map(m => m.id), ['stream', 'chat']);
+  // The first output hears the hidden Monitor A, so the sends follow the next mix it hears.
+  const feeds = [{ output: 'headset', ids: ['monitor', 'chat'] }];
+  assert.equal(mixer.sendMix(mixes, '', feeds), 'chat');
+  assert.equal(mixer.sendMix(mixes, 'stream', feeds), 'stream');
+  // A choice the user then hides falls back the same way.
+  assert.equal(mixer.sendMix(mixes, 'monitor', feeds), 'chat');
+  assert.equal(mixer.sendMix(mixes, '', [{ output: 'headset', ids: ['monitor'] }]), 'stream');
+  assert.equal(mixer.sendMix(mixes, '', []), 'stream');
+  assert.equal(mixer.sendMix(mixer.mixerEntries(all.map(m => ({ ...m, appearance: hide }))), 'stream', feeds), '');
+  // The feeds themselves keep the hidden mix, as the UI's feed pickers do.
+  assert.deepEqual(plain(mixer.monitorFeeds({ mixes: all, monitorOutputs: ['headset'], monitorFeeds: {} })[0].ids), ['monitor']);
+});
+
 test('the interface mute follows the channel that carries its input', () => {
   const unit = '0fd9:00b4@0123456789abcdef';
   const source = 'alsa_input.usb-Blue_Yeti_Nano';

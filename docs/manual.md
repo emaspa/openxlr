@@ -4338,7 +4338,8 @@ the hidden flag. Their icon, a headset until you pick another, and their
 colour show before the labels in HEADPHONES.
 For a channel, **Hide this channel's strip in the mixer** removes its tile
 from the SUBMIXER card and its strip from the terminal mixer's Mixer
-section. Nothing about its audio changes: its sends, meter, applications
+section and the [Omarchy bar](#omarchy)'s popout. Nothing about its audio
+changes: its sends, meter, applications
 and routing stay as they were, it stays in the layout editor, the app
 pickers and the Matrix section, and Stream Deck keys keep controlling it.
 The editor marks it "hidden in the mixer".
@@ -4349,7 +4350,8 @@ plugins stay as they were. The SUBMIXER card drops its master tile and the
 send rows into it. A mix matrix drops its column head and the cell under it
 in every row, so the other columns stay lined up. Mix banks leave it out of
 their pickers. The terminal mixer leaves it out of its Mixer section and
-keeps it in Matrix. It stays in the layout editor, in each output's feed
+keeps it in Matrix. The Omarchy bar's popout drops its master and skips it
+with the send arrows. It stays in the layout editor, in each output's feed
 picker and on Stream Deck keys. If you hide
 every mix, the channels show with no sends and the matrix shows only its
 row heads until you show one again. MONITOR and HEADPHONES are not mixes

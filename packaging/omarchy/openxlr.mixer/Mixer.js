@@ -199,6 +199,30 @@ function shownChannels(channels) {
     return (channels || []).filter(function (channel) { return channel.present !== false; });
 }
 
+// The layout editor's hide flag. The popout is the full mixer, so it leaves
+// out a hidden channel's strip and a hidden mix's master and the sends into
+// it. The bar, its tooltip and the monitor feeds still name them, as Stream
+// Deck keys and the UI's feed pickers do, and nothing about their audio
+// changes. An older daemon sends no appearance, so nothing is hidden.
+function hidden(entry) {
+    return !!entry && !!entry.appearance && entry.appearance.hidden === true;
+}
+function mixerEntries(entries) {
+    return (entries || []).filter(function (entry) { return !!entry && !hidden(entry); });
+}
+// The mix the popout's channel strips send to: the one chosen with the
+// arrows while it is shown, else the first shown mix the first output hears,
+// else the first shown mix. "" when every mix is hidden, which leaves the
+// popout with no send strips.
+function sendMix(shown, selected, feeds) {
+    var ids = (shown || []).map(function (mix) { return mix.id; });
+    if (selected && ids.indexOf(selected) >= 0)
+        return selected;
+    var heard = feeds && feeds.length ? feeds[0].ids : [];
+    var first = heard.filter(function (id) { return ids.indexOf(id) >= 0; })[0];
+    return first || ids[0] || "";
+}
+
 function monitorFeeds(mixer) {
     var mixes = mixer.mixes || [];
     var monitors = mixes.filter(function (mix) { return mix.kind === "monitor"; });
