@@ -12,7 +12,7 @@
 %global deepfilter_version 0.5.6
 
 Name:           openxlr
-Version: 0.9.4
+Version: 0.9.5
 Release:        1%{?dist}
 Summary:        Linux Wave Link replacement for Elgato XLR interfaces and Wave microphones
 # OpenXLR is GPL-3.0-only. The native helper links RNNoise (BSD-3-Clause),
@@ -280,6 +280,12 @@ MSG
 %{_datadir}/gnome-shell/extensions/openxlr-focus@emaspa.github.com/
 
 %changelog
+* Sat Nov 28 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.5-1
+- Windows VST3 and CLAP plugins run on a Windows plugin host built into the package, editors included, with Wine as the only addition.
+- Inserts and plugin folders move from yabridge on update, with a host choice per plugin and for all of them; the companion is frozen.
+- French joins the languages, applications play up to 150% and routed browser tabs up to 125%.
+- Fixes in the plugin host, the daemon, the devices, the Deck plugin and the Omarchy bar plugin.
+
 * Tue Nov 24 2026 Emanuele Sparvoli <sparvoli@gmail.com> - 0.9.4-1
 - An application's playback volume counts a separate gain PipeWire holds on its stream, and a change of the volume sets that gain back to unity.
 

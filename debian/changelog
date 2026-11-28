@@ -1,3 +1,12 @@
+openxlr (0.9.5) resolute; urgency=medium
+
+  * Windows VST3 and CLAP plugins run on a Windows plugin host built into the package, editors included, with Wine as the only addition.
+  * Inserts and plugin folders move from yabridge on update, with a host choice per plugin and for all of them; the companion is frozen.
+  * French joins the languages, applications play up to 150% and routed browser tabs up to 125%.
+  * Fixes in the plugin host, the daemon, the devices, the Deck plugin and the Omarchy bar plugin.
+
+ -- Emanuele Sparvoli <sparvoli@gmail.com>  Sat, 28 Nov 2026 06:21:09 +0000
+
 openxlr (0.9.4) resolute; urgency=medium
 
   * An application's playback volume counts a separate gain PipeWire holds on its stream, and a change of the volume sets that gain back to unity.
