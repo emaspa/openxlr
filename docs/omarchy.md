@@ -126,12 +126,11 @@ the application's defaults for unset thresholds.
 
 ## Install and enable
 
-This needs Omarchy 4's plugin host, a running OpenXLR daemon in the same
-user session, and Arch's `qt6-websockets` package. It does not need the
-OpenXLR UI. The Arch package installs the plugin under
-`/usr/share/openxlr/omarchy/openxlr.mixer/` and the enable command under
-`/usr/bin/` when it is built on an Omarchy host. Then run inside your
-Omarchy session:
+This needs Omarchy 4's plugin host and a running OpenXLR daemon in the same
+user session. It does not need the OpenXLR UI. The Arch package installs
+the plugin under `/usr/share/openxlr/omarchy/openxlr.mixer/` and the enable
+command under `/usr/bin/` when it is built on an Omarchy host. Then run
+inside your Omarchy session:
 
 ```sh
 openxlr-omarchy-enable
@@ -182,7 +181,6 @@ build host for that shell rather than treating every Arch machine as Omarchy.
 _openxlr_omarchy=0
 if [[ -f /usr/share/omarchy/shell/Ui/PluginBarApi.qml ]]; then
     _openxlr_omarchy=1
-    depends+=(qt6-websockets)
 fi
 ```
 
@@ -258,7 +256,7 @@ It loads no bar or Quickshell window.
 
 `python3 tools/check-omarchy.py` parses every QML file and runs qmllint with
 no warnings allowed. Its small external type declarations let this run
-without Quickshell; Qt Quick, Controls and WebSockets use real Qt modules.
+without Quickshell; Qt Quick and Controls use real Qt modules.
 This does not load a shell or test the external components. Bare qmllint
 on a machine without Quickshell also reports unresolved imports and the
 type errors caused by those missing modules.

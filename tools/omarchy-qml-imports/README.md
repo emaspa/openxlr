@@ -2,7 +2,7 @@
 
 These declarations describe only the external types used by the plugin.
 They are inputs to `check-omarchy.py`, never installed or loaded by the shell.
-QtQuick, Controls and WebSockets still use the real Qt type information.
+QtQuick and Controls still use the real Qt type information.
 
 `Style.font` and `Color` declare the `qs.Commons` values used by the bar.
 The bar tests import these declarations by path and pass their scalar values

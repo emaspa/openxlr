@@ -137,7 +137,7 @@ jobs:
     container: archlinux:base
     steps:
       - name: Install QML check tools
-        run: pacman -Syu --noconfirm git python qt6-declarative qt6-websockets ttf-dejavu
+        run: pacman -Syu --noconfirm git python qt6-declarative ttf-dejavu
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check Omarchy QML with external type declarations
         run: python3 tools/check-omarchy.py

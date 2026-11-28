@@ -381,7 +381,7 @@ On Omarchy 4, link the checkout's plugin into the shell and enable it:
 bash packaging/omarchy/openxlr-omarchy-enable "$PWD/packaging/omarchy/openxlr.mixer"
 ```
 
-It needs `qt6-websockets` and the running daemon. `omarchy plugin remove
+It needs the running daemon. `omarchy plugin remove
 openxlr.mixer` takes it out again; [omarchy.md](omarchy.md) has the
 commands and the package recipe.
 
