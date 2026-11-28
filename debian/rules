@@ -153,6 +153,12 @@ override_dh_auto_test:
 override_dh_installsystemduser:
 	dh_installsystemduser --no-enable
 
+# The Windows plugin host's notices stay a plain file at the path
+# debian/copyright names. dh_compress would turn a file of this size
+# under /usr/share/doc into NOTICE.gz.
+override_dh_compress:
+	dh_compress -Xwinhost/NOTICE
+
 # The publish output is prebuilt .NET; its bundled native libraries must
 # not be stripped, deduplicated or scanned for shared-library deps.
 override_dh_strip:

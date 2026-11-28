@@ -57,6 +57,7 @@ REQUIRED = [
     ('packaging/rpm/openxlr.spec', '\n%license %{_licensedir}/openxlr/winhost/\n'),
     ('.github/workflows/release-rpm.yml', 'test -f /usr/share/licenses/openxlr/winhost/NOTICE'),
     ('debian/rules', '\tinstall -Dm644 native/winhost/NOTICE $(PKG)/usr/share/doc/openxlr/winhost/NOTICE\n'),
+    ('debian/rules', '\noverride_dh_compress:\n\tdh_compress -Xwinhost/NOTICE\n'),
     ('debian/copyright', '\nFiles: native/winhost/NOTICE\n'),
     ('.github/workflows/release-deb.yml', 'usr/share/doc/openxlr/winhost/NOTICE'),
     ('packaging/nix/package.nix', 'install -Dm644 native/winhost/NOTICE $out/share/licenses/openxlr/winhost/NOTICE'),
